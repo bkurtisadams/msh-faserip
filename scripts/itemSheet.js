@@ -120,18 +120,22 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
 
   /**
-   * V2 form-submit pipeline. Without this override, the default ItemSheetV2
-   * implementation strips the entire `system` tree before reaching
-   * document.update(), so any field without an explicit change handler in
-   * power-sheet-v2-logic.js silently fails to persist (notes, vfx, etc.).
-   * Mirrors the pattern in equipment.js: expand the flat formData and
-   * rebuild any indexed-array fields that expandObject converts to objects.
+   * V2 form-data extraction. The default pipeline passes a partial formData
+   * to _prepareSubmitData — only fields V2 considers "changed" since render —
+   * which silently drops late-rendered or untracked fields (textareas, dynamic
+   * sections, etc.). _processFormData is the documented v14 hook for
+   * "customize how form data is extracted into an expanded object," so we
+   * override it to do a fresh full-form scan via FormDataExtended and
+   * expandObject. This guarantees every named field reaches the document
+   * update. Indexed-array fields (bonusPowers) are rebuilt here since
+   * expandObject converts them to numeric-keyed objects.
    */
-  _prepareSubmitData(event, form, formData) {
-    const data = foundry.utils.expandObject(formData.object);
+  _processFormData(event, form, formData) {
+    const FDE = foundry.applications.ux?.FormDataExtended ?? FormDataExtended;
+    const fresh = (form instanceof HTMLFormElement) ? new FDE(form) : formData;
+    const data = foundry.utils.expandObject(fresh.object);
     if (!data.system) data.system = {};
 
-    // Rebuild bonusPowers — expandObject turns indexed names into numeric-keyed objects
     if (data.system.bonusPowers && !Array.isArray(data.system.bonusPowers)) {
       data.system.bonusPowers = Object.values(data.system.bonusPowers).map(b => ({
         name: b?.name ?? "",
