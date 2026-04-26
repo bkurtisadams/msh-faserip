@@ -1263,6 +1263,12 @@ export function installActionChatHandlers() {
       }
 
       ev.preventDefault();
+      // Disable immediately to prevent double-clicks
+      el.setAttribute("aria-disabled", "true");
+      el.style.pointerEvents = "none";
+      el.style.opacity = "0.55";
+      el.style.cursor = "not-allowed";
+      el.style.filter = "grayscale(.3)";
       const btn = ev.currentTarget;
       const actorUuid = btn.dataset.actorUuid;
       const attackForm = btn.dataset.attackForm || "";
@@ -1276,6 +1282,11 @@ export function installActionChatHandlers() {
         
         if (!actor) {
           ui.notifications.warn("Could not find actor for death save.");
+          el.removeAttribute("aria-disabled");
+          el.style.pointerEvents = "";
+          el.style.opacity = "";
+          el.style.cursor = "pointer";
+          el.style.filter = "";
           return;
         }
         
@@ -1286,6 +1297,11 @@ export function installActionChatHandlers() {
       } catch (err) {
         console.error("Death save handler failed:", err);
         ui.notifications.error("Failed to open death save dialog.");
+        el.removeAttribute("aria-disabled");
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+        el.style.cursor = "pointer";
+        el.style.filter = "";
       }
     });
 
@@ -1299,6 +1315,12 @@ export function installActionChatHandlers() {
       }
 
       ev.preventDefault();
+      // Disable immediately to prevent double-clicks
+      el.setAttribute("aria-disabled", "true");
+      el.style.pointerEvents = "none";
+      el.style.opacity = "0.55";
+      el.style.cursor = "not-allowed";
+      el.style.filter = "grayscale(.3)";
       const btn = ev.currentTarget;
       const actorUuid = btn.dataset.actorUuid;
       const attackForm = btn.dataset.attackForm || "";
@@ -1313,6 +1335,11 @@ export function installActionChatHandlers() {
         
         if (!actor) {
           ui.notifications.warn("Could not find actor for kill save.");
+          el.removeAttribute("aria-disabled");
+          el.style.pointerEvents = "";
+          el.style.opacity = "";
+          el.style.cursor = "pointer";
+          el.style.filter = "";
           return;
         }
         
@@ -1323,12 +1350,24 @@ export function installActionChatHandlers() {
       } catch (err) {
         console.error("Kill save handler failed:", err);
         ui.notifications.error("Failed to open kill save dialog.");
+        el.removeAttribute("aria-disabled");
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+        el.style.cursor = "pointer";
+        el.style.filter = "";
       }
     });
 
     // 13) FF Breach Psyche FEAT (projected force field overload)
     html.on("click", ".ff-breach-psyche-feat", async (ev) => {
       ev.preventDefault();
+      // Disable immediately to prevent double-clicks
+      const el = ev.currentTarget;
+      el.setAttribute("aria-disabled", "true");
+      el.style.pointerEvents = "none";
+      el.style.opacity = "0.55";
+      el.style.cursor = "not-allowed";
+      el.style.filter = "grayscale(.3)";
       const btn = ev.currentTarget;
       const actorId = btn.dataset.actorId;
       const intensity = Number(btn.dataset.intensity) || 0;
@@ -1338,6 +1377,11 @@ export function installActionChatHandlers() {
         || canvas.tokens.placeables.find(t => t.actor?.id === actorId)?.actor;
       if (!actor) {
         ui.notifications.warn("Could not find actor for Psyche FEAT.");
+        el.removeAttribute("aria-disabled");
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+        el.style.cursor = "pointer";
+        el.style.filter = "";
         return;
       }
 
@@ -1409,6 +1453,11 @@ export function installActionChatHandlers() {
       } catch (err) {
         console.error("[FASERIP ERROR] FF breach Psyche FEAT failed:", err);
         ui.notifications.error("Failed to roll Psyche FEAT.");
+        el.removeAttribute("aria-disabled");
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+        el.style.cursor = "pointer";
+        el.style.filter = "";
       }
     });
 
