@@ -120,19 +120,19 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
 
   /**
-   * V2 form-data extraction. The default pipeline passes a partial formData
-   * to _prepareSubmitData — only fields V2 considers "changed" since render —
-   * which silently drops late-rendered or untracked fields (textareas, dynamic
-   * sections, etc.). _processFormData is the documented v14 hook for
-   * "customize how form data is extracted into an expanded object," so we
-   * override it to do a fresh full-form scan via FormDataExtended and
-   * expandObject. This guarantees every named field reaches the document
-   * update. Indexed-array fields (bonusPowers) are rebuilt here since
-   * expandObject converts them to numeric-keyed objects.
+   * V2 form-submit pipeline. The default ItemSheetV2 implementation supplies
+   * a partial formData (only fields V2 considers changed since render), which
+   * silently drops late-rendered or untracked fields. Diagnostic logging
+   * revealed that the `form` argument is also unreliable — it's a different
+   * DOM node than the on-screen form, with empty values for all inputs.
+   * We bypass both issues by scanning the live on-screen form via
+   * sheet.element. updateData is merged in last so manual submit() calls
+   * with additional data still work.
    */
-  _processFormData(event, form, formData) {
+  _prepareSubmitData(event, form, formData, updateData) {
     const FDE = foundry.applications.ux?.FormDataExtended ?? FormDataExtended;
-    const fresh = (form instanceof HTMLFormElement) ? new FDE(form) : formData;
+    const liveForm = this.element?.querySelector?.("form") ?? form;
+    const fresh = (liveForm instanceof HTMLFormElement) ? new FDE(liveForm) : formData;
     const data = foundry.utils.expandObject(fresh.object);
     if (!data.system) data.system = {};
 
@@ -142,6 +142,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         rankMod: b?.rankMod ?? "same"
       }));
     }
+    if (updateData) foundry.utils.mergeObject(data, updateData);
     return data;
   }
 
