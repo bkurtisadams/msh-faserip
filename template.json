@@ -569,6 +569,15 @@
         "emptyVolume": 80,
         "reloadVolume": 80
       },
+      "vfx": {
+        "enabled": true,
+        "preset": "",
+        "color": "",
+        "asset": "",
+        "impact": "",
+        "scale": 1,
+        "duration": 1000
+      },
       "variantType": "standard",
       "specialAmmo": {
         "mercy": false,

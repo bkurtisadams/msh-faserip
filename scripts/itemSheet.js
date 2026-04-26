@@ -119,6 +119,28 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     return context;
   }
 
+  /**
+   * V2 form-submit pipeline. Without this override, the default ItemSheetV2
+   * implementation strips the entire `system` tree before reaching
+   * document.update(), so any field without an explicit change handler in
+   * power-sheet-v2-logic.js silently fails to persist (notes, vfx, etc.).
+   * Mirrors the pattern in equipment.js: expand the flat formData and
+   * rebuild any indexed-array fields that expandObject converts to objects.
+   */
+  _prepareSubmitData(event, form, formData) {
+    const data = foundry.utils.expandObject(formData.object);
+    if (!data.system) data.system = {};
+
+    // Rebuild bonusPowers — expandObject turns indexed names into numeric-keyed objects
+    if (data.system.bonusPowers && !Array.isArray(data.system.bonusPowers)) {
+      data.system.bonusPowers = Object.values(data.system.bonusPowers).map(b => ({
+        name: b?.name ?? "",
+        rankMod: b?.rankMod ?? "same"
+      }));
+    }
+    return data;
+  }
+
   // v14: AE changes live at system.changes, and change.mode is now change.type.
   // _v14NormalizeAE rewrites the legacy shape on return so preset bodies stay readable.
   _v14NormalizeAE(data) {

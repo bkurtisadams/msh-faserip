@@ -220,6 +220,24 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     if (!this.isEditable) return;
     const html = $(this.element);
 
+    // One-time migration: backfill vfx defaults for equipment created before
+    // the vfx schema was added. Without this, partial form submissions into
+    // an undefined parent can fail to merge cleanly.
+    const sys = this.item?.system ?? {};
+    if (!sys.vfx || typeof sys.vfx !== "object") {
+      this.item.update({
+        "system.vfx": {
+          enabled: true,
+          preset: "",
+          color: "",
+          asset: "",
+          impact: "",
+          scale: 1,
+          duration: 1000
+        }
+      }, { render: false });
+    }
+
     // Manual tab handling — replaces V1 `tabs: [...]` defaultOptions entry.
     // Template has `data-tab="properties"` / `data-tab="effects"` elements.
     const activateTab = (tabName) => {
@@ -307,6 +325,22 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         console.error("[FASERIP ERROR] Failed to play SFX preview:", err);
         ui.notifications.error("Failed to play sound: " + err.message);
         button.classList.remove("playing");
+      }
+    });
+
+    // VFX Preview button handler — reads form values so unsaved edits preview correctly
+    html.find(".vfx-preview").on("click", async (ev) => {
+      ev.preventDefault();
+      const preset   = html.find('select[name="system.vfx.preset"]').val() || "";
+      const color    = html.find('input[name="system.vfx.color"]').val() || "";
+      const asset    = html.find('input[name="system.vfx.asset"]').val() || "";
+      const impact   = html.find('input[name="system.vfx.impact"]').val() || "";
+      const scale    = Number(html.find('input[name="system.vfx.scale"]').val()) || 1;
+      const duration = Number(html.find('input[name="system.vfx.duration"]').val()) || 1000;
+      if (game.msh?.fx?.preview) {
+        await game.msh.fx.preview({ preset, color, asset, impact, scale, duration });
+      } else {
+        ui.notifications?.warn("FX service unavailable.");
       }
     });
 
