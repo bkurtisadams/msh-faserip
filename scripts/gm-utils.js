@@ -520,3 +520,21 @@ export async function safeActorDeleteEffects(actor, effectIds, opts = {}) {
     args: ["ActiveEffect", effectIds]
   });
 }
+
+/**
+ * Safe AE update — delegates to GM via updateEmbeddedDocuments when needed.
+ * Use this instead of `effect.update(...)` whenever the call may run on a
+ * non-owner client (death-save / dying / status-effect application paths).
+ */
+export async function safeActorUpdateEffect(actor, effectId, updateData, opts = {}) {
+  if (!actor || !effectId || !updateData) return;
+  if (_canWriteActor(actor)) {
+    return actor.updateEmbeddedDocuments("ActiveEffect", [{ _id: effectId, ...updateData }], opts);
+  }
+  console.log(`[FASERIP] safeActorUpdateEffect: delegating to GM for ${actor.name}`);
+  return runAsGM({
+    operation: "updateEmbeddedDocuments",
+    targetActorUuid: actor.uuid,
+    args: ["ActiveEffect", [{ _id: effectId, ...updateData }]]
+  });
+}

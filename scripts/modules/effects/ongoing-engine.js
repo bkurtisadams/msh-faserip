@@ -72,7 +72,7 @@
 // Corrosive damage, and any future timed effects via a declarative config schema.
 
 import { getAllTokenActors, applyEffect } from "./effect-engine.js";
-import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect } from "../../gm-utils.js";
+import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect, safeActorUpdateEffect } from "../../gm-utils.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -1089,8 +1089,8 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
       e.flags?.[scope]?.ongoingId === "healing" && !e.disabled
     );
     if (healingAE) {
-      await healingAE.update({ disabled: true });
-      await actor.setFlag(scope, "ongoing.healing.startedAt", null);
+      await safeActorUpdateEffect(actor, healingAE.id, { disabled: true });
+      await safeActorSetFlag(actor, scope, "ongoing.healing.startedAt", null);
       console.log(`[FASERIP:DYING] Disabled Healing AE on ${actor.name} (dying begins)`);
     }
   } catch (e) {
