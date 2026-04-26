@@ -283,6 +283,41 @@ export function ps2ActivateListeners(html, sheet) {
     }
   });
 
+  // File picker buttons — V2 dropped V1's automatic class="file-picker"
+  // binding, so sheets have to wire them up themselves.
+  // Covers both <button class="file-picker"> rows (SFX hit/miss, VFX
+  // asset/impact) and the portrait <img data-edit="img"> in the header.
+  const FilePickerImpl = foundry.applications.apps?.FilePicker?.implementation ?? FilePicker;
+
+  html.find('button.file-picker').on('click', ev => {
+    ev.preventDefault();
+    const btn = ev.currentTarget;
+    const target = btn.dataset.target;
+    if (!target) return;
+    const input = html.find(`input[name="${target}"]`);
+    new FilePickerImpl({
+      type: btn.dataset.type || "imagevideo",
+      current: input.val() || "",
+      callback: path => {
+        input.val(path).trigger("change");
+      }
+    }).render(true);
+  });
+
+  html.find('img[data-edit]').on('click', ev => {
+    ev.preventDefault();
+    const img = ev.currentTarget;
+    const field = img.dataset.edit;
+    if (!field) return;
+    new FilePickerImpl({
+      type: "image",
+      current: img.getAttribute("src") || "",
+      callback: path => {
+        sheet.item.update({ [field]: path });
+      }
+    }).render(true);
+  });
+
   // Active Effects: auto-expand if effects exist, collapse if none
   const effectsFieldset = html.find('.ps2-effects-fieldset');
   const effectsBody = html.find('.ps2-effects-body');
