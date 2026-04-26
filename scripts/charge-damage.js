@@ -392,6 +392,9 @@ export function getBodyArmorValue(actor) {
 }
 
 export function initializeSlamHandlers() {
+    if (game.msh?.slamHandlersInstalled) return;
+    game.msh ??= {};
+    game.msh.slamHandlersInstalled = true;
     console.log("🔧 initializeSlamHandlers() called");
     // Add event listener for collision damage calculation
     Hooks.on("renderChatMessageHTML", (message, htmlEl) => {

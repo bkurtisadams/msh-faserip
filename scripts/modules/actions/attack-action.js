@@ -1279,6 +1279,26 @@ export class AttackAction extends BaseAction {
         targets: target ? [target] : []
       });
 
+      // Pre-stamp resolvedChecks BEFORE message creation so the
+      // chat-hooks render-time chip auto-fire can see it and skip checks
+      // this attack-action will auto-trigger itself. Without this pre-stamp,
+      // both paths fire applySlam/applyStun and the delete-then-create
+      // dedup inside those wrappers makes Times-Up emit a phantom
+      // "expired" card for the deleted intermediate AE.
+      if (!isManualMode) {
+        const SCOPE_ID = game.system?.id || "msh-faserip";
+        const willResolve = [];
+        if (showSlam) willResolve.push("slam");
+        if (showStun) willResolve.push("stun");
+        if (showKill) willResolve.push("kill");
+        if (willResolve.length) {
+          damageFlags[SCOPE_ID] = {
+            ...(damageFlags[SCOPE_ID] || {}),
+            resolvedChecks: willResolve
+          };
+        }
+      }
+
       const attackChatMsg = await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: cardHtml,

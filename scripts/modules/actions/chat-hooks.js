@@ -197,9 +197,23 @@ export function installActionChatHandlers() {
 
           // Per-chip auto run (Stun/Slam/Kill). Chips from attacks include per-target prefill.
           // Auto-run Stun/Slam/Kill per defender in Full mode
+          // Pre-fetch resolvedChecks once outside the loop
+          const messageResolvedChecks = message?.flags?.[SCOPE]?.resolvedChecks || [];
+
           for (const el of chips.toArray()) {
             const checkType  = el.dataset.check;                // "stun"|"slam"|"kill"|"escape"
             if (checkType === "escape") continue;               // not a save
+
+            // Skip if attack-action has already (or is about to) auto-trigger this check.
+            // Without this skip, applySlam/applyStun get called twice for the same
+            // defender — the second call's delete-then-create dedup makes Times-Up
+            // emit a phantom "expired" card for the intermediate AE.
+            if (messageResolvedChecks.includes(checkType)) {
+              if (game.settings.get("msh-faserip", "debugMode")) {
+                console.log(`FASERIP | Skipping ${checkType} chip auto-fire — attack-action handles it`);
+              }
+              continue;
+            }
 
             const attackForm = el.dataset.attackForm || "blunt";
 
