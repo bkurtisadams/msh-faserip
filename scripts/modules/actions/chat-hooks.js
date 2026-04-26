@@ -122,6 +122,30 @@ export function installActionChatHandlers() {
       console.error("Auto-apply failed:", err);
     }
 
+    // Four-Color knockout: GM sees the real round count; players see "?"
+    try {
+      const fcKO = message?.flags?.[SCOPE]?.fourColorKnockout;
+      if (fcKO && game.user.isGM) {
+        const roundsEl = htmlEl.querySelector(".msh-fc-rounds");
+        if (roundsEl) roundsEl.textContent = String(fcKO.rounds);
+        const metaEl = htmlEl.querySelector(".msh-fc-meta");
+        if (metaEl) metaEl.textContent = `Four-Color Rule (GM only): players see "? rounds".`;
+      }
+    } catch (err) {
+      console.error("Four-Color render substitution failed:", err);
+    }
+
+    // FF Breach Psyche FEAT failure: GM sees the real round count; players see "?"
+    try {
+      const ffbKO = message?.flags?.[SCOPE]?.ffBreachKnockout;
+      if (ffbKO && game.user.isGM) {
+        const roundsEl = htmlEl.querySelector(".msh-ffb-rounds");
+        if (roundsEl) roundsEl.textContent = String(ffbKO.rounds);
+      }
+    } catch (err) {
+      console.error("FF Breach render substitution failed:", err);
+    }
+
     // Bail if already auto-processed (prevents double-fire on rerender/notify)
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
 
@@ -1436,8 +1460,9 @@ export function installActionChatHandlers() {
           await ChatMessage.create({
             content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:4px;">
               <strong>${actor.name}</strong> Psyche FEAT (${psycheRank}) vs Intensity ${intensity}: <strong style="color:#c62828;">${color.toUpperCase()}</strong> (${rollTotal})
-              <div style="margin-top:4px;"><strong>${actor.name}</strong> is unconscious for ${rounds} round${rounds !== 1 ? "s" : ""}!</div>
-            </div>`
+              <div style="margin-top:4px;"><strong>${actor.name}</strong> is unconscious for <strong class="msh-ffb-rounds">?</strong> rounds!</div>
+            </div>`,
+            flags: { "msh-faserip": { ffBreachKnockout: { rounds: Number(rounds) } } }
           });
 
           btn.disabled = true;
