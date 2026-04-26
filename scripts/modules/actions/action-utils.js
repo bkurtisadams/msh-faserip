@@ -1988,23 +1988,15 @@ export async function postFourColorKnockout(actor, { rounds = null, source = "hp
     if (fresh) await fresh.setFlag("msh-faserip", "knockoutSource", source);
   } catch (_e) {}
 
-  // Public card — players see "? rounds" so they can't meta-game the wake-up turn.
+  // Single card. Players see "?"; the renderChatMessageHTML hook in chat-hooks.js
+  // substitutes the actual count on GM clients only.
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-      <strong>${actor.name}</strong> is unconscious (0 Health) for <strong>?</strong> rounds.
-      <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
-    </div>`
-  });
-
-  // GM-only whisper — full round count for tracking.
-  await ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
-    content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-      <i class="fas fa-eye-slash" style="opacity:.6;"></i> <strong>${actor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
-      <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule (GM only): players see "? rounds".</div>
-    </div>`
+      <strong>${actor.name}</strong> is unconscious (0 Health) for <strong class="msh-fc-rounds">?</strong> rounds.
+      <div style="font-size:0.9em;color:#666;margin-top:4px;" class="msh-fc-meta">Four-Color Rule: No death save (non-lethal).</div>
+    </div>`,
+    flags: { "msh-faserip": { fourColorKnockout: { rounds: Number(rounds) } } }
   });
 
   return { rounds, applied: true };
