@@ -1,4 +1,7 @@
-// scripts/action-hud.js v3.1.0 - 2026-04-23
+// scripts/action-hud.js v3.2.0 - 2026-04-25
+// v3.2.0: Replace title-bar shortcut tooltip (giant blob obscured the HUD)
+//         with a "?" header control button that opens a small Shortcuts
+//         popover. Mirrors the existing settings popover pattern.
 // v3.1.0: Right-click per-button context menu (Hide, Reorder, Reset, Settings).
 //         Header cog opens in-HUD settings popover — retires UI-layer
 //         settings from Foundry Configure Settings panel. New actionHudHidden
@@ -99,7 +102,6 @@ const CSS = `
   padding: 4px; background: var(--fah-bg); overflow: visible;
 }
 .faserip-action-hud.fah-locked .window-header { cursor: default; }
-.faserip-action-hud .window-title { cursor: help; }
 .fah-wrap { display: flex; flex-direction: column; gap: 4px; }
 .fah-grid { display: grid; gap: 3px; }
 .fah-btn {
@@ -223,9 +225,10 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       minimizable: true,
       resizable: true,
       controls: [
-        { icon: "fas fa-cog",         label: "Settings…",              action: "openSettings" },
-        { icon: "fas fa-arrows-alt",  label: "Reorder (E)",            action: "toggleEdit" },
-        { icon: "fas fa-undo-alt",    label: "Reset layout",           action: "resetLayout" },
+        { icon: "fas fa-cog",            label: "Settings…",              action: "openSettings" },
+        { icon: "fas fa-arrows-alt",     label: "Reorder (E)",            action: "toggleEdit" },
+        { icon: "fas fa-undo-alt",       label: "Reset layout",           action: "resetLayout" },
+        { icon: "fas fa-question-circle",label: "Shortcuts",              action: "openHelp" },
       ],
     },
     position: { width: 240, height: "auto" },
@@ -233,6 +236,7 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       toggleEdit:    FaseripActionPanel._onToggleEdit,
       resetLayout:   FaseripActionPanel._onResetLayout,
       openSettings:  FaseripActionPanel._onOpenSettings,
+      openHelp:      FaseripActionPanel._onOpenHelp,
     },
   };
 
@@ -264,6 +268,9 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
   static _onResetLayout()  { FaseripActionPanel._findInstance()?._confirmReset(); }
   static _onOpenSettings(event, target) {
     FaseripActionPanel._findInstance()?._toggleSettingsPopover(target);
+  }
+  static _onOpenHelp(event, target) {
+    FaseripActionPanel._findInstance()?._toggleHelpPopover(target);
   }
 
   static _findInstance() {
@@ -428,12 +435,7 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       setSetting("actionHudZoom", this._zoom);
     }, { passive: false });
 
-    // Title tooltip lists all shortcuts
-    const title = el.querySelector(".window-title");
-    if (title) {
-      title.dataset.tooltip = SHORTCUTS.map(([k, v]) => `${k}: ${v}`).join(" • ");
-    }
-
+    // Shortcuts now live behind the header help button (?), not a title tooltip
     this._updateTitle();
 
     if (!this._controlHook) {
@@ -745,9 +747,75 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     }
   }
 
+  // ── Help popover (shortcuts list) ──
+  _toggleHelpPopover(anchor = null) {
+    if (this._helpPopover) { this._hideHelpPopover(); return; }
+    this._hideContextMenu();
+    this._hideSettingsPopover();
+    this._showHelpPopover(anchor);
+  }
+
+  _showHelpPopover(anchor = null) {
+    const pop = document.createElement("div");
+    pop.className = "fah-popover fah-help-popover";
+    pop.innerHTML = `
+      <section>
+        <h4>Shortcuts</h4>
+        <dl>${SHORTCUTS.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+      </section>
+    `;
+    document.body.appendChild(pop);
+
+    const hudRect = this.element?.getBoundingClientRect();
+    const anchorRect = anchor?.getBoundingClientRect?.();
+    const popRect = pop.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = anchorRect
+      ? (anchorRect.left + anchorRect.width / 2 - popRect.width / 2)
+      : (hudRect ? hudRect.right + 6 : 100);
+    let top = anchorRect
+      ? (anchorRect.bottom + 4)
+      : (hudRect ? hudRect.top : 100);
+    left = Math.max(4, Math.min(left, vw - popRect.width - 4));
+    top  = Math.max(4, Math.min(top,  vh - popRect.height - 4));
+    pop.style.left = `${left}px`;
+    pop.style.top  = `${top}px`;
+
+    this._helpPopover = pop;
+
+    setTimeout(() => {
+      this._helpDismiss = (ev) => {
+        if (pop.contains(ev.target)) return;
+        if (ev.target.closest("[data-action='openHelp']")) return;
+        this._hideHelpPopover();
+      };
+      this._helpKeyDismiss = (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          this._hideHelpPopover();
+        }
+      };
+      document.addEventListener("mousedown", this._helpDismiss);
+      document.addEventListener("keydown", this._helpKeyDismiss);
+    }, 0);
+  }
+
+  _hideHelpPopover() {
+    if (this._helpPopover) { this._helpPopover.remove(); this._helpPopover = null; }
+    if (this._helpDismiss) {
+      document.removeEventListener("mousedown", this._helpDismiss);
+      this._helpDismiss = null;
+    }
+    if (this._helpKeyDismiss) {
+      document.removeEventListener("keydown", this._helpKeyDismiss);
+      this._helpKeyDismiss = null;
+    }
+  }
+
   async close(options = {}) {
     this._hideContextMenu();
     this._hideSettingsPopover();
+    this._hideHelpPopover();
     if (this._controlHook) {
       Hooks.off("controlToken", this._controlHook);
       this._controlHook = null;
