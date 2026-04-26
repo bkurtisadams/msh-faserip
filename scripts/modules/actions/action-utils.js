@@ -1785,17 +1785,8 @@ export async function applyDamageToTargets({
             await postDeathSavePrompt(targetActor, { wasKillResult, attackForm, fromZeroHealth: true });
           }
         } else {
-          // Four-Color rule: Non-lethal knockout — roll 1d10 for duration, apply unconscious effect
-          const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
-          const durationRoll = await new Roll(`1${stunDie}`).evaluate();
-          const rounds = durationRoll.total;
-          await _applyFourColorKnockout(targetActor, rounds);
-          await ChatMessage.create({
-            content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-              <strong>${targetActor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
-              <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
-            </div>`
-          });
+          // Four-Color rule: Non-lethal knockout via consolidated helper (handles roll, AE, chat, and dedup)
+          await postFourColorKnockout(targetActor, { source: "hp-zero:applyDamageToTargets" });
         }
       }
       // ===== HANDLE KILL RESULT THAT DIDN'T REDUCE TO 0 =====
@@ -1945,6 +1936,78 @@ export async function _applyFourColorKnockout(actor, rounds) {
   };
   await safeActorCreateEffect(actor, [effectData]);
   console.log(`[FASERIP] Four-Color knockout: ${actor.name} unconscious for ${rounds} rounds`);
+}
+
+/**
+ * Centralized Four-Color knockout: rolls duration (or accepts a precomputed one),
+ * applies the unconscious AE, and posts the chat card. Idempotent: if an
+ * unconscious AE was just applied (~1.5s window), the call no-ops silently —
+ * this is what kills the duplicate "is unconscious" cards when both
+ * applyDamageToTargets and applyDamageNow fire for the same attack.
+ */
+export async function postFourColorKnockout(actor, { rounds = null, source = "hp-zero" } = {}) {
+  if (!actor) return { rounds: 0, applied: false };
+
+  // GM-only: HP-zero KO handling is owned by the updateActor hook in init.js on the
+  // GM client. Player clients also walk the applyDamageToTargets HP-zero branch
+  // locally and would emit their own card + duration roll — defer here to keep the
+  // GM as the single source of truth. (The createdTime dedup below handles the
+  // separate same-client case where the GM is the attacker.)
+  if (!game.user.isGM) {
+    console.log(`[FASERIP] postFourColorKnockout: non-GM client, deferring to GM hook (source=${source})`);
+    return { rounds: 0, applied: false, deferredToGm: true };
+  }
+
+  const existing = actor.effects?.find?.(e => e.statuses?.has?.("unconscious"));
+  if (existing) {
+    const createdTime = Number(existing._stats?.createdTime ?? existing.createdTime ?? 0);
+    if (createdTime && (Date.now() - createdTime) < 1500) {
+      console.log(`[FASERIP] postFourColorKnockout: deduped (existing AE ${Date.now() - createdTime}ms old, source=${source})`);
+      return { rounds: Number(existing.flags?.["msh-faserip"]?.durationRounds) || 0, applied: false, deduplicated: true };
+    }
+  }
+
+  if (!Number.isFinite(rounds) || rounds <= 0) {
+    const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+    const r = await new Roll(`1${stunDie}`).evaluate();
+    rounds = r.total;
+  }
+
+  if (existing) {
+    const priorRounds = Number(existing.flags?.["msh-faserip"]?.durationRounds) || 0;
+    if (priorRounds >= rounds) {
+      console.log(`[FASERIP] postFourColorKnockout: keeping existing (${priorRounds} ≥ new ${rounds})`);
+      return { rounds: priorRounds, applied: false };
+    }
+  }
+
+  await _applyFourColorKnockout(actor, rounds);
+
+  try {
+    const fresh = actor.effects?.find?.(e => e.statuses?.has?.("unconscious"));
+    if (fresh) await fresh.setFlag("msh-faserip", "knockoutSource", source);
+  } catch (_e) {}
+
+  // Public card — players see "? rounds" so they can't meta-game the wake-up turn.
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
+      <strong>${actor.name}</strong> is unconscious (0 Health) for <strong>?</strong> rounds.
+      <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
+    </div>`
+  });
+
+  // GM-only whisper — full round count for tracking.
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
+    content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
+      <i class="fas fa-eye-slash" style="opacity:.6;"></i> <strong>${actor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
+      <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule (GM only): players see "? rounds".</div>
+    </div>`
+  });
+
+  return { rounds, applied: true };
 }
 
 /**
@@ -2373,16 +2436,7 @@ export async function applyDamageNow({
           if (!fourColor || lethal) {
             await postDeathSavePrompt(targetActor);
           } else {
-            const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
-            const durationRoll = await new Roll(`1${stunDie}`).evaluate();
-            const rounds = durationRoll.total;
-            await _applyFourColorKnockout(targetActor, rounds);
-            await ChatMessage.create({
-              content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-                <strong>${targetActor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
-                <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
-              </div>`
-            });
+            await postFourColorKnockout(targetActor, { source: "hp-zero:applyDamageNow" });
           }
         }
 

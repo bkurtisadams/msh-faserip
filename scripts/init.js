@@ -2787,18 +2787,8 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       const isLethal = !!pendingKill;
 
       if (fourColor && !isLethal) {
-        console.log(`[FASERIP] Four-Color Rule active â€” non-lethal knockout for ${actor.name}`);
-        const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
-        const durationRoll = await new Roll(`1${stunDie}`).evaluate();
-        const rounds = durationRoll.total;
-        const { _applyFourColorKnockout } = await import("./modules/actions/action-utils.js");
-        await _applyFourColorKnockout(actor, rounds);
-        await ChatMessage.create({
-          content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-            <strong>${actor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
-            <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
-          </div>`
-        });
+        const { postFourColorKnockout } = await import("./modules/actions/action-utils.js");
+        await postFourColorKnockout(actor, { source: "hp-zero:updateActor-hook" });
       } else {
       const mode = resolveCombatMode(actor) || "manual";
       console.log("FASERIP DEBUG | Combat mode resolved to:", mode);
