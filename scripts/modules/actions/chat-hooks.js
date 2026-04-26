@@ -146,6 +146,24 @@ export function installActionChatHandlers() {
       console.error("FF Breach render substitution failed:", err);
     }
 
+    // Wake attempts: GM sees the roll value and exact rounds; players see redacted
+    try {
+      const wakeFail = message?.flags?.[SCOPE]?.wakeFail;
+      if (wakeFail && game.user.isGM) {
+        const rollEl = htmlEl.querySelector(".msh-wake-roll");
+        if (rollEl) rollEl.textContent = ` (rolled ${wakeFail.roll})`;
+        const roundsEl = htmlEl.querySelector(".msh-wake-rounds");
+        if (roundsEl) roundsEl.textContent = String(wakeFail.rounds);
+      }
+      const wakeSuccess = message?.flags?.[SCOPE]?.wakeSuccess;
+      if (wakeSuccess && game.user.isGM) {
+        const rollEl = htmlEl.querySelector(".msh-wake-roll");
+        if (rollEl) rollEl.textContent = ` (rolled ${wakeSuccess.roll})`;
+      }
+    } catch (err) {
+      console.error("Wake-attempt render substitution failed:", err);
+    }
+
     // Bail if already auto-processed (prevents double-fire on rerender/notify)
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
 

@@ -265,7 +265,7 @@ async function emitRecoverySummary(actor) {
  *                                  fully-recovered
  * @param {string} [opts.detail]  - short detail string for ledger/summary
  */
-export async function postRecoveryCard(actor, { content, eventType, detail } = {}) {
+export async function postRecoveryCard(actor, { content, eventType, detail, flags } = {}) {
   if (!actor) return;
   await appendRecoveryLog(actor, { event: eventType, detail });
 
@@ -283,14 +283,15 @@ export async function postRecoveryCard(actor, { content, eventType, detail } = {
   }
 
   if (mode === "public") {
-    await ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor }) });
+    await ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor }), flags });
     return;
   }
   if (mode === "whisper-each") {
     await ChatMessage.create({
       content,
       speaker: ChatMessage.getSpeaker({ actor }),
-      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id)
+      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
+      flags
     });
     return;
   }
@@ -662,7 +663,7 @@ static async attemptRegainConsciousness(actor) {
             <i class="fas fa-heart"></i> ${actor.name} Regained Consciousness!
           </div>
           <div style="margin-bottom:6px;">
-            <strong>Endurance FEAT:</strong> ${color.toUpperCase()} (rolled ${roll})
+            <strong>Endurance FEAT:</strong> ${color.toUpperCase()}<span class="msh-wake-roll"></span>
           </div>
           <div style="margin-bottom:6px;">
             <strong>Result:</strong> Success - Conscious with ${enduranceValue} Health
@@ -670,7 +671,8 @@ static async attemptRegainConsciousness(actor) {
           <div style="background:#c8e6c9;padding:8px;margin-top:8px;border-radius:3px;text-align:center;">
             <strong>Health: 0 → ${enduranceValue}</strong>
           </div>
-        </div>`
+        </div>`,
+        flags: { "msh-faserip": { wakeSuccess: { roll, color } } }
       });
 
       if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
@@ -757,15 +759,16 @@ static async attemptRegainConsciousness(actor) {
             <i class="fas fa-times-circle"></i> ${actor.name} Failed to Wake
           </div>
           <div style="margin-bottom:6px;">
-            <strong>Endurance FEAT:</strong> ${color.toUpperCase()} (rolled ${roll})
+            <strong>Endurance FEAT:</strong> ${color.toUpperCase()}<span class="msh-wake-roll"></span>
           </div>
           <div style="margin-bottom:6px;">
             <strong>Result:</strong> Failed - Remains unconscious
           </div>
           <div style="background:#ffcdd2;padding:8px;margin-top:8px;border-radius:3px;text-align:center;">
-            <strong>Unconscious for ${rounds} more rounds</strong>
+            <strong>Unconscious for <span class="msh-wake-rounds">?</span> more rounds</strong>
           </div>
-        </div>`
+        </div>`,
+        flags: { "msh-faserip": { wakeFail: { rounds, roll, color } } }
       });
 
       if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.warn(message);
