@@ -1716,7 +1716,7 @@ export async function applyDamageToTargets({
         try {
           await targetActor?.update(
             { [hpPath]: after },
-            { healthChange: { old: before, new: after } }
+            { healthChange: { old: before, new: after }, mshHpZeroHandled: true }
           );
         } finally {
           delete game.msh._combatDamageInProgress;
@@ -1733,13 +1733,15 @@ export async function applyDamageToTargets({
             await game.msh.runAsGM({
               operation: "update",
               targetActorUuid: targetActor.uuid,
-              args: [{ [hpPath]: after }]
+              args: [{ [hpPath]: after }],
+              opts: { healthChange: { old: before, new: after }, mshHpZeroHandled: true }
             });
           } else if (game.msh?.socket?.executeAsGM) {
             await game.msh.socket.executeAsGM("runGMCommand", {
               operation: "update",
               targetActorUuid: targetActor.uuid,
-              args: [{ [hpPath]: after }]
+              args: [{ [hpPath]: after }],
+              opts: { healthChange: { old: before, new: after }, mshHpZeroHandled: true }
             });
           } else {
             console.warn("FASERIP | No GM helper available for applyDamageToTargets");
@@ -2411,11 +2413,12 @@ export async function applyDamageNow({
 
       if (net > 0) {
         const update = { "system.attributes.health.value": hpAfter };
+        const updateOpts = { healthChange: { old: hpBefore, new: hpAfter }, mshHpZeroHandled: true };
 
         if (game.user.isGM || targetActor.isOwner) {
-          await targetActor.update(update);
+          await targetActor.update(update, updateOpts);
         } else if (game.msh?.runAsGM) {
-          await game.msh.runAsGM({ operation: "update", targetActorUuid: targetActor.uuid, args: [update] });
+          await game.msh.runAsGM({ operation: "update", targetActorUuid: targetActor.uuid, args: [update], opts: updateOpts });
         } else {
           if (showNotification) ui.notifications.warn("Couldn't update Health: no GM helper available.");
         }

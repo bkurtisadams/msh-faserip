@@ -68,7 +68,10 @@ export class DeathSaveAction extends BaseAction {
           actor, effectiveRank, shiftDisplay, endValue,
           roll, colorLower, killResult, isDying, fromZeroHealth,
           unconsciousDuration, attackForm, killContext, isRobot
-        })
+        }),
+        flags: (fromZeroHealth && !isDying && Number.isFinite(unconsciousDuration))
+          ? { "msh-faserip": { deathSaveUnconscious: { rounds: Number(unconsciousDuration) } } }
+          : {}
       });
 
       if (fromZeroHealth) await this._createStunnedEffect(actor, unconsciousDuration ?? 1);
@@ -220,7 +223,10 @@ export class DeathSaveAction extends BaseAction {
         actor, effectiveRank, shiftDisplay, endValue: endurance.value,
         roll, colorLower, killResult, isDying, fromZeroHealth,
         unconsciousDuration, attackForm, killContext, isRobot
-      })
+      }),
+      flags: (fromZeroHealth && !isDying && Number.isFinite(unconsciousDuration))
+        ? { "msh-faserip": { deathSaveUnconscious: { rounds: Number(unconsciousDuration) } } }
+        : {}
     });
 
     if (fromZeroHealth) await this._createStunnedEffect(actor, unconsciousDuration ?? 1);
@@ -271,7 +277,7 @@ export class DeathSaveAction extends BaseAction {
         Any Aid (stops loss)
       </div>`);
     } else if (fromZeroHealth) {
-      outcomeLines.push(`<div style="color:#1565c0;font-weight:700;">UNCONSCIOUS — ${unconsciousDuration} round${unconsciousDuration !== 1 ? "s" : ""}</div>`);
+      outcomeLines.push(`<div style="color:#1565c0;font-weight:700;">UNCONSCIOUS — <span class="msh-ds-rounds">?</span> rounds</div>`);
       outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Wakes with Health = Endurance rank value (${endValue}).</div>`);
     } else {
       outcomeLines.push(`<div style="color:#2e7d32;font-weight:700;">NO EFFECT</div>`);
