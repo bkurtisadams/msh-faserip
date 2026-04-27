@@ -25,6 +25,35 @@
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
+/**
+ * Map string mode names to Foundry's numeric ActiveEffect mode constants.
+ * Foundry expects CONST.ACTIVE_EFFECT_MODES values (integers); strings are
+ * silently treated as ADD, which has caused override-based effects (Stunned,
+ * Just Escaped, Restrained, etc.) to fail in subtle ways.
+ */
+const AE_MODE_MAP = {
+  custom: 0,
+  multiply: 1,
+  add: 2,
+  downgrade: 3,
+  upgrade: 4,
+  override: 5
+};
+
+/** Translate a change.mode string to its numeric constant; pass through if already numeric. */
+function _normalizeChangeMode(change) {
+  if (!change || typeof change !== "object") return change;
+  if (typeof change.mode === "string") {
+    const numeric = AE_MODE_MAP[change.mode.toLowerCase()];
+    if (numeric === undefined) {
+      console.warn(`[effect-engine] Unknown change mode "${change.mode}", falling back to ADD`);
+      return { ...change, mode: 2 };
+    }
+    return { ...change, mode: numeric };
+  }
+  return change;
+}
+
 /** Safe handle to CTT time engine (if installed & active) */
 function getCTT() {
   const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
@@ -313,7 +342,7 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
     img,
     duration,
     origin: origin ?? originUuid ?? actor.uuid,
-    changes: changes || [],
+    changes: (changes || []).map(_normalizeChangeMode),
     statuses: statuses || [],
     flags: {
       ...(flags || {}),
