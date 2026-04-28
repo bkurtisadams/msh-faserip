@@ -156,8 +156,23 @@ export class GrapplingAction extends AttackAction {
             e.statuses?.has?.("partial-hold") ||
             e.statuses?.has?.("full-hold")
           );
-          for (const eff of existingHolds || []) {
-            await eff.delete();
+          if (existingHolds?.length) {
+            const { canWriteEffectsOn } = await import("../effects/effect-engine.js");
+            if (canWriteEffectsOn(tActor)) {
+              for (const eff of existingHolds) {
+                await eff.delete();
+              }
+            } else {
+              try {
+                const { executeAsGM } = await import("../../gm-utils.js");
+                await executeAsGM("deleteActiveEffects", {
+                  targetActorUuid: tActor.uuid,
+                  effectIds: existingHolds.map(e => e.id)
+                });
+              } catch (err) {
+                console.error("[FASERIP] Grapple: GM hold-cleanup delete failed", err);
+              }
+            }
           }
           
           // Apply appropriate hold effect using effect-engine

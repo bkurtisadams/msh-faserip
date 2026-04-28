@@ -281,6 +281,8 @@ async function checkAllAuras() {
 export async function removeAllAuraEffects(casterActorId) {
   if (!canvas?.tokens) return;
   const scope = SCOPE();
+  const { canWriteEffectsOn } = await import("../effects/effect-engine.js");
+  let gmExec = null;
   for (const token of canvas.tokens.placeables) {
     const actor = token.actor;
     if (!actor) continue;
@@ -288,9 +290,23 @@ export async function removeAllAuraEffects(casterActorId) {
       const f = e.flags?.[scope] || {};
       return f.effectType === "nullified" && !f.selfNullify && f.auraCasterId === casterActorId;
     }) ?? [];
-    for (const effect of effects) {
-      await effect.delete();
-      console.log(`[FASERIP] Nullify aura ended: removed nullified from ${actor.name}`);
+    if (!effects.length) continue;
+    if (canWriteEffectsOn(actor)) {
+      for (const effect of effects) {
+        await effect.delete();
+        console.log(`[FASERIP] Nullify aura ended: removed nullified from ${actor.name}`);
+      }
+    } else {
+      try {
+        if (!gmExec) gmExec = (await import("../../gm-utils.js")).executeAsGM;
+        await gmExec("deleteActiveEffects", {
+          targetActorUuid: actor.uuid,
+          effectIds: effects.map(e => e.id)
+        });
+        console.log(`[FASERIP] Nullify aura ended: removed nullified from ${actor.name} (via GM)`);
+      } catch (err) {
+        console.error(`[FASERIP] Nullify aura cleanup failed for ${actor.name}:`, err);
+      }
     }
   }
 }

@@ -25,6 +25,21 @@
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
+// Permission check for ActiveEffect writes on an actor — handles linked tokens,
+// unlinked ActorDeltas, and synthetic token actors. Returns true if current user
+// can directly mutate effects on the actor (otherwise caller must route via GM socket).
+export function canWriteEffectsOn(actor) {
+  if (!actor) return false;
+  if (game.user.isGM) return true;
+  if (actor.token?.isLinked === false) return !!actor.token.isOwner;
+  if (actor.parent?.documentName === "Token") return !!actor.parent.isOwner;
+  if (actor.isToken === true) {
+    const token = canvas.tokens?.placeables?.find(t => t.actor === actor);
+    return !!(token?.document?.isOwner ?? actor.isOwner);
+  }
+  return !!actor.isOwner;
+}
+
 /**
  * Map string mode names to Foundry's numeric ActiveEffect mode constants.
  * Foundry expects CONST.ACTIVE_EFFECT_MODES values (integers); strings are
@@ -472,7 +487,20 @@ export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, o
     } else {
       // New stun is longer - remove existing and apply new
       console.log(`[FASERIP] Stun: Replacing existing (${existingRounds} rounds) with new (${rounds} rounds)`);
-      await existingStun.delete();
+      if (canWriteEffectsOn(actor)) {
+        await existingStun.delete();
+      } else {
+        try {
+          const { executeAsGM } = await import("../../gm-utils.js");
+          await executeAsGM("deleteActiveEffects", {
+            targetActorUuid: actor.uuid,
+            effectIds: [existingStun.id]
+          });
+        } catch (err) {
+          console.error("[FASERIP] Stun replace: GM delete failed", err);
+          return existingStun;
+        }
+      }
     }
   }
   
@@ -1117,7 +1145,16 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
   // Disable the powers
   if (suppressedIds.length > 0) {
     const updates = suppressedIds.map(id => ({ _id: id, "system.isActive": false }));
-    await resolvedActor.updateEmbeddedDocuments("Item", updates);
+    if (canWriteEffectsOn(resolvedActor)) {
+      await resolvedActor.updateEmbeddedDocuments("Item", updates);
+    } else {
+      const { executeAsGM } = await import("../../gm-utils.js");
+      await executeAsGM("updateEmbeddedDocsOnActor", {
+        targetActorUuid: resolvedActor.uuid,
+        collection: "Item",
+        updates
+      });
+    }
     console.log(`[FASERIP] Nullified: disabled ${suppressedIds.length} inborn powers on ${resolvedActor.name}:`,
       powersToSuppress.map(p => p.name).join(", "));
   }
@@ -1144,7 +1181,13 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
   const preNullifyDamage = Math.max(0, preNullifyHealthMax - preNullifyHealth);
 
   if (Object.keys(actorUpdates).length > 0) {
-    await resolvedActor.update(actorUpdates);
+    const ownsTarget = canWriteEffectsOn(resolvedActor);
+    const gmExec = ownsTarget ? null : (await import("../../gm-utils.js")).executeAsGM;
+    if (ownsTarget) {
+      await resolvedActor.update(actorUpdates);
+    } else {
+      await gmExec("updateActor", { targetActorUuid: resolvedActor.uuid, updateData: actorUpdates });
+    }
 
     // Recalc new health max from (possibly reduced) abilities
     const abs = resolvedActor.system?.abilities || {};
@@ -1157,7 +1200,14 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
     // Scale health proportionally to new max
     const healthPct = preNullifyHealthMax > 0 ? (preNullifyHealth / preNullifyHealthMax) : 1;
     const newHealth = Math.max(0, Math.round(newHealthMax * healthPct));
-    await resolvedActor.update({ "system.attributes.health.value": newHealth });
+    if (ownsTarget) {
+      await resolvedActor.update({ "system.attributes.health.value": newHealth });
+    } else {
+      await gmExec("updateActor", {
+        targetActorUuid: resolvedActor.uuid,
+        updateData: { "system.attributes.health.value": newHealth }
+      });
+    }
     console.log(`[FASERIP] Nullified: ${resolvedActor.name} health ${preNullifyHealth}/${preNullifyHealthMax} → ${newHealth}/${newHealthMax} (${preNullifyDamage} pre-existing damage stored)`);
   }
 
@@ -1209,7 +1259,16 @@ export async function restoreNullifiedPowers(effect, actor) {
 
   if (toRestore.length > 0) {
     const updates = toRestore.map(id => ({ _id: id, "system.isActive": true }));
-    await actor.updateEmbeddedDocuments("Item", updates);
+    if (canWriteEffectsOn(actor)) {
+      await actor.updateEmbeddedDocuments("Item", updates);
+    } else {
+      const { executeAsGM } = await import("../../gm-utils.js");
+      await executeAsGM("updateEmbeddedDocsOnActor", {
+        targetActorUuid: actor.uuid,
+        collection: "Item",
+        updates
+      });
+    }
     const names = toRestore.map(id => actor.items.get(id)?.name).filter(Boolean);
     console.log(`[FASERIP] Nullification ended: restored ${toRestore.length} powers on ${actor.name}:`, names.join(", "));
   }
@@ -1229,7 +1288,14 @@ export async function restoreNullifiedPowers(effect, actor) {
     const currentMax = actor.system?.attributes?.health?.max ?? 0;
     const damageWhileNullified = Math.max(0, currentMax - currentHealth);
 
-    await actor.update(actorUpdates);
+    const ownsTarget = canWriteEffectsOn(actor);
+    const gmExec = ownsTarget ? null : (await import("../../gm-utils.js")).executeAsGM;
+
+    if (ownsTarget) {
+      await actor.update(actorUpdates);
+    } else {
+      await gmExec("updateActor", { targetActorUuid: actor.uuid, updateData: actorUpdates });
+    }
 
     // Recalc new health max from restored abilities
     const abs = actor.system?.abilities || {};
@@ -1243,7 +1309,14 @@ export async function restoreNullifiedPowers(effect, actor) {
     const preNullifyDamage = flags.preNullifyDamage ?? 0;
     const totalDamage = preNullifyDamage + damageWhileNullified;
     const restoredHealth = Math.max(0, restoredMax - totalDamage);
-    await actor.update({ "system.attributes.health.value": restoredHealth });
+    if (ownsTarget) {
+      await actor.update({ "system.attributes.health.value": restoredHealth });
+    } else {
+      await gmExec("updateActor", {
+        targetActorUuid: actor.uuid,
+        updateData: { "system.attributes.health.value": restoredHealth }
+      });
+    }
     console.log(`[FASERIP] Nullification ended: ${actor.name} health ${currentHealth} → ${restoredHealth}/${restoredMax} (pre-existing dmg: ${preNullifyDamage}, nullified dmg: ${damageWhileNullified})`);
   }
 }

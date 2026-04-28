@@ -119,6 +119,7 @@ export async function executeAsGM(action, payload) {
       case "manageRecoveryEffect": return await manageRecoveryEffect(payload);
       case "applyRulesDamage":      return await applyRulesDamage(payload);
       case "updateActor":           return await updateActor(payload);
+      case "updateEmbeddedDocsOnActor": return await updateEmbeddedDocsOnActor(payload);
       case "deleteActiveEffects":   return await deleteActiveEffects(payload);
       case "deleteEmbeddedDocsOnActor": return await deleteEmbeddedDocsOnActor(payload);
       case "updateActiveEffect":    return await updateActiveEffect(payload);
@@ -156,6 +157,9 @@ export function registerSocket() {
     socket.register("applyRulesDamage", applyRulesDamage);
     socket.register("createMacroForPlayer", createMacroForPlayer);
     socket.register("updateActiveEffect", updateActiveEffect);
+    socket.register("deleteActiveEffects", deleteActiveEffects);
+    socket.register("updateEmbeddedDocsOnActor", updateEmbeddedDocsOnActor);
+    socket.register("updateActor", updateActor);
     socket.register("renameEffectWithRemaining", gmRenameEffectWithRemaining);
 
 

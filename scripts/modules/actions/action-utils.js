@@ -1498,7 +1498,21 @@ async function handleFFBreach(targetActor, breach) {
   if (aeId) {
     const ffAe = targetActor.effects.get(aeId);
     if (ffAe) {
-      await ffAe.update({ disabled: true });
+      const { canWriteEffectsOn } = await import("../effects/effect-engine.js");
+      if (canWriteEffectsOn(targetActor)) {
+        await ffAe.update({ disabled: true });
+      } else {
+        try {
+          const { executeAsGM } = await import("../../gm-utils.js");
+          await executeAsGM("updateActiveEffect", {
+            targetActorUuid: targetActor.uuid,
+            effectId: aeId,
+            updateData: { disabled: true }
+          });
+        } catch (err) {
+          console.error("[FASERIP] handleFFBreach: GM disable failed", err);
+        }
+      }
       console.log(`[FASERIP] FF breached on ${targetActor.name} — disabled AE ${aeId}`);
     }
   }
