@@ -33,6 +33,7 @@ import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/ef
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 export class GrapplingAction extends AttackAction {
   constructor(args) {
     super(args);
@@ -370,11 +371,10 @@ export class GrapplingAction extends AttackAction {
     return new Promise((resolve) => {
       let _resolved = false;
       let _csState = null;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: dialogTitle,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -462,7 +462,7 @@ export class GrapplingAction extends AttackAction {
           if (_csState) _csState.destroy();
           if (!_resolved) resolve(null);
         }
-      }).render(true);
+      });
     });
   }
 

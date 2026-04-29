@@ -36,6 +36,7 @@ import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 // Thrown blunt damage per RAW (Advanced Set Combat, Blunt Throwing Attack):
 // "A blunt thrown weapon inflicts damage equal to the Strength of the thrower,
 //  or the material strength of the thrown item, whichever is less."
@@ -262,11 +263,10 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const choice = await new Promise(resolve => {
       let _csState = null;
       let _resolved = false;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -494,7 +494,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           if (this._disposeAutoFill) this._disposeAutoFill();
           if (!_resolved) resolve(null);
         }
-      }).render(true);
+      });
     });
 
     if (!choice) return;

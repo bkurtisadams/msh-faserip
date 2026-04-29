@@ -37,6 +37,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { showFaseripDialog } from "./dialog-shim.js";
 
 export class EdgedAttackAction extends AttackAction {
   async execute() {
@@ -274,11 +275,10 @@ export class EdgedAttackAction extends AttackAction {
     const choice = await new Promise((resolve) => {
       let _csState = null;
       let _resolved = false;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -535,7 +535,7 @@ export class EdgedAttackAction extends AttackAction {
           if (_csState) _csState.destroy();
           if (!_resolved) resolve(null);
         }
-      }).render(true);
+      });
     });
     
     if (!choice) return;

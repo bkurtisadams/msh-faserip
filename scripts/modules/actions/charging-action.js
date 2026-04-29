@@ -70,6 +70,7 @@ import {
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 /**
  * ChargingAction - Endurance-based attack combining movement and combat
  * Rules:
@@ -365,11 +366,10 @@ export class ChargingAction extends AttackAction {
 
   const choice = await new Promise(resolve => {
     let _resolved = false;
-    const dlg = new Dialog({
+    showFaseripDialog({
       title: "Charging",
       content: dialogHtml,
-      buttons: {},
-      render: async (html) => {
+      render: async (html, dlg) => {
         setupKarmaControlHandlers(html);
         const $dialog = html.closest('.dialog');
 
@@ -649,7 +649,7 @@ export class ChargingAction extends AttackAction {
       close: () => {
         if (!_resolved) resolve(null);
       }
-    }).render(true);
+    });
   });
 
   if (!choice) return;

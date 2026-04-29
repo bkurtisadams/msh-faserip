@@ -31,6 +31,7 @@ import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 import { applyEscaped, applyReversed } from "../effects/effect-engine.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 /**
  * Remove grappled/held effects from an actor
  * @param {Actor} actor 
@@ -314,11 +315,10 @@ export class EscapingAction extends AttackAction {
     return new Promise((resolve) => {
       let _resolved = false;
       let _csState = null;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: `Escape: ${actor.name}`,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -402,7 +402,7 @@ export class EscapingAction extends AttackAction {
           applyCapabilitiesToDialog(html, "escaping", { actor });
         },
         close: () => { if (!_resolved) resolve(null); }
-      }).render(true);
+      });
     });
   }
 

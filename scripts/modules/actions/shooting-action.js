@@ -78,6 +78,7 @@ import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 export class ShootingAction extends RangedAttackAction {
   async execute() {
     const actor = this.actor;
@@ -341,11 +342,10 @@ export class ShootingAction extends RangedAttackAction {
     const choice = await new Promise((resolve) => {
       let _resolved = false;
       let _csState = null;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -610,7 +610,7 @@ export class ShootingAction extends RangedAttackAction {
           if (_csState) _csState.destroy();
           if (!_resolved) resolve(null);
         }
-      }).render(true);
+      });
     });
 
     if (!choice) return;

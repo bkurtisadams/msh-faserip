@@ -35,6 +35,7 @@ import {
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 export class ForceAction extends RangedAttackAction {
   async execute() {
     const actor = this.actor;
@@ -290,11 +291,10 @@ export class ForceAction extends RangedAttackAction {
     const choice = await new Promise((resolve) => {
       let _csState = null;
       let _resolved = false;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -577,7 +577,7 @@ export class ForceAction extends RangedAttackAction {
           if (this._disposeAutoFill) this._disposeAutoFill();
           if (!_resolved) resolve(null);
         },
-      }).render(true);
+      });
     });
 
     if (!choice) return;

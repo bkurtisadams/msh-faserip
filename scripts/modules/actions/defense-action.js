@@ -52,6 +52,7 @@ import {
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 /**
  * Handles: "dodging" | "evading" | "blocking" | "catching"
  * Expect dispatcher to pass { actionType, abilityName, opts }
@@ -182,11 +183,10 @@ export class DefenseAction extends BaseAction {
     const choice = await new Promise((resolve) => {
       let _resolved = false;
       let _csState = null;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: `${actionName}: ${actor.name}`,
         content: dialogHtml,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
@@ -245,7 +245,7 @@ export class DefenseAction extends BaseAction {
           });
         },
         close: () => { if (!_resolved) resolve(null); }
-      }).render(true);
+      });
    });
     if (!choice) return;
 

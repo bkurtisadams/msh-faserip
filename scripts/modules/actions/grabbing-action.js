@@ -35,6 +35,7 @@ import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/ef
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
+import { showFaseripDialog } from "./dialog-shim.js";
 /**
  * Grabbing (Wrestling) — STR vs UT → Miss / Take / Grab / Break
  * - Miss: no possession; loose items may scatter up to 1 area (GM decides).
@@ -326,11 +327,10 @@ export class GrabbingAction extends AttackAction {
     return new Promise((resolve) => {
       let _resolved = false;
       let _csState = null;
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: dialogTitle,
         content: html,
-        buttons: {},
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
           $dialog.find('.dialog-buttons').hide();
@@ -415,7 +415,7 @@ export class GrabbingAction extends AttackAction {
           if (_csState) _csState.destroy();
           if (!_resolved) resolve(null);
         }
-      }).render(true);
+      });
     });
   }
 
