@@ -3,6 +3,7 @@
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from '../dice/dice-roller.js';
 import { applyColumnShifts } from '../dice/column-shifts.js';
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 const RANKS = [
   "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -251,7 +252,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
 
   // ── Dialog ──────────────────────────────────────────────────
 
-  new Dialog({
+  showFaseripButtonDialog({
     title: `${fullName} FEAT Roll: ${actor.name}`,
     content: dialogContent,
     buttons: {
@@ -581,5 +582,5 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         updateFeatTypeDisplay();
       }
     }
-  }).render(true);
+  });
 }

@@ -6,6 +6,7 @@
 // v1.1.0: Chat card styled to match attack action format
 
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 const RANKS = [
   "Shift-0","Feeble","Poor","Typical","Good","Excellent",
@@ -161,7 +162,7 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatR
   const options = RANKS.map(r => `<option value="${r}" ${r === targetMatRank ? 'selected' : ''}>${r}</option>`).join('');
   const wielderStr = actor?.system?.abilities?.strength?.rank ?? 'Typical';
 
-  const dlg = new Dialog({
+  showFaseripButtonDialog({
     title: `Breaking FEAT — ${actor?.name ?? "Character"}`,
     content: `
       <div style="line-height:1.4;">
@@ -205,7 +206,6 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatR
       cancel: { label: "Cancel" }
     }
   });
-  dlg.render(true);
 }
 
 // ===== helpers =====

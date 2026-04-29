@@ -41,6 +41,7 @@ import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import * as Effects from "../effects/effect-engine.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 /**
  * Handle escape check from chat card button
@@ -916,7 +917,7 @@ export function installActionChatHandlers() {
         </div>
       `;
       
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Deal Hold Damage",
         content: dialogHtml,
         buttons: {
@@ -974,7 +975,7 @@ export function installActionChatHandlers() {
             }
           });
         }
-      }).render(true);
+      });
     });
 
     // Grapple Back handler (Reverse - red escape result)
@@ -1700,7 +1701,7 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
     </div>
   `;
 
-  new Dialog({
+  showFaseripButtonDialog({
     title: `Escape Attempt: ${actualDefenderName}`,
     content: dialogHtml,
     buttons: {
@@ -1829,5 +1830,5 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
     },
     default: "roll",
     render: (html) => { setupKarmaControlHandlers(html); }
-  }).render(true);
+  });
 }

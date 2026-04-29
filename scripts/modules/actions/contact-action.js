@@ -3,6 +3,7 @@
 // Standalone contact popularity FEAT dialog.
 
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -151,7 +152,7 @@ export async function rollContact(actor, contact) {
     <label><input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? "checked" : ""}> Skip dice animation</label>
   </div>`;
 
-  new Dialog({
+  showFaseripButtonDialog({
     title: `Contact Roll: ${contact.name}`,
     content: dialogContent,
     buttons: {
@@ -245,5 +246,5 @@ export async function rollContact(actor, contact) {
       cancel: { label: "Cancel" }
     },
     default: "roll"
-  }).render(true);
+  });
 }

@@ -45,6 +45,7 @@ import * as Nullify from "./nullify.js";
 import { resolveSlamFeat, getGrandSlamDistance } from "../combat/damage-resolution.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
 import { GRAND_SLAM_AREAS } from "../../rules/rules-reference.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -564,7 +565,7 @@ export class CheckAction extends BaseAction {
     `;
 
     const choice = await new Promise((resolve) => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `${labelFor(actionType)}: ${actor.name}`,
         content: html,
         buttons: {
@@ -584,7 +585,7 @@ export class CheckAction extends BaseAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll"
-      }).render(true);
+      });
     });
     if (!choice) return;
 

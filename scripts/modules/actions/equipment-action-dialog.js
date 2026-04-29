@@ -16,6 +16,7 @@
 //         Replaces fragmented click handlers with a single dialog opened from the equipment roll button.
 import { AreaTemplate } from "./area-template.js";
 import { getTargetData } from "./action-utils.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // Determine which action buttons to show based on item data
 function getAvailableActions(item, actor) {
@@ -348,27 +349,24 @@ export async function openEquipmentActionDialog(actor, item) {
       </div>
     </div>`;
 
-  const dlg = new Dialog({
+  showFaseripButtonDialog({
     title: item.name,
     content,
     buttons: {
       close: { label: "Close" }
     },
     default: "close",
-    render: (html) => {
+    render: (html, dlg) => {
       html.find('.equip-action-btn').on('click', async (ev) => {
         const btn = ev.currentTarget;
         const actionId = btn.dataset.actionId;
         dlg.close();
         await _executeAction(actionId, actor, item, btn.dataset);
       });
-    }
-  }, {
+    },
     width: 380,
     classes: ["faserip", "equipment-action-dialog"]
   });
-
-  dlg.render(true);
 }
 
 // Route an action button click to the appropriate handler

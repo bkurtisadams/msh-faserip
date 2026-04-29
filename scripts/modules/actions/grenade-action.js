@@ -52,6 +52,7 @@ import {
   getAreaIntensityRank
 } from "./action-utils.js";
 import {
+import { showFaseripButtonDialog } from "./dialog-shim.js";
   setupKarmaControlHandlers,
   extractKarmaFromDialog,
   getAvailableKarma,
@@ -281,7 +282,7 @@ export class GrenadeAction extends RangedAttackAction {
     `;
 
     const choice = await new Promise(resolve => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `Grenade: ${actor.name}`,
         content: dialogHtml,
         buttons: {
@@ -335,7 +336,7 @@ export class GrenadeAction extends RangedAttackAction {
           html.find('.cs-reset').on("click", e => { e.preventDefault(); html.find('[name="shift"]').val(0).trigger("change"); });
           update();
         }
-      }).render(true);
+      });
     });
 
     if (!choice) return;

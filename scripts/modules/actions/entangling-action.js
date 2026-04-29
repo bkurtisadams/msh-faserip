@@ -14,6 +14,7 @@ import {
   buildAbilitySection,
   shiftRank
 } from "./action-utils.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 /**
  * Handle entangling weapon mechanics
@@ -42,7 +43,7 @@ export async function processEntanglingHit({
   const targetAgilityValue = target.system?.abilities?.agility?.value || 6;
 
   // Show dialog for the entangle check
-  const dlg = new Dialog({
+  const result = await showFaseripButtonDialog({
     title: `Entangling Check - ${target.name}`,
     content: `
       <div style="line-height:1.4;">
@@ -149,14 +150,7 @@ export async function processEntanglingHit({
     default: "roll"
   });
 
-  return new Promise((resolve) => {
-    dlg.render(true);
-    // Resolve when dialog closes
-    dlg.close = function() {
-      Dialog.prototype.close.call(this);
-      resolve({ cancelled: true });
-    };
-  });
+  return result ?? { cancelled: true };
 }
 
 /**
@@ -195,7 +189,7 @@ export async function attemptEscapeEntanglement(actor) {
 
   const actorStrength = actor.system?.abilities?.strength?.rank || "Typical";
 
-  const dlg = new Dialog({
+  showFaseripButtonDialog({
     title: `Escape Entanglement - ${actor.name}`,
     content: `
       <div style="line-height:1.4;">
@@ -309,6 +303,4 @@ export async function attemptEscapeEntanglement(actor) {
     default: "roll",
     render: (html) => setupKarmaControlHandlers(html)
   });
-
-  dlg.render(true);
 }

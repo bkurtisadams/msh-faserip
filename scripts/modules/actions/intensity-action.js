@@ -13,6 +13,7 @@ import {
   RANKS
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // White = fail (affected), Green+ = resist
 function intensityResult(colorLower) {
@@ -160,7 +161,7 @@ export class IntensityAction extends BaseAction {
       </div>`;
 
     return new Promise(resolve => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `${item.name} — Intensity (${intensityRank})`,
         content,
         buttons: {
@@ -178,7 +179,7 @@ export class IntensityAction extends BaseAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll"
-      }).render(true);
+      });
     });
   }
 

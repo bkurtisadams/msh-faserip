@@ -6,6 +6,7 @@
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
 import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField } from "./action-utils.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 /**
  * Mental Power Action - for powers that skip to-hit roll and go straight to saves
@@ -384,7 +385,7 @@ export class MentalPowerAction extends BaseAction {
     `;
 
     const choice = await new Promise((resolve) => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `${powerName} - Mental Power`,
         content: dialogHtml,
         buttons: {
@@ -407,7 +408,7 @@ export class MentalPowerAction extends BaseAction {
         render: async (html) => {
           await setupModeSelector(actor, html, this.opts || {}, "lastMentalPowerMode");
         }
-      }).render(true);
+      });
     });
 
     if (!choice) {

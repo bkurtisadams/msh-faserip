@@ -11,6 +11,7 @@
  * - Any color (Green/Yellow/Red): Item intact - may use it or move up to half speed
  */
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName = "Item", actor = null }) {
   // Close any existing instance (same id)
   const existing = Object.values(ui.windows).find(w => w.id === "grabbing-break-dialog");
@@ -25,7 +26,7 @@ export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName =
   const wielderStr = actor?.system?.abilities?.strength?.rank ?? 'Typical';
   const wielderStrValue = actor?.system?.abilities?.strength?.value ?? 6;
 
-  const dlg = new Dialog({
+  showFaseripButtonDialog({
     title: `Grabbing Break Check — ${actor?.name ?? "Character"}`,
     content: `
       <div style="line-height:1.4;">
@@ -164,7 +165,6 @@ export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName =
             speaker: ChatMessage.getSpeaker({ actor }),
             content
           });
-          dlg.close();
         }
       },
       cancel: { label: "Cancel" }
@@ -172,5 +172,4 @@ export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName =
     default: "roll",
     id: "grabbing-break-dialog" // Added a unique ID for the dialog
   });
-  dlg.render(true);
 }

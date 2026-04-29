@@ -2,6 +2,7 @@
 // v1.1.1: Fix apply damage - use apply-collision-damage action with target-uuid
 // v1.1.0: Compact dialog layout, default to Good (brick) material
 import { applyDamageToActorUuid, debugLog } from "./action-utils.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 export function openCollisionDamageDialog({ 
   targetName = "Target", 
@@ -98,7 +99,7 @@ export function openCollisionDamageDialog({
     return `<option value="${r}" ${r === "Good" ? 'selected' : ''}>${r} (${val})${example}</option>`;
   }).join('');
 
-  const dlg = new Dialog({
+  showFaseripButtonDialog({
     title: `Collision Damage — ${targetName}`,
     content: `
       <div style="line-height:1.5;">
@@ -204,10 +205,9 @@ export function openCollisionDamageDialog({
           $charPanel.show();
         }
       });
-    }
-  }, { width: 420 });
-  
-  dlg.render(true);
+    },
+    width: 420
+  });
 }
 
 function calculateCollisionDamage({

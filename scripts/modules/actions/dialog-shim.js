@@ -49,17 +49,22 @@ export async function showFaseripDialog({ title, content, render, close } = {}) 
 // resolving $html from dialog.element before invoking the V1 callback.
 //
 // V1 was: const dlg = new Dialog({ title, content, buttons, default, render,
-//         close }); dlg.render(true);
+//         close, id }, { width, height, classes }); dlg.render(true);
 // V2 is:  await showFaseripButtonDialog({ title, content, buttons, default,
-//         render, close })
+//         render, close, id, width, height, classes })
 //
 // The wait-promise resolves with the value returned by the activated button's
 // callback (matches V1's Promise wrapping). On Esc / window-X dismiss it
-// resolves null (rejectClose:false). Render receives ($html, dialog) for
-// callsites that need the V2 dialog instance for explicit close().
+// resolves null (rejectClose:false). Render and button callbacks both receive
+// ($html, dialog); the dialog arg is for callsites that need explicit close.
+//
+// V1's second-arg options (width/height/classes) and config-level `id` are
+// flattened into the same kwargs object — V2 routes them to position{} and
+// top-level fields as needed.
 
 export async function showFaseripButtonDialog({
-  title, content, buttons = {}, default: defaultAction, render, close
+  title, content, buttons = {}, default: defaultAction, render, close,
+  id, width, height, classes
 } = {}) {
   const { DialogV2 } = foundry.applications.api;
   const v2Buttons = Object.entries(buttons).map(([action, b]) => ({
@@ -69,11 +74,11 @@ export async function showFaseripButtonDialog({
     default: action === defaultAction,
     callback: async (event, button, dialog) => {
       const $html = $(dialog.element).find('.window-content').first();
-      try { return b.callback ? await b.callback($html) : null; }
+      try { return b.callback ? await b.callback($html, dialog) : null; }
       catch (e) { console.error("FASERIP button-dialog callback error:", e); return null; }
     }
   }));
-  return DialogV2.wait({
+  const cfg = {
     window: { title },
     content,
     buttons: v2Buttons,
@@ -89,5 +94,9 @@ export async function showFaseripButtonDialog({
       try { close?.(); }
       catch (e) { console.warn("FASERIP button-dialog close error:", e); }
     }
-  });
+  };
+  if (id) cfg.id = id;
+  if (classes) cfg.classes = classes;
+  if (width || height) cfg.position = { ...(width ? { width } : {}), ...(height ? { height } : {}) };
+  return DialogV2.wait(cfg);
 }

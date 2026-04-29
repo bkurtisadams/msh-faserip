@@ -21,6 +21,7 @@ import {
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {
@@ -141,7 +142,7 @@ export class DeathSaveAction extends BaseAction {
     `;
 
     const choice = await new Promise((resolve) => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `${dialogTitle}: ${actor.name}`,
         content: dialogHtml,
         buttons: {
@@ -184,7 +185,7 @@ export class DeathSaveAction extends BaseAction {
             html.find('[name="shift"]').val(0).trigger("change");
           });
         }
-      }).render(true);
+      });
     });
 
     if (!choice) return;

@@ -60,6 +60,7 @@ import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS } from "./action-config.js";
 import { SCOPE, getFlagScope } from "./flags.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 
 export class AttackAction extends BaseAction {
@@ -279,7 +280,7 @@ export class AttackAction extends BaseAction {
     `;
     
     return new Promise((resolve) => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `Multiple Attack FEAT (${attackCount} attacks)`,
         content: dialogContent,
         buttons: {
@@ -385,7 +386,7 @@ export class AttackAction extends BaseAction {
             html.find('[name="shift"]').val(0).trigger("input");
           });
         }
-      }).render(true);
+      });
     });
   }
 
