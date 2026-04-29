@@ -1013,3 +1013,38 @@
   align-items: baseline;
   gap: 4px;
 }
+
+/* ── V2 button-dialog (showFaseripButtonDialog) frame overrides ──────── */
+/* DialogV2's default form-footer is much taller than V1's button row, with
+   chunky default <button> sizing. Compress to V1-like dimensions so migrated
+   button-driven dialogs (FEAT, Talent, etc.) match the visual density they
+   had under V1 Dialog. The .faserip-shim-dialog class is added by the shim
+   to every dialog it creates. */
+.application.faserip-shim-dialog .window-content {
+  padding: 8px 10px;
+}
+.application.faserip-shim-dialog .form-footer,
+.application.faserip-shim-dialog footer.form-footer {
+  padding: 4px 8px;
+  gap: 6px;
+  margin-top: 4px;
+  border-top: 1px solid #c0a070;
+  background: #faf8f2;
+}
+.application.faserip-shim-dialog .form-footer button {
+  flex: 0 1 auto;
+  padding: 3px 14px;
+  font-size: 13px;
+  font-family: 'Barlow Condensed', Arial, sans-serif;
+  font-weight: 600;
+  line-height: 1.3;
+  min-height: 0;
+  height: auto;
+  border-radius: 3px;
+}
+/* Default-button focus ring tightened — V2's default outline is fat */
+.application.faserip-shim-dialog .form-footer button:focus,
+.application.faserip-shim-dialog .form-footer button:focus-visible {
+  outline: 1px solid #8b0000;
+  outline-offset: 1px;
+}

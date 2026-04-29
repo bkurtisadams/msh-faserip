@@ -96,7 +96,7 @@ export async function showFaseripButtonDialog({
     }
   };
   if (id) cfg.id = id;
-  if (classes) cfg.classes = classes;
+  cfg.classes = ["faserip-shim-dialog", ...(Array.isArray(classes) ? classes : [])];
   if (width || height) cfg.position = { ...(width ? { width } : {}), ...(height ? { height } : {}) };
   return DialogV2.wait(cfg);
 }
