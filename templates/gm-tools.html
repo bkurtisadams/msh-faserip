@@ -257,9 +257,12 @@
       </div>
     </div>
 
-    <fieldset class="gm-test-fieldset">
-      <legend>Health {{#if hasSelected}}({{healthCur}} / {{healthMax}}){{/if}}</legend>
-      <div class="gm-state-row">
+    <div class="gm-state-grid">
+      <div class="gm-state-label">
+        <strong>Health</strong>
+        {{#if hasSelected}}<span class="gm-state-cur">{{healthCur}} / {{healthMax}}</span>{{/if}}
+      </div>
+      <div class="gm-state-controls">
         <button type="button" class="gm-test-btn gm-health-set" data-mode="full">Full</button>
         <button type="button" class="gm-test-btn gm-health-set" data-mode="half">Half</button>
         <button type="button" class="gm-test-btn gm-health-set" data-mode="1">1</button>
@@ -268,23 +271,25 @@
         <button type="button" class="gm-test-btn gm-health-adj" data-delta="-10">-10</button>
         <button type="button" class="gm-test-btn gm-health-adj" data-delta="10">+10</button>
       </div>
-    </fieldset>
 
-    <fieldset class="gm-test-fieldset">
-      <legend>Endurance {{#if hasSelected}}({{enduranceRank}} / {{enduranceVal}}){{/if}}</legend>
-      <div class="gm-state-row">
-        <button type="button" class="gm-test-btn gm-end-shift" data-delta="-1">▼ Step Down</button>
-        <button type="button" class="gm-test-btn gm-end-shift" data-delta="1">▲ Step Up</button>
+      <div class="gm-state-label">
+        <strong>Endurance</strong>
+        {{#if hasSelected}}<span class="gm-state-cur">{{enduranceRank}} / {{enduranceVal}}</span>{{/if}}
+      </div>
+      <div class="gm-state-controls">
+        <button type="button" class="gm-test-btn gm-end-shift" data-delta="-1" data-tooltip="Step down">▼</button>
+        <button type="button" class="gm-test-btn gm-end-shift" data-delta="1" data-tooltip="Step up">▲</button>
         <select class="gm-end-set">
           <option value="">— Set rank —</option>
           {{#each rankList}}<option value="{{this}}">{{this}}</option>{{/each}}
         </select>
       </div>
-    </fieldset>
 
-    <fieldset class="gm-test-fieldset">
-      <legend>Karma {{#if hasSelected}}({{karmaCur}}){{/if}}</legend>
-      <div class="gm-state-row">
+      <div class="gm-state-label">
+        <strong>Karma</strong>
+        {{#if hasSelected}}<span class="gm-state-cur">{{karmaCur}}</span>{{/if}}
+      </div>
+      <div class="gm-state-controls">
         <button type="button" class="gm-test-btn gm-karma-set" data-value="0">0</button>
         <button type="button" class="gm-test-btn gm-karma-set" data-value="1">1</button>
         <button type="button" class="gm-test-btn gm-karma-set" data-value="5">5</button>
@@ -293,18 +298,20 @@
         <button type="button" class="gm-test-btn gm-karma-adj" data-delta="-10">-10</button>
         <button type="button" class="gm-test-btn gm-karma-adj" data-delta="10">+10</button>
       </div>
-    </fieldset>
 
-    <fieldset class="gm-test-fieldset">
-      <legend>Time Jump (advances world time → ongoing effects tick)</legend>
-      <div class="gm-state-row">
-        <button type="button" class="gm-test-btn gm-time-adv" data-unit="round">+1 Round</button>
-        <button type="button" class="gm-test-btn gm-time-adv" data-unit="min">+1 Min</button>
-        <button type="button" class="gm-test-btn gm-time-adv" data-unit="10min">+10 Min</button>
-        <button type="button" class="gm-test-btn gm-time-adv" data-unit="hour">+1 Hour</button>
-        <button type="button" class="gm-test-btn gm-time-adv" data-unit="day">+1 Day</button>
+      <div class="gm-state-label">
+        <strong>Time</strong>
+        <span class="gm-state-cur">{{worldTimeLabel}}</span>
       </div>
-      <span class="gm-test-hint">World time: {{worldTimeLabel}}</span>
-    </fieldset>
+      <div class="gm-state-controls">
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="round">Round</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="min">Min</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="10min">10 Min</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="hour">Hour</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="day">Day</button>
+      </div>
+    </div>
+
+    <p class="gm-test-hint">Time jump advances world time → ongoing effects (regen, dying, stun) tick.</p>
   </section>
 </div>
