@@ -259,10 +259,10 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
               speaker: ChatMessage.getSpeaker({ actor })
             });
           } else {
-            await effect.delete();
+            if (effect.parent?.effects?.has(effect.id)) await effect.delete();
           }
         } catch (e) {
-          console.warn("[FASERIP WARN] Effect auto-expire failed", e);
+          if (!/does not exist/i.test(e?.message ?? "")) console.warn("[FASERIP WARN] Effect auto-expire failed", e);
         }
       }
     }
@@ -3021,10 +3021,10 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       for (const { effect, reason } of toDelete) {
         console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${a.name}: ${reason}`);
         
-        try { 
-          await effect.delete(); 
-        } catch (e) { 
-          console.warn("[FASERIP WARN] AE auto-expire failed", e); 
+        try {
+          if (effect.parent?.effects?.has(effect.id)) await effect.delete();
+        } catch (e) {
+          if (!/does not exist/i.test(e?.message ?? "")) console.warn("[FASERIP WARN] AE auto-expire failed", e);
         }
       }
     }
