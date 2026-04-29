@@ -69,6 +69,8 @@ export class GMToolsApp extends Application {
     this._running = false;
     this._tokenScope = "current";
     this._tokenFilter = "";
+    this._backupFilter = "";
+    this._brokenPortraits = new Set();
   }
 
   activateListeners(html) {
@@ -79,6 +81,11 @@ export class GMToolsApp extends Application {
     this._restoreActiveTab(html);
 
     // Backup tab
+    html.find(".gm-backup-filter").on("input", ev => {
+      this._backupFilter = String(ev.currentTarget.value || "");
+      // Debounce: hook scheduler already coalesces, reuse it
+      this._onActorChange();
+    });
     html.find(".gm-backup-btn").click(ev => this._onBackup(ev));
     html.find(".gm-restore-btn").click(ev => this._onRestore(ev));
     html.find(".gm-export-btn").click(ev => this._onExport(ev));
@@ -88,6 +95,16 @@ export class GMToolsApp extends Application {
     html.find(".gm-delete-backup-btn").click(ev => this._onDeleteBackup(ev));
     html.find(".gm-restore-orphan-btn").click(ev => this._onRestoreOrphan(ev));
     html.find(".gm-import-file").change(ev => this._onImportFile(ev));
+
+    // Record portrait 404s so subsequent renders substitute the fallback
+    // and don't re-fetch the broken URL. Browsers don't cache 404 by default,
+    // so without this every render hits the network on broken paths.
+    html.find(".gm-tools-actor-table img").each((_, el) => {
+      el.addEventListener("error", () => {
+        const orig = el.dataset.orig;
+        if (orig && !orig.startsWith("icons/")) this._brokenPortraits.add(orig);
+      }, { once: true });
+    });
 
     // Effects tab
     html.find("input[name='gm-effect-side']").change(ev => this._onEffectSideChange(ev));
@@ -160,13 +177,20 @@ export class GMToolsApp extends Application {
   async getData() {
     const backups = this._getBackups();
     const actors = game.actors.filter(a => ["hero", "villain", "npc"].includes(a.type));
-    const actorData = actors.map(a => {
+    const FALLBACK_IMG = "icons/svg/mystery-man.svg";
+    const filterLower = this._backupFilter.toLowerCase();
+    const matchesFilter = (name) => !filterLower || (name && name.toLowerCase().includes(filterLower));
+    const actorData = actors
+      .filter(a => matchesFilter(a.name))
+      .map(a => {
       const snap = backups[a.id];
+      const safeImg = this._brokenPortraits.has(a.img) ? FALLBACK_IMG : a.img;
       return {
         id: a.id,
         name: a.name,
         type: a.type,
-        img: a.img,
+        img: safeImg,
+        origImg: a.img,
         hasBackup: !!snap,
         backupDate: snap?.timestamp ? new Date(snap.timestamp).toLocaleString() : "",
         backupCount: snap ? 1 : 0
@@ -174,6 +198,7 @@ export class GMToolsApp extends Application {
     });
     const orphans = Object.entries(backups)
       .filter(([id]) => !game.actors.get(id))
+      .filter(([, snap]) => matchesFilter(snap.name))
       .map(([id, snap]) => ({
         id,
         name: snap.name || "Unknown",
@@ -203,6 +228,7 @@ export class GMToolsApp extends Application {
       actors: actorData,
       orphans,
       hasOrphans: orphans.length > 0,
+      backupFilter: this._backupFilter,
       // Test panels
       selectedName: selectedActor?.name ?? null,
       targetName: targetActor?.name ?? null,
@@ -275,20 +301,34 @@ export class GMToolsApp extends Application {
   async _snapshotActor(actor) {
     const sys = foundry.utils.deepClone(actor.system);
     const items = actor.items.map(i => ({
+      _id: i.id,
       name: i.name,
       type: i.type,
       img: i.img,
       system: foundry.utils.deepClone(i.system),
-      flags: foundry.utils.deepClone(i.flags || {})
+      flags: foundry.utils.deepClone(i.flags || {}),
+      effects: i.effects?.map(e => ({
+        _id: e.id,
+        name: e.name,
+        icon: e.icon,
+        disabled: e.disabled,
+        duration: foundry.utils.deepClone(e.duration || {}),
+        changes: foundry.utils.deepClone(e.changes || []),
+        flags: foundry.utils.deepClone(e.flags || {}),
+        statuses: Array.from(e.statuses || []),
+        origin: e.origin
+      })) || []
     }));
     const effects = actor.effects.map(e => ({
+      _id: e.id,
       name: e.name,
       icon: e.icon,
       disabled: e.disabled,
       duration: foundry.utils.deepClone(e.duration || {}),
       changes: foundry.utils.deepClone(e.changes || []),
       flags: foundry.utils.deepClone(e.flags || {}),
-      statuses: Array.from(e.statuses || [])
+      statuses: Array.from(e.statuses || []),
+      origin: e.origin
     }));
     // Embed portrait as base64 for external tools (GCC import)
     const portraitData = await this._imgToBase64(actor.img);
@@ -392,15 +432,57 @@ export class GMToolsApp extends Application {
     if (snap.prototypeToken) flatUpdates["prototypeToken"] = snap.prototypeToken;
     await actor.update(flatUpdates);
 
-    // Replace items
+    // Replace items — pass keepId so AEs whose flags reference item IDs
+    // (e.g. defense.bodyArmor.flags.powerItemId) stay valid after restore.
+    // Without this, createEmbeddedDocuments assigns new IDs and any AE that
+    // references the old ID becomes an orphan pointing at a non-existent
+    // Power. The system's createItem hooks then build a fresh AE from the
+    // newly-created Power, which can race the snapshot's AE write and
+    // produce stale values.
     const existingIds = actor.items.map(i => i.id);
     if (existingIds.length) await actor.deleteEmbeddedDocuments("Item", existingIds);
-    if (snap.items?.length) await actor.createEmbeddedDocuments("Item", snap.items);
+    if (snap.items?.length) {
+      // Items may have explicit _id from snapshot; sanitize: drop any item
+      // entries lacking _id (legacy snapshots from before this fix).
+      const itemsWithIds = snap.items.filter(i => i._id);
+      const itemsWithoutIds = snap.items.filter(i => !i._id);
+      if (itemsWithIds.length) {
+        await actor.createEmbeddedDocuments("Item", itemsWithIds, { keepId: true });
+      }
+      if (itemsWithoutIds.length) {
+        await actor.createEmbeddedDocuments("Item", itemsWithoutIds);
+      }
+    }
 
-    // Replace effects
+    // Replace effects with same keepId treatment so origin / cross-references
+    // (e.g. ongoingId pointing at item IDs) remain valid.
     const existingEffectIds = actor.effects.map(e => e.id);
     if (existingEffectIds.length) await actor.deleteEmbeddedDocuments("ActiveEffect", existingEffectIds);
-    if (snap.effects?.length) await actor.createEmbeddedDocuments("ActiveEffect", snap.effects);
+    if (snap.effects?.length) {
+      const effectsWithIds = snap.effects.filter(e => e._id);
+      const effectsWithoutIds = snap.effects.filter(e => !e._id);
+      if (effectsWithIds.length) {
+        await actor.createEmbeddedDocuments("ActiveEffect", effectsWithIds, { keepId: true });
+      }
+      if (effectsWithoutIds.length) {
+        await actor.createEmbeddedDocuments("ActiveEffect", effectsWithoutIds);
+      }
+    }
+
+    // Force defense AEs (body armor, force field, resistance) to rebuild
+    // from the restored Power items. The snapshot's defense AE flag values
+    // (physical, energy, *Rank) are computed/cached values, not the source
+    // of truth — the Power item is. If a Power was modified after backup
+    // and then the actor was restored, the snapshot AE will carry the
+    // pre-modification values until something forces a sync. Call the
+    // system's own sync function so this stays consistent with how the
+    // createItem / updateItem / createToken hooks already manage these AEs.
+    try {
+      const { syncAllDefenseEffects } = await import("./modules/effects/defense-effects.js");
+      await syncAllDefenseEffects(actor);
+    } catch (e) {
+      console.warn("[FASERIP:GMTools] syncAllDefenseEffects after restore failed:", e);
+    }
   }
 
   async _onDeleteBackup(ev) {
@@ -755,11 +837,20 @@ export class GMToolsApp extends Application {
     }
     this._running = true;
     const cov = this._coverageFor(actor);
+    // Sweep order: run Escaping last. The escaping action applies a
+    // "Just Escaped (half move, no actions)" AE that gates every
+    // subsequent action with "Cannot act due to: active effects",
+    // so anything after it in ACTION_LIST gets skipped during a
+    // Run All. HUD button order is unchanged.
+    const sweepOrder = [
+      ...ACTION_LIST.filter(a => a.id !== "escaping"),
+      ...ACTION_LIST.filter(a => a.id === "escaping")
+    ];
     try {
-      for (const a of ACTION_LIST) {
+      for (const a of sweepOrder) {
         await this._dispatch(actor, a.id, a.ability);
         cov.add(a.id);
-        this.render();
+        this._onActorChange();   // coalesced render via debouncer (covers ✓ pulse)
         if (this._runDelay > 0) await sleep(this._runDelay);
       }
       ui.notifications.info(`Run All: ${ACTION_LIST.length} actions dispatched.`);
