@@ -441,10 +441,12 @@ export class FaseripInitiative {
         btn.innerHTML = `<i class="fas fa-dice"></i> Roll Initiative`;
         btn.title = "End declarations and roll initiative";
         btn.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (!live) return ui.notifications.warn("No active combat.");
           if (this._isSideMode()) {
-            await this.rollSideInitiative(combat);
+            await this.rollSideInitiative(live);
           } else {
-            await this.rollIndividualInitiative(combat);
+            await this.rollIndividualInitiative(live);
           }
         });
         bar.appendChild(btn);
@@ -456,7 +458,9 @@ export class FaseripInitiative {
         btn.innerHTML = `<i class="fas fa-play"></i> ${winnerLabel} Act`;
         btn.title = `End Pre-Action phase — ${winnerLabel} (initiative winner) act first`;
         btn.addEventListener("click", async () => {
-          await this._setPhase(combat, this.PHASE_ACTIONS_WINNER);
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (!live) return ui.notifications.warn("No active combat.");
+          await this._setPhase(live, this.PHASE_ACTIONS_WINNER);
         });
         bar.appendChild(btn);
       }
@@ -467,7 +471,9 @@ export class FaseripInitiative {
         btn.innerHTML = `<i class="fas fa-forward"></i> ${loserLabel} Act`;
         btn.title = `${winnerLabel} done — ${loserLabel} (initiative loser) act now`;
         btn.addEventListener("click", async () => {
-          await this._setPhase(combat, this.PHASE_ACTIONS_LOSER);
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (!live) return ui.notifications.warn("No active combat.");
+          await this._setPhase(live, this.PHASE_ACTIONS_LOSER);
         });
         bar.appendChild(btn);
       }
