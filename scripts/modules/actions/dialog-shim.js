@@ -19,12 +19,20 @@ export async function showFaseripDialog({ title, content, render, close } = {}) 
   return DialogV2.wait({
     window: { title },
     content,
-    buttons: [],
+    // V2 requires at least one button. Provide a hidden dummy; the
+    // content's own elements drive interaction. We hide the button row
+    // in render before it paints. Not marked as default so Enter doesn't
+    // auto-resolve — the caller's render typically binds its own Enter
+    // handler that triggers the Roll button.
+    buttons: [{ action: "_frame", label: "" }],
     rejectClose: false,
     render: async (event, dialog) => {
-      // V2 dialog.element is the outer <dialog>; .window-content is the
-      // body slot. Wrap it as jQuery so existing render bodies keep working.
-      const $html = $(dialog.element).find('.window-content').first();
+      const $root = $(dialog.element);
+      // Hide V2's button area. Class names vary by core version
+      // (.dialog-buttons in some, footer.form-footer in others); hide
+      // both so the frame-only contract is preserved regardless.
+      $root.find('.dialog-buttons, footer.form-footer').hide();
+      const $html = $root.find('.window-content').first();
       try { await render?.($html, dialog); }
       catch (e) { console.error("FASERIP dialog render error:", e); }
     },
