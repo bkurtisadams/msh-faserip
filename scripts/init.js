@@ -2648,7 +2648,9 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
     || changes.system?.resistanceIsInvulnerability !== undefined
     || changes.system?.forceFieldType !== undefined
     || changes.system?.forceFieldPersonal !== undefined
-    || changes.system?.forceFieldCoverage !== undefined;
+    || changes.system?.forceFieldCoverage !== undefined
+    || changes.system?.isActive !== undefined
+    || changes.system?.activationType !== undefined;
   if (!relevantChange) return;
 
   await syncPowerOngoingEffects(actor, item);
