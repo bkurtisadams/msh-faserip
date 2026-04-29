@@ -71,6 +71,7 @@ export class GMToolsApp extends Application {
     this._tokenFilter = "";
     this._backupFilter = "";
     this._brokenPortraits = new Set();
+    this._preclearAttacker = false;
   }
 
   activateListeners(html) {
@@ -117,6 +118,7 @@ export class GMToolsApp extends Application {
     html.find(".gm-action-btn").click(ev => this._onRunAction(ev));
     html.find(".gm-runner-all").click(ev => this._onRunAll(ev));
     html.find(".gm-runner-delay").change(ev => { this._runDelay = Number(ev.currentTarget.value) || 0; });
+    html.find(".gm-preclear-attacker").change(ev => { this._preclearAttacker = !!ev.currentTarget.checked; });
     html.find(".gm-coverage-reset").click(ev => this._onResetCoverage(ev));
 
     // Tokens tab
@@ -240,6 +242,7 @@ export class GMToolsApp extends Application {
       isFullMode: this._testMode === "full",
       actionList,
       runDelay: this._runDelay,
+      preclearAttacker: this._preclearAttacker,
       // Tokens tab
       tokens: this._collectTokens(),
       tokenFilter: this._tokenFilter,
@@ -815,6 +818,20 @@ export class GMToolsApp extends Application {
     }
   }
 
+  async _preclearForAttacker(actor) {
+    if (!actor) return;
+    const ids = actor.effects
+      .filter(e => {
+        const f = e.flags?.[SCOPE];
+        if (!f) return false;                              // ignore non-FASERIP AEs
+        if (f.effectCategory === "defense") return false;   // keep BA / FF / Resistance
+        return true;
+      })
+      .map(e => e.id);
+    if (!ids.length) return;
+    await safeActorDeleteEffects(actor, ids);
+  }
+
   async _onRunAll(ev) {
     ev.preventDefault();
     if (this._running) return;
@@ -848,6 +865,7 @@ export class GMToolsApp extends Application {
     ];
     try {
       for (const a of sweepOrder) {
+        if (this._preclearAttacker) await this._preclearForAttacker(actor);
         await this._dispatch(actor, a.id, a.ability);
         cov.add(a.id);
         this._onActorChange();   // coalesced render via debouncer (covers ✓ pulse)

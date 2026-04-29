@@ -195,6 +195,10 @@
         <label class="gm-test-inline">Delay:
           <input type="number" class="gm-runner-delay" min="0" max="5000" step="100" value="{{runDelay}}" />ms
         </label>
+        <label class="gm-test-inline" data-tooltip="Clear non-Power AEs from the attacker before each action so leftover state from prior runs doesn't gate later actions">
+          <input type="checkbox" class="gm-preclear-attacker" {{#if preclearAttacker}}checked{{/if}} />
+          Pre-clear attacker
+        </label>
         <button type="button" class="gm-test-btn gm-coverage-reset"><i class="fas fa-eraser"></i> Reset Coverage</button>
       </div>
     </fieldset>
