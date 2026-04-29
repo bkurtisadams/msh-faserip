@@ -2827,6 +2827,15 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
     } else {
       // === Above 0 HP: record damage for rest system (throttled) ===
 
+      // Skip if applyDamageToTargets is handling this. Combat damage path
+      // calls recordDamage explicitly after its actor.update returns; without
+      // this guard the hook fires recordDamage during the update and the
+      // explicit call fires it again, registering Healing twice per hit.
+      // Mirrors the _combatDamageInProgress skip in the 0-HP branch above.
+      if (game.msh?._combatDamageInProgress) {
+        return;
+      }
+
       // Throttle rest-system timer creation (1.5s per actor) â€” only for non-death damage
       const now = Date.now();
       game.msh._lastDamageTimerAt ??= {};
