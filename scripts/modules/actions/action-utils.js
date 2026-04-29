@@ -1670,6 +1670,21 @@ export async function applyDamageToTargets({
         const { isLethalAttackForm } = await import("../../rules/kill-resolver.js");
         const isLethal = wasKillResult || forceKilling || isLethalAttackForm(attackForm);
 
+        // Detect whether the target is already dying (post-FEAT) or just
+        // unconscious from a Stun-row Kill FEAT. The Kill column FEAT runs
+        // once when Health first hits 0 (rules p.31). It does NOT fire again
+        // per-hit. Subsequent hits on an already-down target produce one of:
+        //   - Four-Color non-lethal: chat notice, no rules effect
+        //   - Lethal hit, target dying: no new FEAT — dying countdown handles
+        //     endurance loss at 1 rank/round automatically
+        //   - Lethal hit, target unconscious from Stun-KO: no new FEAT
+        //     — per rules the Kill FEAT was the one chance for dying entry
+        const SCOPE_KEY = "msh-faserip";
+        const isDying = !!targetActor?.effects?.find(e =>
+          e.flags?.[SCOPE_KEY]?.ongoingId?.startsWith("dying.") ||
+          /^Dying\b/i.test(e.name || "")
+        );
+
         if (fourColor && !isLethal) {
           // Four-Color Rule: blunt hit on unconscious target — no death save
           console.log(`[FASERIP] Four-Color: hit on unconscious ${targetActor.name} (non-lethal) — no death save`);
@@ -1679,35 +1694,32 @@ export async function applyDamageToTargets({
               <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save from blunt/non-killing attack.</div>
             </div>`
           });
-        } else {
-        console.log("⚠️ FASERIP | Hit on unconscious target:", targetActor.name, "- triggering death save");
-        
-        const mode = resolveCombatModeSafe(targetActor) || "manual";
-        
-        if (mode === "full") {
-          console.log("FASERIP DEBUG | Full auto - triggering death save for unconscious target");
-          const { ActionDispatcher } = await import("./action-dispatcher.js");
-          await ActionDispatcher.roll("death-save", { 
-            actor: targetActor,
-            opts: { 
-              autoApply: true, 
-              showConfirm: false,
-              attackForm: attackForm,
-              fromZeroHealth: true
-            }
+        } else if (isDying) {
+          // Lethal hit on a dying target. Per rules, dying is a per-round
+          // process (1 Endurance rank/turn). Hits do not retrigger the
+          // Kill-column FEAT or compound the loss.
+          console.log(`[FASERIP] Hit on dying ${targetActor.name} — no new death save (countdown continues per round)`);
+          await ChatMessage.create({
+            content: `<div style="background:#fce4ec;border:1px solid #c2185b;padding:8px;border-radius:3px;">
+              <strong>${targetActor.name}</strong> was hit while dying.
+              <div style="font-size:0.9em;color:#666;margin-top:4px;">Already in dying countdown — endurance loss continues at 1 rank per round.</div>
+            </div>`
           });
         } else {
-          // Manual/Semi mode - show button
-          const _isRobotUncon = targetActor.system?.origin === "Robot";
-          ChatMessage.create({
+          // Lethal hit on a target unconscious from Stun-row Kill FEAT
+          // (Health 0, but the FEAT produced "no effect"/Stun, not dying).
+          // The rules give one Kill FEAT per Health-zero event; they do not
+          // call for a new FEAT on subsequent hits. Record the hit and move
+          // on. (GM may rule otherwise narratively; surface for prompt.)
+          console.log(`[FASERIP] Hit on unconscious ${targetActor.name} (lethal) — no new death save per rules`);
+          await ChatMessage.create({
             content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
-              <strong>${targetActor.name}</strong> was hit while ${_isRobotUncon ? "offline" : "unconscious"}!
-              <button class="death-save-button" data-action="death-save" data-actor-uuid="${targetActor.uuid}" data-attack-form="${attackForm}">${_isRobotUncon ? "Roll Deactivation Save" : "Roll Death Save"}</button>
+              <strong>${targetActor.name}</strong> was hit while unconscious (lethal attack).
+              <div style="font-size:0.9em;color:#666;margin-top:4px;">Rules: Kill-column FEAT fires once at Health 0; no new save. GM discretion for coup-de-grâce.</div>
             </div>`
           });
         }
-        } // end fourColor else
-          
+
         results.push({
           actorUuid: targetActor?.uuid,
           tokenUuid: token?.uuid,
