@@ -1015,14 +1015,88 @@
 }
 
 /* ── V2 button-dialog (showFaseripButtonDialog) frame overrides ──────── */
-/* DialogV2's default form-footer is much taller than V1's button row, with
-   chunky default <button> sizing. Compress to V1-like dimensions so migrated
-   button-driven dialogs (FEAT, Talent, etc.) match the visual density they
-   had under V1 Dialog. The .faserip-shim-dialog class is added by the shim
-   to every dialog it creates. */
+/* DialogV2 has very different defaults than V1 Dialog: a wrapping <form>
+   with flex gap, pill-shaped <input>/<select> styling, and a parchment
+   texture showing through .window-content. The .faserip-shim-dialog class
+   is added by the shim to every dialog it creates so we can scope
+   overrides without touching unrelated V2 dialogs. */
+
+/* Window frame: cream background to match .frp-dlg, kill the V2 texture */
 .application.faserip-shim-dialog .window-content {
+  background: #fcf8eb;
   padding: 8px 10px;
+  gap: 0;
+  color: #1a1a1a;
+  font-family: 'Barlow Condensed', Arial, sans-serif;
+  font-size: 14px;
 }
+
+/* V2 wraps content in <form> with display:flex + gap. Strip both. */
+.application.faserip-shim-dialog .window-content form,
+.application.faserip-shim-dialog form.dialog-form {
+  display: block;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* Kill any auto-margin V2 puts between top-level form children */
+.application.faserip-shim-dialog .window-content > * + *,
+.application.faserip-shim-dialog form > * + * {
+  margin-top: 0;
+}
+
+/* Inputs: V2 default is pillbutton-shaped; flatten to V1-like density */
+.application.faserip-shim-dialog input[type="text"],
+.application.faserip-shim-dialog input[type="number"],
+.application.faserip-shim-dialog input[type="search"],
+.application.faserip-shim-dialog select,
+.application.faserip-shim-dialog textarea {
+  background: #fff;
+  border: 1px solid #b8b8b8;
+  border-radius: 2px;
+  padding: 2px 6px;
+  height: auto;
+  min-height: 0;
+  line-height: 1.3;
+  font-family: inherit;
+  font-size: 13px;
+  box-shadow: none;
+  margin: 0;
+}
+.application.faserip-shim-dialog input[type="text"][readonly],
+.application.faserip-shim-dialog input[type="number"][readonly] {
+  background: #f5f3ee;
+  color: #555;
+}
+.application.faserip-shim-dialog select:focus,
+.application.faserip-shim-dialog input:focus {
+  border-color: #8b0000;
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(139, 0, 0, 0.25);
+}
+
+/* Checkboxes/radios: V2 defaults to oversized; restore V1 inline scale */
+.application.faserip-shim-dialog input[type="checkbox"],
+.application.faserip-shim-dialog input[type="radio"] {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 4px 0 0;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+
+/* Labels: V2 sets bold weight on labels in some forms; let inline drive */
+.application.faserip-shim-dialog label {
+  font-weight: inherit;
+  margin: 0;
+  display: inline-block;
+}
+
+/* Form footer: tighten V2's default chunky footer/buttons to V1 density */
 .application.faserip-shim-dialog .form-footer,
 .application.faserip-shim-dialog footer.form-footer {
   padding: 4px 8px;
@@ -1030,6 +1104,7 @@
   margin-top: 4px;
   border-top: 1px solid #c0a070;
   background: #faf8f2;
+  flex: 0 0 auto;
 }
 .application.faserip-shim-dialog .form-footer button {
   flex: 0 1 auto;
@@ -1041,10 +1116,27 @@
   min-height: 0;
   height: auto;
   border-radius: 3px;
+  background: #d3d3c7;
+  color: #222;
+  border: 1px solid #888;
 }
-/* Default-button focus ring tightened — V2's default outline is fat */
+.application.faserip-shim-dialog .form-footer button:hover {
+  filter: brightness(1.05);
+}
 .application.faserip-shim-dialog .form-footer button:focus,
 .application.faserip-shim-dialog .form-footer button:focus-visible {
   outline: 1px solid #8b0000;
   outline-offset: 1px;
+}
+
+/* Header (titlebar): V2 default is plain black. Tint to system maroon. */
+.application.faserip-shim-dialog .window-header {
+  background: linear-gradient(90deg, #8b0000 0%, #660000 100%);
+  border-bottom: 1px solid #c0a070;
+}
+.application.faserip-shim-dialog .window-header .window-title {
+  color: #fff;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
