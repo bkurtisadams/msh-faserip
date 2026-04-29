@@ -2032,13 +2032,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         const updates = transferEffects.map(e => ({ _id: e.id, disabled: !newState }));
         await item.updateEmbeddedDocuments("ActiveEffect", updates);
       }
-      // Sync defense AEs (BA, FF, Resistance) — respects isActive
-      try {
-        const { syncDefenseEffects } = await import("./modules/effects/defense-effects.js");
-        await syncDefenseEffects(this.actor, item);
-      } catch (e) {
-        console.error("[FASERIP ERROR] Failed to sync defense effects on toggle:", e);
-      }
+      // Defense AEs (BA, FF, Resistance) sync via updateItem hook in init.js
       // If Nullifying Power toggled off, stop the aura and restore powers
       if (!newState && (item.name || "").toLowerCase().includes("nullif")) {
         try {
