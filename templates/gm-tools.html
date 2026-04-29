@@ -1,12 +1,12 @@
 <div class="gm-tools-container">
   <nav class="gm-tools-tabs">
-    <a class="gm-tab-link active" data-tab="backups"><i class="fas fa-save"></i> Backups</a>
+    <a class="gm-tab-link active" data-tab="combat"><i class="fas fa-fist-raised"></i> Combat</a>
     <a class="gm-tab-link" data-tab="effects"><i class="fas fa-bolt"></i> Effects</a>
-    <a class="gm-tab-link" data-tab="combat"><i class="fas fa-fist-raised"></i> Combat</a>
+    <a class="gm-tab-link" data-tab="backups"><i class="fas fa-save"></i> Backups</a>
   </nav>
 
   {{!-- ──────────── Tab 1: Backups ──────────── --}}
-  <section class="gm-tab-panel active" data-tab="backups">
+  <section class="gm-tab-panel" data-tab="backups">
     <div class="gm-tools-bulk-actions">
       <button type="button" class="gm-backup-all-btn"><i class="fas fa-save"></i> Backup All</button>
       <button type="button" class="gm-export-all-btn"><i class="fas fa-file-export"></i> Export All</button>
@@ -153,7 +153,7 @@
   </section>
 
   {{!-- ──────────── Tab 3: Combat ──────────── --}}
-  <section class="gm-tab-panel" data-tab="combat">
+  <section class="gm-tab-panel active" data-tab="combat">
     <div class="gm-test-tokens">
       <div class="gm-test-token-row">
         <span class="gm-test-label">Attacker (selected):</span>

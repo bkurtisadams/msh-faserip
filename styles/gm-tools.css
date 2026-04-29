@@ -413,3 +413,37 @@
   gap: 10px;
   margin-top: 6px;
 }
+
+/* ── v1.2.1 — compact dialog + v14 shadow fix ── */
+
+.faserip-gm-tools .window-content { padding: 6px; }
+
+.gm-tools-tabs { margin: -6px -6px 6px -6px; padding: 0 6px; }
+.gm-tab-link { padding: 5px 10px; font-size: 10px; }
+
+.gm-test-tokens { padding: 4px 6px; margin-bottom: 6px; }
+.gm-test-token-row { font-size: 10px; }
+.gm-test-label { min-width: 110px; }
+
+.gm-test-fieldset { margin: 0 0 6px 0; padding: 4px 6px; }
+.gm-test-fieldset legend { font-size: 10px; }
+.gm-test-radio { margin-right: 8px; font-size: 10px; }
+.gm-test-hint { font-size: 9px; }
+
+.gm-effect-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 3px; }
+.gm-effect-btn { height: 22px; padding: 0 4px; font-size: 10px; }
+
+.gm-action-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 3px; }
+.gm-action-btn { height: 32px; font-size: 12px; }
+
+/* v14 puts a baked-in white text-shadow on table headers + legends.
+   Override for our dialog so labels don't double-image. */
+.faserip-gm-tools th,
+.faserip-gm-tools legend,
+.faserip-gm-tools .gm-tab-link {
+  text-shadow: none;
+}
+
+.gm-inspector-table { font-size: 10px; }
+.gm-inspector-table th { padding: 2px 5px; font-size: 9px; }
+.gm-inspector-table td { padding: 2px 5px; }

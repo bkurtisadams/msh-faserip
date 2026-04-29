@@ -32,8 +32,8 @@ export class GMToolsApp extends Application {
       classes: ["msh", "faserip-gm-tools"],
       title: "GM Tools",
       template: "systems/msh-faserip/templates/gm-tools.html",
-      width: 720,
-      height: 720,
+      width: 460,
+      height: 500,
       resizable: true,
       minimizable: true
     });
@@ -43,7 +43,7 @@ export class GMToolsApp extends Application {
     super(options);
     this._onActorChange = () => { if (this.rendered) this.render(); };
     this._onTokenChange = () => { if (this.rendered) this.render(); };
-    this._activeTab = "backups";
+    this._activeTab = "combat";
     this._effectSide = "target";
     this._testMode = "full";
     this._runDelay = 800;
@@ -179,7 +179,7 @@ export class GMToolsApp extends Application {
   _restoreActiveTab(html) {
     const root = html instanceof jQuery ? html[0] : html;
     if (!root) return;
-    const tab = this._activeTab || "backups";
+    const tab = this._activeTab || "combat";
     root.querySelectorAll(".gm-tab-link").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
     root.querySelectorAll(".gm-tab-panel").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
   }
@@ -718,6 +718,45 @@ export class GMToolsApp extends Application {
 
 // ── Registration ──
 
+// Top-level: register the scene controls hook at module-load time so
+// it's bound BEFORE Foundry first builds the controls. registerGMTools()
+// runs at the "ready" stage (see init.js), which is too late — by then
+// getSceneControlButtons has already fired. ES modules resolve imports
+// before init, so Hooks.on at top level is safe and early.
+Hooks.on("getSceneControlButtons", (controlsData) => {
+  if (!game.user?.isGM) return;
+  let groups;
+  if (Array.isArray(controlsData)) groups = controlsData;
+  else if (controlsData && typeof controlsData === "object") groups = Object.values(controlsData);
+  else return;
+  const tokenGroup = groups.find(g => g.name === "tokens" || g.name === "token");
+  if (!tokenGroup) return;
+
+  const tools = {};
+  if (tokenGroup.tools) {
+    for (const t of Object.values(tokenGroup.tools)) {
+      if (t?.name) tools[t.name] = t;
+    }
+  }
+  if (!tools["faserip-gm-tools"]) {
+    const open = () => {
+      if (game.msh?.openGMTools) return game.msh.openGMTools();
+      // Fallback if registerGMTools hasn't run yet (shouldn't happen)
+      if (!game.user.isGM) return;
+      new GMToolsApp().render(true);
+    };
+    tools["faserip-gm-tools"] = {
+      name: "faserip-gm-tools",
+      title: "GM Tools",
+      icon: "fas fa-shield-alt",
+      visible: true,
+      button: true,
+      onChange: open
+    };
+    tokenGroup.tools = tools;
+  }
+});
+
 export function registerGMTools() {
   // Register backup storage setting
   game.settings.register(SCOPE, SETTING_KEY, {
@@ -732,49 +771,16 @@ export function registerGMTools() {
   game.msh = game.msh ?? {};
   game.msh.openGMTools = () => {
     if (!game.user.isGM) return ui.notifications.warn("GM Tools is GM-only");
-    if (game.msh._gmToolsApp?.rendered) {
-      game.msh._gmToolsApp.bringToTop();
+    // Reuse existing instance regardless of rendered flag — render(true)
+    // re-opens a closed app and brings a rendered one to top.
+    if (game.msh._gmToolsApp) {
+      game.msh._gmToolsApp.render(true);
       return game.msh._gmToolsApp;
     }
     game.msh._gmToolsApp = new GMToolsApp();
     game.msh._gmToolsApp.render(true);
     return game.msh._gmToolsApp;
   };
-
-  // Scene Controls button (v13/v14 reliable path)
-  Hooks.on("getSceneControlButtons", (controlsData) => {
-    if (!game.user?.isGM) return;
-    let groups;
-    if (Array.isArray(controlsData)) groups = controlsData;
-    else if (controlsData && typeof controlsData === "object") groups = Object.values(controlsData);
-    else return;
-    const tokenGroup = groups.find(g => g.name === "tokens" || g.name === "token");
-    if (!tokenGroup) return;
-
-    const tools = {};
-    if (tokenGroup.tools) {
-      for (const t of Object.values(tokenGroup.tools)) {
-        if (t?.name) tools[t.name] = t;
-      }
-    }
-    if (!tools["faserip-gm-tools"]) {
-      tools["faserip-gm-tools"] = {
-        name: "faserip-gm-tools",
-        title: "GM Tools",
-        icon: "fas fa-shield-alt",
-        visible: true,
-        button: true,
-        onClick: () => game.msh.openGMTools(),
-        onChange: () => game.msh.openGMTools()
-      };
-      tokenGroup.tools = tools;
-    }
-  });
-
-  // registerGMTools runs at "ready", after scene controls have already
-  // been built and getSceneControlButtons has already fired. Force a
-  // re-render so the listener above actually runs.
-  try { ui.controls?.render?.(true); } catch (_) { /* no canvas yet */ }
 
   // Actor Directory header button (best-effort across v13/v14 markup)
   const addButton = (html) => {
