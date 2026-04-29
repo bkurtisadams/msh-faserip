@@ -535,13 +535,14 @@
   display: grid;
   grid-template-columns: 90px 1fr;
   gap: 6px 8px;
-  align-items: center;
+  align-items: start;
   padding: 4px 0;
 }
 .gm-state-label {
   font-size: 11px;
   color: #8b0000;
   line-height: 1.2;
+  padding-top: 3px;
 }
 .gm-state-label strong {
   display: block;
@@ -559,17 +560,29 @@
 }
 .gm-state-controls {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 3px;
   align-items: center;
 }
+/* v14 ApplicationV2 forces buttons to display:block / width:100%. Undo
+   that for our row controls so they pack horizontally. */
 .gm-state-controls .gm-test-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   padding: 2px 6px;
-  min-width: 32px;
   height: 22px;
   font-size: 10px;
+  white-space: nowrap;
 }
 .gm-end-set {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   height: 22px;
   padding: 0 4px;
   font-size: 10px;
