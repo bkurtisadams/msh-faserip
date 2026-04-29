@@ -1,70 +1,199 @@
 <div class="gm-tools-container">
-  <div class="gm-tools-bulk-actions">
-    <button type="button" class="gm-backup-all-btn"><i class="fas fa-save"></i> Backup All</button>
-    <button type="button" class="gm-export-all-btn"><i class="fas fa-file-export"></i> Export All</button>
-    <button type="button" class="gm-import-btn"><i class="fas fa-file-import"></i> Import</button>
-    <input type="file" class="gm-import-file" accept=".json" style="display:none" />
-  </div>
+  <nav class="gm-tools-tabs">
+    <a class="gm-tab-link active" data-tab="backups"><i class="fas fa-save"></i> Backups</a>
+    <a class="gm-tab-link" data-tab="effects"><i class="fas fa-bolt"></i> Effects</a>
+    <a class="gm-tab-link" data-tab="combat"><i class="fas fa-fist-raised"></i> Combat</a>
+  </nav>
 
-  <table class="gm-tools-actor-table">
-    <thead>
-      <tr>
-        <th class="col-img"></th>
-        <th class="col-name">Character</th>
-        <th class="col-type">Type</th>
-        <th class="col-backup">Last Backup</th>
-        <th class="col-actions">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#each actors}}
-      <tr class="actor-row {{#if hasBackup}}has-backup{{/if}}">
-        <td class="col-img"><img src="{{img}}" alt="" width="28" height="28" /></td>
-        <td class="col-name">{{name}}</td>
-        <td class="col-type">{{type}}</td>
-        <td class="col-backup">
-          {{#if hasBackup}}
-            <span class="backup-date">{{backupDate}}</span>
-          {{else}}
-            <span class="no-backup">—</span>
-          {{/if}}
-        </td>
-        <td class="col-actions">
-          <button type="button" class="gm-backup-btn" data-actor-id="{{id}}" data-tooltip="Backup"><i class="fas fa-save"></i></button>
-          <button type="button" class="gm-restore-btn" data-actor-id="{{id}}" data-tooltip="Restore" {{#unless hasBackup}}disabled{{/unless}}><i class="fas fa-undo"></i></button>
-          <button type="button" class="gm-export-btn" data-actor-id="{{id}}" data-tooltip="Export JSON"><i class="fas fa-file-export"></i></button>
-        </td>
-      </tr>
-      {{/each}}
-    </tbody>
-  </table>
+  {{!-- ──────────── Tab 1: Backups ──────────── --}}
+  <section class="gm-tab-panel active" data-tab="backups">
+    <div class="gm-tools-bulk-actions">
+      <button type="button" class="gm-backup-all-btn"><i class="fas fa-save"></i> Backup All</button>
+      <button type="button" class="gm-export-all-btn"><i class="fas fa-file-export"></i> Export All</button>
+      <button type="button" class="gm-import-btn"><i class="fas fa-file-import"></i> Import</button>
+      <input type="file" class="gm-import-file" accept=".json" style="display:none" />
+    </div>
 
-  {{#if hasOrphans}}
-  <fieldset class="gm-tools-orphans">
-    <legend>Deleted Characters (Backups Remain)</legend>
-    <table class="gm-tools-orphan-table">
+    <table class="gm-tools-actor-table">
       <thead>
         <tr>
+          <th class="col-img"></th>
           <th class="col-name">Character</th>
           <th class="col-type">Type</th>
-          <th class="col-backup">Backup Date</th>
+          <th class="col-backup">Last Backup</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
-        {{#each orphans}}
-        <tr class="orphan-row">
+        {{#each actors}}
+        <tr class="actor-row {{#if hasBackup}}has-backup{{/if}}">
+          <td class="col-img"><img src="{{img}}" alt="" width="28" height="28" /></td>
           <td class="col-name">{{name}}</td>
           <td class="col-type">{{type}}</td>
-          <td class="col-backup">{{timestamp}}</td>
+          <td class="col-backup">
+            {{#if hasBackup}}
+              <span class="backup-date">{{backupDate}}</span>
+            {{else}}
+              <span class="no-backup">—</span>
+            {{/if}}
+          </td>
           <td class="col-actions">
-            <button type="button" class="gm-restore-orphan-btn" data-backup-id="{{id}}" data-tooltip="Restore as new actor"><i class="fas fa-user-plus"></i></button>
-            <button type="button" class="gm-delete-backup-btn" data-backup-id="{{id}}" data-tooltip="Delete backup"><i class="fas fa-trash"></i></button>
+            <button type="button" class="gm-backup-btn" data-actor-id="{{id}}" data-tooltip="Backup"><i class="fas fa-save"></i></button>
+            <button type="button" class="gm-restore-btn" data-actor-id="{{id}}" data-tooltip="Restore" {{#unless hasBackup}}disabled{{/unless}}><i class="fas fa-undo"></i></button>
+            <button type="button" class="gm-export-btn" data-actor-id="{{id}}" data-tooltip="Export JSON"><i class="fas fa-file-export"></i></button>
           </td>
         </tr>
         {{/each}}
       </tbody>
     </table>
-  </fieldset>
-  {{/if}}
+
+    {{#if hasOrphans}}
+    <fieldset class="gm-tools-orphans">
+      <legend>Deleted Characters (Backups Remain)</legend>
+      <table class="gm-tools-orphan-table">
+        <thead>
+          <tr>
+            <th class="col-name">Character</th>
+            <th class="col-type">Type</th>
+            <th class="col-backup">Backup Date</th>
+            <th class="col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each orphans}}
+          <tr class="orphan-row">
+            <td class="col-name">{{name}}</td>
+            <td class="col-type">{{type}}</td>
+            <td class="col-backup">{{timestamp}}</td>
+            <td class="col-actions">
+              <button type="button" class="gm-restore-orphan-btn" data-backup-id="{{id}}" data-tooltip="Restore as new actor"><i class="fas fa-user-plus"></i></button>
+              <button type="button" class="gm-delete-backup-btn" data-backup-id="{{id}}" data-tooltip="Delete backup"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </fieldset>
+    {{/if}}
+  </section>
+
+  {{!-- ──────────── Tab 2: Effects ──────────── --}}
+  <section class="gm-tab-panel" data-tab="effects">
+    <div class="gm-test-tokens">
+      <div class="gm-test-token-row">
+        <span class="gm-test-label">Selected:</span>
+        <span class="gm-test-value">{{#if selectedName}}{{selectedName}}{{else}}<em>none</em>{{/if}}</span>
+      </div>
+      <div class="gm-test-token-row">
+        <span class="gm-test-label">Targeted:</span>
+        <span class="gm-test-value">{{#if targetName}}{{targetName}}{{else}}<em>none</em>{{/if}}</span>
+      </div>
+    </div>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Apply Effect To</legend>
+      <label class="gm-test-radio">
+        <input type="radio" name="gm-effect-side" value="target" {{#if isTargetSide}}checked{{/if}}/>
+        Targeted Token
+      </label>
+      <label class="gm-test-radio">
+        <input type="radio" name="gm-effect-side" value="selected" {{#unless isTargetSide}}checked{{/unless}}/>
+        Selected Token
+      </label>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Status Effects</legend>
+      <div class="gm-effect-grid">
+        <button type="button" class="gm-effect-btn" data-effect="stun">Stun</button>
+        <button type="button" class="gm-effect-btn" data-effect="slam-1area">Slam (1 Area)</button>
+        <button type="button" class="gm-effect-btn" data-effect="slam-grand">Grand Slam</button>
+        <button type="button" class="gm-effect-btn" data-effect="prone">Prone</button>
+        <button type="button" class="gm-effect-btn" data-effect="grappled">Grappled</button>
+        <button type="button" class="gm-effect-btn" data-effect="held">Held</button>
+        <button type="button" class="gm-effect-btn" data-effect="entangled">Entangled</button>
+        <button type="button" class="gm-effect-btn" data-effect="blinded">Blinded</button>
+        <button type="button" class="gm-effect-btn" data-effect="deafened">Deafened</button>
+        <button type="button" class="gm-effect-btn" data-effect="paralyzed">Paralyzed</button>
+        <button type="button" class="gm-effect-btn" data-effect="weakened">Weakened</button>
+        <button type="button" class="gm-effect-btn" data-effect="unconscious">Unconscious</button>
+        <button type="button" class="gm-effect-btn gm-effect-danger" data-effect="dying">Dying</button>
+        <button type="button" class="gm-effect-btn" data-effect="charging">Charging</button>
+        <button type="button" class="gm-effect-btn" data-effect="evade">Evade</button>
+        <button type="button" class="gm-effect-btn" data-effect="block">Block</button>
+        <button type="button" class="gm-effect-btn" data-effect="catch">Catch</button>
+        <button type="button" class="gm-effect-btn" data-effect="escaped">Escaped</button>
+        <button type="button" class="gm-effect-btn" data-effect="reversed">Reversed</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Effect Inspector ({{inspectorTarget}})</legend>
+      {{#if inspectorEffects.length}}
+      <table class="gm-inspector-table">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Remaining</th><th></th></tr>
+        </thead>
+        <tbody>
+          {{#each inspectorEffects}}
+          <tr>
+            <td>{{name}}</td>
+            <td>{{effectType}}</td>
+            <td>{{remaining}}</td>
+            <td><button type="button" class="gm-effect-clear-one" data-effect-id="{{id}}" data-tooltip="Delete this effect"><i class="fas fa-trash"></i></button></td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      {{else}}
+      <p class="gm-test-hint">No FASERIP effects on inspected token.</p>
+      {{/if}}
+      <button type="button" class="gm-test-btn gm-test-clear-all"><i class="fas fa-broom"></i> Clear All FASERIP Effects</button>
+    </fieldset>
+  </section>
+
+  {{!-- ──────────── Tab 3: Combat ──────────── --}}
+  <section class="gm-tab-panel" data-tab="combat">
+    <div class="gm-test-tokens">
+      <div class="gm-test-token-row">
+        <span class="gm-test-label">Attacker (selected):</span>
+        <span class="gm-test-value">{{#if selectedName}}{{selectedName}}{{else}}<em>none</em>{{/if}}</span>
+      </div>
+      <div class="gm-test-token-row">
+        <span class="gm-test-label">Target (targeted):</span>
+        <span class="gm-test-value">{{#if targetName}}{{targetName}}{{else}}<em>none</em>{{/if}}</span>
+      </div>
+    </div>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Combat Mode (this panel only)</legend>
+      <label class="gm-test-radio"><input type="radio" name="gm-test-mode" value="manual" {{#if isManualMode}}checked{{/if}}/> Manual</label>
+      <label class="gm-test-radio"><input type="radio" name="gm-test-mode" value="semi" {{#if isSemiMode}}checked{{/if}}/> Semi</label>
+      <label class="gm-test-radio"><input type="radio" name="gm-test-mode" value="full" {{#if isFullMode}}checked{{/if}}/> Full</label>
+      <span class="gm-test-hint">Full mode recommended for Run All (no blocking dialogs).</span>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Action Runner</legend>
+      <div class="gm-action-grid">
+        {{#each actionList}}
+        <button type="button" class="gm-action-btn {{#if fired}}fired{{/if}}"
+                data-action-id="{{id}}"
+                data-ability="{{ability}}"
+                style="background:{{color}};color:{{textColor}};"
+                data-tooltip="{{full}} ({{ability}})">
+          <span class="gm-action-label">{{label}}</span>
+          {{#if fired}}<span class="gm-action-check">✓</span>{{/if}}
+        </button>
+        {{/each}}
+      </div>
+      <div class="gm-runner-row">
+        <button type="button" class="gm-test-btn gm-runner-all"><i class="fas fa-play"></i> Run All</button>
+        <label class="gm-test-inline">Delay:
+          <input type="number" class="gm-runner-delay" min="0" max="5000" step="100" value="{{runDelay}}" />ms
+        </label>
+        <button type="button" class="gm-test-btn gm-coverage-reset"><i class="fas fa-eraser"></i> Reset Coverage</button>
+      </div>
+    </fieldset>
+  </section>
 </div>

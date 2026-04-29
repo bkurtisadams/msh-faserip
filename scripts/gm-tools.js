@@ -1,9 +1,29 @@
-// gm-tools.js v1.1.0 - 2026-04-04
-// GM Tools dialog: character backup/restore, export/import
+// gm-tools.js v1.2.0 - 2026-04-29
+// GM Tools dialog: character backup/restore, export/import,
+// effects test panel, action runner.
+// v1.2.0: tabbed dialog. Effects tab applies/clears every status effect
+//         in effect-engine.js against selected/targeted token; inspector
+//         lists active FASERIP effects with remaining duration.
+//         Combat tab dispatches every Action HUD action via
+//         ActionDispatcher with mode override + Run-All sequencer +
+//         coverage tracking.
 // v1.1.0: embed actor portrait as base64 in snapshots for GCC import
+
+import {
+  applyStun, applySlam, applyProne, applyGrappled, applyHeld,
+  applyEntangled, applyBlinded, applyUnconscious, applyDying,
+  applyCharging, applyDeafened, applyParalyzed, applyWeakened,
+  applyEscaped, applyReversed, applyEvade, applyBlock, applyCatch,
+  getRemaining
+} from "./modules/effects/effect-engine.js";
+import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
+import { ACTIONS as ACTION_LIST } from "../helpers/action-constants.js";
+import { safeActorDeleteEffects } from "./gm-utils.js";
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export class GMToolsApp extends Application {
   static get defaultOptions() {
@@ -12,8 +32,8 @@ export class GMToolsApp extends Application {
       classes: ["msh", "faserip-gm-tools"],
       title: "GM Tools",
       template: "systems/msh-faserip/templates/gm-tools.html",
-      width: 680,
-      height: 600,
+      width: 720,
+      height: 720,
       resizable: true,
       minimizable: true
     });
@@ -22,10 +42,23 @@ export class GMToolsApp extends Application {
   constructor(options = {}) {
     super(options);
     this._onActorChange = () => { if (this.rendered) this.render(); };
+    this._onTokenChange = () => { if (this.rendered) this.render(); };
+    this._activeTab = "backups";
+    this._effectSide = "target";
+    this._testMode = "full";
+    this._runDelay = 800;
+    this._coverage = new Map();
+    this._running = false;
   }
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Tab navigation
+    html.find(".gm-tab-link").click(ev => this._onTabClick(ev));
+    this._restoreActiveTab(html);
+
+    // Backup tab
     html.find(".gm-backup-btn").click(ev => this._onBackup(ev));
     html.find(".gm-restore-btn").click(ev => this._onRestore(ev));
     html.find(".gm-export-btn").click(ev => this._onExport(ev));
@@ -36,16 +69,39 @@ export class GMToolsApp extends Application {
     html.find(".gm-restore-orphan-btn").click(ev => this._onRestoreOrphan(ev));
     html.find(".gm-import-file").change(ev => this._onImportFile(ev));
 
-    // Re-render when actors change
+    // Effects tab
+    html.find("input[name='gm-effect-side']").change(ev => this._onEffectSideChange(ev));
+    html.find(".gm-effect-btn").click(ev => this._onApplyEffect(ev));
+    html.find(".gm-effect-clear-one").click(ev => this._onClearOneEffect(ev));
+    html.find(".gm-test-clear-all").click(ev => this._onClearAllEffects(ev));
+
+    // Combat tab
+    html.find("input[name='gm-test-mode']").change(ev => this._onModeChange(ev));
+    html.find(".gm-action-btn").click(ev => this._onRunAction(ev));
+    html.find(".gm-runner-all").click(ev => this._onRunAll(ev));
+    html.find(".gm-runner-delay").change(ev => { this._runDelay = Number(ev.currentTarget.value) || 0; });
+    html.find(".gm-coverage-reset").click(ev => this._onResetCoverage(ev));
+
+    // Re-render when actors / tokens change
     Hooks.on("createActor", this._onActorChange);
     Hooks.on("deleteActor", this._onActorChange);
     Hooks.on("updateActor", this._onActorChange);
+    Hooks.on("controlToken", this._onTokenChange);
+    Hooks.on("targetToken", this._onTokenChange);
+    Hooks.on("createActiveEffect", this._onTokenChange);
+    Hooks.on("deleteActiveEffect", this._onTokenChange);
+    Hooks.on("updateActiveEffect", this._onTokenChange);
   }
 
   close(options) {
     Hooks.off("createActor", this._onActorChange);
     Hooks.off("deleteActor", this._onActorChange);
     Hooks.off("updateActor", this._onActorChange);
+    Hooks.off("controlToken", this._onTokenChange);
+    Hooks.off("targetToken", this._onTokenChange);
+    Hooks.off("createActiveEffect", this._onTokenChange);
+    Hooks.off("deleteActiveEffect", this._onTokenChange);
+    Hooks.off("updateActiveEffect", this._onTokenChange);
     return super.close(options);
   }
 
@@ -64,7 +120,6 @@ export class GMToolsApp extends Application {
         backupCount: snap ? 1 : 0
       };
     });
-    // Orphan backups (actor deleted but backup remains)
     const orphans = Object.entries(backups)
       .filter(([id]) => !game.actors.get(id))
       .map(([id, snap]) => ({
@@ -74,7 +129,59 @@ export class GMToolsApp extends Application {
         timestamp: new Date(snap.timestamp).toLocaleString(),
         isOrphan: true
       }));
-    return { actors: actorData, orphans, hasOrphans: orphans.length > 0 };
+
+    // ── Test panel context ──
+    const selectedToken = canvas?.tokens?.controlled?.[0] ?? null;
+    const targetToken = Array.from(game.user?.targets ?? [])[0] ?? null;
+    const selectedActor = selectedToken?.actor ?? null;
+    const targetActor = targetToken?.actor ?? null;
+
+    const inspectActor = this._effectSide === "selected" ? selectedActor : targetActor;
+    const inspectorEffects = inspectActor ? this._collectFaseripEffects(inspectActor) : [];
+    const inspectorTarget = inspectActor?.name ?? "no token";
+
+    const coverageSet = this._coverageFor(selectedActor);
+    const actionList = ACTION_LIST.map(a => ({
+      ...a,
+      fired: coverageSet.has(a.id)
+    }));
+
+    return {
+      // Backups
+      actors: actorData,
+      orphans,
+      hasOrphans: orphans.length > 0,
+      // Test panels
+      selectedName: selectedActor?.name ?? null,
+      targetName: targetActor?.name ?? null,
+      isTargetSide: this._effectSide === "target",
+      inspectorEffects,
+      inspectorTarget,
+      isManualMode: this._testMode === "manual",
+      isSemiMode: this._testMode === "semi",
+      isFullMode: this._testMode === "full",
+      actionList,
+      runDelay: this._runDelay
+    };
+  }
+
+  // ── Tab nav ──
+
+  _onTabClick(ev) {
+    ev.preventDefault();
+    const tab = ev.currentTarget.dataset.tab;
+    this._activeTab = tab;
+    const root = this.element[0];
+    root.querySelectorAll(".gm-tab-link").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+    root.querySelectorAll(".gm-tab-panel").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+  }
+
+  _restoreActiveTab(html) {
+    const root = html instanceof jQuery ? html[0] : html;
+    if (!root) return;
+    const tab = this._activeTab || "backups";
+    root.querySelectorAll(".gm-tab-link").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+    root.querySelectorAll(".gm-tab-panel").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
   }
 
   // ── Portrait embedding ──
@@ -399,6 +506,212 @@ export class GMToolsApp extends Application {
     }
     await this._saveBackups(backups);
     ui.notifications.info(`Backed up ${actors.length} actors`);
+    this.render();
+  }
+
+  // ── Test panel: actor resolution ──
+
+  _selectedActor() {
+    return canvas?.tokens?.controlled?.[0]?.actor ?? null;
+  }
+
+  _targetActor() {
+    return Array.from(game.user?.targets ?? [])[0]?.actor ?? null;
+  }
+
+  _effectSideActor() {
+    return this._effectSide === "selected" ? this._selectedActor() : this._targetActor();
+  }
+
+  // ── Test panel: effects ──
+
+  _onEffectSideChange(ev) {
+    this._effectSide = ev.currentTarget.value === "selected" ? "selected" : "target";
+    this.render();
+  }
+
+  _collectFaseripEffects(actor) {
+    if (!actor) return [];
+    const out = [];
+    for (const e of actor.effects) {
+      const f = e.flags?.[SCOPE];
+      if (!f) continue;
+      const effectType = f.effectType ?? f.ongoingId ?? (f.isDying ? "dying" : "");
+      if (!effectType && !f.status) continue;
+      let remaining = "";
+      try {
+        const r = getRemaining(e);
+        if (r && typeof r === "object") {
+          if (r.rounds != null) remaining = `${r.rounds}r`;
+          else if (r.seconds != null) remaining = `${r.seconds}s`;
+          else if (r.turns != null) remaining = `${r.turns}t`;
+        } else if (typeof r === "number") {
+          remaining = `${r}`;
+        }
+      } catch (_) { /* ignore */ }
+      if (!remaining) remaining = e.duration?.rounds ? `${e.duration.rounds}r` : "—";
+      out.push({
+        id: e.id,
+        name: e.name,
+        effectType,
+        remaining
+      });
+    }
+    return out;
+  }
+
+  async _onApplyEffect(ev) {
+    ev.preventDefault();
+    const actor = this._effectSideActor();
+    if (!actor) return ui.notifications.warn("No token on the chosen side. Select or target one.");
+    const id = ev.currentTarget.dataset.effect;
+    try {
+      await this._applyEffectById(actor, id);
+      ui.notifications.info(`Applied ${id} to ${actor.name}`);
+    } catch (e) {
+      console.error("[FASERIP:GMTools] applyEffect failed", id, e);
+      ui.notifications.error(`Apply ${id} failed: ${e.message}`);
+    }
+    this.render();
+  }
+
+  async _applyEffectById(actor, id) {
+    switch (id) {
+      case "stun":        return applyStun(actor, { rounds: 1 });
+      case "slam-1area":  return applySlam(actor, { kind: "1 Area", knockbackAreas: 1 });
+      case "slam-grand":  return applySlam(actor, { kind: "Grand Slam", knockbackAreas: 3 });
+      case "prone":       return applyProne(actor, { rounds: 1 });
+      case "grappled":    return applyGrappled(actor, { holderName: this._otherSideName(actor) });
+      case "held":        return applyHeld(actor, { holderName: this._otherSideName(actor) });
+      case "entangled":   return applyEntangled(actor, { materialRank: "Good", rounds: 5 });
+      case "blinded":     return applyBlinded(actor, { rounds: 5 });
+      case "deafened":    return applyDeafened(actor, { rounds: 5 });
+      case "paralyzed":   return applyParalyzed(actor, { rounds: 5 });
+      case "weakened":    return applyWeakened(actor, { rounds: 5 });
+      case "unconscious": return applyUnconscious(actor, { rounds: 10 });
+      case "dying":       return applyDying(actor, {});
+      case "charging":    return applyCharging(actor, { rounds: 1 });
+      case "evade":       return applyEvade(actor, { evadeSuccessful: true });
+      case "block":       return applyBlock(actor, { armorRank: "Good", armorValue: 10 });
+      case "catch":       return applyCatch(actor, { scenario: "generic" });
+      case "escaped":     return applyEscaped(actor);
+      case "reversed":    return applyReversed(actor);
+      default: throw new Error(`Unknown effect id: ${id}`);
+    }
+  }
+
+  _otherSideName(actor) {
+    const sel = this._selectedActor();
+    const tgt = this._targetActor();
+    if (actor === sel) return tgt?.name ?? "";
+    if (actor === tgt) return sel?.name ?? "";
+    return "";
+  }
+
+  async _onClearOneEffect(ev) {
+    ev.preventDefault();
+    const actor = this._effectSideActor();
+    if (!actor) return;
+    const effectId = ev.currentTarget.dataset.effectId;
+    if (!effectId) return;
+    await safeActorDeleteEffects(actor, [effectId]);
+    this.render();
+  }
+
+  async _onClearAllEffects(ev) {
+    ev.preventDefault();
+    const actor = this._effectSideActor();
+    if (!actor) return ui.notifications.warn("No token on the chosen side.");
+    const ids = actor.effects
+      .filter(e => e.flags?.[SCOPE])
+      .map(e => e.id);
+    if (!ids.length) return ui.notifications.info(`${actor.name}: no FASERIP effects to clear.`);
+    await safeActorDeleteEffects(actor, ids);
+    ui.notifications.info(`Cleared ${ids.length} effect(s) from ${actor.name}`);
+    this.render();
+  }
+
+  // ── Test panel: combat / action runner ──
+
+  _onModeChange(ev) {
+    const v = ev.currentTarget.value;
+    this._testMode = (v === "manual" || v === "semi" || v === "full") ? v : "full";
+  }
+
+  _coverageFor(actor) {
+    if (!actor) return new Set();
+    let s = this._coverage.get(actor.id);
+    if (!s) { s = new Set(); this._coverage.set(actor.id, s); }
+    return s;
+  }
+
+  async _onRunAction(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return ui.notifications.warn("Select an attacker token first.");
+    const id = ev.currentTarget.dataset.actionId;
+    const ability = ev.currentTarget.dataset.ability;
+    await this._dispatch(actor, id, ability);
+    this._coverageFor(actor).add(id);
+    this.render();
+  }
+
+  async _dispatch(actor, actionId, ability) {
+    try {
+      await ActionDispatcher.roll(actionId, {
+        actor,
+        abilityName: ability,
+        opts: { mode: this._testMode }
+      });
+    } catch (e) {
+      if (e?.message && e.message !== "cancelled") {
+        console.error(`[FASERIP:GMTools] action ${actionId} threw`, e);
+        ui.notifications.error(`${actionId} error: ${e.message}`);
+      }
+    }
+  }
+
+  async _onRunAll(ev) {
+    ev.preventDefault();
+    if (this._running) return;
+    const actor = this._selectedActor();
+    if (!actor) return ui.notifications.warn("Select an attacker token first.");
+    const target = this._targetActor();
+    if (!target) {
+      const proceed = await Dialog.confirm({
+        title: "No Target",
+        content: "<p>No targeted token. Attack actions will likely warn or no-op. Continue anyway?</p>"
+      });
+      if (!proceed) return;
+    }
+    if (this._testMode !== "full") {
+      const proceed = await Dialog.confirm({
+        title: "Mode is not Full",
+        content: "<p>Manual/Semi modes open dialogs that block the runner. Switch to Full or continue and click through?</p>"
+      });
+      if (!proceed) return;
+    }
+    this._running = true;
+    const cov = this._coverageFor(actor);
+    try {
+      for (const a of ACTION_LIST) {
+        await this._dispatch(actor, a.id, a.ability);
+        cov.add(a.id);
+        this.render();
+        if (this._runDelay > 0) await sleep(this._runDelay);
+      }
+      ui.notifications.info(`Run All: ${ACTION_LIST.length} actions dispatched.`);
+    } finally {
+      this._running = false;
+      this.render();
+    }
+  }
+
+  _onResetCoverage(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (actor) this._coverage.set(actor.id, new Set());
+    else this._coverage.clear();
     this.render();
   }
 }
