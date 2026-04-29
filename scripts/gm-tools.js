@@ -87,6 +87,18 @@ export class GMToolsApp extends Application {
       // Debounce: hook scheduler already coalesces, reuse it
       this._onActorChange();
     });
+    // Stop key events on text/search inputs from reaching Foundry's
+    // keybinding layer. Without this, typing 't' triggers Target,
+    // 'c' opens Combat Tracker, etc. — making the search box unusable.
+    // Allow Enter/Tab/Escape through so form behaviour is preserved.
+    const swallowKeys = ev => {
+      const k = ev.key;
+      if (k === "Enter" || k === "Tab" || k === "Escape") return;
+      ev.stopPropagation();
+    };
+    html.find(".gm-backup-filter, .gm-token-filter")
+      .on("keydown keyup keypress", swallowKeys);
+
     html.find(".gm-backup-btn").click(ev => this._onBackup(ev));
     html.find(".gm-restore-btn").click(ev => this._onRestore(ev));
     html.find(".gm-export-btn").click(ev => this._onExport(ev));
