@@ -29,7 +29,7 @@
       <tbody>
         {{#each actors}}
         <tr class="actor-row {{#if hasBackup}}has-backup{{/if}}">
-          <td class="col-img"><img src="{{img}}" alt="" width="28" height="28" /></td>
+          <td class="col-img"><img src="{{img}}" alt="" width="28" height="28" onerror="this.onerror=null;this.src='icons/svg/mystery-man.svg';" /></td>
           <td class="col-name">{{name}}</td>
           <td class="col-type">{{type}}</td>
           <td class="col-backup">

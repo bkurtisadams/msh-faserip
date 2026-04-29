@@ -46,8 +46,21 @@ export class GMToolsApp extends Application {
 
   constructor(options = {}) {
     super(options);
-    this._onActorChange = () => { if (this.rendered) this.render(); };
-    this._onTokenChange = () => { if (this.rendered) this.render(); };
+    // Debounced re-render: coalesce bursts of actor/token/effect/world-time
+    // updates (e.g. during a Run All sweep) into a single render. Without
+    // this, ~50+ renders fire per Run All, flooding the console with image
+    // fetches and masking real bugs.
+    this._renderTimer = null;
+    const scheduleRender = () => {
+      if (!this.rendered) return;
+      if (this._renderTimer) clearTimeout(this._renderTimer);
+      this._renderTimer = setTimeout(() => {
+        this._renderTimer = null;
+        if (this.rendered) this.render();
+      }, 150);
+    };
+    this._onActorChange = scheduleRender;
+    this._onTokenChange = scheduleRender;
     this._activeTab = "combat";
     this._effectSide = "target";
     this._testMode = "full";
@@ -127,6 +140,7 @@ export class GMToolsApp extends Application {
   }
 
   close(options) {
+    if (this._renderTimer) { clearTimeout(this._renderTimer); this._renderTimer = null; }
     Hooks.off("createActor", this._onActorChange);
     Hooks.off("deleteActor", this._onActorChange);
     Hooks.off("updateActor", this._onActorChange);
