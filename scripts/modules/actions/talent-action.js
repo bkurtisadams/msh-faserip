@@ -21,6 +21,7 @@ import {
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -294,7 +295,7 @@ export async function rollTalent(actor, talent, options = {}) {
     </div>`;
 
   return new Promise(resolve => {
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Talent Roll: ${talent.name}`,
       content: dialogContent,
       buttons: {
@@ -373,7 +374,7 @@ export async function rollTalent(actor, talent, options = {}) {
         setupKarmaControlHandlers(html);
         _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, abilityLabel);
       }
-    }).render(true);
+    });
   });
 }
 

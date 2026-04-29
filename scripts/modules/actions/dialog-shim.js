@@ -42,3 +42,52 @@ export async function showFaseripDialog({ title, content, render, close } = {}) 
     }
   });
 }
+
+// Button-driven DialogV2 wrapper. Maps V1's { buttons: { key: { label, icon,
+// callback(html) } } } shape to DialogV2's button array. V1 button callbacks
+// received a jQuery handle of the dialog body; we preserve that contract by
+// resolving $html from dialog.element before invoking the V1 callback.
+//
+// V1 was: const dlg = new Dialog({ title, content, buttons, default, render,
+//         close }); dlg.render(true);
+// V2 is:  await showFaseripButtonDialog({ title, content, buttons, default,
+//         render, close })
+//
+// The wait-promise resolves with the value returned by the activated button's
+// callback (matches V1's Promise wrapping). On Esc / window-X dismiss it
+// resolves null (rejectClose:false). Render receives ($html, dialog) for
+// callsites that need the V2 dialog instance for explicit close().
+
+export async function showFaseripButtonDialog({
+  title, content, buttons = {}, default: defaultAction, render, close
+} = {}) {
+  const { DialogV2 } = foundry.applications.api;
+  const v2Buttons = Object.entries(buttons).map(([action, b]) => ({
+    action,
+    label: b.label,
+    icon: b.icon,
+    default: action === defaultAction,
+    callback: async (event, button, dialog) => {
+      const $html = $(dialog.element).find('.window-content').first();
+      try { return b.callback ? await b.callback($html) : null; }
+      catch (e) { console.error("FASERIP button-dialog callback error:", e); return null; }
+    }
+  }));
+  return DialogV2.wait({
+    window: { title },
+    content,
+    buttons: v2Buttons,
+    default: defaultAction,
+    rejectClose: false,
+    render: async (event, dialog) => {
+      const $root = $(dialog.element);
+      const $html = $root.find('.window-content').first();
+      try { await render?.($html, dialog); }
+      catch (e) { console.error("FASERIP button-dialog render error:", e); }
+    },
+    close: () => {
+      try { close?.(); }
+      catch (e) { console.warn("FASERIP button-dialog close error:", e); }
+    }
+  });
+}
