@@ -308,22 +308,27 @@
   gap: 4px;
 }
 .gm-effect-btn {
-  height: 26px;
+  height: 24px;
   padding: 0 6px;
   font-size: 11px;
   font-weight: bold;
   color: #fff;
-  background: #5b7a3a;
-  border: 1px solid #3f5527;
+  border: 1.5px solid #000;
   border-radius: 3px;
   cursor: pointer;
+  background: #757575; /* base fallback if no category class */
 }
-.gm-effect-btn:hover { background: #6f9148; }
-.gm-effect-btn.gm-effect-danger {
-  background: #8b0000;
-  border-color: #5a0000;
-}
-.gm-effect-btn.gm-effect-danger:hover { background: #a02020; }
+.gm-effect-btn:hover { filter: brightness(1.15); }
+.gm-effect-btn:active { filter: brightness(0.9); }
+
+/* ── Bronze Age palette by category ── */
+.gm-effect-incapacitate { background: #A020F0; color: #fff; } /* Hulk-pants purple */
+.gm-effect-dying        { background: #E10600; color: #fff; } /* Spidey red */
+.gm-effect-restrain     { background: #0066CC; color: #fff; } /* Cap blue */
+.gm-effect-sensory      { background: #FFB300; color: #000; } /* Iron Man gold */
+.gm-effect-defense      { background: #00A33C; color: #fff; } /* Hulk green */
+.gm-effect-momentum     { background: #FF7700; color: #000; } /* Thing orange */
+.gm-effect-resolved     { background: #757575; color: #fff; } /* newsprint gray */
 
 /* ── Inspector table ── */
 .gm-inspector-table {
@@ -431,7 +436,7 @@
 .gm-test-hint { font-size: 9px; }
 
 .gm-effect-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 3px; }
-.gm-effect-btn { height: 22px; padding: 0 4px; font-size: 10px; }
+.gm-effect-btn { height: 24px; padding: 0 4px; font-size: 10px; }
 
 .gm-action-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 3px; }
 .gm-action-btn { height: 32px; font-size: 12px; }
