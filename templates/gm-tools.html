@@ -2,6 +2,8 @@
   <nav class="gm-tools-tabs">
     <a class="gm-tab-link active" data-tab="combat"><i class="fas fa-fist-raised"></i> Combat</a>
     <a class="gm-tab-link" data-tab="effects"><i class="fas fa-bolt"></i> Effects</a>
+    <a class="gm-tab-link" data-tab="tokens"><i class="fas fa-map-marker-alt"></i> Tokens</a>
+    <a class="gm-tab-link" data-tab="state"><i class="fas fa-sliders-h"></i> State</a>
     <a class="gm-tab-link" data-tab="backups"><i class="fas fa-save"></i> Backups</a>
   </nav>
 
@@ -194,6 +196,115 @@
         </label>
         <button type="button" class="gm-test-btn gm-coverage-reset"><i class="fas fa-eraser"></i> Reset Coverage</button>
       </div>
+    </fieldset>
+  </section>
+
+  {{!-- ──────────── Tab 4: Tokens ──────────── --}}
+  <section class="gm-tab-panel" data-tab="tokens">
+    <fieldset class="gm-test-fieldset">
+      <legend>Scope</legend>
+      <label class="gm-test-radio"><input type="radio" name="gm-token-scope" value="current" {{#if isScopeCurrent}}checked{{/if}}/> Current Scene</label>
+      <label class="gm-test-radio"><input type="radio" name="gm-token-scope" value="all" {{#unless isScopeCurrent}}checked{{/unless}}/> All Scenes ({{sceneCount}})</label>
+      <label class="gm-test-inline" style="margin-left:8px;">
+        <input type="search" class="gm-token-filter" placeholder="filter name or scene…" value="{{tokenFilter}}" />
+      </label>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Bulk (current scene)</legend>
+      <button type="button" class="gm-test-btn gm-token-reveal-all"><i class="fas fa-eye"></i> Reveal Hidden</button>
+      <button type="button" class="gm-test-btn gm-token-rescue-all"><i class="fas fa-life-ring"></i> Rescue Off-Canvas</button>
+      <button type="button" class="gm-test-btn gm-token-refresh"><i class="fas fa-sync"></i> Refresh</button>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Tokens ({{tokens.length}})</legend>
+      {{#if tokens.length}}
+      <table class="gm-token-table">
+        <thead>
+          <tr><th>Name</th><th>Scene</th><th>Pos</th><th>Flags</th><th></th></tr>
+        </thead>
+        <tbody>
+          {{#each tokens}}
+          <tr class="{{#if isCurrentScene}}cur{{else}}other{{/if}}">
+            <td class="col-name">{{name}}</td>
+            <td class="col-scene">{{sceneName}}</td>
+            <td class="col-pos">{{pos}}</td>
+            <td class="col-flags">{{#each flags}}<span class="gm-token-flag {{cls}}">{{label}}</span>{{/each}}</td>
+            <td class="col-act">
+              <button type="button" class="gm-token-locate" data-scene-id="{{sceneId}}" data-token-id="{{tokenId}}" data-tooltip="Locate"><i class="fas fa-crosshairs"></i></button>
+              <button type="button" class="gm-token-bring" data-scene-id="{{sceneId}}" data-token-id="{{tokenId}}" data-tooltip="Bring to my view"><i class="fas fa-people-arrows"></i></button>
+              <button type="button" class="gm-token-center" data-scene-id="{{sceneId}}" data-token-id="{{tokenId}}" data-tooltip="Center on its scene"><i class="fas fa-bullseye"></i></button>
+              <button type="button" class="gm-token-reveal" data-scene-id="{{sceneId}}" data-token-id="{{tokenId}}" data-tooltip="Toggle hidden"><i class="fas {{#if hidden}}fa-eye{{else}}fa-eye-slash{{/if}}"></i></button>
+              <button type="button" class="gm-token-delete" data-scene-id="{{sceneId}}" data-token-id="{{tokenId}}" data-tooltip="Delete token"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      {{else}}
+      <p class="gm-test-hint">No tokens in scope.</p>
+      {{/if}}
+    </fieldset>
+  </section>
+
+  {{!-- ──────────── Tab 5: State ──────────── --}}
+  <section class="gm-tab-panel" data-tab="state">
+    <div class="gm-test-tokens">
+      <div class="gm-test-token-row">
+        <span class="gm-test-label">Selected:</span>
+        <span class="gm-test-value">{{#if selectedName}}{{selectedName}}{{else}}<em>none</em>{{/if}}</span>
+      </div>
+    </div>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Health {{#if hasSelected}}({{healthCur}} / {{healthMax}}){{/if}}</legend>
+      <div class="gm-state-row">
+        <button type="button" class="gm-test-btn gm-health-set" data-mode="full">Full</button>
+        <button type="button" class="gm-test-btn gm-health-set" data-mode="half">Half</button>
+        <button type="button" class="gm-test-btn gm-health-set" data-mode="1">1</button>
+        <button type="button" class="gm-test-btn gm-health-set" data-mode="0">0</button>
+        <button type="button" class="gm-test-btn gm-health-set" data-mode="-1">-1</button>
+        <button type="button" class="gm-test-btn gm-health-adj" data-delta="-10">-10</button>
+        <button type="button" class="gm-test-btn gm-health-adj" data-delta="10">+10</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Endurance {{#if hasSelected}}({{enduranceRank}} / {{enduranceVal}}){{/if}}</legend>
+      <div class="gm-state-row">
+        <button type="button" class="gm-test-btn gm-end-shift" data-delta="-1">▼ Step Down</button>
+        <button type="button" class="gm-test-btn gm-end-shift" data-delta="1">▲ Step Up</button>
+        <select class="gm-end-set">
+          <option value="">— Set rank —</option>
+          {{#each rankList}}<option value="{{this}}">{{this}}</option>{{/each}}
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Karma {{#if hasSelected}}({{karmaCur}}){{/if}}</legend>
+      <div class="gm-state-row">
+        <button type="button" class="gm-test-btn gm-karma-set" data-value="0">0</button>
+        <button type="button" class="gm-test-btn gm-karma-set" data-value="1">1</button>
+        <button type="button" class="gm-test-btn gm-karma-set" data-value="5">5</button>
+        <button type="button" class="gm-test-btn gm-karma-set" data-value="30">30</button>
+        <button type="button" class="gm-test-btn gm-karma-set" data-value="100">100</button>
+        <button type="button" class="gm-test-btn gm-karma-adj" data-delta="-10">-10</button>
+        <button type="button" class="gm-test-btn gm-karma-adj" data-delta="10">+10</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="gm-test-fieldset">
+      <legend>Time Jump (advances world time → ongoing effects tick)</legend>
+      <div class="gm-state-row">
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="round">+1 Round</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="min">+1 Min</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="10min">+10 Min</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="hour">+1 Hour</button>
+        <button type="button" class="gm-test-btn gm-time-adv" data-unit="day">+1 Day</button>
+      </div>
+      <span class="gm-test-hint">World time: {{worldTimeLabel}}</span>
     </fieldset>
   </section>
 </div>

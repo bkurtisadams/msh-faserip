@@ -1,12 +1,16 @@
-// gm-tools.js v1.2.0 - 2026-04-29
-// GM Tools dialog: character backup/restore, export/import,
-// effects test panel, action runner.
-// v1.2.0: tabbed dialog. Effects tab applies/clears every status effect
-//         in effect-engine.js against selected/targeted token; inspector
-//         lists active FASERIP effects with remaining duration.
-//         Combat tab dispatches every Action HUD action via
-//         ActionDispatcher with mode override + Run-All sequencer +
-//         coverage tracking.
+// gm-tools.js v1.3.0 - 2026-04-29
+// GM Tools dialog: backups, effects, action runner, token finder, state quick-set.
+// v1.3.0: Tokens tab — list every token across scope (current/all), filter,
+//         locate (scene-switch + pan + ping + select), bring-to-viewport
+//         (cross-scene supported via clone+delete), center-on-scene, toggle
+//         hidden, delete; bulk reveal-hidden + rescue-off-canvas.
+//         State tab — health quick-set (Full/Half/1/0/-1, ±10), endurance
+//         step+set (uses shiftRank/RANKS_ORDERED), karma quick-set + ±10,
+//         time-jumper (+round/min/10min/hour/day) via CTT timeEngine when
+//         active, falls back to game.time.advance.
+// v1.2.1: Compact dialog (460×500); reorder tabs Combat→Effects→Backups;
+//         Bronze Age palette on effect buttons; v14 text-shadow override.
+// v1.2.0: tabbed dialog. Effects + Combat tabs.
 // v1.1.0: embed actor portrait as base64 in snapshots for GCC import
 
 import {
@@ -19,6 +23,7 @@ import {
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { ACTIONS as ACTION_LIST } from "../helpers/action-constants.js";
 import { safeActorDeleteEffects } from "./gm-utils.js";
+import { RANKS_ORDERED, rankValue, shiftRank } from "./rules/rules-reference.js";
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
@@ -49,6 +54,8 @@ export class GMToolsApp extends Application {
     this._runDelay = 800;
     this._coverage = new Map();
     this._running = false;
+    this._tokenScope = "current";
+    this._tokenFilter = "";
   }
 
   activateListeners(html) {
@@ -82,7 +89,28 @@ export class GMToolsApp extends Application {
     html.find(".gm-runner-delay").change(ev => { this._runDelay = Number(ev.currentTarget.value) || 0; });
     html.find(".gm-coverage-reset").click(ev => this._onResetCoverage(ev));
 
-    // Re-render when actors / tokens change
+    // Tokens tab
+    html.find("input[name='gm-token-scope']").change(ev => this._onTokenScopeChange(ev));
+    html.find(".gm-token-filter").on("input", ev => this._onTokenFilterInput(ev));
+    html.find(".gm-token-locate").click(ev => this._onLocateToken(ev));
+    html.find(".gm-token-bring").click(ev => this._onBringToken(ev));
+    html.find(".gm-token-center").click(ev => this._onCenterToken(ev));
+    html.find(".gm-token-reveal").click(ev => this._onToggleHidden(ev));
+    html.find(".gm-token-delete").click(ev => this._onDeleteToken(ev));
+    html.find(".gm-token-reveal-all").click(ev => this._onRevealAllHidden(ev));
+    html.find(".gm-token-rescue-all").click(ev => this._onRescueOffCanvas(ev));
+    html.find(".gm-token-refresh").click(() => this.render());
+
+    // State tab
+    html.find(".gm-health-set").click(ev => this._onSetHealth(ev));
+    html.find(".gm-health-adj").click(ev => this._onAdjustHealth(ev));
+    html.find(".gm-end-shift").click(ev => this._onShiftEndurance(ev));
+    html.find(".gm-end-set").change(ev => this._onSetEndurance(ev));
+    html.find(".gm-karma-set").click(ev => this._onSetKarma(ev));
+    html.find(".gm-karma-adj").click(ev => this._onAdjustKarma(ev));
+    html.find(".gm-time-adv").click(ev => this._onAdvanceTime(ev));
+
+    // Re-render when actors / tokens / scenes / time change
     Hooks.on("createActor", this._onActorChange);
     Hooks.on("deleteActor", this._onActorChange);
     Hooks.on("updateActor", this._onActorChange);
@@ -91,6 +119,11 @@ export class GMToolsApp extends Application {
     Hooks.on("createActiveEffect", this._onTokenChange);
     Hooks.on("deleteActiveEffect", this._onTokenChange);
     Hooks.on("updateActiveEffect", this._onTokenChange);
+    Hooks.on("createToken", this._onTokenChange);
+    Hooks.on("deleteToken", this._onTokenChange);
+    Hooks.on("updateToken", this._onTokenChange);
+    Hooks.on("updateScene", this._onTokenChange);
+    Hooks.on("updateWorldTime", this._onTokenChange);
   }
 
   close(options) {
@@ -102,6 +135,11 @@ export class GMToolsApp extends Application {
     Hooks.off("createActiveEffect", this._onTokenChange);
     Hooks.off("deleteActiveEffect", this._onTokenChange);
     Hooks.off("updateActiveEffect", this._onTokenChange);
+    Hooks.off("createToken", this._onTokenChange);
+    Hooks.off("deleteToken", this._onTokenChange);
+    Hooks.off("updateToken", this._onTokenChange);
+    Hooks.off("updateScene", this._onTokenChange);
+    Hooks.off("updateWorldTime", this._onTokenChange);
     return super.close(options);
   }
 
@@ -161,7 +199,17 @@ export class GMToolsApp extends Application {
       isSemiMode: this._testMode === "semi",
       isFullMode: this._testMode === "full",
       actionList,
-      runDelay: this._runDelay
+      runDelay: this._runDelay,
+      // Tokens tab
+      tokens: this._collectTokens(),
+      tokenFilter: this._tokenFilter,
+      isScopeCurrent: this._tokenScope === "current",
+      sceneCount: game.scenes?.size ?? 0,
+      // State tab
+      hasSelected: !!selectedActor,
+      ...this._snapshotState(selectedActor),
+      rankList: RANKS_ORDERED,
+      worldTimeLabel: this._formatWorldTime()
     };
   }
 
@@ -713,6 +761,298 @@ export class GMToolsApp extends Application {
     if (actor) this._coverage.set(actor.id, new Set());
     else this._coverage.clear();
     this.render();
+  }
+
+  // ── Tokens tab ──
+
+  _onTokenScopeChange(ev) {
+    this._tokenScope = ev.currentTarget.value === "all" ? "all" : "current";
+    this.render();
+  }
+
+  _onTokenFilterInput(ev) {
+    this._tokenFilter = String(ev.currentTarget.value || "");
+    // Live filter — re-scan and re-render
+    this.render();
+  }
+
+  _collectTokens() {
+    const filter = this._tokenFilter.toLowerCase();
+    const scenes = this._tokenScope === "all"
+      ? game.scenes.contents
+      : (canvas?.scene ? [canvas.scene] : []);
+    const out = [];
+    for (const scene of scenes) {
+      const w = scene.dimensions?.width ?? scene.width ?? 4000;
+      const h = scene.dimensions?.height ?? scene.height ?? 4000;
+      for (const t of scene.tokens) {
+        const name = t.name || "";
+        const sceneName = scene.name || "";
+        if (filter && !name.toLowerCase().includes(filter) && !sceneName.toLowerCase().includes(filter)) continue;
+        const flags = [];
+        const offCanvas = t.x < 0 || t.y < 0 || t.x >= w || t.y >= h;
+        if (offCanvas) flags.push({ label: "off-canvas", cls: "danger" });
+        if (t.hidden) flags.push({ label: "hidden", cls: "warn" });
+        if (!t.actor) flags.push({ label: "no actor", cls: "warn" });
+        if (t.actor?.effects?.some(e => e.flags?.[SCOPE]?.effectType === "dying")) flags.push({ label: "dying", cls: "danger" });
+        if (t.actor?.effects?.some(e => e.flags?.[SCOPE]?.effectType === "unconscious")) flags.push({ label: "ko", cls: "warn" });
+        out.push({
+          tokenId: t.id,
+          sceneId: scene.id,
+          name,
+          sceneName,
+          pos: `${Math.round(t.x)}, ${Math.round(t.y)}`,
+          flags,
+          hidden: !!t.hidden,
+          isCurrentScene: scene.id === canvas?.scene?.id
+        });
+      }
+    }
+    out.sort((a, b) => {
+      if (a.isCurrentScene !== b.isCurrentScene) return a.isCurrentScene ? -1 : 1;
+      const s = a.sceneName.localeCompare(b.sceneName);
+      if (s) return s;
+      return a.name.localeCompare(b.name);
+    });
+    return out;
+  }
+
+  _viewportCenter() {
+    if (!canvas?.stage) return { x: 0, y: 0 };
+    const p = canvas.stage.pivot;
+    return { x: Math.round(p.x), y: Math.round(p.y) };
+  }
+
+  _sceneCenter(scene) {
+    const w = scene.dimensions?.sceneWidth ?? scene.dimensions?.width ?? scene.width ?? 4000;
+    const h = scene.dimensions?.sceneHeight ?? scene.dimensions?.height ?? scene.height ?? 4000;
+    const ox = scene.dimensions?.sceneX ?? 0;
+    const oy = scene.dimensions?.sceneY ?? 0;
+    return { x: Math.round(ox + w / 2), y: Math.round(oy + h / 2) };
+  }
+
+  async _onLocateToken(ev) {
+    ev.preventDefault();
+    const { sceneId, tokenId } = ev.currentTarget.dataset;
+    const scene = game.scenes.get(sceneId);
+    if (!scene) return;
+    if (canvas?.scene?.id !== sceneId) await scene.view();
+    const tok = canvas.tokens?.get(tokenId);
+    if (!tok) return ui.notifications.warn("Token not on canvas yet");
+    const c = tok.center ?? { x: tok.document.x, y: tok.document.y };
+    await canvas.animatePan({ x: c.x, y: c.y, scale: Math.max(canvas.stage.scale.x, 0.5) });
+    try { tok.control({ releaseOthers: true }); } catch (_) {}
+    if (typeof canvas.ping === "function") canvas.ping(c);
+  }
+
+  async _onBringToken(ev) {
+    ev.preventDefault();
+    const { sceneId, tokenId } = ev.currentTarget.dataset;
+    const sourceScene = game.scenes.get(sceneId);
+    const sourceToken = sourceScene?.tokens.get(tokenId);
+    if (!sourceToken) return;
+    const center = this._viewportCenter();
+    if (sceneId === canvas?.scene?.id) {
+      await sourceToken.update({ x: center.x, y: center.y });
+      ui.notifications.info(`${sourceToken.name} brought to viewport center`);
+      return;
+    }
+    const targetScene = canvas?.scene;
+    if (!targetScene) return ui.notifications.warn("No active scene to bring to");
+    const confirm = await Dialog.confirm({
+      title: "Cross-scene move",
+      content: `<p>Token <strong>${sourceToken.name}</strong> is on <em>${sourceScene.name}</em>. Move it to <em>${targetScene.name}</em>? Token data is duplicated then the original is deleted (unlinked actor delta is preserved).</p>`
+    });
+    if (!confirm) return;
+    const data = sourceToken.toObject();
+    delete data._id;
+    data.x = center.x;
+    data.y = center.y;
+    await targetScene.createEmbeddedDocuments("Token", [data]);
+    await sourceScene.deleteEmbeddedDocuments("Token", [tokenId]);
+    ui.notifications.info(`${sourceToken.name} moved to ${targetScene.name}`);
+  }
+
+  async _onCenterToken(ev) {
+    ev.preventDefault();
+    const { sceneId, tokenId } = ev.currentTarget.dataset;
+    const scene = game.scenes.get(sceneId);
+    const tok = scene?.tokens.get(tokenId);
+    if (!tok) return;
+    const c = this._sceneCenter(scene);
+    const gridSize = scene.grid?.size || 100;
+    const halfW = ((tok.width || 1) * gridSize) / 2;
+    const halfH = ((tok.height || 1) * gridSize) / 2;
+    await tok.update({ x: c.x - halfW, y: c.y - halfH });
+    ui.notifications.info(`${tok.name} centered on ${scene.name}`);
+  }
+
+  async _onToggleHidden(ev) {
+    ev.preventDefault();
+    const { sceneId, tokenId } = ev.currentTarget.dataset;
+    const scene = game.scenes.get(sceneId);
+    const tok = scene?.tokens.get(tokenId);
+    if (!tok) return;
+    await tok.update({ hidden: !tok.hidden });
+  }
+
+  async _onDeleteToken(ev) {
+    ev.preventDefault();
+    const { sceneId, tokenId } = ev.currentTarget.dataset;
+    const scene = game.scenes.get(sceneId);
+    const tok = scene?.tokens.get(tokenId);
+    if (!tok) return;
+    const confirm = await Dialog.confirm({
+      title: "Delete token?",
+      content: `<p>Delete <strong>${tok.name}</strong> from <em>${scene.name}</em>? The actor itself is not affected.</p>`
+    });
+    if (!confirm) return;
+    await scene.deleteEmbeddedDocuments("Token", [tokenId]);
+  }
+
+  async _onRevealAllHidden(ev) {
+    ev.preventDefault();
+    const scene = canvas?.scene;
+    if (!scene) return;
+    const ids = scene.tokens.filter(t => t.hidden).map(t => t.id);
+    if (!ids.length) return ui.notifications.info("No hidden tokens on this scene.");
+    await scene.updateEmbeddedDocuments("Token", ids.map(id => ({ _id: id, hidden: false })));
+    ui.notifications.info(`Revealed ${ids.length} token(s)`);
+  }
+
+  async _onRescueOffCanvas(ev) {
+    ev.preventDefault();
+    const scene = canvas?.scene;
+    if (!scene) return;
+    const w = scene.dimensions?.width ?? scene.width ?? 4000;
+    const h = scene.dimensions?.height ?? scene.height ?? 4000;
+    const c = this._sceneCenter(scene);
+    const gridSize = scene.grid?.size || 100;
+    const updates = [];
+    for (const t of scene.tokens) {
+      if (t.x < 0 || t.y < 0 || t.x >= w || t.y >= h) {
+        const halfW = ((t.width || 1) * gridSize) / 2;
+        const halfH = ((t.height || 1) * gridSize) / 2;
+        updates.push({ _id: t.id, x: c.x - halfW, y: c.y - halfH });
+      }
+    }
+    if (!updates.length) return ui.notifications.info("No off-canvas tokens on this scene.");
+    await scene.updateEmbeddedDocuments("Token", updates);
+    ui.notifications.info(`Rescued ${updates.length} token(s)`);
+  }
+
+  // ── State tab ──
+
+  _snapshotState(actor) {
+    if (!actor) return { healthCur: 0, healthMax: 0, enduranceRank: "", enduranceVal: 0, karmaCur: 0 };
+    const sys = actor.system ?? {};
+    const h = sys.derived?.attributes?.health ?? {};
+    const k = sys.derived?.attributes?.karma ?? {};
+    const e = sys.abilities?.endurance ?? {};
+    return {
+      healthCur: h.value ?? 0,
+      healthMax: h.max ?? 0,
+      enduranceRank: e.rank ?? "",
+      enduranceVal: e.value ?? 0,
+      karmaCur: k.value ?? 0
+    };
+  }
+
+  async _onSetHealth(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return ui.notifications.warn("Select a token first");
+    const mode = ev.currentTarget.dataset.mode;
+    const max = actor.system.derived?.attributes?.health?.max ?? 0;
+    let val;
+    if (mode === "full") val = max;
+    else if (mode === "half") val = Math.floor(max / 2);
+    else val = Number(mode);
+    if (!Number.isFinite(val)) return;
+    await actor.update({ "system.derived.attributes.health.value": val });
+  }
+
+  async _onAdjustHealth(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return;
+    const delta = Number(ev.currentTarget.dataset.delta) || 0;
+    const cur = actor.system.derived?.attributes?.health?.value ?? 0;
+    await actor.update({ "system.derived.attributes.health.value": cur + delta });
+  }
+
+  async _onShiftEndurance(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return ui.notifications.warn("Select a token first");
+    const delta = Number(ev.currentTarget.dataset.delta) || 0;
+    const cur = actor.system.abilities?.endurance?.rank ?? "Good";
+    const next = shiftRank(cur, delta);
+    await actor.update({
+      "system.abilities.endurance.rank": next,
+      "system.abilities.endurance.value": rankValue(next)
+    });
+  }
+
+  async _onSetEndurance(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return;
+    const rank = ev.currentTarget.value;
+    if (!rank) return;
+    await actor.update({
+      "system.abilities.endurance.rank": rank,
+      "system.abilities.endurance.value": rankValue(rank)
+    });
+    ev.currentTarget.value = ""; // reset dropdown to placeholder
+  }
+
+  async _onSetKarma(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return ui.notifications.warn("Select a token first");
+    const val = Number(ev.currentTarget.dataset.value) || 0;
+    await actor.update({ "system.derived.attributes.karma.value": val });
+  }
+
+  async _onAdjustKarma(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return;
+    const delta = Number(ev.currentTarget.dataset.delta) || 0;
+    const cur = actor.system.derived?.attributes?.karma?.value ?? 0;
+    await actor.update({ "system.derived.attributes.karma.value": cur + delta });
+  }
+
+  async _onAdvanceTime(ev) {
+    ev.preventDefault();
+    const unit = ev.currentTarget.dataset.unit;
+    const turnSec = Number(game.settings?.get?.("msh-faserip", "turnSeconds")) || 6;
+    const TIME_SEC = { round: turnSec, min: 60, "10min": 600, hour: 3600, day: 86400 };
+    const seconds = TIME_SEC[unit];
+    if (!seconds) return;
+    // Prefer CTT timeEngine if active so calendar stays in sync; else fallback
+    try {
+      const cttMod = game.modules.get("calendar-time-tracker");
+      const te = cttMod?.active ? cttMod.api?.timeEngine : null;
+      if (te?.advance) {
+        await te.advance(seconds, "second");
+      } else {
+        await game.time.advance(seconds);
+      }
+    } catch (_) {
+      await game.time.advance(seconds);
+    }
+    ui.notifications.info(`Advanced ${seconds}s`);
+  }
+
+  _formatWorldTime() {
+    const t = game.time?.worldTime ?? 0;
+    const d = Math.floor(t / 86400);
+    const h = Math.floor((t % 86400) / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const s = t % 60;
+    return `${d}d ${h}h ${m}m ${s}s`;
   }
 }
 

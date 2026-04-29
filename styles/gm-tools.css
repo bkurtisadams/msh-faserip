@@ -452,3 +452,108 @@
 .gm-inspector-table { font-size: 10px; }
 .gm-inspector-table th { padding: 2px 5px; font-size: 9px; }
 .gm-inspector-table td { padding: 2px 5px; }
+
+/* ── v1.3.0 — Tokens + State tabs ── */
+
+/* Token table */
+.gm-token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  table-layout: fixed;
+}
+.gm-token-table th {
+  text-align: left;
+  padding: 2px 5px;
+  background: #e8e0d0;
+  border-bottom: 1px solid #c0a070;
+  color: #666;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.gm-token-table td {
+  padding: 2px 5px;
+  border-bottom: 1px solid #e0d8c8;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gm-token-table .col-name  { width: 28%; font-weight: bold; color: #333; }
+.gm-token-table .col-scene { width: 22%; color: #555; }
+.gm-token-table .col-pos   { width: 16%; color: #888; font-family: Consolas, "Courier New", monospace; font-size: 9px; }
+.gm-token-table .col-flags { width: 14%; }
+.gm-token-table .col-act   { width: 20%; text-align: right; white-space: nowrap; }
+
+.gm-token-table tr.cur   { background: transparent; }
+.gm-token-table tr.other td.col-scene,
+.gm-token-table tr.other td.col-name { color: #888; font-style: italic; }
+.gm-token-table tr:hover { background: #f0ece0; }
+
+/* Flag badges */
+.gm-token-flag {
+  display: inline-block;
+  padding: 0 4px;
+  margin-right: 2px;
+  font-size: 8px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-radius: 2px;
+  background: #999;
+  color: #fff;
+}
+.gm-token-flag.warn   { background: #B8860B; }
+.gm-token-flag.danger { background: #E10600; }
+
+/* Action icon buttons */
+.gm-token-table .col-act button {
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  margin-left: 1px;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #f5f0e8;
+  color: #555;
+  cursor: pointer;
+  font-size: 9px;
+}
+.gm-token-table .col-act button:hover {
+  background: #8b0000;
+  color: #fff;
+  border-color: #8b0000;
+}
+.gm-token-table .col-act .gm-token-delete:hover {
+  background: #E10600;
+  border-color: #E10600;
+}
+
+/* State tab rows */
+.gm-state-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.gm-state-row .gm-test-btn { padding: 3px 8px; min-width: 36px; }
+.gm-end-set {
+  height: 22px;
+  padding: 0 4px;
+  font-size: 10px;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #f5f0e8;
+}
+
+/* Filter input */
+.gm-token-filter {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 10px;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #fff;
+  width: 160px;
+}
