@@ -728,22 +728,67 @@ export function registerGMTools() {
     default: {}
   });
 
-  // Add button to Actor Directory header
-  // Try multiple selectors for v13 compatibility
+  // Console + programmatic opener (singleton)
+  game.msh = game.msh ?? {};
+  game.msh.openGMTools = () => {
+    if (!game.user.isGM) return ui.notifications.warn("GM Tools is GM-only");
+    if (game.msh._gmToolsApp?.rendered) {
+      game.msh._gmToolsApp.bringToTop();
+      return game.msh._gmToolsApp;
+    }
+    game.msh._gmToolsApp = new GMToolsApp();
+    game.msh._gmToolsApp.render(true);
+    return game.msh._gmToolsApp;
+  };
+
+  // Scene Controls button (v13/v14 reliable path)
+  Hooks.on("getSceneControlButtons", (controlsData) => {
+    if (!game.user?.isGM) return;
+    let groups;
+    if (Array.isArray(controlsData)) groups = controlsData;
+    else if (controlsData && typeof controlsData === "object") groups = Object.values(controlsData);
+    else return;
+    const tokenGroup = groups.find(g => g.name === "tokens" || g.name === "token");
+    if (!tokenGroup) return;
+
+    const tools = {};
+    if (tokenGroup.tools) {
+      for (const t of Object.values(tokenGroup.tools)) {
+        if (t?.name) tools[t.name] = t;
+      }
+    }
+    if (!tools["faserip-gm-tools"]) {
+      tools["faserip-gm-tools"] = {
+        name: "faserip-gm-tools",
+        title: "GM Tools",
+        icon: "fas fa-shield-alt",
+        visible: true,
+        button: true,
+        onClick: () => game.msh.openGMTools(),
+        onChange: () => game.msh.openGMTools()
+      };
+      tokenGroup.tools = tools;
+    }
+  });
+
+  // Actor Directory header button (best-effort across v13/v14 markup)
   const addButton = (html) => {
     if (!game.user.isGM) return;
     const root = html instanceof jQuery ? html[0] : html;
     if (!root) return;
-
-    // Don't double-add
     if (root.querySelector?.(".gm-tools-btn")) return;
 
-    // v13 uses .header-actions or .action-buttons in the directory header
-    const header = root.querySelector(".header-actions")
+    const header = root.querySelector(".directory-header .header-actions")
+      || root.querySelector(".directory-header .action-buttons")
+      || root.querySelector("header.directory-header")
+      || root.querySelector("header .action-buttons")
+      || root.querySelector("header .header-actions")
+      || root.querySelector(":scope > header")
+      || root.querySelector(".header-actions")
       || root.querySelector(".action-buttons")
       || root.querySelector(".directory-header");
     if (!header) {
-      console.warn("[FASERIP] GM Tools: could not find Actor Directory header element");
+      console.warn("[FASERIP] GM Tools: Actor Directory header not found; use the shield in the Token controls or game.msh.openGMTools().");
       return;
     }
 
@@ -753,18 +798,15 @@ export function registerGMTools() {
     btn.dataset.tooltip = "GM Tools";
     btn.setAttribute("aria-label", "GM Tools");
     btn.innerHTML = '<i class="fas fa-shield-alt"></i>';
-    btn.addEventListener("click", () => {
-      new GMToolsApp().render(true);
-    });
+    btn.addEventListener("click", () => game.msh.openGMTools());
     header.appendChild(btn);
     console.log("[FASERIP] GM Tools button added to Actor Directory");
   };
 
   Hooks.on("renderActorDirectory", (app, html) => addButton(html));
 
-  // Also try to add now if sidebar already rendered
   if (ui.actors?.element) {
-    const el = ui.actors.element instanceof jQuery ? ui.actors.element : $(ui.actors.element);
-    addButton(el[0] || el);
+    const el = ui.actors.element instanceof jQuery ? ui.actors.element[0] : ui.actors.element;
+    addButton(el);
   }
 }
