@@ -771,6 +771,11 @@ export function registerGMTools() {
     }
   });
 
+  // registerGMTools runs at "ready", after scene controls have already
+  // been built and getSceneControlButtons has already fired. Force a
+  // re-render so the listener above actually runs.
+  try { ui.controls?.render?.(true); } catch (_) { /* no canvas yet */ }
+
   // Actor Directory header button (best-effort across v13/v14 markup)
   const addButton = (html) => {
     if (!game.user.isGM) return;
