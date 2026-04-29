@@ -601,3 +601,15 @@
   background: #fff;
   width: 160px;
 }
+
+/* v1.3.1 — Backup filter */
+.gm-backup-filter {
+  flex: 0 1 200px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 11px;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #fff;
+  margin-right: 4px;
+}
