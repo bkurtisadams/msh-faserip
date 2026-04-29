@@ -52,12 +52,12 @@ import {
   getAreaIntensityRank
 } from "./action-utils.js";
 import {
-import { showFaseripButtonDialog } from "./dialog-shim.js";
   setupKarmaControlHandlers,
   extractKarmaFromDialog,
   getAvailableKarma,
   getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
+import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // Map raw damageType code → normalized form + human label + attack form + killing flag.
 // Kept small and flat — anything else is read from the item fields.
