@@ -87,17 +87,11 @@ export class GMToolsApp extends Application {
       // Debounce: hook scheduler already coalesces, reuse it
       this._onActorChange();
     });
-    // Stop key events on text/search inputs from reaching Foundry's
-    // keybinding layer. Without this, typing 't' triggers Target,
-    // 'c' opens Combat Tracker, etc. — making the search box unusable.
-    // Allow Enter/Tab/Escape through so form behaviour is preserved.
-    const swallowKeys = ev => {
-      const k = ev.key;
-      if (k === "Enter" || k === "Tab" || k === "Escape") return;
-      ev.stopPropagation();
-    };
-    html.find(".gm-backup-filter, .gm-token-filter")
-      .on("keydown keyup keypress", swallowKeys);
+    // Shield text inputs from Foundry's keybinding layer (Action HUD's H,
+    // Combat Tracker's C, Target's T, etc.) so typing into a filter doesn't
+    // also trigger system actions. This is the standard pattern for custom
+    // Application V1 dialogs that don't go through Foundry's form pipeline.
+    this._shieldFromKeybinds(html.find(".gm-backup-filter, .gm-token-filter"));
 
     html.find(".gm-backup-btn").click(ev => this._onBackup(ev));
     html.find(".gm-restore-btn").click(ev => this._onRestore(ev));
@@ -285,6 +279,30 @@ export class GMToolsApp extends Application {
     const tab = this._activeTab || "combat";
     root.querySelectorAll(".gm-tab-link").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
     root.querySelectorAll(".gm-tab-panel").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+  }
+
+  /**
+   * Block Foundry/system keybindings while a text input is focused.
+   * Uses capture-phase listeners so this runs before document-level
+   * hotkey handlers regardless of registration order. Standard pattern
+   * for custom Application V1 dialogs whose inputs aren't auto-shielded
+   * by Foundry's form pipeline.
+   * @param {jQuery|HTMLElement|HTMLElement[]} target
+   */
+  _shieldFromKeybinds(target) {
+    const handler = ev => {
+      const k = ev.key;
+      // Allow form/dialog navigation keys through
+      if (k === "Enter" || k === "Tab" || k === "Escape") return;
+      ev.stopImmediatePropagation();
+    };
+    const els = target instanceof jQuery ? target.toArray() : (Array.isArray(target) ? target : [target]);
+    for (const el of els) {
+      if (!el?.addEventListener) continue;
+      el.addEventListener("keydown", handler, true);
+      el.addEventListener("keyup", handler, true);
+      el.addEventListener("keypress", handler, true);
+    }
   }
 
   // ── Portrait embedding ──
