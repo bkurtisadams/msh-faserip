@@ -1,4 +1,9 @@
-// equipment-action-dialog.js v1.3.0 - 2026-04-22
+// equipment-action-dialog.js v1.4.0 - 2026-04-29
+// v1.4.0: Redesign action picker dialog (.frp-dlg structure matching Contact/Talent).
+//         Adds: header banner with category chip, compressed stat-chip strip,
+//         collapsible description, action buttons grouped by Combat/Powers/State,
+//         right-side mechanic tag per button, low-ammo warning on Reload,
+//         consolidated device function chip ("FUNCTIONS: N").
 // v1.3.0: Skip hub when the item has exactly one rollable action and nothing else
 //         (no toggle, reload, or template). Items with multiple rollable actions —
 //         or any combination of rollable + state-change actions — still show the hub.
@@ -18,6 +23,23 @@ import { AreaTemplate } from "./area-template.js";
 import { getTargetData } from "./action-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
+// ── Display config ──
+// Reload button highlights yellow when shotsRemaining/shots ≤ this fraction.
+// Empty (0/N) gets stronger red treatment.
+const LOW_AMMO_THRESHOLD = 0.25;
+
+// Mechanic-tag label per damageType code (right-side chip on Combat buttons).
+const MECHANIC_LABEL = {
+  "BA": "BLUNT", "EA": "EDGED", "S": "SHOOTING", "E": "ENERGY", "F": "FORCE",
+  "TE": "THROW", "TB": "THROW", "GP": "GRAPPLE", "Gb": "GRAB"
+};
+
+// ── Action grouping ──
+// Each action gets a `group`: "combat" | "powers" | "state". Determined at
+// push-time. Groups render as headed sections in buildActionButtons.
+const GROUP_LABELS = { combat: "Combat", powers: "Powers", state: "State" };
+const GROUP_ORDER  = ["combat", "powers", "state"];
+
 // Determine which action buttons to show based on item data
 function getAvailableActions(item, actor) {
   const actions = [];
@@ -34,6 +56,7 @@ function getAvailableActions(item, actor) {
     const primaryLabel = modes.length ? _primaryAttackLabel(item) : "Attack";
     actions.push({
       id: "attack",
+      group: "combat",
       label: primaryLabel,
       icon: "fas fa-crosshairs",
       color: "#c62828"
@@ -44,6 +67,7 @@ function getAvailableActions(item, actor) {
   for (let i = 0; i < modes.length; i++) {
     actions.push({
       id: `attack-mode-${i}`,
+      group: "combat",
       label: modes[i].name,
       icon: "fas fa-crosshairs",
       color: "#c62828",
@@ -55,6 +79,7 @@ function getAvailableActions(item, actor) {
   if (cat === "other" && sys.weaponType === "grenade") {
     actions.push({
       id: "grenade",
+      group: "combat",
       label: "Throw Grenade",
       icon: "fas fa-bomb",
       color: "#e65100"
@@ -65,6 +90,7 @@ function getAvailableActions(item, actor) {
   if (cat === "other" && sys.weaponType === "missile") {
     actions.push({
       id: "missile",
+      group: "combat",
       label: "Launch Missile",
       icon: "fas fa-rocket",
       color: "#e65100"
@@ -77,6 +103,7 @@ function getAvailableActions(item, actor) {
     const isActive = anyEffectActive;
     actions.push({
       id: "toggle",
+      group: "state",
       label: isActive ? "Turn Off" : "Turn On",
       icon: "fas fa-power-off",
       color: isActive ? "#c62828" : "#2e7d32",
@@ -88,6 +115,7 @@ function getAvailableActions(item, actor) {
   if (sys.intensityRank) {
     actions.push({
       id: "intensity",
+      group: "combat",
       label: "Intensity Attack",
       icon: "fas fa-radiation",
       color: "#e65100"
@@ -99,6 +127,7 @@ function getAvailableActions(item, actor) {
   if (areaRadius > 0) {
     actions.push({
       id: "template",
+      group: "state",
       label: `Place Template (${areaRadius} area${areaRadius > 1 ? "s" : ""})`,
       icon: "fas fa-bullseye",
       color: "#1565c0"
@@ -109,6 +138,7 @@ function getAvailableActions(item, actor) {
   if (sys.stunIntensity && !actions.some(a => a.id === "attack" || a.id.startsWith("attack-mode"))) {
     actions.push({
       id: "stun-intensity",
+      group: "combat",
       label: `Stun/Gas (${sys.stunIntensity})`,
       icon: "fas fa-cloud",
       color: "#6a1b9a"
@@ -119,6 +149,7 @@ function getAvailableActions(item, actor) {
   if (sys.throwable && cat === "weapon") {
     actions.push({
       id: "throw",
+      group: "combat",
       label: "Throw",
       icon: "fas fa-location-arrow",
       color: "#ef6c00"
@@ -134,6 +165,7 @@ function getAvailableActions(item, actor) {
     const rankTag = ca.rank ? ` (${ca.rank})` : "";
     actions.push({
       id: `custom-${i}`,
+      group: isCombat ? "combat" : "powers",
       label: `${ca.name}${rankTag}`,
       icon: caIcon,
       color: caColor,
@@ -149,6 +181,7 @@ function getAvailableActions(item, actor) {
     const rankTag = pw.rank ? ` (${pw.rank})` : "";
     actions.push({
       id: `power-${i}`,
+      group: pw.damageType ? "combat" : "powers",
       label: `${pw.name}${rankTag}`,
       icon: pwIcon,
       color: pwColor,
@@ -174,6 +207,7 @@ function getAvailableActions(item, actor) {
       const rankTag = fn.rank ? ` (${fn.rank})` : "";
       actions.push({
         id: `devfn-${i}`,
+        group: fn.type === "attack" ? "combat" : "powers",
         label: `${fn.name}${rankTag}`,
         icon: fnIcon,
         color: fnColor,
@@ -186,6 +220,7 @@ function getAvailableActions(item, actor) {
   if (cat === "power-item" && sys.powerRank) {
     actions.push({
       id: "power-item",
+      group: "combat",
       label: "Use Power",
       icon: "fas fa-bolt",
       color: "#6a1b9a"
@@ -198,6 +233,7 @@ function getAvailableActions(item, actor) {
   if (shots > 0 && Number.isFinite(remaining) && remaining < shots) {
     actions.push({
       id: "reload",
+      group: "state",
       label: "Reload",
       icon: "fas fa-sync-alt",
       color: "#666"
@@ -208,93 +244,206 @@ function getAvailableActions(item, actor) {
 }
 
 // Build stat summary HTML based on item category
+// Stat chip strip — single horizontal row of compact "LABEL value" chips.
+// Shots chip color-tints by remaining ratio (full = neutral, partial = amber,
+// low/empty = red).
 function buildStatSummary(item) {
   const sys = item.system || {};
   const cat = (sys.category || "").toLowerCase();
-  const rows = [];
+  const chips = [];
 
-  const add = (label, value) => {
-    if (value !== undefined && value !== null && value !== "" && value !== 0 && value !== "0") {
-      rows.push(`<div><span style="color:#666;font-size:.8em;text-transform:uppercase;">${label}</span><br><strong>${value}</strong></div>`);
-    }
+  // chip(label, value, tint?) — tint: undefined | "amber" | "red"
+  const chip = (label, value, tint) => {
+    if (value === undefined || value === null || value === "" || value === 0 || value === "0") return;
+    const valColor = tint === "red" ? "#c62828" : tint === "amber" ? "#f57f17" : "#1a1a1a";
+    const valWeight = tint ? "700" : "600";
+    chips.push(`<span style="padding:2px 6px;background:#faf8f2;border:1px solid #d8cfb8;border-radius:2px;font-size:11px;white-space:nowrap;"><span style="font-family:'Oswald',sans-serif;color:#c8960c;letter-spacing:0.4px;font-size:10px;margin-right:3px;">${label}</span><strong style="color:${valColor};font-weight:${valWeight};">${value}</strong></span>`);
   };
 
-  add("Material", sys.materialStrength);
-
   if (cat === "weapon" || cat === "other") {
-    add("Damage", sys.damage || sys.grenadeDamage || sys.missileDamage);
-    add("Type", sys.damageType || sys.grenadeDamageType || sys.missileDamageType);
-    add("Range", sys.range || (sys.grenadeRadius ? `${sys.grenadeRadius} area radius` : ""));
-    add("Rate", sys.rate);
-    const shots = sys.shots;
-    const rem = sys.shotsRemaining;
-    if (shots) add("Shots", `${rem ?? shots}/${shots}`);
+    chip("RNG", sys.range || (sys.grenadeRadius ? `${sys.grenadeRadius}a radius` : ""));
+    const dmgVal = sys.damage || sys.grenadeDamage || sys.missileDamage;
+    const dmgType = sys.damageType || sys.grenadeDamageType || sys.missileDamageType;
+    if (dmgVal) chip("DMG", dmgType ? `${dmgVal} (${dmgType})` : dmgVal);
+    chip("RATE", sys.rate);
+
+    const shots = Number(sys.shots);
+    const rem = Number(sys.shotsRemaining);
+    if (shots > 0) {
+      const remDisplay = Number.isFinite(rem) ? rem : shots;
+      const ratio = Number.isFinite(rem) ? rem / shots : 1;
+      let shotsTint;
+      if (remDisplay === 0) shotsTint = "red";
+      else if (ratio <= LOW_AMMO_THRESHOLD) shotsTint = "red";
+      else if (ratio < 1) shotsTint = "amber";
+      chip("SHOTS", `${remDisplay}/${shots}`, shotsTint);
+    }
   }
 
   if (cat === "armor") {
-    add("Protection", sys.protection);
-    add("Coverage", sys.coverage);
+    chip("PROT", sys.protection);
+    chip("COV", sys.coverage);
   }
 
   if (cat === "power-item") {
-    add("Power Rank", sys.powerRank);
-    add("Power Type", sys.powerType);
-    add("Range", sys.powerRange);
+    chip("RANK", sys.powerRank);
+    chip("PTYPE", sys.powerType);
+    chip("RNG", sys.powerRange);
   }
 
   if (cat === "device" || cat === "custom") {
     const dfns = Array.isArray(sys.deviceFunctions) ? sys.deviceFunctions.filter(f => f?.name) : [];
     if (dfns.length > 0) {
-      const attacks = dfns.filter(f => f.type === "attack").length;
-      const powers = dfns.filter(f => f.type === "power").length;
-      const buffs = dfns.filter(f => f.type === "buff").length;
-      const defs = dfns.filter(f => f.type === "defense").length;
-      if (attacks) add("Attacks", attacks);
-      if (powers) add("Powers", powers);
-      if (buffs) add("Buffs", buffs);
-      if (defs) add("Defenses", defs);
+      chip("FUNCTIONS", dfns.length);
     } else {
-      // Legacy fallback
       const cas = Array.isArray(sys.customAbilities) ? sys.customAbilities.filter(a => a?.name) : [];
       const pws = Array.isArray(sys.powers) ? sys.powers.filter(p => p?.name) : [];
-      add("Abilities", cas.length || "");
-      add("Powers", pws.length || "");
+      const total = cas.length + pws.length;
+      if (total > 0) chip("FUNCTIONS", total);
     }
   }
 
-  if (sys.intensityRank) add("Intensity", sys.intensityRank);
-  if (sys.areaRadius) add("Area", `${sys.areaRadius} area${sys.areaRadius > 1 ? "s" : ""} radius`);
+  // Always show material strength last so it doesn't crowd the primary stats.
+  chip("MAT", sys.materialStrength);
+
+  if (sys.intensityRank) chip("INT", sys.intensityRank);
+  if (sys.areaRadius) chip("AREA", `${sys.areaRadius}a`);
 
   const dur = Number(sys.duration);
   if (dur > 0) {
     const unit = sys.durationUnit || "hour";
-    add("Duration", `${dur} ${dur === 1 ? unit : unit + "s"}`);
+    chip("DUR", `${dur}${unit.charAt(0)}`);
   }
 
-  if (!rows.length) return "";
+  if (!chips.length) return "";
 
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-bottom:10px;padding:8px;background:#f5f5f0;border:1px solid #ddd;border-radius:3px;">
-    ${rows.join("")}
-  </div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">${chips.join("")}</div>`;
 }
 
 // Build action button HTML
-function buildActionButtons(actions) {
-  if (!actions.length) return `<div style="color:#888;font-style:italic;padding:8px;">No actions available for this item.</div>`;
+// Resolve the right-side mechanic tag for an action (e.g. "SHOOTING").
+// Returns "" when no mechanic should be shown (state actions, generic powers).
+function _resolveMechanicTag(action, item) {
+  const sys = item.system || {};
+  const id = action.id;
 
-  return actions.map(a => {
-    return `<button type="button" class="equip-action-btn" data-action-id="${a.id}"
-      ${a.modeIndex !== undefined ? `data-mode-index="${a.modeIndex}"` : ""}
-      ${a.customIndex !== undefined ? `data-custom-index="${a.customIndex}"` : ""}
-      ${a.powerIndex !== undefined ? `data-power-index="${a.powerIndex}"` : ""}
-      ${a.devFnIndex !== undefined ? `data-devfn-index="${a.devFnIndex}"` : ""}
-      style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;margin-bottom:4px;
-             border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;
-             font-size:0.95em;text-align:left;">
-      <i class="${a.icon}" style="color:${a.color};width:18px;text-align:center;"></i>
-      <span style="flex:1;font-weight:600;">${a.label}</span>
+  if (id === "attack") {
+    // Primary attack — derive from item's damageType / weaponType.
+    const dt = sys.damageType;
+    return MECHANIC_LABEL[dt] || "";
+  }
+  if (id.startsWith("attack-mode-")) {
+    const idx = action.modeIndex;
+    const mode = sys.attackModes?.[idx];
+    return MECHANIC_LABEL[mode?.damageType] || "";
+  }
+  if (id.startsWith("custom-")) {
+    const idx = action.customIndex;
+    const ca = sys.customAbilities?.[idx];
+    return ca?.damageType ? (MECHANIC_LABEL[ca.damageType] || "") : "POWER";
+  }
+  if (id.startsWith("power-") && !id.startsWith("power-item")) {
+    const idx = action.powerIndex;
+    const pw = sys.powers?.[idx];
+    return pw?.damageType ? (MECHANIC_LABEL[pw.damageType] || "") : "POWER";
+  }
+  if (id.startsWith("devfn-")) {
+    const idx = action.devFnIndex;
+    const fn = sys.deviceFunctions?.[idx];
+    if (fn?.type === "attack") return MECHANIC_LABEL[fn.damageType] || "";
+    return "POWER";
+  }
+  if (id === "grenade")        return "THROW";
+  if (id === "missile")        return "MISSILE";
+  if (id === "throw")          return "THROW";
+  if (id === "intensity")      return "INTENSITY";
+  if (id === "stun-intensity") return "STUN";
+  if (id === "power-item")     return "POWER";
+  // State actions (toggle, reload, template) — no mechanic tag.
+  return "";
+}
+
+// Reload tinting: derived from shotsRemaining/shots ratio. Only the Reload
+// button is treated specially; other state actions render plain.
+function _reloadTint(item) {
+  const sys = item.system || {};
+  const shots = Number(sys.shots);
+  const rem = Number(sys.shotsRemaining);
+  if (!(shots > 0 && Number.isFinite(rem))) return null;
+  if (rem === 0) return { bg: "#ffebee", border: "#ef9a9a", color: "#c62828", note: "EMPTY" };
+  if (rem / shots <= LOW_AMMO_THRESHOLD) return { bg: "#fff8e1", border: "#ffcc80", color: "#f57f17", note: "LOW AMMO" };
+  return null;
+}
+
+// Toggle tinting: green when off (action label "Turn On"), red when on.
+function _toggleTint(action) {
+  if (action.active) return { bg: "#fff5f5", border: "#ef9a9a", color: "#c62828", note: "" };
+  return { bg: "#e8f5e9", border: "#a5d6a7", color: "#2e7d32", note: "" };
+}
+
+function buildActionButtons(actions, item) {
+  if (!actions.length) {
+    return `<div style="color:#888;font-style:italic;padding:8px;font-size:12px;">No actions available for this item.</div>`;
+  }
+
+  // Bucket by group, preserving insertion order within each.
+  const buckets = { combat: [], powers: [], state: [] };
+  for (const a of actions) {
+    const g = a.group && buckets[a.group] ? a.group : "combat";
+    buckets[g].push(a);
+  }
+
+  const renderButton = (a) => {
+    const dataAttrs = [
+      `data-action-id="${a.id}"`,
+      a.modeIndex !== undefined ? `data-mode-index="${a.modeIndex}"` : "",
+      a.customIndex !== undefined ? `data-custom-index="${a.customIndex}"` : "",
+      a.powerIndex !== undefined ? `data-power-index="${a.powerIndex}"` : "",
+      a.devFnIndex !== undefined ? `data-devfn-index="${a.devFnIndex}"` : ""
+    ].filter(Boolean).join(" ");
+
+    // Per-button styling overrides for state-action highlights
+    let btnBg = "#fff", btnBorder = "#c0a070", labelColor = "#1a1a1a";
+    let stateNote = "", stateNoteColor = "#777";
+
+    if (a.id === "reload") {
+      const tint = _reloadTint(item);
+      if (tint) {
+        btnBg = tint.bg; btnBorder = tint.border;
+        stateNote = `⚠ ${tint.note}`; stateNoteColor = tint.color;
+      }
+    } else if (a.id === "toggle") {
+      const tint = _toggleTint(a);
+      btnBg = tint.bg; btnBorder = tint.border; labelColor = tint.color;
+    }
+
+    const mechanic = _resolveMechanicTag(a, item);
+    const tagHTML = mechanic
+      ? `<span style="font-size:10px;color:${stateNote ? stateNoteColor : "#777"};font-family:'Oswald',sans-serif;letter-spacing:0.4px;">${mechanic}</span>`
+      : (stateNote
+          ? `<span style="font-size:10px;color:${stateNoteColor};font-family:'Oswald',sans-serif;letter-spacing:0.4px;font-weight:700;">${stateNote}</span>`
+          : "");
+
+    return `<button type="button" class="equip-action-btn" ${dataAttrs}
+      style="display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;margin-bottom:3px;
+             border:1px solid ${btnBorder};border-radius:3px;background:${btnBg};cursor:pointer;
+             font-family:inherit;font-size:13px;text-align:left;">
+      <i class="${a.icon}" style="color:${a.color};width:16px;text-align:center;"></i>
+      <span style="flex:1;font-weight:600;color:${labelColor};">${a.label}</span>
+      ${tagHTML}
     </button>`;
+  };
+
+  const sections = GROUP_ORDER.map(g => {
+    const list = buckets[g];
+    if (!list.length) return "";
+    return `<div style="margin-bottom:6px;">
+      <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">${GROUP_LABELS[g]}</div>
+      ${list.map(renderButton).join("")}
+    </div>`;
   }).join("");
+
+  return sections;
 }
 
 /**
@@ -326,28 +475,31 @@ export async function openEquipmentActionDialog(actor, item) {
   }
 
   const statSummary = buildStatSummary(item);
-  const actionButtons = buildActionButtons(actions);
+  const actionButtons = buildActionButtons(actions, item);
 
   const descText = item.system?.description || "";
   const descHtml = descText
-    ? `<div style="font-size:.85em;color:#555;margin-bottom:8px;max-height:60px;overflow-y:auto;">${descText}</div>`
+    ? `<details style="margin-bottom:6px;font-size:11px;">
+         <summary style="cursor:pointer;color:#555;padding:2px 4px;user-select:none;">Description</summary>
+         <div style="padding:4px 8px;background:#f5f3ee;border:1px solid #d8cfb8;border-radius:2px;margin-top:3px;color:#444;font-style:italic;max-height:120px;overflow-y:auto;">${descText}</div>
+       </details>`
     : "";
 
+  const categoryLabel = (item.system?.category || "equipment").toUpperCase();
+
   const content = `
-    <div style="min-width:320px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <img src="${item.img}" width="40" height="40" style="border:1px solid #ccc;border-radius:3px;"/>
-        <div>
-          <div style="font-weight:bold;font-size:1.15em;">${item.name}</div>
-          <div style="font-size:.8em;color:#888;text-transform:uppercase;">${item.system.category || "equipment"}</div>
-        </div>
-      </div>
-      ${descHtml}
-      ${statSummary}
-      <div class="equip-action-buttons">
-        ${actionButtons}
-      </div>
-    </div>`;
+  <div class="frp-dlg" style="font-family:'Barlow Condensed',Arial,sans-serif;">
+    <div class="frp-header-v3">
+      <span class="h-actor">${actor.name}</span>
+      <span class="h-arrow">→</span>
+      <span class="h-target">${item.name}</span>
+      <span style="margin-left:auto;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;font-size:10px;letter-spacing:0.4px;text-transform:uppercase;">${categoryLabel}</span>
+    </div>
+
+    ${statSummary}
+    ${descHtml}
+    ${actionButtons}
+  </div>`;
 
   showFaseripButtonDialog({
     title: item.name,
@@ -364,7 +516,7 @@ export async function openEquipmentActionDialog(actor, item) {
         await _executeAction(actionId, actor, item, btn.dataset);
       });
     },
-    width: 380,
+    width: 420,
     classes: ["faserip", "equipment-action-dialog"]
   });
 }
