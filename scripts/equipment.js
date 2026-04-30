@@ -219,11 +219,39 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
    * Capture scroll position and the currently-focused input's name +
    * caret position right before V2 destroys the DOM for re-render.
    * Restored in _onRender.
+   *
+   * Scroll container detection: try the actually-scrollable elements in
+   * priority order. The equipment sheet template wraps content in a
+   * <section class="sheet-body"> that V2 makes scrollable; .window-content
+   * (V2's outer scroller for most sheets) ends up not scrolling here
+   * because the sheet-body absorbs the overflow. Fall through to whichever
+   * element actually has overflow when no fixed selector matches.
    */
+  _findScroller() {
+    if (!this.element) return null;
+    const candidates = [
+      this.element.querySelector(".sheet-body"),
+      this.element.querySelector(".window-content"),
+      this.element
+    ];
+    for (const el of candidates) {
+      if (el && el.scrollHeight > el.clientHeight) return el;
+    }
+    // Last resort: walk descendants for any scrolling element.
+    const descendants = this.element.querySelectorAll("*");
+    for (const el of descendants) {
+      if (el.scrollHeight > el.clientHeight) {
+        const cs = getComputedStyle(el);
+        if (/(auto|scroll)/.test(cs.overflow + cs.overflowY)) return el;
+      }
+    }
+    return null;
+  }
+
   _preRender(context, options) {
     if (super._preRender) super._preRender(context, options);
     if (!this.element) return;
-    const scroller = this.element.querySelector(".window-content");
+    const scroller = this._findScroller();
     const active = this.element.contains(document.activeElement) ? document.activeElement : null;
     let focusName = null, selectionStart = null, selectionEnd = null;
     if (active && active.name) {
@@ -252,8 +280,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     // _preRender (just before the DOM is replaced) and restore here.
     if (this._scrollSnapshot) {
       const snap = this._scrollSnapshot;
-      // Restore scroll on the .window-content scroll container
-      const scroller = this.element.querySelector(".window-content");
+      // Restore scroll on whichever element is the live scroll container
+      const scroller = this._findScroller();
       if (scroller && typeof snap.scrollTop === "number") {
         scroller.scrollTop = snap.scrollTop;
       }
@@ -499,46 +527,16 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       html.find('[name="system.missileDamageType"]').val(damageType);
     });
 
-    // Toggle collapsible sections
-    html.find('.collapsible').click(ev => {
-      const header = ev.currentTarget;
-      const section = header.dataset.section;
-      const content = header.nextElementSibling;
-      const icon = header.querySelector('i');
-
-      // Toggle the content display
-      const isOpen = content.style.display !== "none";
-      if (!isOpen) {
-        content.style.display = "block";
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
-        this.item.setFlag("msh-faserip", `section_${section}_open`, true);
-      } else {
-        content.style.display = "none";
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
-        this.item.setFlag("msh-faserip", `section_${section}_open`, false);
-      }
-    });
-
-    // Initialize section states based on saved flags
-    html.find('.collapsible').each((i, el) => {
-      const header = el;
-      const section = header.dataset.section;
-      const content = header.nextElementSibling;
-      const icon = header.querySelector('i');
-
-      const isOpen = this.item.getFlag("msh-faserip", `section_${section}_open`);
-      if (isOpen) {
-        content.style.display = "block";
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
-      } else {
-        // Ensure closed state is consistent on load if flag is false or not set
-        content.style.display = "none";
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
-      }
+    // ── <details> accordion state persistence ──
+    // Native <details> elements with [data-section] save their open/close
+    // state to a per-section item flag so re-renders preserve user choice.
+    // The template renders <details open> when the flag is true, otherwise
+    // closed. Toggle event fires whenever the user clicks the summary.
+    html.find('details.frp-section[data-section]').on('toggle', ev => {
+      const det = ev.currentTarget;
+      const section = det.dataset.section;
+      if (!section) return;
+      this.item.setFlag("msh-faserip", `section_${section}_open`, det.open);
     });
 
 
