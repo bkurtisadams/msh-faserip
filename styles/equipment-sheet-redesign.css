@@ -1,0 +1,353 @@
+/* equipment-sheet-redesign.css
+ *
+ * Layout-only redesign of the FASERIP equipment edit sheet. Original
+ * pastel-coded section colors are preserved; this file only adds:
+ *   - 4-column grid scaffolding for the top fields card and Combat section
+ *   - Native <details> accordion styling for specialized sections
+ *   - Inline boolean flags row inside Combat
+ *   - Damage cell merge (number + damage-type select side-by-side)
+ *
+ * Original styling (white inputs, standard heights, Cambria/Arial fonts,
+ * pastel section headers) is intentionally retained. No global palette
+ * shift.
+ */
+
+/* ── Top-fields card ──────────────────────────────────────────────────── */
+
+.equipment-sheet .frp-top-fields {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid #c0a070;
+  border-radius: 4px;
+  background: #faf8f2;
+}
+
+.equipment-sheet .frp-top-fields > label {
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.equipment-sheet .frp-top-fields > select,
+.equipment-sheet .frp-top-fields > input[type="text"],
+.equipment-sheet .frp-top-fields > input[type="number"] {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 13px;
+  min-height: 28px;
+}
+
+.equipment-sheet .frp-top-fields .frp-broken-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal;
+  cursor: pointer;
+  margin: 0;
+}
+
+.equipment-sheet .frp-top-fields .frp-broken-field input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.equipment-sheet .frp-top-fields .frp-broken-field span {
+  font-size: 12px;
+  color: #666;
+}
+
+/* ── 4-column grid inside specialized sections ────────────────────────── */
+/* Used by Combat, and (later) by other section redesigns.
+ * Pattern: <div class="frp-grid-2col">  ⇒  label / control / label / control */
+
+.equipment-sheet .frp-grid-2col {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px;
+  font-size: 13px;
+}
+
+.equipment-sheet .frp-grid-2col > label {
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.equipment-sheet .frp-grid-2col > select,
+.equipment-sheet .frp-grid-2col > input[type="text"],
+.equipment-sheet .frp-grid-2col > input[type="number"] {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 13px;
+  min-height: 28px;
+}
+
+/* Damage cell — number input + damage-type select side-by-side */
+.equipment-sheet .frp-damage-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.equipment-sheet .frp-damage-cell input[type="number"] {
+  width: 60px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 13px;
+  text-align: center;
+  min-height: 28px;
+}
+
+.equipment-sheet .frp-damage-cell select {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 13px;
+  min-height: 28px;
+}
+
+/* Range / Shots cell — number input + unit hint side-by-side */
+.equipment-sheet .frp-unit-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.equipment-sheet .frp-unit-cell input[type="number"] {
+  width: 60px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 13px;
+  text-align: center;
+  min-height: 28px;
+}
+
+.equipment-sheet .frp-unit-cell .frp-unit-label {
+  color: #666;
+  font-size: 12px;
+}
+
+/* Inline boolean-flags row spanning the right two grid columns */
+.equipment-sheet .frp-grid-2col .frp-bool-row {
+  grid-column: 3 / 5;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.equipment-sheet .frp-grid-2col .frp-bool-row > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: normal;
+  cursor: pointer;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.equipment-sheet .frp-grid-2col .frp-bool-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+/* ── Native <details> accordion sections ──────────────────────────────── */
+/* Replaces .specialized-section + .collapsible JS handler. The pastel
+ * header colors live as inline styles on the <summary> so each section
+ * keeps its original color identity (Combat=blue, Ammunition=green, etc).
+ */
+
+.equipment-sheet .frp-section {
+  margin-bottom: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.equipment-sheet .frp-section > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.equipment-sheet .frp-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.equipment-sheet .frp-section > summary > .frp-chevron,
+.equipment-sheet .frp-section > summary > .frp-section-chevron {
+  font-size: 11px;
+  display: inline-block;
+  transition: transform 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.equipment-sheet .frp-section[open] > summary > .frp-chevron,
+.equipment-sheet .frp-section[open] > summary > .frp-section-chevron {
+  transform: rotate(90deg);
+}
+
+.equipment-sheet .frp-section > summary > h3 {
+  margin: 0;
+  font-size: 1em;
+  font-weight: inherit;
+  color: inherit;
+  flex: 1;
+}
+
+.equipment-sheet .frp-section > .frp-section-body {
+  padding: 10px;
+}
+
+/* Per-section pastel styling — applied via [data-section] attribute. */
+.equipment-sheet .frp-section[data-section="combat"] {
+  border: 1px solid #c5d5f8;
+}
+.equipment-sheet .frp-section[data-section="combat"] > summary {
+  background: #e8f0fe;
+  color: #1a237e;
+  border-bottom: 1px solid #c5d5f8;
+}
+
+.equipment-sheet .frp-section[data-section="ammunition"] {
+  border: 1px solid #a5d6a7;
+}
+.equipment-sheet .frp-section[data-section="ammunition"] > summary {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-bottom: 1px solid #a5d6a7;
+}
+
+.equipment-sheet .frp-section[data-section="armor-penetration"] {
+  border: 1px solid #f48fb1;
+}
+.equipment-sheet .frp-section[data-section="armor-penetration"] > summary {
+  background: #fce4ec;
+  color: #880e4f;
+  border-bottom: 1px solid #f48fb1;
+}
+
+.equipment-sheet .frp-section[data-section="special-effects"] {
+  border: 1px solid #ffe082;
+}
+.equipment-sheet .frp-section[data-section="special-effects"] > summary {
+  background: #fff8e1;
+  color: #5d4037;
+  border-bottom: 1px solid #ffe082;
+}
+
+.equipment-sheet .frp-section[data-section="attack-modes"] {
+  border: 1px solid #ddd;
+}
+.equipment-sheet .frp-section[data-section="attack-modes"] > summary {
+  background: #f5f5f5;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+}
+
+.equipment-sheet .frp-section[data-section="grenade-fields"],
+.equipment-sheet .frp-section[data-section="missile-fields"] {
+  border: 1px solid #ddd;
+}
+.equipment-sheet .frp-section[data-section="grenade-fields"] > summary,
+.equipment-sheet .frp-section[data-section="missile-fields"] > summary {
+  background: #f5f5f5;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+}
+
+.equipment-sheet .frp-section[data-section="body-armor"],
+.equipment-sheet .frp-section[data-section="protection"] {
+  border: 1px solid #90caf9;
+}
+.equipment-sheet .frp-section[data-section="body-armor"] > summary,
+.equipment-sheet .frp-section[data-section="protection"] > summary {
+  background: #e3f2fd;
+  color: #0d47a1;
+  border-bottom: 1px solid #90caf9;
+}
+
+.equipment-sheet .frp-section[data-section="sensory"] {
+  border: 1px solid #ffcc80;
+}
+.equipment-sheet .frp-section[data-section="sensory"] > summary {
+  background: #fff3e0;
+  color: #e65100;
+  border-bottom: 1px solid #ffcc80;
+}
+
+.equipment-sheet .frp-section[data-section="movement"] {
+  border: 1px solid #9fa8da;
+}
+.equipment-sheet .frp-section[data-section="movement"] > summary {
+  background: #e8eaf6;
+  color: #283593;
+  border-bottom: 1px solid #9fa8da;
+}
+
+.equipment-sheet .frp-section[data-section="restraint"] {
+  border: 1px solid #f48fb1;
+}
+.equipment-sheet .frp-section[data-section="restraint"] > summary {
+  background: #fce4ec;
+  color: #880e4f;
+  border-bottom: 1px solid #f48fb1;
+}
+
+.equipment-sheet .frp-section[data-section="sundry"] {
+  border: 1px solid #ce93d8;
+}
+.equipment-sheet .frp-section[data-section="sundry"] > summary {
+  background: #f3e5f5;
+  color: #4a148c;
+  border-bottom: 1px solid #ce93d8;
+}
+
+.equipment-sheet .frp-section[data-section="resistances"] {
+  border: 1px solid #a5d6a7;
+}
+.equipment-sheet .frp-section[data-section="resistances"] > summary {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-bottom: 1px solid #a5d6a7;
+}
+
+.equipment-sheet .frp-section[data-section="sfx-fields"],
+.equipment-sheet .frp-section[data-section="vfx-fields"] {
+  border: 1px solid #b39ddb;
+}
+.equipment-sheet .frp-section[data-section="sfx-fields"] > summary,
+.equipment-sheet .frp-section[data-section="vfx-fields"] > summary {
+  background: #ede7f6;
+  color: #311b92;
+  border-bottom: 1px solid #b39ddb;
+}
+
+.equipment-sheet .frp-section[data-section="description"] {
+  border: 1px solid #ddd;
+}
+.equipment-sheet .frp-section[data-section="description"] > summary {
+  background: #f5f5f5;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+}

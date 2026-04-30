@@ -24,7 +24,8 @@
 
       <!-- ══════════════ PROPERTIES TAB ══════════════ -->
       <div class="tab active" data-tab="properties" data-group="primary">
-      <div class="form-group">
+
+      <div class="frp-top-fields">
         <label>Category:</label>
         <select name="system.category" class="equipment-category-select">
           <option value="weapon" {{#if (eq system.category "weapon")}}selected{{/if}}>Weapon</option>
@@ -35,10 +36,8 @@
           {{#if (eq system.category "power-item")}}<option value="power-item" selected>Power Item (legacy)</option>{{/if}}
           {{#if (eq system.category "custom")}}<option value="custom" selected>Custom (legacy)</option>{{/if}}
         </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Material Strength:</label>
+
+        <label>Material:</label>
         <select name="system.materialStrength">
           <option value="Shift-0" {{#if (eq system.materialStrength "Shift-0")}}selected{{/if}}>Shift-0</option>
           <option value="Feeble" {{#if (eq system.materialStrength "Feeble")}}selected{{/if}}>Feeble</option>
@@ -52,15 +51,8 @@
           <option value="Monstrous" {{#if (eq system.materialStrength "Monstrous")}}selected{{/if}}>Monstrous</option>
           <option value="Unearthly" {{#if (eq system.materialStrength "Unearthly")}}selected{{/if}}>Unearthly</option>
         </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Broken:</label>
-        <input type="checkbox" name="system.broken" {{#if system.broken}}checked{{/if}} title="If checked, this item is unusable in attack dialogs until repaired." />
-      </div>
 
-      <div class="form-group">
-        <label>Price (Resource Rank):</label>
+        <label>Price:</label>
         <select name="system.price">
           <option value="Shift-0" {{#if (eq system.price "Shift-0")}}selected{{/if}}>Shift-0</option>
           <option value="Feeble" {{#if (eq system.price "Feeble")}}selected{{/if}}>Feeble</option>
@@ -74,169 +66,144 @@
           <option value="Monstrous" {{#if (eq system.price "Monstrous")}}selected{{/if}}>Monstrous</option>
           <option value="Unearthly" {{#if (eq system.price "Unearthly")}}selected{{/if}}>Unearthly</option>
         </select>
+
+        <label>Broken:</label>
+        <label class="frp-broken-field">
+          <input type="checkbox" name="system.broken" {{#if system.broken}}checked{{/if}} title="If checked, this item is unusable in attack dialogs until repaired." />
+          <span>Mark as broken</span>
+        </label>
       </div>
-  
+
       <!-- Weapon-specific fields -->
       {{#if isWeapon}}
       <div class="weapon-fields">
 
         <!-- ═══ COMBAT ═══════════════════════════════════════════════════ -->
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#e8f0fe;border-bottom:1px solid #c5d5f8;">
+        <details class="frp-section" data-section="combat" {{#if (getSysFlagOr item "section_combat_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#e8f0fe;border-bottom:1px solid #c5d5f8;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#1a237e;">Combat</h3>
-          </div>
-          <div style="padding:8px;">
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Weapon Type:</label>
-                <select name="system.weaponType">
-                  <option value="" {{#if (eq system.weaponType "")}}selected{{/if}}>None</option>
-                  <option value="shooting" {{#if (eq system.weaponType "shooting")}}selected{{/if}}>Shooting Weapon</option>
-                  <option value="melee" {{#if (eq system.weaponType "melee")}}selected{{/if}}>Melee Weapon</option>
-                  <option value="thrown" {{#if (eq system.weaponType "thrown")}}selected{{/if}}>Thrown Weapon</option>
-                </select>
-              </div>
-              <div class="form-group half">
-                <label>Legality:</label>
-                <select name="system.legality">
-                  <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
-                  <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
-                  <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
-                  <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
-                </select>
-              </div>
+          </summary>
+
+          <div class="frp-grid-2col">
+
+            <label>Weapon Type:</label>
+            <select name="system.weaponType">
+              <option value="" {{#if (eq system.weaponType "")}}selected{{/if}}>None</option>
+              <option value="shooting" {{#if (eq system.weaponType "shooting")}}selected{{/if}}>Shooting Weapon</option>
+              <option value="melee" {{#if (eq system.weaponType "melee")}}selected{{/if}}>Melee Weapon</option>
+              <option value="thrown" {{#if (eq system.weaponType "thrown")}}selected{{/if}}>Thrown Weapon</option>
+            </select>
+
+            <label>Legality:</label>
+            <select name="system.legality">
+              <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
+              <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
+              <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
+              <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
+            </select>
+
+            <label>Attack Type:</label>
+            <select name="system.attackType">
+              <option value="" {{#if (eq system.attackType "")}}selected{{/if}}>(auto-detect)</option>
+              <option value="blunt-attack" {{#if (eq system.attackType "blunt-attack")}}selected{{/if}}>Blunt Attack</option>
+              <option value="edged-attack" {{#if (eq system.attackType "edged-attack")}}selected{{/if}}>Edged Attack</option>
+              <option value="shooting" {{#if (eq system.attackType "shooting")}}selected{{/if}}>Shooting</option>
+              <option value="throwing-blunt" {{#if (eq system.attackType "throwing-blunt")}}selected{{/if}}>Throwing Blunt</option>
+              <option value="throwing-edged" {{#if (eq system.attackType "throwing-edged")}}selected{{/if}}>Throwing Edged</option>
+              <option value="energy" {{#if (eq system.attackType "energy")}}selected{{/if}}>Energy</option>
+              <option value="force" {{#if (eq system.attackType "force")}}selected{{/if}}>Force</option>
+              <option value="grappling" {{#if (eq system.attackType "grappling")}}selected{{/if}}>Grappling</option>
+              <option value="grabbing" {{#if (eq system.attackType "grabbing")}}selected{{/if}}>Grabbing</option>
+            </select>
+
+            <label>Damage:</label>
+            <div class="frp-damage-cell">
+              <input type="text" name="system.damage" value="{{system.damage}}" />
+              <select name="system.damageType">
+                <option value="" {{#if (eq system.damageType "")}}selected{{/if}}>None</option>
+                <option value="S" {{#if (eq system.damageType "S")}}selected{{/if}}>Shooting (S)</option>
+                <option value="E" {{#if (eq system.damageType "E")}}selected{{/if}}>Energy (E)</option>
+                <option value="F" {{#if (eq system.damageType "F")}}selected{{/if}}>Force (F)</option>
+                <option value="EA" {{#if (eq system.damageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
+                <option value="BA" {{#if (eq system.damageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
+                <option value="TE" {{#if (eq system.damageType "TE")}}selected{{/if}}>Throwing Edged (TE)</option>
+                <option value="TB" {{#if (eq system.damageType "TB")}}selected{{/if}}>Throwing Blunt (TB)</option>
+                <option value="GP" {{#if (eq system.damageType "GP")}}selected{{/if}}>Grappling (GP)</option>
+                <option value="Gb" {{#if (eq system.damageType "Gb")}}selected{{/if}}>Grabbing (Gb)</option>
+                <option value="Stun" {{#if (eq system.damageType "Stun")}}selected{{/if}}>Stunning (Stun)</option>
+              </select>
             </div>
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Attack Type:</label>
-                <select name="system.attackType">
-                  <option value="" {{#if (eq system.attackType "")}}selected{{/if}}>(auto-detect)</option>
-                  <option value="blunt-attack" {{#if (eq system.attackType "blunt-attack")}}selected{{/if}}>Blunt Attack</option>
-                  <option value="edged-attack" {{#if (eq system.attackType "edged-attack")}}selected{{/if}}>Edged Attack</option>
-                  <option value="shooting" {{#if (eq system.attackType "shooting")}}selected{{/if}}>Shooting</option>
-                  <option value="throwing-blunt" {{#if (eq system.attackType "throwing-blunt")}}selected{{/if}}>Throwing Blunt</option>
-                  <option value="throwing-edged" {{#if (eq system.attackType "throwing-edged")}}selected{{/if}}>Throwing Edged</option>
-                  <option value="energy" {{#if (eq system.attackType "energy")}}selected{{/if}}>Energy</option>
-                  <option value="force" {{#if (eq system.attackType "force")}}selected{{/if}}>Force</option>
-                  <option value="grappling" {{#if (eq system.attackType "grappling")}}selected{{/if}}>Grappling</option>
-                  <option value="grabbing" {{#if (eq system.attackType "grabbing")}}selected{{/if}}>Grabbing</option>
-                </select>
-              </div>
-              <div class="form-group half">
-                <label>Damage Type:</label>
-                <select name="system.damageType">
-                  <option value="" {{#if (eq system.damageType "")}}selected{{/if}}>None</option>
-                  <option value="S" {{#if (eq system.damageType "S")}}selected{{/if}}>Shooting (S)</option>
-                  <option value="E" {{#if (eq system.damageType "E")}}selected{{/if}}>Energy (E)</option>
-                  <option value="F" {{#if (eq system.damageType "F")}}selected{{/if}}>Force (F)</option>
-                  <option value="EA" {{#if (eq system.damageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
-                  <option value="BA" {{#if (eq system.damageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
-                  <option value="TE" {{#if (eq system.damageType "TE")}}selected{{/if}}>Throwing Edged (TE)</option>
-                  <option value="TB" {{#if (eq system.damageType "TB")}}selected{{/if}}>Throwing Blunt (TB)</option>
-                  <option value="GP" {{#if (eq system.damageType "GP")}}selected{{/if}}>Grappling (GP)</option>
-                  <option value="Gb" {{#if (eq system.damageType "Gb")}}selected{{/if}}>Grabbing (Gb)</option>
-                  <option value="Stun" {{#if (eq system.damageType "Stun")}}selected{{/if}}>Stunning (Stun)</option>
-                </select>
-              </div>
+            <label>Range:</label>
+            <div class="frp-unit-cell">
+              <input type="text" name="system.range" value="{{system.range}}" />
+              <span class="frp-unit-label">areas</span>
             </div>
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Range (in areas):</label>
-                <input type="text" name="system.range" value="{{system.range}}" />
-              </div>
-              <div class="form-group half">
-                <label>Damage:</label>
-                <input type="text" name="system.damage" value="{{system.damage}}" />
-              </div>
+            <label>Rate:</label>
+            <input type="text" name="system.rate" value="{{system.rate}}" />
+
+            <label>Shots:</label>
+            <div class="frp-unit-cell">
+              <input type="text" name="system.shots" value="{{system.shots}}" />
+              <span class="frp-unit-label">before reload</span>
             </div>
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Rate of Fire:</label>
-                <input type="text" name="system.rate" value="{{system.rate}}" />
-              </div>
-              <div class="form-group half">
-                <label>Shots Before Reload:</label>
-                <input type="text" name="system.shots" value="{{system.shots}}" />
-              </div>
-            </div>
+            <label>One-Hand:</label>
+            <select name="system.oneHandedUse">
+              <option value="normal" {{#if (eq system.oneHandedUse "normal")}}selected{{/if}}>Can Use One-Handed</option>
+              <option value="-1cs" {{#if (eq system.oneHandedUse "-1cs")}}selected{{/if}}>One-Handed at -1CS</option>
+              <option value="-2cs" {{#if (eq system.oneHandedUse "-2cs")}}selected{{/if}}>One-Handed at -2CS</option>
+              <option value="two-handed-only" {{#if (eq system.oneHandedUse "two-handed-only")}}selected{{/if}}>Requires Two Hands</option>
+            </select>
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>One-Handed Use:</label>
-                <select name="system.oneHandedUse">
-                  <option value="normal" {{#if (eq system.oneHandedUse "normal")}}selected{{/if}}>Can Use One-Handed</option>
-                  <option value="-1cs" {{#if (eq system.oneHandedUse "-1cs")}}selected{{/if}}>One-Handed at -1CS</option>
-                  <option value="-2cs" {{#if (eq system.oneHandedUse "-2cs")}}selected{{/if}}>One-Handed at -2CS</option>
-                  <option value="two-handed-only" {{#if (eq system.oneHandedUse "two-handed-only")}}selected{{/if}}>Requires Two Hands</option>
-                </select>
-              </div>
-              <div class="form-group half">
-                <label>Burst/Scatter:</label>
-                <select name="system.burstScatter">
-                  <option value="none" {{#if (eq system.burstScatter "none")}}selected{{/if}}>None</option>
-                  <option value="burst" {{#if (eq system.burstScatter "burst")}}selected{{/if}}>Burst</option>
-                  <option value="scatter" {{#if (eq system.burstScatter "scatter")}}selected{{/if}}>Scatter</option>
-                </select>
-              </div>
-            </div>
+            <label>Burst:</label>
+            <select name="system.burstScatter">
+              <option value="none" {{#if (eq system.burstScatter "none")}}selected{{/if}}>None</option>
+              <option value="burst" {{#if (eq system.burstScatter "burst")}}selected{{/if}}>Burst</option>
+              <option value="scatter" {{#if (eq system.burstScatter "scatter")}}selected{{/if}}>Scatter</option>
+            </select>
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Precision Weapon:</label>
-                <input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>
-                <span style="font-size:0.85em;color:#666;">No range penalty</span>
-              </div>
-              <div class="form-group half">
-                <label>Requires Two Operators:</label>
-                <input type="checkbox" name="system.requiresTwoOperators" {{checked system.requiresTwoOperators}}/>
-              </div>
-            </div>
+            <label>Power Rank:</label>
+            <input type="text" name="system.weaponPowerRank" value="{{system.weaponPowerRank}}" />
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Throwable (Melee):</label>
-                <input type="checkbox" name="system.throwable" {{checked system.throwable}}/>
-                <span style="font-size:0.85em;color:#666;">Can be thrown</span>
-              </div>
-              <div class="form-group half">
-                <label>Entangling:</label>
-                <input type="checkbox" name="system.entangling" {{checked system.entangling}}/>
-                <span style="font-size:0.85em;color:#666;">Net, bola, webbing</span>
-              </div>
-            </div>
-
-            {{#if system.entangling}}
-            <div class="form-group" style="background:#fff3e0;border:1px solid #ff9800;border-radius:3px;padding:8px;font-size:0.85em;">
-              <strong>⚠ Entangling Weapons:</strong> Target must make Agility FEAT vs weapon's Material Strength.
-              On failure, target is enmeshed and can escape via Strength FEAT (break) or Agility (slip).
-            </div>
-            {{/if}}
-
-            <div class="form-row">
-              <div class="form-group half">
-                <label for="system.weaponPowerRank">Power Rank</label>
-                <input type="text" name="system.weaponPowerRank" value="{{system.weaponPowerRank}}" />
-              </div>
-              <div class="form-group half">
-                <label for="system.treatAsPower">Treat as Power</label>
-                <input type="checkbox" name="system.treatAsPower" {{checked system.treatAsPower}} />
-                <span style="font-size:0.85em;color:#666;">Uses power rank, not ability</span>
-              </div>
+            <label>Flags:</label>
+            <div class="frp-bool-row">
+              <label><input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>No Range Penalty</label>
+              <label><input type="checkbox" name="system.throwable" {{checked system.throwable}}/>Throwable</label>
+              <label><input type="checkbox" name="system.entangling" {{checked system.entangling}}/>Entangling</label>
+              <label><input type="checkbox" name="system.requiresTwoOperators" {{checked system.requiresTwoOperators}}/>Two Operators</label>
+              <label><input type="checkbox" name="system.treatAsPower" {{checked system.treatAsPower}}/>Treat as Power</label>
             </div>
 
           </div>
-        </div>
+
+          {{#if system.entangling}}
+          <div style="margin:0 10px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;padding:8px;font-size:0.85em;">
+            <strong>⚠ Entangling Weapons:</strong> Target must make Agility FEAT vs weapon's Material Strength.
+            On failure, target is enmeshed and can escape via Strength FEAT (break) or Agility (slip).
+          </div>
+          {{/if}}
+
+        </details>
 
         <!-- ═══ AMMUNITION (shooting weapons only) ════════════════════════ -->
         {{#if (eq system.weaponType "shooting")}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#e8f5e9;border-bottom:1px solid #a5d6a7;">
+        <details class="frp-section" data-section="ammunition" {{#if (getSysFlagOr item "section_ammunition_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#e8f5e9;border-bottom:1px solid #a5d6a7;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#1b5e20;">Ammunition</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
 
             <div class="form-group">
@@ -293,15 +260,21 @@
             </p>
 
           </div>
-        </div>
+        </details>
         {{/if}}
 
         <!-- ═══ ARMOR PENETRATION (melee / thrown / non-shooting) ════════ -->
         {{#unless (eq system.weaponType "shooting")}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#fce4ec;border-bottom:1px solid #f48fb1;">
+        <details class="frp-section" data-section="armor-penetration" {{#if (getSysFlagOr item "section_armor-penetration_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#fce4ec;border-bottom:1px solid #f48fb1;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#880e4f;">Armor Penetration</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
 
             <div class="form-group">
@@ -324,14 +297,20 @@
             </div>
 
           </div>
-        </div>
+        </details>
         {{/unless}}
 
         <!-- ═══ SPECIAL EFFECTS ════════════════════════════════════════════ -->
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#fff8e1;border-bottom:1px solid #ffe082;">
+        <details class="frp-section" data-section="special-effects" {{#if (getSysFlagOr item "section_special-effects_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#fff8e1;border-bottom:1px solid #ffe082;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#5d4037;">Special Effects</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
 
             <div class="form-group">
@@ -368,15 +347,20 @@
             </div>
 
           </div>
-        </div>
+        </details>
 
         <!-- ═══ ATTACK MODES (collapsible) ════════════════════════════════ -->
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header collapsible" data-section="attack-modes">
-            <h3>Attack Modes <span style="font-size:0.8em;color:#666;">(for multi-mode weapons)</span></h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="attack-modes-section section-content" style="display:none;">
+        <details class="frp-section" data-section="attack-modes" {{#if (getSysFlagOr item "section_attack-modes_open" false)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#f5f5f5;border-bottom:1px solid #ddd;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;color:#333;">
+
+            <span class="frp-section-chevron" style="font-size:11px;">▶</span>
+
+            <h3 style="margin:0;font-size:1em;font-weight:700;">Attack Modes <span style="font-size:0.8em;color:#666;">(for multi-mode weapons)</span></h3>
+
+          </summary>
+
+          <div class="attack-modes-section" style="padding:8px;">
             <div class="frp-modes-header" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
               <span style="font-family:'Oswald',sans-serif;font-size:11px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;">Attack Modes</span>
               <span style="font-size:11px;color:#777;font-style:italic;flex:1;min-width:200px;">Multiple ways to attack — e.g. Spear: Thrust / Shaft Strike</span>
@@ -442,7 +426,7 @@
               {{/each}}
             </div>
           </div>
-        </div>
+        </details>
 
       </div>
       <!-- END weapon-fields -->
@@ -479,12 +463,17 @@
         <!-- Grenade sub-fields -->
         <div class="other-grenade-fields" {{#unless (eq system.weaponType "grenade")}}style="display: none;"{{/unless}}>
         <!-- Grenade Fields -->
-        <div class="specialized-section">
-          <div class="section-header collapsible" data-section="grenade-fields">
-            <h3>Grenade Properties</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="grenade-fields section-content" style="display: none;">
+        <details class="frp-section" data-section="grenade-fields" {{#if (getSysFlagOr item "section_grenade-fields_open" false)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#f5f5f5;border-bottom:1px solid #ddd;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;color:#333;">
+
+            <span class="frp-section-chevron" style="font-size:11px;">▶</span>
+
+            <h3 style="margin:0;font-size:1em;font-weight:700;">Grenade Properties</h3>
+
+          </summary>
+
+          <div class="grenade-fields" style="padding:8px;">
             <div class="form-group">
               <label>Grenade Type:</label>
               <select name="system.grenadeType">
@@ -540,18 +529,23 @@
               </select>
             </div>
           </div>
-        </div>
+        </details>
         </div>
 
         <!-- Missile sub-fields -->
         <div class="other-missile-fields" {{#unless (eq system.weaponType "missile")}}style="display: none;"{{/unless}}>
         <!-- Missile Fields -->
-        <div class="specialized-section">
-          <div class="section-header collapsible" data-section="missile-fields">
-            <h3>Missile Properties</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="missile-fields section-content" style="display: none;">
+        <details class="frp-section" data-section="missile-fields" {{#if (getSysFlagOr item "section_missile-fields_open" false)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#f5f5f5;border-bottom:1px solid #ddd;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;color:#333;">
+
+            <span class="frp-section-chevron" style="font-size:11px;">▶</span>
+
+            <h3 style="margin:0;font-size:1em;font-weight:700;">Missile Properties</h3>
+
+          </summary>
+
+          <div class="missile-fields" style="padding:8px;">
             <div class="form-group">
               <label>Missile Type:</label>
               <select name="system.missileType">
@@ -641,7 +635,7 @@
               </select>
             </div>
           </div>
-        </div>
+        </details>
         </div>
 
       </div>
@@ -652,10 +646,16 @@
       <!-- Armor-specific fields -->
       {{#if isArmor}}
       <div class="armor-fields">
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#e3f2fd;border-bottom:1px solid #90caf9;">
+        <details class="frp-section" data-section="body-armor" {{#if (getSysFlagOr item "section_body-armor_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#e3f2fd;border-bottom:1px solid #90caf9;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#0d47a1;">Body Armor</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
               <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;">Rank:</label>
@@ -676,7 +676,7 @@
               Reduces physical damage by rank number. -20 vs Energy attacks per rules.
             </p>
           </div>
-        </div>
+        </details>
       </div>
       {{/if}}
       <!-- END armor-fields -->
@@ -706,10 +706,16 @@
         </div>
 
         {{#if isGearProtective}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#e3f2fd;border-bottom:1px solid #90caf9;">
+        <details class="frp-section" data-section="protection" {{#if (getSysFlagOr item "section_protection_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#e3f2fd;border-bottom:1px solid #90caf9;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#0d47a1;">Protection</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
               <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;">Rank:</label>
@@ -727,14 +733,20 @@
               </select>
             </div>
           </div>
-        </div>
+        </details>
         {{/if}}
 
         {{#if isGearSensory}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#fff3e0;border-bottom:1px solid #ffcc80;">
+        <details class="frp-section" data-section="sensory" {{#if (getSysFlagOr item "section_sensory_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#fff3e0;border-bottom:1px solid #ffcc80;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#e65100;">Sensory</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
             <div class="form-group">
               <label>Sensory Type:</label>
@@ -755,14 +767,20 @@
               <input type="text" name="system.sensoryRange" value="{{system.sensoryRange}}" placeholder="e.g., 5"/>
             </div>
           </div>
-        </div>
+        </details>
         {{/if}}
 
         {{#if isGearMovement}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#e8eaf6;border-bottom:1px solid #9fa8da;">
+        <details class="frp-section" data-section="movement" {{#if (getSysFlagOr item "section_movement_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#e8eaf6;border-bottom:1px solid #9fa8da;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#283593;">Movement</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
             <div class="form-group">
               <label>Movement Type:</label>
@@ -786,14 +804,20 @@
               </select>
             </div>
           </div>
-        </div>
+        </details>
         {{/if}}
 
         {{#if isGearRestraint}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#fce4ec;border-bottom:1px solid #f48fb1;">
+        <details class="frp-section" data-section="restraint" {{#if (getSysFlagOr item "section_restraint_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#fce4ec;border-bottom:1px solid #f48fb1;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#880e4f;">Restraint / Inhibitor</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
             <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
               Ability shifts applied when equipped. Negative values penalize.
@@ -824,20 +848,26 @@
               Inhibitor bands: -5CS physical, -7CS powers. Handcuffs: Excellent material to break.
             </p>
           </div>
-        </div>
+        </details>
         {{/if}}
 
         {{#if isGearSundry}}
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header" style="background:#f3e5f5;border-bottom:1px solid #ce93d8;">
+        <details class="frp-section" data-section="sundry" {{#if (getSysFlagOr item "section_sundry_open" true)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#f3e5f5;border-bottom:1px solid #ce93d8;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;">
+
+            <span class="frp-section-chevron" style="font-size:11px;color:inherit;">▶</span>
+
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#4a148c;">Sundry</h3>
-          </div>
+
+          </summary>
+
           <div style="padding:8px;">
             <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
               Salaries, clothing, entertainment, and other non-combat items. Use Notes and Description below.
             </p>
           </div>
-        </div>
+        </details>
         {{/if}}
       </div>
       {{/if}}
@@ -845,11 +875,12 @@
 
       <!-- Shared Resistances block — rendered once for armor OR gear-protective -->
       {{#if showResistances}}
-      <div class="specialized-section resistances-section" style="margin-bottom:10px;">
-        <div class="section-header" style="background:#e8f5e9;border-bottom:1px solid #a5d6a7;">
-          <h3 style="margin:0;font-size:1em;font-weight:700;color:#1b5e20;">Resistances</h3>
-        </div>
-        <div style="padding:8px;">
+      <details class="frp-section resistances-section" data-section="resistances" {{#if (getSysFlagOr item "section_resistances_open" true)}}open{{/if}}>
+        <summary>
+          <span class="frp-chevron">▶</span>
+          <h3>Resistances</h3>
+        </summary>
+        <div class="frp-section-body">
           <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
             Per FASERIP rules: FEAT roll vs damage as Intensity. Success = no damage. Failure = rank number as Body Armor.
           </p>
@@ -893,7 +924,7 @@
             {{/each}}
           </div>
         </div>
-      </div>
+      </details>
       {{/if}}
       <!-- END shared resistances -->
 
@@ -1010,12 +1041,17 @@
       <!-- ═══ SOUND EFFECTS — shared across weapon & other categories ═══ -->
       {{#if showSfx}}
       <div class="sfx-shared-fields">
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header collapsible" data-section="sfx-fields">
-            <h3>Sound Effects</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="sfx-fields section-content" style="display:none;">
+        <details class="frp-section" data-section="sfx-fields" {{#if (getSysFlagOr item "section_sfx-fields_open" false)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#f5f5f5;border-bottom:1px solid #ddd;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;color:#333;">
+
+            <span class="frp-section-chevron" style="font-size:11px;">▶</span>
+
+            <h3 style="margin:0;font-size:1em;font-weight:700;">Sound Effects</h3>
+
+          </summary>
+
+          <div class="sfx-fields" style="padding:8px;">
 
             <div class="form-group">
               <label>SFX (Hit)</label>
@@ -1062,7 +1098,7 @@
             </div>
 
           </div>
-        </div>
+        </details>
       </div>
       {{/if}}
       <!-- END sfx-shared-fields -->
@@ -1070,12 +1106,17 @@
       <!-- ═══ VISUAL EFFECTS — shared across weapon & other categories ═══ -->
       {{#if showSfx}}
       <div class="vfx-shared-fields">
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header collapsible" data-section="vfx-fields">
-            <h3>Visual Effects</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="vfx-fields section-content" style="display:none;">
+        <details class="frp-section" data-section="vfx-fields" {{#if (getSysFlagOr item "section_vfx-fields_open" false)}}open{{/if}}>
+
+          <summary class="section-header" style="background:#f5f5f5;border-bottom:1px solid #ddd;list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 12px;color:#333;">
+
+            <span class="frp-section-chevron" style="font-size:11px;">▶</span>
+
+            <h3 style="margin:0;font-size:1em;font-weight:700;">Visual Effects</h3>
+
+          </summary>
+
+          <div class="vfx-fields" style="padding:8px;">
 
             <div class="form-group">
               <label>Enable VFX</label>
@@ -1134,7 +1175,7 @@
             </div>
 
           </div>
-        </div>
+        </details>
       </div>
       {{/if}}
       <!-- END vfx-shared-fields -->

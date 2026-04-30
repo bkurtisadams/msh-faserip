@@ -1639,6 +1639,15 @@ Hooks.once("init", async () => {
   Handlebars.registerHelper('add', function(a, b) {
     return Number(a) + Number(b);
   });
+
+  // Returns the flag value if set, otherwise the provided default.
+  // Used in templates for accordion open-state with a sensible default
+  // when no flag has been written yet.
+  Handlebars.registerHelper('getSysFlagOr', function(object, flag, defaultValue) {
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+    const v = object?.getFlag?.(scope, flag);
+    return (v === undefined || v === null) ? defaultValue : v;
+  });
   
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
     return object.getFlag(scope, flag);

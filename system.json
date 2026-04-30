@@ -64,7 +64,8 @@
         "styles/action-dialog.css",
         "styles/vehicle-sheet.css",
         "styles/compact-mode.css",
-        "styles/universal-table-tab.css"
+        "styles/universal-table-tab.css",
+        "styles/equipment-sheet-redesign.css"
     ],
     "packs": [
         {
