@@ -587,25 +587,7 @@
         "canister": false,
         "heatSeeker": false
       },
-      "attackModes": [
-        {
-          "name": "Thrust",
-          "actionType": "edged-attack",
-          "damageType": "EA",
-          "damage": 10,
-          "ability": "fighting",
-          "description": "",
-          "allowedVariants": [
-            "standard",
-            "ap"
-          ],
-          "sfx": {
-            "hit": "",
-            "miss": "",
-            "critical": ""
-          }
-        }
-      ],
+      "attackModes": [],
       "burstScatter": "none",
       "canisterSubType": "gas",
       "stunIntensity": "",
