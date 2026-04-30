@@ -137,27 +137,26 @@ function buildMultiTargetHTML(actionCode) {
   if (!validMulti && !validAttack) return "";
 
   const targetCount = game.user.targets.size;
-  let html = `<div style="margin-bottom:10px;padding:8px;background:#e8f4f8;border:1px solid #b8d4da;border-radius:3px;">
-    <div style="font-weight:bold;margin-bottom:5px;color:#2c5aa0;">Multiple Target Options:</div>`;
+  let html = `<div style="border:1px solid #d8cfb8;border-radius:2px;padding:5px 7px;background:#faf8f2;margin-bottom:6px;">
+    <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">Multiple Targets</div>`;
 
   if (validMulti) {
-    html += `<div style="margin-bottom:5px;">
-      <label><input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right:5px;">
-        Multiple Adjacent Targets (-4CS, single roll affects all)</label>
-      <div style="font-size:0.8em;color:#666;margin-left:20px;">Targets selected: ${targetCount} | All must be adjacent</div>
-      <div style="font-size:0.8em;color:#888;margin-left:20px;">Valid for: Blunt Attack, Escaping, Energy, Force</div>
-    </div>`;
+    html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;margin-bottom:2px;cursor:pointer;">
+      <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin:0;flex:0 0 auto;">
+      <span><strong>Adjacent group</strong> <span style="color:#777;">(–4 CS, single roll vs all)</span></span>
+    </label>
+    <div style="font-size:10px;color:#888;margin-left:20px;margin-bottom:4px;">Targets selected: <strong>${targetCount}</strong> · BA / Es / En / Fo</div>`;
   }
   if (validAttack) {
-    html += `<div style="margin-bottom:5px;">
-      <label><input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right:5px;">
-        Multiple Attacks (requires Fighting FEAT)</label>
-      <div id="multi-attacks-options" style="margin-left:20px;display:none;">
-        <label style="display:block;margin:3px 0;"><input type="radio" name="attackCount" value="2" checked style="margin-right:5px;">2 Attacks (Remarkable FEAT, -1CS each)</label>
-        <label style="display:block;margin:3px 0;"><input type="radio" name="attackCount" value="3" style="margin-right:5px;">3 Attacks (Amazing FEAT, -1CS each)</label>
-      </div>
-      <div style="font-size:0.8em;color:#888;margin-left:20px;">Valid for: Slugfest (Blunt, Edged) and Shooting</div>
-    </div>`;
+    html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;margin-bottom:2px;cursor:pointer;">
+      <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin:0;flex:0 0 auto;">
+      <span><strong>Multiple attacks</strong> <span style="color:#777;">(Fighting FEAT required)</span></span>
+    </label>
+    <div id="multi-attacks-options" style="margin-left:20px;display:none;font-size:11px;">
+      <label style="display:block;margin:2px 0;cursor:pointer;"><input type="radio" name="attackCount" value="2" checked style="margin:0 4px 0 0;">2 attacks <span style="color:#777;">(Remarkable FEAT, –1 CS each)</span></label>
+      <label style="display:block;margin:2px 0;cursor:pointer;"><input type="radio" name="attackCount" value="3" style="margin:0 4px 0 0;">3 attacks <span style="color:#777;">(Amazing FEAT, –1 CS each)</span></label>
+    </div>
+    <div style="font-size:10px;color:#888;margin-left:20px;">BA / EA / Sh only</div>`;
   }
   html += `</div>`;
   return html;
@@ -219,24 +218,18 @@ export async function rollTalent(actor, talent, options = {}) {
     return `<option value="${ab}" data-rank="${info.rank}" data-value="${info.value}" ${ab === defaultAbility ? "selected" : ""}>${label} (${info.rank})</option>`;
   }).join("");
 
-  // Rank override
+  // Initial effective rank computed once; render hook recomputes live.
   const rankOverride = talent.system.rankOverride;
-  let effectiveRankDisplay, talentBonusDisplay;
+  let effRankInitial, effShiftInitial;
   if (rankOverride) {
     const baseIdx = RANKS.indexOf(baseRank);
     const overIdx = RANKS.indexOf(rankOverride);
-    const overShift = (baseIdx >= 0 && overIdx >= 0) ? (overIdx - baseIdx) : 0;
-    effectiveRankDisplay = `<div style="margin-bottom:10px;padding:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:4px;">
-      <div style="font-weight:bold;color:#2e7d32;margin-bottom:4px;">★ RANK OVERRIDE</div>
-      <div style="font-size:0.9em;">${baseRank} → <strong>${rankOverride}</strong> (+${overShift} CS)</div></div>`;
-    talentBonusDisplay = "";
+    effShiftInitial = (baseIdx >= 0 && overIdx >= 0) ? (overIdx - baseIdx) : 0;
+    effRankInitial = rankOverride;
   } else {
-    const effIdx = Math.min(Math.max(RANKS.indexOf(baseRank) + talentBonus, 0), RANKS.length - 1);
-    effectiveRankDisplay = `<div style="margin-bottom:10px;">
-      <label style="display:inline-block;width:120px;">Effective Rank:</label>
-      <span>${baseRank} → <strong>${RANKS[effIdx]}</strong></span></div>`;
-    talentBonusDisplay = `<div style="margin-bottom:10px;">
-      <label style="display:inline-block;width:120px;">Talent Bonus:</label><span>+${talentBonus}CS</span></div>`;
+    const effIdx = Math.min(Math.max(RANKS.indexOf(baseRank) + talentBonus + savedExtraShift, 0), RANKS.length - 1);
+    effRankInitial = RANKS[effIdx];
+    effShiftInitial = talentBonus + savedExtraShift;
   }
 
   // Intensity dropdown
@@ -250,49 +243,65 @@ export async function rollTalent(actor, talent, options = {}) {
   const multiHTML = isAbilityFeat ? "" : buildMultiTargetHTML(defaultCode);
 
   const dialogContent = `
-    <div style="background:#f0e8d8;padding:10px;border-radius:5px;">
-      <div style="margin-bottom:10px;">
-        <label style="display:inline-block;width:120px;">Action Type:</label>
-        <select id="action-type" name="actionType" style="width:180px;">${actionOptionsHTML}</select>
-      </div>
-      ${talentBonusDisplay}
-      <div id="ability-container" style="margin-bottom:10px;padding:8px;background:#e8e8e8;border:1px solid #ccc;border-radius:4px;">
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:120px;">Ability:</label>
-          <select id="ability-select" name="abilitySelect" style="width:180px;">${abilityOptionsHTML}</select>
-        </div>
-        <div id="ability-hint" style="font-size:0.85em;color:#666;margin-left:124px;">
-          ${abilityModified !== "none" ? `(Talent default: ${abilityLabel})` : "(No default ability set)"}
-        </div>
-      </div>
-      <div style="margin-bottom:10px;">
-        <label style="display:inline-block;width:120px;">Base Rank:</label>
-        <span id="base-rank-display">${baseRank}</span>
-      </div>
-      <div id="effective-rank-container">${effectiveRankDisplay}</div>
-      <div style="margin-bottom:10px;">
-        <label style="display:inline-block;width:120px;">Extra Column Shift:</label>
-        <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width:50px;">
-        <span style="color:#666;font-size:0.9em;">(additional +/- CS)</span>
-      </div>
-      <div id="intensity-container" ${isAbilityFeat ? "" : 'style="display:none;"'}>
-        <div style="margin-bottom:10px;">
-          <label style="display:inline-block;width:120px;">Intensity:</label>
-          <select id="intensity" name="intensity" style="width:180px;">${intensityOptionsHTML}</select>
-        </div>
-        <div id="intensity-info" style="margin-bottom:10px;padding:8px;background:#e8e8e8;border-radius:4px;font-size:0.9em;color:#555;">
-          <em>Select intensity to determine required FEAT color</em>
-        </div>
-      </div>
-      <div id="multi-target-container">${multiHTML}</div>
+  <div class="frp-dlg" style="font-family:'Barlow Condensed',Arial,sans-serif;">
+    <div class="frp-header-v3">
+      <span class="h-actor">${actor.name}</span>
+      <span class="h-arrow">→</span>
+      <span class="h-target">${talent.name}</span>
+      ${rankOverride ? `<span style="margin-left:auto;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;font-size:10px;letter-spacing:0.4px;text-transform:uppercase;">★ Override ${rankOverride}</span>` : `<span style="margin-left:auto;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;font-size:10px;letter-spacing:0.4px;text-transform:uppercase;">+${talentBonus} CS</span>`}
     </div>
+
+    <div style="display:grid;grid-template-columns:80px 1fr;gap:4px 8px;align-items:center;font-size:13px;padding:4px 6px;background:#f5f3ee;border:1px solid #d8cfb8;border-radius:2px;margin-bottom:6px;">
+      <label style="color:#444;">Action:</label>
+      <select id="action-type" name="actionType" style="width:100%;padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:13px;height:auto;">${actionOptionsHTML}</select>
+    </div>
+
+    <div id="ability-container" style="display:grid;grid-template-columns:80px 1fr;gap:4px 8px;align-items:center;font-size:13px;padding:4px 6px;background:#faf8f2;border:1px solid #d8cfb8;border-radius:2px;margin-bottom:6px;">
+      <label style="color:#444;">Ability:</label>
+      <select id="ability-select" name="abilitySelect" style="width:100%;padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:13px;height:auto;">${abilityOptionsHTML}</select>
+      <div></div>
+      <div id="ability-hint" style="font-size:10px;color:#777;font-style:italic;">${abilityModified !== "none" ? `Talent default: ${abilityLabel}` : "No default ability set"}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+      <div style="border:1px solid #d8cfb8;border-radius:2px;padding:4px 6px;background:#faf8f2;">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Base Rank</div>
+        <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:14px;" id="base-rank-display">${baseRank}</div>
+      </div>
+      <div id="effective-card" style="border:1px solid ${rankOverride ? '#4caf50' : '#d8cfb8'};border-radius:2px;padding:4px 6px;background:${rankOverride ? '#e8f5e9' : '#faf8f2'};">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:${rankOverride ? '#2e7d32' : '#c8960c'};letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">${rankOverride ? '★ Effective (Override)' : 'Effective Rank'}</div>
+        <div style="display:flex;align-items:baseline;gap:4px;">
+          <span style="font-family:'Oswald',sans-serif;font-weight:700;font-size:14px;" id="effective-rank-display">${effRankInitial}</span>
+          <span id="effective-shift-display" style="font-size:11px;color:#777;">(${effShiftInitial >= 0 ? '+' : ''}${effShiftInitial} CS)</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border:1px solid #d8cfb8;border-radius:2px;margin-bottom:6px;">
+      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;">Extra CS</span>
+      <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width:42px;padding:2px;text-align:center;border:1px solid #b8b8b8;border-radius:2px;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;height:auto;">
+      <span style="margin-left:auto;font-size:11px;color:#777;">additional +/– column shift</span>
+    </div>
+
+    <div id="intensity-container" ${isAbilityFeat ? "" : 'style="display:none;"'}>
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:4px 8px;align-items:center;font-size:13px;padding:4px 6px;background:#faf8f2;border:1px solid #d8cfb8;border-radius:2px;margin-bottom:6px;">
+        <label style="color:#444;">Intensity:</label>
+        <select id="intensity" name="intensity" style="width:100%;padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:13px;height:auto;">${intensityOptionsHTML}</select>
+      </div>
+      <div id="intensity-info" style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#f5f5f5;border:1px solid #ddd;border-radius:2px;margin-bottom:6px;font-size:11px;color:#666;font-style:italic;">
+        Select intensity to determine required FEAT color
+      </div>
+    </div>
+
+    <div id="multi-target-container">${multiHTML}</div>
+
     ${generateKarmaControlsHTML(actor, 0)}
-    <div style="margin-bottom:10px;">
-      <label><input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? "checked" : ""}> Skip dice animation</label>
+
+    <div style="display:flex;align-items:center;gap:12px;padding-top:4px;border-top:1px solid #d8cfb8;font-size:11px;color:#666;">
+      <label style="display:inline-flex;align-items:center;gap:3px;margin:0;"><input type="checkbox" id="save-settings" name="saveSettings" ${savedRemember ? "checked" : ""} style="margin:0;"> Remember settings</label>
+      <label style="display:inline-flex;align-items:center;gap:3px;margin:0;"><input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? "checked" : ""} style="margin:0;"> Skip dice animation</label>
     </div>
-    <div style="margin-top:10px;">
-      <label><input type="checkbox" id="save-settings" name="saveSettings" ${savedRemember ? "checked" : ""}> Remember these settings</label>
-    </div>`;
+  </div>`;
 
   return new Promise(resolve => {
     showFaseripButtonDialog({
@@ -512,7 +521,9 @@ function _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, 
   const abilityContainer       = html.find("#ability-container");
   const abilityHint            = html.find("#ability-hint");
   const baseRankDisplay        = html.find("#base-rank-display");
-  const effectiveRankContainer = html.find("#effective-rank-container");
+  const effectiveCard          = html.find("#effective-card");
+  const effectiveRankDisplay   = html.find("#effective-rank-display");
+  const effectiveShiftDisplay  = html.find("#effective-shift-display");
   const multiContainer         = html.find("#multi-target-container");
   const intensityContainer     = html.find("#intensity-container");
   const intensitySelect        = html.find("#intensity");
@@ -532,20 +543,14 @@ function _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, 
       const bIdx = RANKS.indexOf(currentRank);
       const oIdx = RANKS.indexOf(rankOverride);
       const shift = (bIdx >= 0 && oIdx >= 0) ? (oIdx - bIdx) : 0;
-      effectiveRankContainer.html(`
-        <div style="margin-bottom:10px;padding:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:4px;">
-          <div style="font-weight:bold;color:#2e7d32;margin-bottom:4px;">★ RANK OVERRIDE</div>
-          <div style="font-size:0.9em;">${currentRank} → <strong>${rankOverride}</strong> (+${shift} CS)</div>
-        </div>`);
+      effectiveRankDisplay.text(rankOverride);
+      effectiveShiftDisplay.text(`(${shift >= 0 ? "+" : ""}${shift} CS)`);
     } else {
       const bIdx = RANKS.indexOf(currentRank);
       const effIdx = Math.min(Math.max(bIdx + talentBonus + extra, 0), RANKS.length - 1);
       const totalShift = talentBonus + extra;
-      effectiveRankContainer.html(`
-        <div style="margin-bottom:10px;">
-          <label style="display:inline-block;width:120px;">Effective Rank:</label>
-          <span>${currentRank} → <strong>${RANKS[effIdx]}</strong> (${totalShift >= 0 ? "+" : ""}${totalShift}CS)</span>
-        </div>`);
+      effectiveRankDisplay.text(RANKS[effIdx]);
+      effectiveShiftDisplay.text(`(${totalShift >= 0 ? "+" : ""}${totalShift} CS)`);
     }
     if (intensityContainer.is(":visible")) updateIntensityInfo();
   }
@@ -553,7 +558,8 @@ function _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, 
   function updateIntensityInfo() {
     const selInt = intensitySelect.val();
     if (!selInt) {
-      intensityInfo.html("<em>Select intensity to determine required FEAT color</em>");
+      intensityInfo.html("Select intensity to determine required FEAT color")
+        .css({ background: "#f5f5f5", "border-color": "#ddd", color: "#666", "font-style": "italic" });
       return;
     }
     const currentRank = getCurrentAbilityRank();
@@ -567,13 +573,14 @@ function _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, 
       effRank = RANKS[effIdx];
     }
     const feat = determineFeatRequirement(effRank, selInt);
-    let text, bg;
-    if (feat.automatic)  { text = `<strong style="color:#2e7d32;">Automatic Success</strong>`; bg = "#c8e6c9"; }
-    else if (feat.impossible) { text = `<strong style="color:#b71c1c;">Impossible</strong>`; bg = "#ffcdd2"; }
-    else if (feat.requirement === "Red") { text = `<strong style="color:#F44336;">Red only</strong> succeeds`; bg = "#ffebee"; }
-    else if (feat.requirement === "Yellow") { text = `<strong style="color:#F57C00;">Yellow or better</strong> required`; bg = "#fff3e0"; }
-    else { text = `<strong style="color:#4CAF50;">Green or better</strong> required`; bg = "#e8f5e9"; }
-    intensityInfo.html(text).css("background", bg);
+    let text, bg, border, color;
+    if (feat.automatic)        { text = "Automatic Success"; bg = "#e8f5e9"; border = "#a5d6a7"; color = "#2e7d32"; }
+    else if (feat.impossible)  { text = "Impossible";        bg = "#ffebee"; border = "#ef9a9a"; color = "#c62828"; }
+    else if (feat.requirement === "Red")    { text = "RED only succeeds";       bg = "#ffebee"; border = "#ef9a9a"; color = "#c62828"; }
+    else if (feat.requirement === "Yellow") { text = "YELLOW or higher required"; bg = "#fff8e1"; border = "#ffe082"; color = "#f57f17"; }
+    else                       { text = "GREEN or higher required"; bg = "#e8f5e9"; border = "#a5d6a7"; color = "#2e7d32"; }
+    intensityInfo.text(text)
+      .css({ background: bg, "border-color": border, color, "font-style": "normal", "font-weight": "600", "font-family": "'Oswald',sans-serif", "letter-spacing": "0.4px", "text-transform": "uppercase", "font-size": "12px" });
   }
 
   function updateMultiOptions() {
@@ -583,8 +590,8 @@ function _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, 
 
     if (selected === "Ability FEAT") {
       abilitySelect.prop("disabled", false);
-      abilityContainer.css("background", "#e8e8e8");
-      abilityHint.html(abilityModified !== "none" ? `(Talent default: ${abilityLabel})` : "(No default ability set)");
+      abilityContainer.css("background", "#faf8f2");
+      abilityHint.text(abilityModified !== "none" ? `Talent default: ${abilityLabel}` : "No default ability set");
       multiContainer.hide();
       intensityContainer.show();
       updateIntensityInfo();
@@ -592,8 +599,8 @@ function _wireDialogHandlers(html, actor, talent, talentBonus, abilityModified, 
       if (requiredAbility) {
         abilitySelect.val(requiredAbility);
         abilitySelect.prop("disabled", true);
-        abilityContainer.css("background", "#d0d8e0");
-        abilityHint.html(`(${selected} uses ${requiredAbility.charAt(0).toUpperCase() + requiredAbility.slice(1)})`);
+        abilityContainer.css("background", "#e8f0e8");
+        abilityHint.text(`${selected} uses ${requiredAbility.charAt(0).toUpperCase() + requiredAbility.slice(1)}`);
       }
       multiContainer.html(buildMultiTargetHTML(code)).show();
       intensityContainer.hide();
