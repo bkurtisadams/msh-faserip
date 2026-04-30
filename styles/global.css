@@ -3737,20 +3737,23 @@ form.faserip-sheet .secondary-abilities .resources-row {
 }
 
 form.faserip-sheet .secondary-abilities .resources-row select {
-  width: 48px !important;
-  min-width: 48px !important;
-  max-width: 48px !important;
+  width: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
   flex: 0 0 auto !important;
-  text-align: left;
-  padding-left: 4px;
-  font-size: 11px !important;
+  text-align: center;
+  text-align-last: center;
+  padding: 2px 4px;
+  font-size: 13px !important;
+  font-family: 'Oswald', sans-serif !important;
+  font-weight: 600 !important;
   box-sizing: border-box;
 }
 
 form.faserip-sheet .secondary-abilities .resources-row input[type="number"] {
-  width: 48px !important;
-  min-width: 48px !important;
-  max-width: 48px !important;
+  width: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
   flex: 0 0 auto !important;
   padding: 2px 4px;
   box-sizing: border-box;
