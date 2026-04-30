@@ -337,6 +337,39 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       onManageActiveEffect(ev, this.item);
     });
 
+    // ── File Picker buttons ──
+    // The legacy {{filePicker}} Handlebars helper renders <button class=
+    // "file-picker" data-type="..." data-target="...">, but in v14 V2's
+    // action dispatcher only auto-wires buttons with data-action set.
+    // Wire .file-picker clicks manually so audio/video pickers work.
+    html.find('button.file-picker').on('click', ev => {
+      ev.preventDefault();
+      const button = ev.currentTarget;
+      const target = button.dataset.target;
+      const type = button.dataset.type || "imagevideo";
+      if (!target) return;
+      const current = foundry.utils.getProperty(this.item, target) || "";
+      const FilePickerClass = foundry.applications?.apps?.FilePicker?.implementation
+        ?? foundry.applications?.apps?.FilePicker
+        ?? globalThis.FilePicker;
+      if (!FilePickerClass) {
+        console.warn("FASERIP equipment sheet: FilePicker class not found");
+        return;
+      }
+      const fp = new FilePickerClass({
+        type,
+        current,
+        callback: (path) => {
+          // Write the chosen path to the matching input so submitOnChange
+          // picks it up; also update the document directly to be safe.
+          const input = this.element.querySelector(`[name="${CSS.escape(target)}"]`);
+          if (input) input.value = path;
+          this.item.update({ [target]: path });
+        }
+      });
+      fp.browse();
+    });
+
     // Collapsible effect sections
     html.find('.effect-header').click((event) => {
       if ($(event.target).closest('.effect-control, .btn-add').length) return;
