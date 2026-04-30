@@ -215,10 +215,61 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     return data;
   }
 
+  /**
+   * Capture scroll position and the currently-focused input's name +
+   * caret position right before V2 destroys the DOM for re-render.
+   * Restored in _onRender.
+   */
+  _preRender(context, options) {
+    if (super._preRender) super._preRender(context, options);
+    if (!this.element) return;
+    const scroller = this.element.querySelector(".window-content");
+    const active = this.element.contains(document.activeElement) ? document.activeElement : null;
+    let focusName = null, selectionStart = null, selectionEnd = null;
+    if (active && active.name) {
+      focusName = active.name;
+      if ("selectionStart" in active) {
+        try { selectionStart = active.selectionStart; selectionEnd = active.selectionEnd; }
+        catch (_e) { /* type=number on some browsers rejects */ }
+      }
+    }
+    this._scrollSnapshot = {
+      scrollTop: scroller?.scrollTop ?? 0,
+      focusName,
+      selectionStart,
+      selectionEnd
+    };
+  }
+
   _onRender(context, options) {
     super._onRender(context, options);
     if (!this.isEditable) return;
     const html = $(this.element);
+
+    // Restore scroll position + focused-element-by-name after re-render. V2's
+    // submitOnChange triggers a full render on every field change, which by
+    // default loses scroll position and active focus. We snapshot in
+    // _preRender (just before the DOM is replaced) and restore here.
+    if (this._scrollSnapshot) {
+      const snap = this._scrollSnapshot;
+      // Restore scroll on the .window-content scroll container
+      const scroller = this.element.querySelector(".window-content");
+      if (scroller && typeof snap.scrollTop === "number") {
+        scroller.scrollTop = snap.scrollTop;
+      }
+      // Restore focus on the input matching the captured `name` attribute.
+      // Caret position restore on text/number inputs; selects just refocus.
+      if (snap.focusName) {
+        const target = this.element.querySelector(`[name="${CSS.escape(snap.focusName)}"]`);
+        if (target) {
+          target.focus({ preventScroll: true });
+          if (typeof snap.selectionStart === "number" && "setSelectionRange" in target) {
+            try { target.setSelectionRange(snap.selectionStart, snap.selectionEnd); } catch (_e) { /* select / type=number rejects */ }
+          }
+        }
+      }
+      this._scrollSnapshot = null;
+    }
 
     // One-time migration: backfill vfx defaults for equipment created before
     // the vfx schema was added. Without this, partial form submissions into
