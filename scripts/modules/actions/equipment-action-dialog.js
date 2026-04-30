@@ -496,13 +496,18 @@ export async function openEquipmentActionDialog(actor, item) {
       <span style="margin-left:auto;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;font-size:10px;letter-spacing:0.4px;text-transform:uppercase;">${categoryLabel}</span>
     </div>
 
-    ${statSummary}
+    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">
+      <img src="${item.img}" alt="" style="width:48px;height:48px;object-fit:cover;border:1px solid #c0a070;border-radius:3px;flex:0 0 48px;background:rgba(0,0,0,0.4);" />
+      <div style="flex:1;min-width:0;">
+        ${statSummary}
+      </div>
+    </div>
     ${descHtml}
     ${actionButtons}
   </div>`;
 
   showFaseripButtonDialog({
-    title: item.name,
+    title: "Equipment Action",
     content,
     buttons: {
       close: { label: "Close" }
