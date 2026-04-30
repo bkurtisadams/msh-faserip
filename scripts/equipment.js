@@ -138,31 +138,6 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
    * which defaults to this.document.update(submitData).
    */
   _prepareSubmitData(event, form, formData) {
-    // Pre-process: rebuild attackModes directly from flat formData keys.
-    // ApplicationV2's form serialization can drop indexed array inputs when
-    // the source field is empty (no array shape registered), so even with
-    // populated form fields, the expanded data may show attackModes as an
-    // empty/missing array. Walk formData.object's flat keys and reconstruct
-    // before expandObject runs so the indexed entries survive.
-    const flat = formData.object || {};
-    const modeKeys = Object.keys(flat).filter(k => k.startsWith("system.attackModes."));
-    if (modeKeys.length) {
-      const grouped = {};
-      for (const k of modeKeys) {
-        // k looks like "system.attackModes.0.name"
-        const m = k.match(/^system\.attackModes\.(\d+)\.(.+)$/);
-        if (!m) continue;
-        const [, idx, field] = m;
-        if (!grouped[idx]) grouped[idx] = {};
-        grouped[idx][field] = flat[k];
-        delete flat[k]; // remove flat key so expandObject doesn't see partial data
-      }
-      // Stash the rebuilt array so it survives expandObject below.
-      flat["system.attackModes"] = Object.keys(grouped)
-        .sort((a, b) => Number(a) - Number(b))
-        .map(idx => grouped[idx]);
-    }
-
     const data = foundry.utils.expandObject(formData.object);
     if (!data.system) data.system = {};
     const category = (data.system.category !== undefined) ? data.system.category : this.item.system.category;
@@ -200,11 +175,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         shiftCS: parseInt(m.shiftCS) || 0
       }));
     }
-    if (data.system.attackModes && (!Array.isArray(data.system.attackModes) || data.system.attackModes.length > 0)) {
-      const arr = Array.isArray(data.system.attackModes)
-        ? data.system.attackModes
-        : Object.values(data.system.attackModes);
-      data.system.attackModes = arr.map(m => ({
+    if (data.system.attackModes && !Array.isArray(data.system.attackModes)) {
+      data.system.attackModes = Object.values(data.system.attackModes).map(m => ({
         name: m.name || "",
         actionType: m.actionType || "blunt-attack",
         damageType: m.damageType || "BA",
