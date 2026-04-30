@@ -1635,6 +1635,10 @@ Hooks.once("init", async () => {
   Handlebars.registerHelper('div', function(a, b) {
     return Math.floor(a / b);
   });
+
+  Handlebars.registerHelper('add', function(a, b) {
+    return Number(a) + Number(b);
+  });
   
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
     return object.getFlag(scope, flag);
