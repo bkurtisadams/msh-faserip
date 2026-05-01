@@ -138,7 +138,7 @@ function buildMultiTargetHTML(actionCode) {
 
   const targetCount = game.user.targets.size;
   let html = `<div style="border:1px solid #d8cfb8;border-radius:2px;padding:5px 7px;background:#faf8f2;margin-bottom:6px;">
-    <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">Multiple Targets</div>`;
+    <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">Multiple Targets</div>`;
 
   if (validMulti) {
     html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;margin-bottom:2px;cursor:pointer;">
@@ -265,11 +265,11 @@ export async function rollTalent(actor, talent, options = {}) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
       <div style="border:1px solid #d8cfb8;border-radius:2px;padding:4px 6px;background:#faf8f2;">
-        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Base Rank</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Base Rank</div>
         <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:14px;" id="base-rank-display">${baseRank}</div>
       </div>
       <div id="effective-card" style="border:1px solid ${rankOverride ? '#4caf50' : '#d8cfb8'};border-radius:2px;padding:4px 6px;background:${rankOverride ? '#e8f5e9' : '#faf8f2'};">
-        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:${rankOverride ? '#2e7d32' : '#c8960c'};letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">${rankOverride ? '★ Effective (Override)' : 'Effective Rank'}</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:${rankOverride ? '#2e7d32' : '#6a0000'};letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">${rankOverride ? '★ Effective (Override)' : 'Effective Rank'}</div>
         <div style="display:flex;align-items:baseline;gap:4px;">
           <span style="font-family:'Oswald',sans-serif;font-weight:700;font-size:14px;" id="effective-rank-display">${effRankInitial}</span>
           <span id="effective-shift-display" style="font-size:11px;color:#777;">(${effShiftInitial >= 0 ? '+' : ''}${effShiftInitial} CS)</span>
@@ -278,7 +278,7 @@ export async function rollTalent(actor, talent, options = {}) {
     </div>
 
     <div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border:1px solid #d8cfb8;border-radius:2px;margin-bottom:6px;">
-      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;">Extra CS</span>
+      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;">Extra CS</span>
       <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width:42px;padding:2px;text-align:center;border:1px solid #b8b8b8;border-radius:2px;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;height:auto;">
       <span style="margin-left:auto;font-size:11px;color:#777;">additional +/– column shift</span>
     </div>

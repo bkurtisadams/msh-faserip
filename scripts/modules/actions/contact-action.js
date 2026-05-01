@@ -153,19 +153,19 @@ export async function rollContact(actor, contact) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
       <div style="border:1px solid #d8cfb8;border-radius:2px;padding:4px 6px;background:#faf8f2;">
-        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Hero</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Hero</div>
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0;"><span style="color:#444;">Popularity</span><span style="font-family:'Oswald';font-weight:700;${heroPopularity < 0 ? 'color:#c62828;' : ''}">${heroPopularityRank} (${heroPopularity})</span></div>
         ${isMutant ? `<div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0;"><span style="color:#444;">Mutant</span><span style="font-family:'Oswald';font-weight:700;color:${isMutantPenaltyActive ? '#c62828' : '#777'};">Yes${isMutantPenaltyActive ? ' (–1 CS)' : ''}</span></div>` : ''}
       </div>
       <div style="border:1px solid #d8cfb8;border-radius:2px;padding:4px 6px;background:#faf8f2;">
-        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Contact</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Contact</div>
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0;"><span style="color:#444;">Type</span><span style="font-family:'Oswald';font-weight:700;">${contactType}</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0;"><span style="color:#444;">Resources cap</span><span style="font-family:'Oswald';font-weight:700;">${resourceLevel}</span></div>
       </div>
     </div>
 
     <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid #d8cfb8;border-radius:2px;background:#faf8f2;margin-bottom:6px;">
-      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;">Disposition</span>
+      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;">Disposition</span>
       <select name="storedDisposition" style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:12px;height:auto;">${dispOptionsHTML}</select>
       <span id="disp-shift-note" style="font-size:11px;font-style:italic;"></span>
       <span style="margin-left:auto;font-size:10px;color:#777;">(this roll only)</span>
@@ -178,7 +178,7 @@ export async function rollContact(actor, contact) {
     </div>
 
     <div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border:1px solid #d8cfb8;border-radius:2px;margin-bottom:6px;">
-      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;">CS</span>
+      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;">CS</span>
       <input type="number" name="shift" value="${savedColumnShift}" style="width:42px;padding:2px;text-align:center;border:1px solid #b8b8b8;border-radius:2px;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;height:auto;">
       <span style="font-size:11px;color:#777;">→</span>
       <span id="effective-rank-preview" style="font-size:13px;font-family:'Oswald',sans-serif;font-weight:600;">${effRank0}</span>
