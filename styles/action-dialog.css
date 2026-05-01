@@ -1,4 +1,8 @@
-/* action-dialog.css v3.3.0 - 2026-03-16 */
+/* action-dialog.css v3.4.0 - 2026-04-30 */
+/* v3.4.0: Readability Pass 1 — dmg-box (white + 1.5px #b71c1c border, was pink wash),
+           opt-row.inactive opacity 0.4→0.55 + grey out colored labels when inactive,
+           frp-box border #d0c8b8→#b8a868, foot border 1px #d8cfb8→1.5px #b8a868,
+           foot labels #777→ink */
 /* v3.3.0: Header name ellipsis — max-width:120px + overflow on h-actor and h-target,
            remove flex-wrap on header (nowrap + overflow:hidden), flex-shrink:0 on fixed elements */
 /* v3.2.0: Titlebar mode buttons (frp-titlebar-mode), remove mode+target row,
@@ -254,8 +258,8 @@
   min-height: 0;
 }
 .frp-dlg .frp-dmg-box {
-  background: #ffebee;
-  border-color: #ef9a9a;
+  background: #fff;
+  border: 1.5px solid #b71c1c;
   padding: 3px 8px;
 }
 .frp-dlg .frp-opts-box {
@@ -267,8 +271,13 @@
 
 /* ── Inactive option row (v3) ────────────────────────────────────────── */
 .frp-dlg .frp-opt-row.inactive {
-  opacity: 0.4;
+  opacity: 0.55;
   transition: opacity 0.15s ease;
+}
+.frp-dlg .frp-opt-row.inactive .frp-opt-label.orange,
+.frp-dlg .frp-opt-row.inactive .frp-opt-label.green,
+.frp-dlg .frp-opt-row.inactive .frp-opt-label.blue {
+  color: #444;
 }
 .frp-dlg .frp-opt-row.inactive select,
 .frp-dlg .frp-opt-row.inactive input[type="number"],
@@ -350,7 +359,7 @@
 
 /* ── Boxed section ───────────────────────────────────────────────────── */
 .frp-dlg .frp-box {
-  border: 1px solid #d0c8b8;
+  border: 1px solid #b8a868;
   border-radius: 3px;
   padding: 5px 8px;
   margin-bottom: 5px;
@@ -953,11 +962,11 @@
   gap: 8px;
   margin-top: 4px;
   padding-top: 5px;
-  border-top: 1px solid #d8cfb8;
+  border-top: 1.5px solid #b8a868;
 }
 .frp-dlg .frp-foot label {
   font-size: 11px;
-  color: var(--txt-m);
+  color: var(--ink);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1006,8 +1015,8 @@
   border-color: var(--gold);
 }
 .frp-dlg .frp-dmg-box {
-  background: #ffebee;
-  border-color: #ef9a9a;
+  background: #fff;
+  border: 1.5px solid #b71c1c;
 }
 .frp-dlg .frp-dmg-left {
   display: flex;
