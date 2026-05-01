@@ -1,4 +1,8 @@
-// attack-action.js v1.9.22 - 2026-04-03
+// attack-action.js v1.9.23 - 2026-04-30
+// v1.9.23: Multi-Attack FEAT dialog wrapped in frp-dlg + frp-header-v3 — picks up
+//          all Pass-1 high-contrast styling (boxes, footer, ink). Replaces inline
+//          grey/yellow ctx-cards and CS row with frp-box + frp-cs-box patterns.
+//          Header logic preserved: actor + Fighting + ×N attacks → Multi-Attack.
 // v1.9.22: Ammo variant effects — rubber (blunt column, suppress slam), mercy (KO save),
 //          explosive (2x damage), heat-seeker (no range penalty), variant badge on chat card.
 // v1.9.21: Semi mode now auto-triggers slam/stun/kill checks (not just full auto).
@@ -58,6 +62,7 @@ import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS } from "./action-config.js";
+import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { SCOPE, getFlagScope } from "./flags.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
@@ -239,44 +244,58 @@ export class AttackAction extends BaseAction {
     const isImpossible = USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF;
     const isPreDetermined = isAuto || isImpossible;
 
+    const fightingShort = RANK_ABBR[fightingAbility.rank] || fightingAbility.rank;
+
+    // Color scheme for the FEAT-status box: green-on-auto, red-on-impossible, neutral otherwise
+    const statusBg = isAuto ? '#e8f5e9' : isImpossible ? '#ffebee' : '#fff';
+    const statusBorder = isAuto ? '#2e7d32' : isImpossible ? '#b71c1c' : '#b8a868';
+    const statusInk = isAuto ? '#1b5e20' : isImpossible ? '#6a0000' : '#1a1a1a';
+    const statusText = isAuto ? '✓ Automatic' : isImpossible ? '✗ Impossible' : `Need: ${requiredColor}`;
+
     const dialogContent = `
-      <!-- Context: Attacker + FEAT info side by side -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attacker</div>
-          <div style="font-weight:600;">${actor.name}</div>
-          <div style="font-weight:600;">Fighting: ${fightingAbility.rank}</div>
-          <div style="color:#666;">Rank Value: ${fightingAbility.value}</div>
-        </div>
-        <div style="background:${isAuto ? '#e8f5e9' : isImpossible ? '#ffebee' : '#f5f5f5'};padding:8px;border-radius:3px;border:1px solid ${isAuto ? '#a5d6a7' : isImpossible ? '#ef9a9a' : 'transparent'};">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">FEAT</div>
-          <div style="font-weight:600;">${attackCount} attacks</div>
-          <div style="color:#666;">Intensity: ${intensity}</div>
-          <div style="color:${isAuto ? '#2e7d32' : isImpossible ? '#c62828' : '#555'};font-size:.9em;font-weight:${isPreDetermined ? '700' : '400'};">
-            ${isAuto ? '✓ Automatic' : isImpossible ? '✗ Impossible' : `Need: <strong>${requiredColor}</strong>`}
-          </div>
-        </div>
+    <div class="frp-dlg">
+      <!-- Header banner: Actor (Fighting RANK VALUE) ×N Multi-Attack -->
+      <div class="frp-header-v3">
+        <span class="h-actor" title="${actor.name}">${actor.name}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">Fighting</span>
+          <span class="h-stat-rank">${fightingShort} ${fightingAbility.value}</span>
+        </span>
+        <span class="h-paren">)</span>
+        <span class="h-arrow">&times;${attackCount}</span>
+        <span class="h-target">Multi-Attack</span>
+      </div>
+
+      <!-- FEAT Intensity / requirement readout -->
+      <div class="frp-box" style="background:${statusBg};border:1.5px solid ${statusBorder};display:flex;align-items:center;gap:8px;">
+        <span class="frp-box-label" style="margin:0;">FEAT Intensity</span>
+        <strong style="font-family:'Oswald',sans-serif;font-size:14px;color:#1a1a1a;">${intensity}</strong>
+        <span style="margin-left:auto;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;color:${statusInk};">${statusText}</span>
       </div>
 
       ${isPreDetermined ? '' : `
-      <!-- CS row with notes -->
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:3px;">
+      <!-- CS row + notes -->
+      <div class="frp-box frp-cs-box" style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;">
         <div style="display:flex;align-items:center;gap:4px;">
-          <label style="font-weight:600;color:#666;font-size:.85em;">CS:</label>
-          <input type="number" name="shift" value="0" style="width:50px;padding:3px;text-align:center;box-sizing:border-box;">
-          <span style="color:#666;">→</span>
-          <strong id="shifted-rank-display">${fightingAbility.rank}</strong>
-          <button type="button" class="cs-reset" style="visibility:hidden;padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+          <span class="frp-box-label" style="margin:0;color:#6a0000;">CS</span>
+          <input type="number" name="shift" value="0" style="width:46px;padding:2px;text-align:center;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;border:1px solid #888;border-radius:2px;">
+          <span style="color:#6a0000;font-weight:700;">&rarr;</span>
+          <strong id="shifted-rank-display" style="font-family:'Oswald',sans-serif;font-size:14px;">${fightingAbility.rank}</strong>
+          <button type="button" class="cs-reset" style="visibility:hidden;padding:1px 5px;font-size:11px;cursor:pointer;border:1px solid #888;border-radius:2px;background:#eee;" title="Reset to 0">&times;</button>
         </div>
-        <input type="text" name="csNotes" placeholder="e.g., Martial Arts B +1" style="width:100%;padding:3px 6px;font-size:.9em;box-sizing:border-box;">
+        <input type="text" name="csNotes" placeholder="e.g., Martial Arts B +1" style="width:100%;padding:3px 6px;font-size:12px;border:1px solid #888;border-radius:2px;">
       </div>
 
       ${generateKarmaControlsHTML(actor, 0)}
 
-      <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #ddd;margin-top:8px;">
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+      <div class="frp-foot">
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+        </div>
       </div>
       `}
+    </div>
     `;
     
     return new Promise((resolve) => {

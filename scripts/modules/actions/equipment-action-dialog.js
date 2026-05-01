@@ -257,7 +257,7 @@ function buildStatSummary(item) {
     if (value === undefined || value === null || value === "" || value === 0 || value === "0") return;
     const valColor = tint === "red" ? "#c62828" : tint === "amber" ? "#f57f17" : "#1a1a1a";
     const valWeight = tint ? "700" : "600";
-    chips.push(`<span style="padding:2px 6px;background:#faf8f2;border:1px solid #d8cfb8;border-radius:2px;font-size:11px;white-space:nowrap;"><span style="font-family:'Oswald',sans-serif;color:#c8960c;letter-spacing:0.4px;font-size:10px;margin-right:3px;">${label}</span><strong style="color:${valColor};font-weight:${valWeight};">${value}</strong></span>`);
+    chips.push(`<span style="padding:2px 6px;background:#faf8f2;border:1px solid #d8cfb8;border-radius:2px;font-size:11px;white-space:nowrap;"><span style="font-family:'Oswald',sans-serif;color:#6a0000;letter-spacing:0.4px;font-size:10px;margin-right:3px;">${label}</span><strong style="color:${valColor};font-weight:${valWeight};">${value}</strong></span>`);
   };
 
   if (cat === "weapon" || cat === "other") {
@@ -438,7 +438,7 @@ function buildActionButtons(actions, item) {
     const list = buckets[g];
     if (!list.length) return "";
     return `<div style="margin-bottom:6px;">
-      <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#c8960c;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">${GROUP_LABELS[g]}</div>
+      <div style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">${GROUP_LABELS[g]}</div>
       ${list.map(renderButton).join("")}
     </div>`;
   }).join("");

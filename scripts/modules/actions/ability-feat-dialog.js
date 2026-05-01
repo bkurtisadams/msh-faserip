@@ -169,7 +169,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         <label style="margin-left: 10px;"><input type="radio" name="featType" value="lifting" ${savedFeatType === 'lifting' ? 'checked' : ''}> Lifting</label>
         <label style="margin-left: 10px;"><input type="radio" name="featType" value="breaking" ${savedFeatType === 'breaking' ? 'checked' : ''}> Breaking</label>
       </div>
-      <div id="lifting-section" style="display: none; padding: 8px; background-color: #f0f0f0; border-radius: 3px; margin-bottom: 10px;">
+      <div id="lifting-section" style="display: none; padding: 8px 10px; background-color: #fffdf4; border: 1px solid #c0a070; border-radius: 3px; margin-bottom: 10px;">
         <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Lifting Weight ───</div>
         <div style="margin-bottom: 5px;">
           <label style="display: inline-block; width: 50px;">Weight:</label>
@@ -212,7 +212,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           <label><input type="radio" name="multiAttackCount" value="2" ${savedMultiAttackCount === '2' ? 'checked' : ''}> 2 (Remarkable)</label>
           <label style="margin-left: 10px;"><input type="radio" name="multiAttackCount" value="3" ${savedMultiAttackCount === '3' ? 'checked' : ''}> 3 (Amazing)</label>
         </div>
-        <div style="font-size: 0.85em; color: #555; margin-top: 4px; padding: 4px 6px; border-left: 3px solid #c0a070;">
+        <div style="font-size: 12px; color: #1a1a1a; margin-top: 6px; padding: 6px 8px; border-left: 3px solid #c0a070; background: #fffdf4;">
           <div><strong>Success:</strong> All attacks at −1CS to hit</div>
           <div><strong>Failure:</strong> 1 attack at −3CS to hit</div>
           <div style="margin-top: 3px;">Slugfest and Shooting only. Powers may permit multiple attacks as Power Stunts.</div>
@@ -234,7 +234,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
     <div style="margin-bottom: 10px;">
       <label style="display: inline-block; width: 120px;">Column Shift:</label>
       <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
-      <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+      <span style="color: #2a2a2a; font-size: 12px; font-style: italic; margin-left: 6px;">(+ right, - left)</span>
     </div>
     ${generateKarmaControlsHTML(actor)}
     <div style="margin-bottom: 10px;">

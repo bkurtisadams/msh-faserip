@@ -1,4 +1,9 @@
-// chat-hooks.js v1.5.9 - 2026-04-19
+// chat-hooks.js v1.6.0 - 2026-04-30
+// v1.6.0: Deal Hold Damage and Escape Attempt dialogs wrapped in frp-dlg + frp-header-v3.
+//         Hold Damage now resolves attackerUuid → name for the header banner;
+//         slider/target/armor boxes converted to frp-box pattern. Escape Attempt
+//         uses blue header gradient (matches escaping-action.js standalone),
+//         compact CS row, fx-grid effect preview, frp-foot checkboxes.
 // v1.5.9: Drop deprecated CONST.CHAT_MESSAGE_TYPES.OTHER on the damage
 //         chat card. Removed in v13 (replaced by CHAT_MESSAGE_STYLES).
 //         Default non-roll style is OTHER already.
@@ -885,32 +890,52 @@ export function installActionChatHandlers() {
         } catch (_e) { /* ignore */ }
       }
       
+      // Resolve attacker name for header banner
+      let attackerName = "Attacker";
+      if (attackerUuid) {
+        try {
+          const aDoc = await fromUuid(attackerUuid);
+          const attackerActor = aDoc?.actor ?? (aDoc?.documentName === "Actor" ? aDoc : null);
+          if (attackerActor) attackerName = attackerActor.name;
+        } catch (_e) { /* ignore */ }
+      }
+      
       // Show dialog to choose damage amount
       const dialogHtml = `
-        <div style="padding:4px 0;">
-          <div style="margin-bottom:8px;">
-            <strong>Deal Hold Damage</strong>
-            <div style="color:#666;font-size:.9em;">Full Hold allows damage up to ${damageRank} (${maxDamage})</div>
+        <div class="frp-dlg">
+          <!-- Header banner: Attacker → Hold Damage → Target -->
+          <div class="frp-header-v3">
+            <span class="h-actor" title="${attackerName}">${attackerName}</span>
+            <span class="h-verb">deals damage to</span>
+            <span class="h-target" title="${targetName}">${targetName}</span>
           </div>
-          
-          <div style="margin-bottom:8px;">
-            <label style="display:block;margin-bottom:4px;">Damage to inflict:</label>
-            <input type="range" name="damage" min="0" max="${maxDamage}" value="${maxDamage}" style="width:100%;" id="hold-dmg-slider">
-            <div style="display:flex;justify-content:space-between;font-size:.85em;color:#666;">
+
+          <!-- Cap readout -->
+          <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+            <span class="frp-box-label" style="margin:0;">Hold Cap</span>
+            <span style="font-size:13px;color:#1a1a1a;">Full Hold allows damage up to <strong>${damageRank} (${maxDamage})</strong></span>
+          </div>
+
+          <!-- Damage slider -->
+          <div class="frp-box">
+            <div class="frp-box-label">Damage to Inflict</div>
+            <input type="range" name="damage" min="0" max="${maxDamage}" value="${maxDamage}" style="width:100%;margin:4px 0;" id="hold-dmg-slider">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#1a1a1a;font-weight:600;">
               <span>0</span>
-              <span id="hold-dmg-display" style="font-weight:bold;color:#d32f2f;">${maxDamage}</span>
+              <span id="hold-dmg-display" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;color:#6a0000;">${maxDamage}</span>
               <span>${maxDamage}</span>
             </div>
           </div>
-          
+
           ${targetActor ? `
-          <div style="padding:6px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
-            <div><strong>${targetName}</strong></div>
-            <div style="font-size:.9em;">Body Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}</div>
-            <div style="font-size:.9em;color:#666;" id="hold-dmg-after">After armor: <strong>${Math.max(0, maxDamage - targetArmor)}</strong></div>
+          <!-- Target armor box -->
+          <div class="frp-box frp-dmg-box">
+            <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#1a1a1a;">${targetName}</div>
+            <div style="font-size:12px;color:#1a1a1a;">Body Armor: <strong>${targetArmor}</strong>${targetArmorSource ? ` <span style="color:#2a2a2a;font-style:italic;">(${targetArmorSource})</span>` : ''}</div>
+            <div style="font-size:12px;color:#1a1a1a;font-weight:600;" id="hold-dmg-after">After armor: <strong style="color:#6a0000;font-family:'Oswald',sans-serif;font-size:14px;">${Math.max(0, maxDamage - targetArmor)}</strong></div>
           </div>
           ` : `
-          <div style="padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;margin-bottom:8px;font-size:.9em;">
+          <div class="frp-box" style="background:#fff;border:1.5px solid #c87a00;font-size:12px;color:#1a1a1a;">
             Target the held token to apply damage automatically, or apply manually.
           </div>
           `}
@@ -971,7 +996,7 @@ export function installActionChatHandlers() {
             display.text(val);
             if (afterDisplay.length) {
               const afterArmor = Math.max(0, val - targetArmor);
-              afterDisplay.html(`After armor: <strong>${afterArmor}</strong>`);
+              afterDisplay.html(`After armor: <strong style="color:#6a0000;font-family:'Oswald',sans-serif;font-size:14px;">${afterArmor}</strong>`);
             }
           });
         }
@@ -1664,38 +1689,49 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
   const savedSkipDice = await defender.getFlag("msh-faserip", "lastEscapeSkipDice") ?? false;
 
   const dialogHtml = `
-    <div style="line-height:1.4;">
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Action:</label>
-        <strong>Escaping</strong>
+    <div class="frp-dlg">
+      <!-- Header banner: defender (Strength rank value) — Escape -->
+      <div class="frp-header-v3" style="background:linear-gradient(90deg, #4682B4 0%, #2c5f8a 100%);">
+        <span class="h-actor" title="${actualDefenderName}">${actualDefenderName}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">Strength</span>
+          <span class="h-stat-rank">${defenderStrength} ${defenderStrengthValue}</span>
+        </span>
+        <span class="h-paren">)</span>
+        <span class="h-arrow">&rarr;</span>
+        <span class="h-target">Escape</span>
       </div>
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Character:</label>
-        <strong>${actualDefenderName}</strong>
+
+      <!-- Column Shift row -->
+      <div class="frp-box frp-cs-box" style="display:flex;align-items:center;gap:8px;">
+        <span class="frp-box-label" style="margin:0;color:#6a0000;">Column Shift</span>
+        <input type="number" name="shift" value="${Number(savedShift)}" style="width:50px;padding:2px;text-align:center;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;border:1px solid #888;border-radius:2px;">
+        <span style="font-size:11px;color:#1a1a1a;font-style:italic;">(+ easier, &minus; harder)</span>
       </div>
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Strength:</label>
-        <input type="text" value="${defenderStrength}" style="width:160px;" readonly>
-        <span style="margin-left:6px;">(${defenderStrengthValue})</span>
-      </div>
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
-        <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
-      </div>
+
       ${generateKarmaControlsHTML(defender, savedSpendKarma)}
-      <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
+
+      <!-- Effect preview grid -->
+      <div class="frp-fx-grid">
+        <div class="frp-fx-cell w" title="White: still held; no other actions this turn.">Miss</div>
+        <div class="frp-fx-cell g" title="Green: still held; no other actions this turn.">Miss</div>
+        <div class="frp-fx-cell y" title="Yellow: free; half move; no other actions.">Escape</div>
+        <div class="frp-fx-cell r" title="Red: free + grapple back or act at -2 CS.">Reverse</div>
       </div>
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+
+      <!-- Results reference -->
+      <div class="frp-box" style="font-size:11.5px;line-height:1.4;color:#1a1a1a;">
+        <div class="frp-box-label">Escape Results</div>
+        <div><strong>Miss (W/G):</strong> Still held; no other actions.</div>
+        <div><strong>Escape (Y):</strong> Free; may move up to half speed; no other actions.</div>
+        <div><strong>Reverse (R):</strong> Free; move &frac12;, Grapple attacker, or take another action at &minus;2 CS.</div>
       </div>
-      <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
-        <div style="font-weight:bold;margin-bottom:4px;">Escape Results</div>
-        <div style="font-size:.85em;color:#555;">
-          <strong>Miss (White/Green):</strong> Still held; no other actions.<br>
-          <strong>Escape (Yellow):</strong> Free; may move up to half speed; no other actions.<br>
-          <strong>Reverse (Red):</strong> Free; move ½, Grapple attacker, or take another action at -2 CS.
+
+      <div class="frp-foot">
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
         </div>
       </div>
     </div>
