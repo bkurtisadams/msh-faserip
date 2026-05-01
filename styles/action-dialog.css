@@ -120,8 +120,8 @@
 }
 .frp-dlg .frp-header-v3 .h-stat-label {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 9px;
-  opacity: 0.7;
+  font-size: 11px;
+  opacity: 0.95;
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
@@ -219,9 +219,9 @@
 /* ── CS label (v3 inline) ────────────────────────────────────────────── */
 .frp-dlg .frp-cs-label {
   font-family: 'Oswald', sans-serif;
-  font-size: 10px;
-  color: var(--gold);
-  font-weight: 600;
+  font-size: 12px;
+  color: #6a0000;
+  font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -491,20 +491,21 @@
 
 /* ── Base Rank (before arrow) ──────────────────────────────────────── */
 .frp-dlg .frp-cs-base {
-  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px;
-  color: #777; margin-left: 4px;
+  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 13px;
+  color: #1a1a1a; margin-left: 4px;
 }
 
 /* ── Range Penalty (read-only, between CS input and base rank) ─────── */
 .frp-dlg .frp-cs-range {
   display: inline-flex; align-items: center; gap: 3px;
-  font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600;
-  color: #777;
+  font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700;
+  color: #1a1a1a;
 }
 .frp-dlg .frp-cs-range.neg { color: #c62828; }
 .frp-dlg .frp-range-label {
-  font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px;
-  opacity: 0.7;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+  font-weight: 700;
+  opacity: 1;
 }
 .frp-dlg .frp-range-num {
   font-weight: 700; min-width: 16px; text-align: center;
@@ -512,31 +513,31 @@
 
 /* ── Reference Panel (read-only, toggled by ? button) ──────────────── */
 .frp-dlg .frp-ref-panel {
-  margin-top: 4px; padding: 4px 6px;
-  border: 1px solid #d8cfb8; border-radius: 3px;
-  background: #faf8f2;
+  margin-top: 4px; padding: 5px 7px;
+  border: 1px solid #b89a4a; border-radius: 3px;
+  background: #ffffff;
   max-height: 260px; overflow-y: auto;
 }
 .frp-dlg .frp-ref-group { margin-bottom: 4px; }
 .frp-dlg .frp-ref-group:last-child { margin-bottom: 0; }
 .frp-dlg .frp-ref-group-label {
-  font-family: 'Oswald', sans-serif; font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.3px; color: #999;
-  border-bottom: 1px solid #e8e0d0; margin-bottom: 2px; padding-bottom: 1px;
+  font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.3px; color: #6a0000;
+  border-bottom: 1.5px solid #6a0000; margin-bottom: 4px; padding-bottom: 2px;
 }
 .frp-dlg .frp-ref-item {
   display: flex; align-items: baseline; gap: 4px;
-  padding: 0 2px; font-size: 11px; line-height: 1.5;
+  padding: 1px 2px; font-size: 13px; line-height: 1.5;
 }
 .frp-dlg .frp-ref-cs {
-  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 11px;
-  flex-shrink: 0; min-width: 38px; text-align: right; color: #555;
+  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 13px;
+  flex-shrink: 0; min-width: 38px; text-align: right; color: #6a0000;
 }
 .frp-dlg .frp-ref-name {
-  font-weight: 600; color: #333; white-space: nowrap;
+  font-weight: 600; color: #1a1a1a; white-space: nowrap;
 }
 .frp-dlg .frp-ref-note {
-  font-size: 10px; color: #999; font-style: italic;
+  font-size: 12px; color: #2a2a2a; font-style: italic;
 }
 
 /* ── Situational modifier dropdown (legacy, may still be referenced) ── */
@@ -809,15 +810,15 @@
 }
 .frp-dlg .frp-fx-cell {
   text-align: center;
-  font-size: 10px;
-  padding: 2px 0;
+  font-size: 12px;
+  padding: 3px 0;
   border-radius: 2px;
-  font-weight: 600;
+  font-weight: 700;
 }
-.frp-dlg .frp-fx-cell.w { background: #fff; border: 1px solid #ddd; color: #666; }
-.frp-dlg .frp-fx-cell.g { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; }
-.frp-dlg .frp-fx-cell.y { background: #fff8e1; border: 1px solid #ffe082; color: #f57f17; }
-.frp-dlg .frp-fx-cell.r { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; }
+.frp-dlg .frp-fx-cell.w { background: #fff; border: 1px solid #888; color: #1a1a1a; }
+.frp-dlg .frp-fx-cell.g { background: #c8e6c9; border: 1px solid #2e7d32; color: #1b5e20; }
+.frp-dlg .frp-fx-cell.y { background: #ffe082; border: 1px solid #c87a00; color: #5a3500; }
+.frp-dlg .frp-fx-cell.r { background: #ffcdd2; border: 1px solid #b71c1c; color: #6a0000; }
 
 /* ── Legacy pull/multi/karma box styles (kept for compat) ────────────── */
 .frp-dlg .frp-pull-box.pull-active {
