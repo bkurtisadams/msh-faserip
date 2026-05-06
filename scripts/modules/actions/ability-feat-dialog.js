@@ -1,4 +1,12 @@
-// ability-feat-dialog.js v1.3.0 - 2026-05-06
+// ability-feat-dialog.js v1.5.0 - 2026-05-06
+// v1.5.0: Strip font/padding/color from select inline styles — moved to
+//         CSS rule .frp-dlg.frp-feat select for centralised tuning.
+//         Only layout (flex, min-width) remains inline.
+// v1.4.0: NEED color readouts inside Lifting/Breaking/Multi-Attack sub-
+//         panels (previously hidden because intensityRow.hide() also hid
+//         #required-feat-text). updateFeatRequirement now writes to all
+//         four targets in a single jQuery selector; only visible ones
+//         are seen.
 // v1.3.0: FEAT green theme — add frp-feat wrapper class, swap inline
 //         #6a0000 label color for var(--feat-deep). Functional FEAT-result
 //         red colors (IMPOSSIBLE, Red column) left intact.
@@ -232,9 +240,13 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       <div id="lifting-section" class="frp-box" style="display:none;">
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">WEIGHT</span>
-          <select id="weight-intensity" name="weightIntensity" style="flex:1;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+          <select id="weight-intensity" name="weightIntensity" style="flex:1;">
             ${weightIntensityOptionsHTML}
           </select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:4px;">
+          <span style="font-family:'Oswald',sans-serif;font-size:10px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;">Need:</span>
+          <span id="lift-need-text" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#1a1a1a;">Any Color</span>
         </div>
       </div>
 
@@ -242,7 +254,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       <div id="breaking-section" class="frp-box" style="display:none;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
           <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">MATERIAL</span>
-          <select id="material-select" name="material" style="flex:1;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+          <select id="material-select" name="material" style="flex:1;">
             ${materialOptionsHTML}
           </select>
           <span id="base-material-strength" style="font-size:12px;color:#1a1a1a;font-weight:600;flex-shrink:0;"></span>
@@ -254,6 +266,10 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           <label><input type="radio" name="thickness" value="2-12" ${savedThickness === '2-12' ? 'checked' : ''}> 2-12"</label>
           <label><input type="radio" name="thickness" value="1-2ft" ${savedThickness === '1-2ft' ? 'checked' : ''}> 1-2'</label>
           <label><input type="radio" name="thickness" value=">2ft" ${savedThickness === '>2ft' ? 'checked' : ''}> &gt;2'</label>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;">
+            <span style="font-family:'Oswald',sans-serif;font-size:10px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;">Need:</span>
+            <span id="break-need-text" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#1a1a1a;">Any Color</span>
+          </span>
         </div>
       </div>
       ` : ''}
@@ -265,6 +281,10 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">ATTACKS</span>
           <label style="font-size:13px;"><input type="radio" name="multiAttackCount" value="2" ${savedMultiAttackCount === '2' ? 'checked' : ''}> 2 (Remarkable)</label>
           <label style="font-size:13px;"><input type="radio" name="multiAttackCount" value="3" ${savedMultiAttackCount === '3' ? 'checked' : ''}> 3 (Amazing)</label>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;">
+            <span style="font-family:'Oswald',sans-serif;font-size:10px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;">Need:</span>
+            <span id="multi-need-text" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#1a1a1a;">Any Color</span>
+          </span>
         </div>
         <div style="font-size:11px;color:#1a1a1a;font-style:italic;line-height:1.35;">
           Success: all attacks &minus;1CS &middot; Failure: 1 attack at &minus;3CS
@@ -275,7 +295,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       <!-- Intensity + Required FEAT readout (one line) -->
       <div class="frp-box" id="intensity-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
-        <select id="intensity" name="intensity" style="flex:1;min-width:100px;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+        <select id="intensity" name="intensity" style="flex:1;min-width:100px;">
           ${intensityOptionsHTML}
         </select>
         <span style="font-family:'Oswald',sans-serif;font-size:11px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;flex-shrink:0;">Need:</span>
@@ -514,11 +534,15 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           });
         };  // end runRoll
 
-      // Shared updateFeatRequirement for all abilities
+      // Shared updateFeatRequirement for all abilities — writes to the
+      // intensity-row readout AND the three sub-panel NEED readouts in
+      // one shot. Only the visible target is seen; non-existent IDs are
+      // jQuery no-ops.
+      const NEED_TARGETS = '#required-feat-text, #multi-need-text, #lift-need-text, #break-need-text';
       const updateFeatRequirement = () => {
         const intensity = html.find('#intensity').val();
         const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-        const reqText = html.find('#required-feat-text');
+        const reqText = html.find(NEED_TARGETS);
 
         if (intensity === "None") {
           reqText.text("Any Color").css('color', '#1a1a1a');

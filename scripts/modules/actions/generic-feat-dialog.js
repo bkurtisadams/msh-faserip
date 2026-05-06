@@ -1,4 +1,7 @@
-// generic-feat-dialog.js v1.1.0 - 2026-05-06
+// generic-feat-dialog.js v1.2.0 - 2026-05-06
+// v1.2.0: Strip font/padding/color from select inline styles — moved to
+//         CSS rule .frp-dlg.frp-feat select for centralised tuning.
+//         Only layout (flex, min-width) remains inline.
 // v1.1.0: FEAT green theme — add frp-feat wrapper class, swap inline
 //         #6a0000 label color for var(--feat-deep). Functional FEAT-result
 //         red colors (IMPOSSIBLE, Red column) left intact.
@@ -135,7 +138,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
       <div class="frp-box">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">ABILITY</span>
-          <select id="generic-ability" name="ability" style="flex:1;min-width:140px;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+          <select id="generic-ability" name="ability" style="flex:1;min-width:140px;">
             ${abilityOptionsHTML}
           </select>
         </div>
@@ -150,7 +153,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
       <div class="frp-box" id="intensity-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
-        <select id="intensity" name="intensity" style="flex:1;min-width:100px;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+        <select id="intensity" name="intensity" style="flex:1;min-width:100px;">
           ${intensityOptionsHTML}
         </select>
         <span style="font-family:'Oswald',sans-serif;font-size:11px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;flex-shrink:0;">Need:</span>

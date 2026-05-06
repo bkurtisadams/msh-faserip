@@ -38,26 +38,39 @@ export function getMinimumKarmaCommitment(actor) {
  * Generate HTML for karma declaration checkbox (Phase 1 - before roll)
  * Just a simple checkbox to declare intent - amount chosen AFTER roll
  */
+/**
+ * Generate the compact Action HUD-style karma row (blue Oswald label +
+ * right-aligned avail/min readout). Critical styles inlined so the row
+ * renders correctly even in dialogs that don't wrap content in .frp-dlg
+ * (e.g. movement-feats, entangling-action). Theme classes preserved so
+ * scoped CSS overrides still apply where present.
+ *
+ * v2.0.0 - 2026-05-06: Replace tan-panel layout with single-row format
+ * matching blunt/edged/shooting/etc. attack dialogs. Drops the
+ * post-roll-amount warning text.
+ */
 export function generateKarmaControlsHTML(actor, defaultChecked = false) {
   const availableKarma = getAvailableKarma(actor);
   const minKarma = getMinimumKarmaCommitment(actor);
-  
+
   if (availableKarma <= 0) {
-    return `<div style="color: #666; font-size: 0.9em; margin: 8px 0;">No karma available to spend.</div>`;
+    return `
+      <div class="frp-opt-row inactive" style="display:flex;align-items:center;gap:8px;padding:4px 0;opacity:0.55;">
+        <span class="frp-opt-label" style="font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Karma</span>
+        <span style="margin-left:auto;font-size:11px;color:#888;font-style:italic;">none available</span>
+      </div>
+    `;
   }
-  
+
   return `
-    <div class="karma-controls" style="margin: 8px 0; padding: 8px; background: #f5f0e0; border: 1px solid #c9b98a; border-radius: 3px;">
-      <div style="margin-bottom: 4px;">
+    <div class="frp-opt-row" style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:13px;">
         <input type="checkbox" id="spend-karma" name="spendKarma" ${defaultChecked ? 'checked' : ''}>
-        <label for="spend-karma" style="font-weight: bold;">Spend Karma on this roll</label>
-      </div>
-      <div style="font-size: 0.85em; color: #666;">
-        Available: ${availableKarma} | Minimum commitment: ${minKarma}
-      </div>
-      <div style="color: #8b0000; font-size: 0.8em; margin-top: 4px; font-style: italic;">
-        ⚠️ You choose the amount AFTER rolling, but must spend at least ${minKarma} once committed.
-      </div>
+        <span class="frp-opt-label blue" style="font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;color:#1565c0;">Karma</span>
+      </label>
+      <span class="frp-karma-pool" style="margin-left:auto;font-size:12px;color:#444;">
+        <strong style="font-family:'Oswald',sans-serif;font-size:14px;">${availableKarma}</strong> avail (min ${minKarma})
+      </span>
     </div>
   `;
 }

@@ -1,4 +1,8 @@
-/* action-dialog.css v3.6.0 - 2026-05-06 */
+/* action-dialog.css v3.8.0 - 2026-05-06 */
+/* v3.8.0: FEAT dropdown readability — 15px Barlow (uncondensed),
+           4px 8px padding, explicit ink color, optgroup tier-tinting. */
+/* v3.7.0: FEAT theme refinement — darker forest green
+           (#1b5e20/#0d3d12/#1b5e20) replacing the lighter spring green. */
 /* v3.6.0: FEAT theme — add --feat/--feat-dk/--feat-deep vars,
            .frp-dlg.frp-feat header gradient + label/CS-label override. */
 /* v3.5.0: Readability Pass 4 — body.system-msh-faserip-scoped lift for
@@ -23,7 +27,7 @@
 .frp-dlg {
   --mred: #8b0000; --mred-dk: #660000; --mred-lit: #a80000;
   --gold: #c8960c; --gold-lit: #e2ab14;
-  --feat: #22BB22; --feat-dk: #178417; --feat-deep: #0d5a0d;
+  --feat: #1b5e20; --feat-dk: #0d3d12; --feat-deep: #1b5e20;
   --cream: #faf8f3; --cream-dk: #f5f3ee;
   --ink: #1a1a1a; --txt: #1a1a1a; --txt-s: #444; --txt-m: #777;
   font-family: 'Barlow Condensed', Arial, sans-serif;
@@ -173,6 +177,29 @@
 }
 .frp-dlg.frp-feat .frp-cs-label {
   color: var(--feat-deep);
+}
+.frp-dlg.frp-feat select {
+  font-family: 'Barlow', Arial, sans-serif;
+  font-size: 15px;
+  padding: 4px 8px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #888;
+  border-radius: 2px;
+}
+.frp-dlg.frp-feat select option {
+  font-family: 'Barlow', Arial, sans-serif;
+  font-size: 15px;
+  padding: 4px 8px;
+  color: #1a1a1a;
+  background: #fff;
+}
+.frp-dlg.frp-feat select optgroup {
+  font-family: 'Barlow', Arial, sans-serif;
+  font-style: italic;
+  font-weight: 700;
+  color: #444;
+  background: var(--cream-dk);
 }
 
 /* ── Mode buttons in titlebar ─────────────────────────────────────────── */
