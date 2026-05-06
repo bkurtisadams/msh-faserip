@@ -1560,6 +1560,12 @@ Hooks.once("init", async () => {
   // Add the collision damage dialog
   game.msh.openCollisionDamageDialog = openCollisionDamageDialog;
 
+  // Add the generic FEAT dialog (lazy-imported so it tree-shakes if unused)
+  game.msh.openGenericFeat = async (actor, opts = {}) => {
+    const { showGenericFeatDialog } = await import('./modules/actions/generic-feat-dialog.js');
+    return showGenericFeatDialog(actor, opts);
+  };
+
   // Initialize faserip initiative
   FaseripInitiative.init();
 

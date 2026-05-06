@@ -1,9 +1,25 @@
-// ability-feat-dialog.js v1.1.0 - 2026-03-21
+// ability-feat-dialog.js v1.3.0 - 2026-05-06
+// v1.3.0: FEAT green theme — add frp-feat wrapper class, swap inline
+//         #6a0000 label color for var(--feat-deep). Functional FEAT-result
+//         red colors (IMPOSSIBLE, Red column) left intact.
+// v1.2.1: Drop CS reference panel — that's a combat-modifier list (Surprise,
+//         Cover, Blindside) which doesn't apply to ability FEATs. Inline
+//         the CS row instead of using buildCSRow + wireCSPanel.
+// v1.2.0: Compact frp-dlg + frp-header-v3 layout matching Blunt Attack style.
+//         Header banner replaces "Ability Rank" row. FEAT Type radios
+//         become single-line opt-row. Lifting/Breaking/Multiattack panels
+//         collapse to compact frp-box rows. Intensity + Required FEAT
+//         on one line. CS row inlined with live effective-rank recalc.
+//         Roll/Cancel + Remember/Skip dice in single frp-foot.
+//         Switched showFaseripButtonDialog → showFaseripDialog so the
+//         framework footer is hidden; buttons live in content.
+// v1.1.0 - 2026-03-21
 // Standalone ability FEAT dialog. Fighting supports Multiple Combat Actions pre-action FEAT.
 
-import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from '../dice/dice-roller.js';
+import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
 import { applyColumnShifts } from '../dice/column-shifts.js';
-import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { showFaseripDialog } from "./dialog-shim.js";
+import { RANK_ABBR } from "../../rules/rules-reference.js";
 
 const RANKS = [
   "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -153,112 +169,153 @@ export async function showAbilityFeatDialog(actor, abilityName) {
     `<option value="${item.rank}" ${item.rank === savedWeightIntensity ? 'selected' : ''}>${item.display}</option>`
   ).join('');
 
-  // Build dialog content
-  let dialogContent = `
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 100px;">Ability Rank:</label>
-      <input type="text" id="ability-rank" name="abilityRank" value="${abilityRank}" style="width: 120px;" readonly>
-      <span style="margin-left: 5px;">(${abilityValue})</span>
+  const abilityShort = RANK_ABBR[abilityRank] || abilityRank;
+  const initShift = Number(savedColumnShift) || 0;
+  const csInputCls = initShift > 0 ? ' pos' : initShift < 0 ? ' neg' : '';
+  const initEffective = applyCS(abilityRank, initShift);
+
+  // Inline CS row — no reference panel (combat modifiers don't apply to FEATs)
+  const csRowHtml = `
+    <div class="frp-box frp-cs-box">
+      <div class="frp-cs-line">
+        <span class="frp-cs-label">CS</span>
+        <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${initShift}" id="frp-cs-manual">
+        <span class="frp-cs-base">${abilityShort}</span>
+        <span class="frp-cs-arrow">&rarr;</span>
+        <span class="frp-cs-rank" id="frp-cs-rank">${initEffective}</span>
+      </div>
     </div>`;
 
-  if (isStrength) {
-    dialogContent += `
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 100px;">FEAT Type:</label>
+  // FEAT type radios — Strength gets standard/lifting/breaking; Fighting gets standard/multiattack
+  const buildTypeRadios = () => {
+    if (isStrength) {
+      return `
         <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
-        <label style="margin-left: 10px;"><input type="radio" name="featType" value="lifting" ${savedFeatType === 'lifting' ? 'checked' : ''}> Lifting</label>
-        <label style="margin-left: 10px;"><input type="radio" name="featType" value="breaking" ${savedFeatType === 'breaking' ? 'checked' : ''}> Breaking</label>
+        <label><input type="radio" name="featType" value="lifting" ${savedFeatType === 'lifting' ? 'checked' : ''}> Lifting</label>
+        <label><input type="radio" name="featType" value="breaking" ${savedFeatType === 'breaking' ? 'checked' : ''}> Breaking</label>`;
+    }
+    if (isFighting) {
+      return `
+        <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
+        <label><input type="radio" name="featType" value="multiattack" ${savedFeatType === 'multiattack' ? 'checked' : ''}> Multi-Attack</label>`;
+    }
+    return '';
+  };
+
+  const dialogContent = `
+    <div class="frp-dlg frp-feat">
+      <!-- Header banner: actor (ability rank value) -->
+      <div class="frp-header-v3">
+        <span class="h-actor" title="${actor.name}">${actor.name}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">${fullName}</span>
+          <span class="h-stat-rank">${abilityShort} ${abilityValue}</span>
+        </span>
+        <span class="h-paren">)</span>
       </div>
-      <div id="lifting-section" style="display: none; padding: 8px 10px; background-color: #fffdf4; border: 1px solid #c0a070; border-radius: 3px; margin-bottom: 10px;">
-        <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Lifting Weight ───</div>
-        <div style="margin-bottom: 5px;">
-          <label style="display: inline-block; width: 50px;">Weight:</label>
-          <select id="weight-intensity" name="weightIntensity" style="width: 300px;">
+
+      <input type="hidden" name="abilityRank" value="${abilityRank}">
+
+      ${(isStrength || isFighting) ? `
+      <!-- FEAT Type — compact horizontal radios -->
+      <div class="frp-box frp-opts-box">
+        <div class="frp-opt-row" style="gap:10px;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">TYPE</span>
+          ${buildTypeRadios()}
+        </div>
+      </div>
+      ` : ''}
+
+      ${isStrength ? `
+      <!-- Lifting sub-panel -->
+      <div id="lifting-section" class="frp-box" style="display:none;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">WEIGHT</span>
+          <select id="weight-intensity" name="weightIntensity" style="flex:1;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
             ${weightIntensityOptionsHTML}
           </select>
         </div>
       </div>
-      <div id="breaking-section" style="display: none; padding: 8px; background-color: #f0f0f0; border-radius: 3px; margin-bottom: 10px;">
-        <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Breaking Material ───</div>
-        <div style="margin-bottom: 5px;">
-          <label style="display: inline-block; width: 60px;">Material:</label>
-          <select id="material-select" name="material" style="width: 200px;">
+
+      <!-- Breaking sub-panel -->
+      <div id="breaking-section" class="frp-box" style="display:none;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">MATERIAL</span>
+          <select id="material-select" name="material" style="flex:1;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
             ${materialOptionsHTML}
           </select>
-          <span id="base-material-strength" style="margin-left: 5px; font-size: 0.9em;"></span>
+          <span id="base-material-strength" style="font-size:12px;color:#1a1a1a;font-weight:600;flex-shrink:0;"></span>
+          <span id="effective-material-strength" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:var(--feat-deep);flex-shrink:0;"></span>
         </div>
-        <div style="margin-bottom: 5px;">
-          <label style="display: inline-block; width: 60px;">Thickness:</label>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">THICK</span>
           <label><input type="radio" name="thickness" value="<2" ${savedThickness === '<2' ? 'checked' : ''}> &lt;2"</label>
-          <label style="margin-left: 8px;"><input type="radio" name="thickness" value="2-12" ${savedThickness === '2-12' ? 'checked' : ''}> 2-12"</label>
-          <label style="margin-left: 8px;"><input type="radio" name="thickness" value="1-2ft" ${savedThickness === '1-2ft' ? 'checked' : ''}> 1-2'</label>
-          <label style="margin-left: 8px;"><input type="radio" name="thickness" value=">2ft" ${savedThickness === '>2ft' ? 'checked' : ''}> &gt;2'</label>
-          <span id="effective-material-strength" style="margin-left: 10px; font-weight: bold;"></span>
+          <label><input type="radio" name="thickness" value="2-12" ${savedThickness === '2-12' ? 'checked' : ''}> 2-12"</label>
+          <label><input type="radio" name="thickness" value="1-2ft" ${savedThickness === '1-2ft' ? 'checked' : ''}> 1-2'</label>
+          <label><input type="radio" name="thickness" value=">2ft" ${savedThickness === '>2ft' ? 'checked' : ''}> &gt;2'</label>
         </div>
-      </div>`;
-  }
-
-  if (isFighting) {
-    dialogContent += `
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 100px;">FEAT Type:</label>
-        <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
-        <label style="margin-left: 10px;"><input type="radio" name="featType" value="multiattack" ${savedFeatType === 'multiattack' ? 'checked' : ''}> Multiple Attacks</label>
       </div>
-      <div id="multiattack-section" style="display: none; padding: 8px; background-color: #f0f0f0; border-radius: 3px; margin-bottom: 10px;">
-        <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Multiple Combat Actions ───</div>
-        <div style="margin-bottom: 5px;">
-          <label style="display: inline-block; width: 60px;">Attacks:</label>
-          <label><input type="radio" name="multiAttackCount" value="2" ${savedMultiAttackCount === '2' ? 'checked' : ''}> 2 (Remarkable)</label>
-          <label style="margin-left: 10px;"><input type="radio" name="multiAttackCount" value="3" ${savedMultiAttackCount === '3' ? 'checked' : ''}> 3 (Amazing)</label>
-        </div>
-        <div style="font-size: 12px; color: #1a1a1a; margin-top: 6px; padding: 6px 8px; border-left: 3px solid #c0a070; background: #fffdf4;">
-          <div><strong>Success:</strong> All attacks at −1CS to hit</div>
-          <div><strong>Failure:</strong> 1 attack at −3CS to hit</div>
-          <div style="margin-top: 3px;">Slugfest and Shooting only. Powers may permit multiple attacks as Power Stunts.</div>
-        </div>
-      </div>`;
-  }
+      ` : ''}
 
-  dialogContent += `
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Intensity:</label>
-      <select id="intensity" name="intensity" style="width: 120px;">
-        ${intensityOptionsHTML}
-      </select>
-    </div>
-    <div style="margin-bottom: 10px;" id="feat-requirement">
-      <label style="display: inline-block; width: 120px;">Required FEAT:</label>
-      <span id="required-feat-text" style="font-weight: bold;">Any Color</span>
-    </div>
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Column Shift:</label>
-      <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
-      <span style="color: #2a2a2a; font-size: 12px; font-style: italic; margin-left: 6px;">(+ right, - left)</span>
-    </div>
-    ${generateKarmaControlsHTML(actor)}
-    <div style="margin-bottom: 10px;">
-      <label>
-        <input type="checkbox" id="save-settings" name="saveSettings" checked> 
-        Remember settings for future rolls
-      </label>
-    </div>
-    <div>
-      <label>
-        <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
-        Skip dice animation
-      </label>
+      ${isFighting ? `
+      <!-- Multiattack sub-panel -->
+      <div id="multiattack-section" class="frp-box" style="display:none;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">ATTACKS</span>
+          <label style="font-size:13px;"><input type="radio" name="multiAttackCount" value="2" ${savedMultiAttackCount === '2' ? 'checked' : ''}> 2 (Remarkable)</label>
+          <label style="font-size:13px;"><input type="radio" name="multiAttackCount" value="3" ${savedMultiAttackCount === '3' ? 'checked' : ''}> 3 (Amazing)</label>
+        </div>
+        <div style="font-size:11px;color:#1a1a1a;font-style:italic;line-height:1.35;">
+          Success: all attacks &minus;1CS &middot; Failure: 1 attack at &minus;3CS
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Intensity + Required FEAT readout (one line) -->
+      <div class="frp-box" id="intensity-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
+        <select id="intensity" name="intensity" style="flex:1;min-width:100px;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+          ${intensityOptionsHTML}
+        </select>
+        <span style="font-family:'Oswald',sans-serif;font-size:11px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;flex-shrink:0;">Need:</span>
+        <span id="required-feat-text" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;flex-shrink:0;color:#1a1a1a;">Any Color</span>
+      </div>
+
+      <!-- CS row from shared utility -->
+      ${csRowHtml}
+
+      <!-- Karma -->
+      ${generateKarmaControlsHTML(actor)}
+
+      <!-- Footer: Roll/Cancel + Remember/Skip dice on one row -->
+      <div class="frp-foot">
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="saveSettings" id="save-settings" checked> Remember</label>
+          <label><input type="checkbox" name="skipDice" id="skip-dice" ${skipDiceRoll ? 'checked' : ''}> Skip dice</label>
+        </div>
+      </div>
     </div>`;
 
   // ── Dialog ──────────────────────────────────────────────────
 
-  showFaseripButtonDialog({
+  showFaseripDialog({
     title: `${fullName} FEAT Roll: ${actor.name}`,
     content: dialogContent,
-    buttons: {
-      roll: {
-        label: "Roll",
-        callback: async (html) => {
+    render: async (html, dlg) => {
+      setupKarmaControlHandlers(html);
+      const $dialog = html.closest('.dialog');
+      $dialog.find('.dialog-buttons, footer.form-footer').hide();
+      if ($dialog.length) {
+        $dialog.css('width', '380px');
+        $dialog[0].style.height = 'auto';
+      }
+
+      const runRoll = async () => {
           const intensity = html.find('[name="intensity"]').val();
           const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
           const spendKarma = html.find('#spend-karma').is(':checked');
@@ -455,20 +512,16 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                 ${multiAttackResult}
               </div>`
           });
-        }
-      },
-      cancel: { label: "Cancel" }
-    },
-    default: "roll",
-    render: html => {
+        };  // end runRoll
+
       // Shared updateFeatRequirement for all abilities
       const updateFeatRequirement = () => {
         const intensity = html.find('#intensity').val();
-        const cs = parseInt(html.find('#shift').val()) || 0;
+        const cs = parseInt(html.find('[name="shift"]').val()) || 0;
         const reqText = html.find('#required-feat-text');
 
         if (intensity === "None") {
-          reqText.text("Any Color").css('color', '#333');
+          reqText.text("Any Color").css('color', '#1a1a1a');
           return;
         }
 
@@ -476,21 +529,19 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         const { requirement, impossible, automatic } = determineFeatRequirement(effectiveRank, intensity);
 
         if (impossible) {
-          reqText.text("IMPOSSIBLE").css('color', '#F44336');
+          reqText.text("IMPOSSIBLE").css('color', '#6a0000');
         } else if (automatic) {
-          reqText.text("AUTOMATIC").css('color', '#4CAF50');
+          reqText.text("AUTOMATIC").css('color', '#1b5e20');
         } else {
-          const colors = { Green: '#4CAF50', Yellow: '#FFC107', Red: '#F44336' };
-          reqText.text(requirement).css('color', colors[requirement] || '#333');
+          const colors = { Green: '#1b5e20', Yellow: '#c87a00', Red: '#6a0000' };
+          reqText.text(requirement).css('color', colors[requirement] || '#1a1a1a');
         }
       };
 
       if (!isStrength && !isFighting) {
-        html.find('#intensity, #shift').on('change', updateFeatRequirement);
+        html.find('#intensity, [name="shift"]').on('change keyup', updateFeatRequirement);
         updateFeatRequirement();
       } else if (isFighting) {
-        const dialogElement = html.closest('.dialog');
-
         const updateMultiAttackIntensity = () => {
           const count = html.find('[name="multiAttackCount"]:checked').val() || '2';
           const intensity = parseInt(count) >= 3 ? "Amazing" : "Remarkable";
@@ -502,7 +553,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const ft = html.find('[name="featType"]:checked').val();
           const multiSec = html.find('#multiattack-section');
           const intensitySelect = html.find('#intensity');
-          const intensityRow = intensitySelect.closest('div');
+          const intensityRow = html.find('#intensity-row');
 
           if (ft === 'multiattack') {
             multiSec.show(); intensityRow.hide();
@@ -514,18 +565,16 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             updateFeatRequirement();
           }
 
-          if (dialogElement.length > 0) {
-            dialogElement[0].style.height = 'auto';
+          if ($dialog.length > 0) {
+            $dialog[0].style.height = 'auto';
           }
         };
 
         html.find('[name="featType"]').on('change', updateFightingFeatType);
         html.find('[name="multiAttackCount"]').on('change', updateMultiAttackIntensity);
-        html.find('#intensity, #shift').on('change', updateFeatRequirement);
+        html.find('#intensity, [name="shift"]').on('change keyup', updateFeatRequirement);
         updateFightingFeatType();
       } else {
-        const dialogElement = html.closest('.dialog');
-
         const updateWeightIntensity = () => {
           html.find('#intensity').val(html.find('#weight-intensity').val());
           updateFeatRequirement();
@@ -553,7 +602,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const liftSec = html.find('#lifting-section');
           const breakSec = html.find('#breaking-section');
           const intensitySelect = html.find('#intensity');
-          const intensityRow = intensitySelect.closest('div');
+          const intensityRow = html.find('#intensity-row');
 
           if (ft === 'lifting') {
             liftSec.show(); breakSec.hide(); intensityRow.hide();
@@ -569,8 +618,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           }
           updateFeatRequirement();
 
-          if (dialogElement.length > 0) {
-            dialogElement[0].style.height = 'auto';
+          if ($dialog.length > 0) {
+            $dialog[0].style.height = 'auto';
           }
         };
 
@@ -578,9 +627,37 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         html.find('#weight-intensity').on('change', updateWeightIntensity);
         html.find('#material-select').on('change', updateMaterialStrength);
         html.find('[name="thickness"]').on('change', updateMaterialStrength);
-        html.find('#intensity, #shift').on('change', updateFeatRequirement);
+        html.find('#intensity, [name="shift"]').on('change keyup', updateFeatRequirement);
         updateFeatTypeDisplay();
       }
+
+      // ──── CS input live recalc — no reference panel ────
+      const $csInput = html.find('#frp-cs-manual');
+      const $csRank = html.find('#frp-cs-rank');
+      const recalcCS = () => {
+        const cs = Number($csInput.val()) || 0;
+        $csInput.removeClass('pos neg');
+        if (cs > 0) $csInput.addClass('pos');
+        else if (cs < 0) $csInput.addClass('neg');
+        $csRank.text(applyCS(abilityRank, cs));
+        updateFeatRequirement();
+        if ($dialog.length) $dialog[0].style.height = 'auto';
+      };
+      $csInput.on('change keyup', recalcCS);
+
+      // ──── Roll / Cancel button wiring + Enter-to-roll ────
+      html.find('#frp-roll').on('click', async () => {
+        try { await runRoll(); } finally { dlg.close(); }
+      });
+      html.find('#frp-cancel').on('click', () => dlg.close());
+      html.find('#frp-roll').focus();
+      $dialog.on('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          html.find('#frp-roll').trigger('click');
+        }
+      });
     }
   });
 }

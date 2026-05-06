@@ -1,4 +1,12 @@
-/* action-dialog.css v3.4.0 - 2026-04-30 */
+/* action-dialog.css v3.6.0 - 2026-05-06 */
+/* v3.6.0: FEAT theme — add --feat/--feat-dk/--feat-deep vars,
+           .frp-dlg.frp-feat header gradient + label/CS-label override. */
+/* v3.5.0: Readability Pass 4 — body.system-msh-faserip-scoped lift for
+           Foundry-default V1 Dialog and raw V2 DialogV2 that don't use
+           .faserip-shim-dialog. Targets karma/karmaPool/karmaAdvancement,
+           sheet-launched confirms, movement feats, stunts. Lifts label
+           color #1a1a1a + weight 600, hint/notes/small to #2a2a2a, input
+           text to ink. .karma-calculation block gets tan border. */
 /* v3.4.0: Readability Pass 1 — dmg-box (white + 1.5px #b71c1c border, was pink wash),
            opt-row.inactive opacity 0.4→0.55 + grey out colored labels when inactive,
            frp-box border #d0c8b8→#b8a868, foot border 1px #d8cfb8→1.5px #b8a868,
@@ -15,6 +23,7 @@
 .frp-dlg {
   --mred: #8b0000; --mred-dk: #660000; --mred-lit: #a80000;
   --gold: #c8960c; --gold-lit: #e2ab14;
+  --feat: #22BB22; --feat-dk: #178417; --feat-deep: #0d5a0d;
   --cream: #faf8f3; --cream-dk: #f5f3ee;
   --ink: #1a1a1a; --txt: #1a1a1a; --txt-s: #444; --txt-m: #777;
   font-family: 'Barlow Condensed', Arial, sans-serif;
@@ -156,6 +165,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── FEAT-themed dialog (green accent) ───────────────────────────────── */
+.frp-dlg.frp-feat .frp-header-v3 {
+  background: linear-gradient(90deg, var(--feat) 0%, var(--feat-dk) 100%);
+}
+.frp-dlg.frp-feat .frp-cs-label {
+  color: var(--feat-deep);
 }
 
 /* ── Mode buttons in titlebar ─────────────────────────────────────────── */
@@ -1149,4 +1166,48 @@
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
   letter-spacing: 0.3px;
+}
+
+/* ── Pass 4: lift Foundry-default Dialog readability ──────────────────── */
+/* Body-scoped to the FASERIP system. Targets V1 Dialog (.app.dialog) and
+   raw V2 DialogV2 (.application.dialog) that don't carry .faserip-shim-dialog
+   — karma, karmaPool, karmaAdvancement, sheet-launched confirms, movement
+   feats, stunts. Skips .frp-dlg internal markup (Pass 1-3 owns that).
+   Inline color:#666/#777 styles in JS source still win the cascade —
+   this rule only raises the structural baseline so default-grey labels,
+   form-group hints, and small text become legible. */
+
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .window-content,
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .window-content {
+  color: #1a1a1a;
+}
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .form-group > label,
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .form-group > label {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .form-group > label + .hint,
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .hint,
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .notes,
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .form-group small,
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .hint,
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .notes,
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .form-group small {
+  color: #2a2a2a;
+}
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) input[type="text"],
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) input[type="number"],
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) select,
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) textarea {
+  color: #1a1a1a;
+}
+
+/* Common per-row inline-styled blocks across karma/sheet dialogs use a
+   #f5f5f0 or #f5f3ee soft cream wash that can disappear against the page.
+   Bump them up only when they're INSIDE a non-shim dialog AND not part of
+   .frp-dlg content. Keeps Pass 1-3 dialogs untouched. */
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .karma-calculation,
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-calculation {
+  border: 1px solid #b8a868;
+  color: #1a1a1a;
 }

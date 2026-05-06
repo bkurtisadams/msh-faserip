@@ -1,0 +1,392 @@
+// generic-feat-dialog.js v1.1.0 - 2026-05-06
+// v1.1.0: FEAT green theme — add frp-feat wrapper class, swap inline
+//         #6a0000 label color for var(--feat-deep). Functional FEAT-result
+//         red colors (IMPOSSIBLE, Red column) left intact.
+// v1.0.0 - 2026-04-30
+// Player-facing FEAT dialog with ability picker + optional context label.
+// Routed from the GF button on the Action HUD or game.msh.openGenericFeat().
+//
+// opts.customRank (string) — bypass actor flow; roll against an arbitrary rank.
+// Used by macros / GM tools, hidden from the player UI.
+
+import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
+import { showFaseripDialog } from "./dialog-shim.js";
+import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
+
+const RANKS = [
+  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+];
+
+const ALL_RANKS_WITH_NONE = ["None", ...RANKS];
+
+const ABILITIES = [
+  { key: "fighting",  label: "Fighting"  },
+  { key: "agility",   label: "Agility"   },
+  { key: "strength",  label: "Strength"  },
+  { key: "endurance", label: "Endurance" },
+  { key: "reason",    label: "Reason"    },
+  { key: "intuition", label: "Intuition" },
+  { key: "psyche",    label: "Psyche"    }
+];
+
+function applyCS(rank, shift) {
+  if (shift === 0) return rank;
+  const i = RANKS.indexOf(rank);
+  if (i < 0) return rank;
+  const shifted = Math.max(0, Math.min(RANKS.length - 1, i + shift));
+  return RANKS[shifted];
+}
+
+function colorBg(c) {
+  switch ((c || '').toLowerCase()) {
+    case 'white':  return '#f5f5f0';
+    case 'green':  return '#4CAF50';
+    case 'yellow': return '#FFC107';
+    case 'red':    return '#F44336';
+    default:       return '#ddd';
+  }
+}
+
+function colorFg(c) {
+  switch ((c || '').toLowerCase()) {
+    case 'white':  return '#1a1a1a';
+    case 'green':  return '#fff';
+    case 'yellow': return '#1a1a1a';
+    case 'red':    return '#fff';
+    default:       return '#1a1a1a';
+  }
+}
+
+export async function showGenericFeatDialog(actor, opts = {}) {
+  if (!actor && !opts.customRank) {
+    ui.notifications.warn("Generic FEAT requires an actor or a customRank option.");
+    return;
+  }
+
+  const gf = (flag) => actor?.getFlag?.("msh-faserip", flag);
+  const setF = (k, v) => actor?.setFlag?.("msh-faserip", k, v);
+
+  const savedAbility   = (gf("lastGenericFeatAbility")) || "fighting";
+  const savedLabel     = gf("lastGenericFeatLabel") || "";
+  const savedSkipDice  = gf("lastGenericFeatSkipDice") || false;
+  const savedRemember  = gf("lastGenericFeatRemember") ?? true;
+
+  // Resolve initial ability + rank state
+  let abilityKey, abilityRank, abilityValue, abilityDisplayLabel;
+  if (opts.customRank) {
+    abilityKey = null;
+    abilityRank = opts.customRank;
+    abilityValue = game.msh?.getRankValue?.(opts.customRank) ?? 0;
+    abilityDisplayLabel = "Custom";
+  } else {
+    abilityKey = ABILITIES.some(a => a.key === savedAbility) ? savedAbility : "fighting";
+    const ab = actor.system.abilities[abilityKey];
+    abilityRank = ab?.rank || "Typical";
+    abilityValue = ab?.value || 6;
+    abilityDisplayLabel = abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1);
+  }
+  const abilityShort = RANK_ABBR[abilityRank] || abilityRank;
+
+  // Build dropdown options
+  const abilityOptionsHTML = !opts.customRank ? ABILITIES.map(a => {
+    const ab = actor.system.abilities[a.key];
+    const rank = ab?.rank ?? "—";
+    const val = ab?.value ?? 0;
+    const short = RANK_ABBR[rank] || rank;
+    return `<option value="${a.key}" ${a.key === abilityKey ? 'selected' : ''}>${a.label} (${short} ${val})</option>`;
+  }).join('') : '';
+
+  const intensityOptionsHTML = ALL_RANKS_WITH_NONE.map(r =>
+    `<option value="${r}">${r}</option>`
+  ).join('');
+
+  // Inline CS row — no reference panel (combat modifiers don't apply to FEATs)
+  const csRowHtml = `
+    <div class="frp-box frp-cs-box">
+      <div class="frp-cs-line">
+        <span class="frp-cs-label">CS</span>
+        <input type="number" class="frp-cs-input" name="shift" value="0" id="frp-cs-manual">
+        <span class="frp-cs-base">${abilityShort}</span>
+        <span class="frp-cs-arrow">&rarr;</span>
+        <span class="frp-cs-rank" id="frp-cs-rank">${abilityRank}</span>
+      </div>
+    </div>`;
+
+  const showAbilityPicker = !opts.customRank && !!actor;
+  const showKarma = !opts.customRank && !!actor;
+
+  const dialogContent = `
+    <div class="frp-dlg frp-feat">
+      <div class="frp-header-v3">
+        <span class="h-actor" title="${actor?.name || 'No actor'}">${actor?.name || 'No actor'}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">${abilityDisplayLabel}</span>
+          <span class="h-stat-rank">${abilityShort} ${abilityValue}</span>
+        </span>
+        <span class="h-paren">)</span>
+        <span style="margin-left:auto;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.4px;text-transform:uppercase;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;flex-shrink:0;">Generic FEAT</span>
+      </div>
+
+      ${showAbilityPicker ? `
+      <div class="frp-box">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">ABILITY</span>
+          <select id="generic-ability" name="ability" style="flex:1;min-width:140px;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+            ${abilityOptionsHTML}
+          </select>
+        </div>
+      </div>` : ''}
+
+      <div class="frp-box">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">LABEL</span>
+          <input type="text" name="label" placeholder="Optional &mdash; what's this FEAT for?" value="${savedLabel}" style="flex:1;min-width:0;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+        </div>
+      </div>
+
+      <div class="frp-box" id="intensity-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
+        <select id="intensity" name="intensity" style="flex:1;min-width:100px;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+          ${intensityOptionsHTML}
+        </select>
+        <span style="font-family:'Oswald',sans-serif;font-size:11px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;flex-shrink:0;">Need:</span>
+        <span id="required-feat-text" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;flex-shrink:0;color:#1a1a1a;">Any Color</span>
+      </div>
+
+      ${csRowHtml}
+
+      ${showKarma ? generateKarmaControlsHTML(actor) : ''}
+
+      <div class="frp-foot">
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="remember" id="save-settings" ${savedRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" name="skipDice" id="skip-dice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
+      </div>
+    </div>`;
+
+  showFaseripDialog({
+    title: actor ? `Generic FEAT: ${actor.name}` : `Generic FEAT`,
+    content: dialogContent,
+    render: async (html, dlg) => {
+      if (showKarma) setupKarmaControlHandlers(html);
+      const $dialog = html.closest('.dialog');
+      $dialog.find('.dialog-buttons, footer.form-footer').hide();
+      if ($dialog.length) {
+        $dialog.css('width', '380px');
+        $dialog[0].style.height = 'auto';
+      }
+
+      let currentRank = abilityRank;
+      let currentValue = abilityValue;
+      let currentLabel = abilityDisplayLabel;
+      let currentKey = abilityKey;
+
+      const $abilitySelect = html.find('#generic-ability');
+      const $intensity = html.find('#intensity');
+      const $shift = html.find('[name="shift"]');
+      const $reqText = html.find('#required-feat-text');
+      const $csInput = html.find('#frp-cs-manual');
+      const $csRank = html.find('#frp-cs-rank');
+      const $csBase = html.find('.frp-cs-base');
+      const $hStatLabel = html.find('.frp-header-v3 .h-stat-label');
+      const $hStatRank = html.find('.frp-header-v3 .h-stat-rank');
+
+      const updateFeatRequirement = () => {
+        const intensity = $intensity.val();
+        const cs = parseInt($shift.val()) || 0;
+
+        if (intensity === "None") {
+          $reqText.text("Any Color").css('color', '#1a1a1a');
+          return;
+        }
+
+        const effectiveRank = applyCS(currentRank, cs);
+        const { requirement, impossible, automatic } = determineFeatRequirement(effectiveRank, intensity);
+
+        if (impossible) {
+          $reqText.text("IMPOSSIBLE").css('color', '#6a0000');
+        } else if (automatic) {
+          $reqText.text("AUTOMATIC").css('color', '#1b5e20');
+        } else {
+          const colors = { Green: '#1b5e20', Yellow: '#c87a00', Red: '#6a0000' };
+          $reqText.text(requirement).css('color', colors[requirement] || '#1a1a1a');
+        }
+      };
+
+      // Ability picker change → swap header + CS row + recompute
+      $abilitySelect.on('change', () => {
+        if (!actor) return;
+        currentKey = $abilitySelect.val();
+        const ab = actor.system.abilities[currentKey];
+        currentRank = ab?.rank || "Typical";
+        currentValue = ab?.value || 6;
+        currentLabel = currentKey.charAt(0).toUpperCase() + currentKey.slice(1);
+        const short = RANK_ABBR[currentRank] || currentRank;
+        $hStatLabel.text(currentLabel);
+        $hStatRank.text(`${short} ${currentValue}`);
+        $csBase.text(short);
+        const cs = parseInt($csInput.val()) || 0;
+        $csRank.text(applyCS(currentRank, cs));
+        updateFeatRequirement();
+      });
+
+      // CS input live recalc with pos/neg coloring
+      const recalcCS = () => {
+        const cs = Number($csInput.val()) || 0;
+        $csInput.removeClass('pos neg');
+        if (cs > 0) $csInput.addClass('pos');
+        else if (cs < 0) $csInput.addClass('neg');
+        $csRank.text(applyCS(currentRank, cs));
+        updateFeatRequirement();
+        if ($dialog.length) $dialog[0].style.height = 'auto';
+      };
+      $csInput.on('change keyup', recalcCS);
+
+      $intensity.on('change', updateFeatRequirement);
+
+      updateFeatRequirement();
+
+      const runRoll = async () => {
+        const labelVal     = (html.find('[name="label"]').val() || '').trim();
+        const intensity    = $intensity.val();
+        const columnShift  = parseInt($shift.val()) || 0;
+        const spendKarma   = html.find('#spend-karma').is(':checked');
+        const saveSettings = html.find('[name="remember"]').is(':checked');
+        const skipDice     = html.find('[name="skipDice"]').is(':checked');
+
+        if (saveSettings && actor) {
+          await setF("lastGenericFeatAbility", currentKey || savedAbility);
+          await setF("lastGenericFeatLabel", labelVal);
+          await setF("lastGenericFeatSkipDice", skipDice);
+          await setF("lastGenericFeatRemember", true);
+        } else if (!saveSettings && actor) {
+          await setF("lastGenericFeatRemember", false);
+        }
+
+        const effectiveRank = applyCS(currentRank, columnShift);
+
+        let featRequirement = "Any Color";
+        let isImpossible = false;
+        let isAutomatic = false;
+        if (intensity !== "None") {
+          const req = determineFeatRequirement(effectiveRank, intensity);
+          featRequirement = req.requirement;
+          isImpossible = req.impossible;
+          isAutomatic = req.automatic;
+        }
+
+        if (isImpossible) {
+          ui.notifications.warn(`FEAT is impossible: ${effectiveRank} ability vs ${intensity} intensity. Need ability to be within one rank of intensity.`);
+          return;
+        }
+
+        const cardTitle = labelVal || "Generic FEAT";
+        const cardSubtitle = intensity !== "None"
+          ? `${currentLabel} FEAT vs ${intensity} intensity`
+          : `${currentLabel} (${currentRank})`;
+
+        if (isAutomatic) {
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `
+              <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
+                  <strong>${cardTitle}</strong><br>
+                  <span style="font-size:0.85em;font-weight:400;">${cardSubtitle}</span>
+                </div>
+                <div style="padding:5px 10px;font-size:0.9em;">
+                  <div>Base Rank: ${currentRank} (${currentValue})</div>
+                  ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} &rarr; ${effectiveRank}</div>` : ''}
+                  <div>Intensity: ${intensity}</div>
+                  <div>Ability rank is 3+ ranks higher than intensity</div>
+                </div>
+                <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:#4CAF50;color:#fff;">
+                  AUTOMATIC SUCCESS
+                </div>
+              </div>`
+          });
+          return;
+        }
+
+        const roll = new Roll("1d100");
+        await roll.evaluate();
+
+        if (!skipDice) {
+          await roll.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            flavor: actor
+              ? `${actor.name} makes a ${currentLabel} FEAT roll${intensity !== "None" ? ` vs ${intensity} intensity` : ""}`
+              : `Generic FEAT roll`,
+            rollMode: game.settings.get("core", "rollMode")
+          });
+        }
+
+        let cappedTotal = roll.total;
+        let karmaUsed = 0;
+
+        if (spendKarma && actor && getAvailableKarma(actor) > 0) {
+          const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+          const karmaResult = await showKarmaDecisionDialog(
+            actor, roll.total, effectiveRank, `${currentLabel} FEAT`, initialColor
+          );
+          cappedTotal = karmaResult.finalResult;
+          karmaUsed = karmaResult.karmaSpent;
+        }
+
+        const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+
+        let featSuccess = true;
+        if (intensity !== "None") {
+          featSuccess = checkFeatSuccess(resultColor, featRequirement);
+        }
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+              <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
+                <strong>${cardTitle}</strong><br>
+                <span style="font-size:0.85em;font-weight:400;">${cardSubtitle}</span>
+              </div>
+              <div style="padding:5px 10px;font-size:0.9em;">
+                <div>Base Rank: ${currentRank} (${currentValue})</div>
+                ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} &rarr; ${effectiveRank}</div>` : ''}
+                ${intensity !== "None" ? `<div>Intensity: ${intensity} (Required: ${featRequirement})</div>` : ''}
+                <div>Roll: ${roll.total}${karmaUsed ? ` + Karma: ${karmaUsed}` : ''} = ${cappedTotal}</div>
+              </div>
+              <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:${colorBg(resultColor)};color:${colorFg(resultColor)};">
+                ${resultColor.toUpperCase()}
+              </div>
+              ${intensity !== "None" ? `
+                <div style="padding:5px 10px;font-size:1.05em;text-align:center;font-weight:bold;color:${featSuccess ? '#2e7d32' : '#c62828'};">
+                  ${featSuccess ? 'FEAT SUCCEEDED' : 'FEAT FAILED'}
+                </div>
+              ` : ''}
+            </div>`
+        });
+      };
+
+      html.find('#frp-roll').on('click', async () => {
+        try { await runRoll(); } finally { dlg.close(); }
+      });
+      html.find('#frp-cancel').on('click', () => dlg.close());
+      html.find('#frp-roll').focus();
+      $dialog.on('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          html.find('#frp-roll').trigger('click');
+        }
+      });
+    }
+  });
+}

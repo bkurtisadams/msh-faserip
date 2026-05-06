@@ -1,4 +1,9 @@
-// scripts/action-hud.js v3.2.0 - 2026-04-25
+// scripts/action-hud.js v3.3.0 - 2026-04-30
+// v3.3.0: Add Generic FEAT button (yellow #FFD54A, label "FEAT" at 11px).
+//         Click routes to showGenericFeatDialog instead of the combat
+//         dispatcher. Per-button CSS override scopes the smaller font
+//         to data-action="generic-feat" only.
+// v3.2.0 - 2026-04-25
 // v3.2.0: Replace title-bar shortcut tooltip (giant blob obscured the HUD)
 //         with a "?" header control button that opens a small Shortcuts
 //         popover. Mirrors the existing settings popover pattern.
@@ -40,7 +45,8 @@ const ACTIONS = [
   { id:"catching",       label:"Ca",  full:"Catching",       ability:"agility",   color:"#32CD32", textColor:"#000", icon:`${ICON_PATH}/catch.png` },
   { id:"stun",           label:"St",  full:"Stun",           ability:"endurance", color:"#9932CC", textColor:"#FFF", icon:`${ICON_PATH}/stun.png` },
   { id:"slam",           label:"Sl",  full:"Slam",           ability:"endurance", color:"#9932CC", textColor:"#FFF", icon:`${ICON_PATH}/slam.png` },
-  { id:"kill",           label:"Kl",  full:"Kill",           ability:"endurance", color:"#8B008B", textColor:"#FFF", icon:`${ICON_PATH}/kill.png` }
+  { id:"kill",           label:"Kl",  full:"Kill",           ability:"endurance", color:"#8B008B", textColor:"#FFF", icon:`${ICON_PATH}/kill.png` },
+  { id:"generic-feat",   label:"FEAT",full:"Generic FEAT",   ability:"any",       color:"#FFD54A", textColor:"#1a1a1a" }
 ];
 
 const SHORTCUTS = [
@@ -124,6 +130,8 @@ const CSS = `
 .faserip-action-hud.editing .fah-btn { cursor: move; }
 .fah-btn.dragging { opacity: .5; }
 .fah-btn.drop-indicator { outline: 2px dashed #fff; outline-offset: -2px; }
+/* Generic FEAT button — 4-letter label needs smaller font to fit the square */
+.fah-btn[data-action="generic-feat"] .fah-code { font-size: 11px; }
 
 /* Context menu */
 .fah-ctx-menu {
@@ -371,6 +379,11 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       const actor = this.actor;
       if (!actor) return ui.notifications.warn("Select a token first.");
       try {
+        if (btn.dataset.action === "generic-feat") {
+          const { showGenericFeatDialog } = await import("./modules/actions/generic-feat-dialog.js");
+          await showGenericFeatDialog(actor);
+          return;
+        }
         await ActionDispatcher.roll(btn.dataset.action, {
           actor,
           abilityName: btn.dataset.ability,
