@@ -1,4 +1,11 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.9.0 - 2026-03-17
+// scripts/modules/canvas/faserip-dot-token.js v1.10.0 - 2026-05-06
+// v1.10.0: Robustness — _isDotMode honors only strict boolean flag values;
+//          non-booleans (e.g. stale "off"/"on"/"default" strings from older
+//          scene saves) fall through as "no override". preUpdateScene now
+//          handles both expanded and flattened change shapes so the
+//          string-to-boolean translation always runs. Adds
+//          game.msh.scrubDotFlags() to clean stale string flags across all
+//          scenes + tokens in one shot.
 // v1.9.0: Auto-resize tokens to 0.5x0.5 on dot-mode entry, restore original size on exit.
 //         Stashes original dimensions in dotOrigSize flag. Removed Ctrl+click resize.
 //         New world setting "dotSize" (Small/Medium/Large) controls dot radius for all tokens.
@@ -42,15 +49,17 @@ function _getDotRatio() {
 // ---------------------------------------------------------------------------
 
 function _isDotMode(token) {
-  // 1. Per-token override (highest priority)
+  // 1. Per-token override (highest priority) — strict boolean only.
+  //    Non-booleans (stale strings, objects, etc.) are treated as "no
+  //    override" and fall through.
   const perToken = token.document.getFlag(SCOPE, DOT_FLAG);
-  if (perToken !== null && perToken !== undefined) return Boolean(perToken);
-  // 2. Per-scene flag
+  if (perToken === true || perToken === false) return perToken;
+  // 2. Per-scene flag — strict boolean only.
   const sceneFlag = canvas.scene?.getFlag(SCOPE, DOT_FLAG);
-  if (sceneFlag !== null && sceneFlag !== undefined) return Boolean(sceneFlag);
+  if (sceneFlag === true || sceneFlag === false) return sceneFlag;
   // 3. World setting fallback
   try {
-    return game.settings.get(SCOPE, DOT_FLAG);
+    return Boolean(game.settings.get(SCOPE, DOT_FLAG));
   } catch {
     return false;
   }
@@ -438,6 +447,36 @@ export function initDotToken() {
     ui.notifications?.info(`Dot portraits: ${_persistentPortraits ? "persistent (hover to pin)" : "hover only"}`);
   });
 
+  // Expose a one-shot cleanup for stale string flags. Run from console:
+  //   game.msh.scrubDotFlags()
+  // Removes any non-boolean dotMode flag from every scene and every token
+  // doc in every scene. Safe to run repeatedly. Returns counts.
+  Hooks.once("ready", () => {
+    if (!game.msh) game.msh = {};
+    game.msh.scrubDotFlags = async () => {
+      let scenesFixed = 0;
+      let tokensFixed = 0;
+      for (const scene of game.scenes ?? []) {
+        const sf = scene.getFlag(SCOPE, DOT_FLAG);
+        if (sf !== undefined && sf !== null && sf !== true && sf !== false) {
+          await scene.unsetFlag(SCOPE, DOT_FLAG);
+          scenesFixed++;
+        }
+        for (const tokenDoc of scene.tokens ?? []) {
+          const tf = tokenDoc.getFlag(SCOPE, DOT_FLAG);
+          if (tf !== undefined && tf !== null && tf !== true && tf !== false) {
+            await tokenDoc.unsetFlag(SCOPE, DOT_FLAG);
+            tokensFixed++;
+          }
+        }
+      }
+      const msg = `Dot-mode flag scrub complete: ${scenesFixed} scene(s), ${tokensFixed} token(s).`;
+      console.log(`[FASERIP] ${msg}`);
+      ui.notifications?.info(msg);
+      return { scenesFixed, tokensFixed };
+    };
+  });
+
   // Inject "Dot Mode" select into Scene Config → Grid tab (V13 AppV2)
   Hooks.on("renderSceneConfig", (app, html, context, options) => {
     const scene = app.document;
@@ -473,14 +512,35 @@ export function initDotToken() {
     gridTab.appendChild(group);
   });
 
-  // Intercept scene config submission to translate select values into flags
+  // Intercept scene config submission to translate select values into flags.
+  // V13 may pass changes in expanded shape (changes.flags[SCOPE][DOT_FLAG])
+  // or flattened ("flags.msh-faserip.dotMode" as a top-level key); handle
+  // both so the string never reaches storage.
   Hooks.on("preUpdateScene", (scene, changes) => {
-    const flagVal = changes?.flags?.[SCOPE]?.[DOT_FLAG];
-    if (typeof flagVal === "string") {
-      if (flagVal === "on") changes.flags[SCOPE][DOT_FLAG] = true;
-      else if (flagVal === "off") changes.flags[SCOPE][DOT_FLAG] = false;
-      else {
-        // "default" — delete the flag
+    const flatKey = `flags.${SCOPE}.${DOT_FLAG}`;
+    const flatUnsetKey = `flags.${SCOPE}.-=${DOT_FLAG}`;
+    let flagVal;
+    let isFlat = false;
+    if (changes && Object.prototype.hasOwnProperty.call(changes, flatKey)) {
+      flagVal = changes[flatKey];
+      isFlat = true;
+    } else {
+      flagVal = changes?.flags?.[SCOPE]?.[DOT_FLAG];
+    }
+    if (typeof flagVal !== "string") return;
+
+    if (flagVal === "on") {
+      if (isFlat) changes[flatKey] = true;
+      else changes.flags[SCOPE][DOT_FLAG] = true;
+    } else if (flagVal === "off") {
+      if (isFlat) changes[flatKey] = false;
+      else changes.flags[SCOPE][DOT_FLAG] = false;
+    } else {
+      // "default" or any other string — unset the flag
+      if (isFlat) {
+        delete changes[flatKey];
+        changes[flatUnsetKey] = null;
+      } else {
         changes.flags[SCOPE][`-=${DOT_FLAG}`] = null;
         delete changes.flags[SCOPE][DOT_FLAG];
       }
