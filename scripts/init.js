@@ -2030,6 +2030,28 @@ function _collectTokenEffectState(actor) {
   return desired;
 }
 
+// FASERIP "areas" -> scene grid distance. Light presets author bright/dim as
+// areas (e.g. flashlight bright=0.5 = half an area). Foundry stores
+// light.bright/light.dim in the scene's grid-distance units, so on a 5ft-per-
+// square map the raw 0.5 renders as half a foot of light. Scale on apply.
+const _AREA_SCALED_KEYS = new Set(["light.bright", "light.dim"]);
+const _AREA_FT = 30;       // 1 area ≈ 30 ft (rules-ref: "more than 30ft = >1 area")
+const _AREA_M  = 9.144;    // 30 ft in meters
+function _areasToSceneUnits(areas, scene) {
+  const n = Number(areas);
+  if (!Number.isFinite(n)) return areas;
+  const u = String(scene?.grid?.units ?? "").trim().toLowerCase();
+  if (!u || u === "area" || u === "areas" || u === "ar") return n;
+  if (["ft","feet","'"].includes(u)) return n * _AREA_FT;
+  if (["yd","yds","yard","yards"].includes(u)) return n * (_AREA_FT / 3);
+  if (["in","inch","inches",'"'].includes(u)) return n * (_AREA_FT * 12);
+  if (["mi","mile","miles"].includes(u)) return n * (_AREA_FT / 5280);
+  if (["m","meter","meters","metre","metres"].includes(u)) return n * _AREA_M;
+  if (u === "km") return n * (_AREA_M / 1000);
+  if (u === "cm") return n * (_AREA_M * 100);
+  return n;
+}
+
 // Reconcile token state: apply desired or revert to baseline
 async function _reconcileTokenEffects(actor) {
   if (!canvas?.scene || !game.user.isGM) return;
@@ -2063,7 +2085,8 @@ async function _reconcileTokenEffects(actor) {
       // Build nested update object from dot-notation keys
       const update = {};
       for (const [dotKey, val] of desired) {
-        foundry.utils.setProperty(update, dotKey, val);
+        const out = _AREA_SCALED_KEYS.has(dotKey) ? _areasToSceneUnits(val, tokenDoc.parent) : val;
+        foundry.utils.setProperty(update, dotKey, out);
       }
       await tokenDoc.update(update);
 
