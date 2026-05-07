@@ -2019,9 +2019,12 @@ function _collectTokenEffectState(actor) {
       if ((change.type ?? change.mode) !== CUSTOM) continue;
       if (!change.key.startsWith("faserip.token.")) continue;
       const tokenKey = change.key.replace("faserip.token.", "");
-      // v14: change.value arrives pre-parsed (JSON parse of the entered value,
-      // or the raw string on parse failure), so no manual coercion needed.
-      desired.set(tokenKey, change.value);
+      // change.value is stored as a raw string on the AE document. Parse it as
+      // JSON so "null" -> null, "0.5" -> 0.5, "60" -> 60; fall back to the raw
+      // string for non-JSON values like color hex codes and animation names.
+      let val = change.value;
+      try { val = JSON.parse(change.value); } catch { /* keep raw string */ }
+      desired.set(tokenKey, val);
     }
   }
   return desired;

@@ -896,7 +896,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
             { key: "faserip.token.light.color", mode: "custom", value: "#ffffcc" },
             { key: "faserip.token.light.alpha", mode: "custom", value: "0.5" },
             { key: "faserip.token.light.angle", mode: "custom", value: "60" },
-            { key: "faserip.token.light.animation.type", mode: "custom", value: "" },
+            { key: "faserip.token.light.animation.type", mode: "custom", value: "null" },
             { key: "faserip.token.light.animation.speed", mode: "custom", value: "0" },
             { key: "faserip.token.light.animation.intensity", mode: "custom", value: "0" }
           ]
