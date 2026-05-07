@@ -1,4 +1,11 @@
-// shooting-action.js v3.5.1 - 2026-04-17
+// shooting-action.js v3.6.0 - 2026-05-06
+// v3.6.0: Honor opts.attackMode.damage and opts.attackMode.damageType when the equipment
+//         hub dispatched a specific attack mode (e.g. Air Pistol → Explosive Pellet).
+//         _modeDamage / _modeDamageType helpers gate the override to the passed item;
+//         other weapons in the dropdown keep their own values. Without this, multi-mode
+//         weapons resolved to 0 damage because mode.damage was never read. Chat card
+//         sourceName now reads "Weapon — Mode Name" when a mode is active so the chat
+//         log distinguishes which pellet/mode was fired.
 // v3.5.1: Mercy Shot armor-gate preserved per RAW. If the weapon's
 //         standard damage would not have penetrated armor, KO drug
 //         has no effect. Pairs with removal of legacy mercy stun-
@@ -91,6 +98,20 @@ export class ShootingAction extends RangedAttackAction {
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
 
+    // Per-attack-mode override: when the equipment hub dispatched a specific mode
+    // (e.g. Air Pistol → Explosive Pellet), the mode's damage/damageType replace
+    // the item-level values for the duration of this attack. Other weapons in the
+    // dropdown keep their own values.
+    const attackMode = this.opts?.attackMode || null;
+    const _modeDamage = (weapon) =>
+      (attackMode && passedItem && weapon?.id === passedItem.id)
+        ? (Number(attackMode.damage) || 0)
+        : (Number(weapon?.system?.damage) || 0);
+    const _modeDamageType = (weapon) =>
+      (attackMode && passedItem && weapon?.id === passedItem.id && attackMode.damageType)
+        ? attackMode.damageType
+        : (weapon?.system?.damageType || "");
+
     let shootingWeapons = actor.items.filter(i => {
       if (i.type !== "equipment") return false;
       const s = i.system || {};
@@ -144,7 +165,7 @@ export class ShootingAction extends RangedAttackAction {
     // === Initial weapon info ===
     const initialWeapon = shootingWeapons.find(i => i.id === savedItemId) || shootingWeapons[0];
     const initialWeaponRange = initialWeapon?.system?.range || 15;
-    const initialWeaponDamage = initialWeapon?.system?.damage || 0;
+    const initialWeaponDamage = _modeDamage(initialWeapon);
 
     // Variant/special ammo helpers
     const _buildVariantOptions = (weapon, currentVariant) => {
@@ -197,7 +218,7 @@ export class ShootingAction extends RangedAttackAction {
 
     // === Build weapon damage source <select> ===
     const damageSrcOptions = shootingWeapons.map(i => {
-      const dmg = Number(i.system?.damage || 0);
+      const dmg = _modeDamage(i);
       const rng = Number(i.system?.range || 0);
       const ap = Number(i.system?.armorPiercing || 0) || 0;
       const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
@@ -393,7 +414,7 @@ export class ShootingAction extends RangedAttackAction {
             const $apDisplay = html.find('#ap-display');
             const $apVal = html.find('#ap-val');
 
-            const currentDamage = weapon?.system?.damage || 0;
+            const currentDamage = _modeDamage(weapon);
             const currentRange = weapon?.system?.range || 15;
             const variantType = html.find('[name="variantType"]').val() || "standard";
             const apInfo = _getEffectiveAPForVariant(weapon, variantType);
@@ -497,7 +518,7 @@ export class ShootingAction extends RangedAttackAction {
 
             // Weapon stats + AP
             const weaponRange = weapon.system?.range || 15;
-            const weaponDamage = weapon.system?.damage || 0;
+            const weaponDamage = _modeDamage(weapon);
             const _apInfo = _getEffectiveAPForVariant(weapon, variantType);
 
             // Range validation
@@ -682,7 +703,7 @@ export class ShootingAction extends RangedAttackAction {
     let effectiveActionType = actionType;
     let effectiveEffects = effects;
     let effectiveAttackForm = "shooting";
-    let effectiveDamageType = choice.weapon?.system?.damageType || "physical-ranged";
+    let effectiveDamageType = _modeDamageType(choice.weapon) || "physical-ranged";
     let effectiveDamage = choice.weaponDamage || 0;
     let effectiveDamageNote = "";
     let variantNote = "";
@@ -767,6 +788,11 @@ export class ShootingAction extends RangedAttackAction {
       const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
       const targetForThisAttack = actualAttackCount === 1 ? targets[0] : targets[(i-1) % targets.length];
 
+      const _baseSourceName = choice.weapon?.name || "Weapon";
+      const _sourceName = (attackMode && choice.weapon?.id === passedItem?.id && attackMode.name)
+        ? `${_baseSourceName} — ${attackMode.name}`
+        : _baseSourceName;
+
       await this._executeSingleAttack({
         choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 1 ? multiAttackFeatResult : null },
         actor: this.actor,
@@ -777,7 +803,7 @@ export class ShootingAction extends RangedAttackAction {
         damageType: effectiveDamageType,
         rawDamage: effectiveDamage,
         damageNote: effectiveDamageNote,
-        sourceName: choice.weapon?.name || "Weapon",
+        sourceName: _sourceName,
         attackForm: effectiveAttackForm,
         breakingFeat: null,
         targetCount: 1,

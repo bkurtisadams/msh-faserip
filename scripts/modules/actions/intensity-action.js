@@ -1,4 +1,13 @@
-// intensity-action.js v4.0.0 - 2026-03-10
+// intensity-action.js v4.1.1 - 2026-05-06
+// v4.1.1: Split the Use button's label and icon (V14 DialogV2 escapes raw HTML in label,
+//         which rendered the <i class="fas fa-radiation"></i> as literal text). Use the
+//         shim's separate icon field instead.
+// v4.1.0: Per-attack-mode Resistance FEAT support. resolveIntensityFields() accepts an
+//         optional attackMode argument and returns its resist* fields when set, taking
+//         priority over item-level intensityRank and the power save block. Adds 2d10
+//         and 5d10 duration modes for Gravity-Enhancer-style 2-20 / 5-50 turn effects.
+//         IntensityAction.execute() reads opts.attackMode (passed by the equipment action
+//         hub when chaining a resist FEAT after a multi-mode weapon's damage attack).
 // v4.0.0: Support power items (save.intensity/onFail schema) alongside equipment items.
 //         Reads save.ability for target FEAT, handles duration modes (1d10, rank, fixed, scene, escape).
 // v3.0.0: Apply effects on failed Endurance FEAT — reads intensityEffect field,
@@ -44,10 +53,24 @@ const EFFECT_LABELS = {
 /**
  * Normalize intensity fields from either equipment or power items.
  * Equipment: system.intensityRank, system.intensityEffect, system.intensityDescription
+ * Per-mode: attackMode.resistRank/resistAbility/resistEffect/resistDuration/resistDescription
+ *           (highest priority — caller passes the active attack mode)
  * Power: system.save.intensity (power-rank|fixed-rank|none), system.save.onFail.effect, etc.
  */
-function resolveIntensityFields(item) {
+function resolveIntensityFields(item, attackMode = null) {
   const sys = item.system || {};
+
+  // Per-attack-mode override (multi-mode weapons with chained Resistance FEAT)
+  if (attackMode && attackMode.resistRank) {
+    return {
+      rank: attackMode.resistRank,
+      effect: attackMode.resistEffect || "",
+      description: attackMode.resistDescription || "",
+      saveAbility: attackMode.resistAbility || "endurance",
+      durationMode: attackMode.resistDuration || "1d10",
+      fixedRounds: 0
+    };
+  }
 
   // Equipment path — explicit intensityRank field
   if (sys.intensityRank) {
@@ -92,6 +115,14 @@ async function resolveDuration(mode, fixedRounds, powerRank) {
       const r = await (new Roll("1d10")).evaluate({ async: true });
       return { rounds: r.total, label: `1d10 = ${r.total}` };
     }
+    case "2d10": {
+      const r = await (new Roll("2d10")).evaluate({ async: true });
+      return { rounds: r.total, label: `2d10 = ${r.total}` };
+    }
+    case "5d10": {
+      const r = await (new Roll("5d10")).evaluate({ async: true });
+      return { rounds: r.total, label: `5d10 = ${r.total}` };
+    }
     case "rank": {
       const rv = RANKS[powerRank] || 6;
       return { rounds: rv, label: `${powerRank} rank (${rv})` };
@@ -121,7 +152,8 @@ export class IntensityAction extends BaseAction {
 
     if (!item) return ui.notifications.warn("No item for Intensity roll.");
 
-    const fields = resolveIntensityFields(item);
+    const attackMode = this.opts?.attackMode || null;
+    const fields = resolveIntensityFields(item, attackMode);
     if (!fields) return ui.notifications.warn(`${item.name} has no Intensity/Save configured.`);
 
     const { rank: intensityRank, effect: intensityEffect, description: intensityDesc,
@@ -166,7 +198,8 @@ export class IntensityAction extends BaseAction {
         content,
         buttons: {
           roll: {
-            label: '<i class="fas fa-radiation"></i> Use',
+            label: 'Use',
+            icon: 'fas fa-radiation',
             callback: async () => {
               if (!targets.length) {
                 ui.notifications.warn("No targets selected.");
