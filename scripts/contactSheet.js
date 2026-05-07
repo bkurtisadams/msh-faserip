@@ -1,4 +1,9 @@
-// contactSheet.js v2.0.0 - 2026-04-18
+// contactSheet.js v2.0.1 - 2026-05-06
+// v2.0.1: Regression fix — contact template had a top-level <form> wrapper that nested
+//         inside ItemSheetV2's auto-supplied <form>. Browsers break nested forms apart,
+//         leaving the inputs outside the form V2 listens to, so submitOnChange never
+//         fired and edits never persisted. Template now uses <div> at root; V2 supplies
+//         the form. Fix lives in templates/contact-sheet.html, no JS change needed here.
 // v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 // v1.0.0: Standalone contact item sheet extending ItemSheet directly (like headquartersSheet.js, talentSheet.js)
 

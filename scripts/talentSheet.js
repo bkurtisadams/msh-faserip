@@ -1,4 +1,9 @@
-// talentSheet.js v3.0.0 - 2026-04-18
+// talentSheet.js v3.0.1 - 2026-05-06
+// v3.0.1: Regression fix — talent template had a top-level <form> wrapper that nested
+//         inside ItemSheetV2's auto-supplied <form>. Browsers break nested forms apart,
+//         leaving the inputs outside the form V2 listens to, so submitOnChange never
+//         fired and edits never persisted. Template now uses <div> at root; V2 supplies
+//         the form. Fix lives in templates/talent-sheet.html, no JS change needed here.
 // v3.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 // v2.0.0: Add appliesTo (action types) and flags (special mechanics) fields.
 //         Auto-fill from specialty, save via checkbox change handlers.
