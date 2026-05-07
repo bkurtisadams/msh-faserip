@@ -1,4 +1,10 @@
-// equipment-action-dialog.js v1.4.0 - 2026-04-29
+// equipment-action-dialog.js v1.5.0 - 2026-05-06
+// v1.5.0: Chain Resistance FEAT after attack-mode damage when the active mode declares a
+//         resistRank. After the primary attack ActionDispatcher.roll resolves, dispatch
+//         IntensityAction with the same attackMode passed via opts. The intensity dialog
+//         is gated by its own "Use" button so the player can cancel if the attack missed.
+//         Powers e.g. Air Pistol: Laughing Gas (Incredible vs Psyche), Paralysis Gas
+//         (Remarkable vs Endurance), Gravity Enhancer (Excellent vs Strength).
 // v1.4.0: Redesign action picker dialog (.frp-dlg structure matching Contact/Talent).
 //         Adds: header banner with category chip, compressed stat-chip strip,
 //         collapsible description, action buttons grouped by Combat/Powers/State,
@@ -553,10 +559,18 @@ async function _executeAction(actionId, actor, item, dataset) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         const actionType = mode.actionType || "blunt-attack";
         const abilityName = mode.ability || _resolveAbility(actionType);
-        return ActionDispatcher.roll(actionType, {
+        await ActionDispatcher.roll(actionType, {
           actor, abilityName,
           opts: { itemId: item.id, item, sourceItem: item, equipment: item, attackMode: mode }
         });
+        if (mode.resistRank) {
+          return ActionDispatcher.roll("intensity", {
+            actor,
+            abilityName: mode.resistAbility || "endurance",
+            opts: { itemId: item.id, item, sourceItem: item, equipment: item, attackMode: mode }
+          });
+        }
+        return;
       }
 
       // ── Custom Ability (combat or utility) ──

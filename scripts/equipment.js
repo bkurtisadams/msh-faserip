@@ -1,4 +1,11 @@
-// equipment.js v2.0.0 - 2026-04-18
+// equipment.js v2.1.0 - 2026-05-06
+// v2.1.0: Per-attack-mode Resistance FEAT fields (resistRank/resistAbility/resistEffect/
+//         resistDuration/resistDescription). Multi-mode weapons can now declare an
+//         intensity-style FEAT-to-resist alongside their damage attack — e.g. Air Pistol
+//         with Laughing Gas (Incredible vs Psyche), Paralysis Gas (Remarkable vs Endurance),
+//         Gravity Enhancer (Excellent vs Strength) modes. New mode default seeds blank
+//         resist fields. _prepareSubmitData reconstructs the new fields when expandObject
+//         turns the indexed form names into a numeric-keyed object.
 // v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 //         _updateObject → _prepareSubmitData. Manual tab wiring for .sheet-tabs nav.
 // v1.5.0: Expanded categories (gear subtypes, device, armor resistances). Computed display flags
@@ -184,7 +191,12 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         ability: m.ability || "fighting",
         description: m.description || "",
         allowedVariants: m.allowedVariants || ["standard"],
-        sfx: m.sfx || { hit: "", miss: "", critical: "" }
+        sfx: m.sfx || { hit: "", miss: "", critical: "" },
+        resistRank: m.resistRank || "",
+        resistAbility: m.resistAbility || "endurance",
+        resistEffect: m.resistEffect || "",
+        resistDuration: m.resistDuration || "1d10",
+        resistDescription: m.resistDescription || ""
       }));
     }
     if (data.system.customAbilities && !Array.isArray(data.system.customAbilities)) {
@@ -799,7 +811,12 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         damageType: "BA",
         damage: this.item.system.damage || 10,
         ability: "fighting",
-        description: ""
+        description: "",
+        resistRank: "",
+        resistAbility: "endurance",
+        resistEffect: "",
+        resistDuration: "1d10",
+        resistDescription: ""
       });
       await this.item.update({ "system.attackModes": modes });
     });

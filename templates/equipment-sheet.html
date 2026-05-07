@@ -422,6 +422,68 @@
                   <input type="text" name="system.attackModes.{{i}}.description" value="{{mode.description}}" placeholder="e.g., Thrust with the spearhead"
                          style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;font-family:inherit;font-size:12px;"/>
                 </div>
+
+                <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:6px 8px;">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                    <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#8b0000;letter-spacing:0.4px;text-transform:uppercase;font-weight:600;">Resistance FEAT</span>
+                    <span style="font-size:10px;color:#5d4037;font-style:italic;">Optional &mdash; target rolls FEAT to resist on hit</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:65px 1fr 65px 1fr;gap:4px 8px;align-items:center;font-size:12px;">
+                    <label style="color:#444;font-size:11px;margin:0;">FEAT rank</label>
+                    <select name="system.attackModes.{{i}}.resistRank"
+                            style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:12px;">
+                      <option value="" {{#if (eq mode.resistRank "")}}selected{{/if}}>None</option>
+                      {{#each ../ranks as |rank|}}
+                      <option value="{{rank}}" {{#if (eq mode.resistRank rank)}}selected{{/if}}>{{rank}}</option>
+                      {{/each}}
+                    </select>
+
+                    <label style="color:#444;font-size:11px;margin:0;">vs ability</label>
+                    <select name="system.attackModes.{{i}}.resistAbility"
+                            style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:12px;">
+                      <option value="fighting" {{#if (eq mode.resistAbility "fighting")}}selected{{/if}}>Fighting</option>
+                      <option value="agility" {{#if (eq mode.resistAbility "agility")}}selected{{/if}}>Agility</option>
+                      <option value="strength" {{#if (eq mode.resistAbility "strength")}}selected{{/if}}>Strength</option>
+                      <option value="endurance" {{#if (eq mode.resistAbility "endurance")}}selected{{/if}}>Endurance</option>
+                      <option value="reason" {{#if (eq mode.resistAbility "reason")}}selected{{/if}}>Reason</option>
+                      <option value="intuition" {{#if (eq mode.resistAbility "intuition")}}selected{{/if}}>Intuition</option>
+                      <option value="psyche" {{#if (eq mode.resistAbility "psyche")}}selected{{/if}}>Psyche</option>
+                    </select>
+
+                    <label style="color:#444;font-size:11px;margin:0;">On fail</label>
+                    <select name="system.attackModes.{{i}}.resistEffect"
+                            style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:12px;">
+                      <option value="" {{#if (eq mode.resistEffect "")}}selected{{/if}}>(none / GM)</option>
+                      <option value="blinded" {{#if (eq mode.resistEffect "blinded")}}selected{{/if}}>Blinded</option>
+                      <option value="deafened" {{#if (eq mode.resistEffect "deafened")}}selected{{/if}}>Deafened</option>
+                      <option value="stunned" {{#if (eq mode.resistEffect "stunned")}}selected{{/if}}>Stunned</option>
+                      <option value="unconscious" {{#if (eq mode.resistEffect "unconscious")}}selected{{/if}}>Unconscious</option>
+                      <option value="incapacitated" {{#if (eq mode.resistEffect "incapacitated")}}selected{{/if}}>Incapacitated</option>
+                      <option value="immobilized" {{#if (eq mode.resistEffect "immobilized")}}selected{{/if}}>Immobilized</option>
+                      <option value="paralyzed" {{#if (eq mode.resistEffect "paralyzed")}}selected{{/if}}>Paralyzed</option>
+                      <option value="nullified" {{#if (eq mode.resistEffect "nullified")}}selected{{/if}}>Nullified</option>
+                      <option value="slammed" {{#if (eq mode.resistEffect "slammed")}}selected{{/if}}>Slammed</option>
+                      <option value="grabbed" {{#if (eq mode.resistEffect "grabbed")}}selected{{/if}}>Grabbed</option>
+                      <option value="weakened" {{#if (eq mode.resistEffect "weakened")}}selected{{/if}}>Weakened</option>
+                      <option value="custom" {{#if (eq mode.resistEffect "custom")}}selected{{/if}}>Custom (use flavor)</option>
+                    </select>
+
+                    <label style="color:#444;font-size:11px;margin:0;">Duration</label>
+                    <select name="system.attackModes.{{i}}.resistDuration"
+                            style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:12px;">
+                      <option value="1d10" {{#if (eq mode.resistDuration "1d10")}}selected{{/if}}>1d10 turns (1-10)</option>
+                      <option value="2d10" {{#if (eq mode.resistDuration "2d10")}}selected{{/if}}>2d10 turns (2-20)</option>
+                      <option value="5d10" {{#if (eq mode.resistDuration "5d10")}}selected{{/if}}>5d10 turns (5-50)</option>
+                      <option value="rank" {{#if (eq mode.resistDuration "rank")}}selected{{/if}}>Rank value</option>
+                      <option value="scene" {{#if (eq mode.resistDuration "scene")}}selected{{/if}}>Scene</option>
+                    </select>
+
+                    <label style="color:#444;font-size:11px;margin:0;">Flavor</label>
+                    <input type="text" name="system.attackModes.{{i}}.resistDescription" value="{{mode.resistDescription}}"
+                           placeholder="e.g., Helpless with hysterical laughter"
+                           style="grid-column:span 3;padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;font-family:inherit;font-size:12px;"/>
+                  </div>
+                </div>
               </div>
               {{/each}}
             </div>
