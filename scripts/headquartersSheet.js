@@ -1,4 +1,21 @@
-// headquartersSheet.js v3.0.1 - 2026-04-19
+// headquartersSheet.js v3.0.3 - 2026-05-06
+// v3.0.3: Apply locationModifier (Rich +1CS / Secluded -1CS) to purchase cost as well
+//         as rent. Per the rulebook ("Cost is presented in two values..."), the modifier
+//         applies symmetrically to both the rent and buy values listed in the Building
+//         Types table. Previously only rent display + Pay Rent button honored the
+//         modifier; the Resource FEAT (purchase) button rolled against the unadjusted
+//         base rank. _prepareContext now exposes purchaseDisplayCost + purchaseModified
+//         and the template renders an inline "→ <adjusted>" hint next to the FEAT
+//         button when active.
+// v3.0.2: Fix edit persistence regression — hq-sheet.html had a top-level <form>
+//         wrapper that nested inside ItemSheetV2's auto-supplied <form>. Browsers
+//         break nested forms apart, leaving inputs outside the form V2 listens to,
+//         so submitOnChange never fired for fields without a manual handler (name,
+//         system.location, system.locationModifier, system.ownership, system.notes).
+//         Existing manual change/blur handlers on building-type, rent date, etc. were
+//         masking the issue. Template now uses <div> at root; V2 supplies the form.
+//         Also wire img[data-edit] click → FilePicker explicitly so clicking the
+//         portrait image (in addition to the .hq-img-btn button) opens the picker.
 // v3.0.1: Drop deprecated CONST.CHAT_MESSAGE_TYPES.OTHER on two chat
 //         cards (the first card emitter and the rent-due whisper).
 //         Removed in v13 (replaced by CHAT_MESSAGE_STYLES). Default
@@ -121,7 +138,7 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
       };
     });
 
-    // Rent status
+    // Rent display — apply location modifier
     const rentCost = context.system.rentCost || "";
     const locMod = context.system.locationModifier || "normal";
     if (rentCost && locMod !== "normal") {
@@ -135,6 +152,25 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
       }
     } else {
       context.rentDisplayCost = rentCost || "—";
+    }
+
+    // Purchase display — same location modifier applies to buy cost per the rules
+    // ("raise prices by 1CS" Manhattan / "shift cost down by 1CS" secluded covers both
+    // the rent and buy values listed in the Building Types table).
+    const purchaseCost = context.system.purchaseCost || "";
+    if (purchaseCost && locMod !== "normal") {
+      const pIdx = RANKS.indexOf(purchaseCost);
+      if (pIdx >= 0) {
+        const pShift = locMod === "rich" ? 1 : -1;
+        context.purchaseDisplayCost = RANKS[Math.max(0, Math.min(RANKS.length - 1, pIdx + pShift))];
+        context.purchaseModified = true;
+      } else {
+        context.purchaseDisplayCost = purchaseCost;
+        context.purchaseModified = false;
+      }
+    } else {
+      context.purchaseDisplayCost = purchaseCost || "—";
+      context.purchaseModified = false;
     }
 
     const rentStatus = _computeRentStatus(context.system.rentLastPaidGameDate);
@@ -167,11 +203,39 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
       fp.render(true);
     });
 
+    // Portrait img click — V2 backward-compat for data-edit="img" doesn't fire
+    // for this sheet shape (same issue fixed in talentSheet/contactSheet).
+    html.find('img[data-edit]').on('click', ev => {
+      ev.preventDefault();
+      const img = ev.currentTarget;
+      const field = img.dataset.edit;
+      if (!field) return;
+      const FilePickerClass = foundry.applications?.apps?.FilePicker?.implementation
+        ?? foundry.applications?.apps?.FilePicker
+        ?? globalThis.FilePicker;
+      if (!FilePickerClass) return;
+      new FilePickerClass({
+        type: "image",
+        current: img.getAttribute("src") || "",
+        callback: path => this.item.update({ [field]: path })
+      }).render(true);
+    });
+
     // Resource FEAT button (for purchase)
     html.find('.hq-resource-feat').click(ev => {
       const sys = this.item.system;
       const isRented = sys.ownership === "rented";
-      const costRank = isRented ? (sys.rentCost || "Typical") : (sys.purchaseCost || "Typical");
+      const baseRank = isRented ? (sys.rentCost || "Typical") : (sys.purchaseCost || "Typical");
+      // Apply location modifier to both rent and purchase per the rules.
+      const locMod = sys.locationModifier || "normal";
+      let costRank = baseRank;
+      if (locMod !== "normal") {
+        const idx = RANKS.indexOf(baseRank);
+        if (idx >= 0) {
+          const shift = locMod === "rich" ? 1 : -1;
+          costRank = RANKS[Math.max(0, Math.min(RANKS.length - 1, idx + shift))];
+        }
+      }
       const costType = isRented ? "Rent" : "Purchase";
       FaseripHeadquartersSheet.rollHQResourceFEAT(this.item, costRank, costType, false);
     });

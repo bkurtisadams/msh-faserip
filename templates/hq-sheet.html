@@ -1,4 +1,4 @@
-<form class="faserip-dialog headquarters-dialog" autocomplete="off">
+<div class="faserip-dialog headquarters-dialog" autocomplete="off">
   <div class="hq-header">
     <img src="{{item.img}}" data-edit="img" width="32" height="32" class="hq-portrait" />
     <input type="text" name="name" value="{{item.name}}" class="hq-name-input" placeholder="Headquarters Name" />
@@ -74,7 +74,8 @@
         <div class="hq-field hq-field-row">
           <label class="hq-check"><input type="radio" name="system.ownership" value="owned" {{#if (eq system.ownership "owned")}}checked{{/if}} /> Owned</label>
           <label class="hq-check"><input type="radio" name="system.ownership" value="rented" {{#if (eq system.ownership "rented")}}checked{{/if}} /> Rented</label>
-          <button type="button" class="hq-resource-feat" title="Resource FEAT for purchase">Resource FEAT</button>
+          <button type="button" class="hq-resource-feat" title="Resource FEAT for purchase{{#if purchaseModified}} (effective: {{purchaseDisplayCost}}){{/if}}">Resource FEAT</button>
+          {{#if purchaseModified}}<span class="hq-effective-cost" style="font-size:0.85em;color:#8b0000;font-style:italic;">&rarr; {{purchaseDisplayCost}}</span>{{/if}}
         </div>
       </div>
     </fieldset>
@@ -196,4 +197,4 @@
     </fieldset>
 
   </div>
-</form>
+</div>
