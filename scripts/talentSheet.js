@@ -1,4 +1,7 @@
-// talentSheet.js v3.0.1 - 2026-05-06
+// talentSheet.js v3.0.2 - 2026-05-06
+// v3.0.2: Wire portrait click → FilePicker explicitly. V2's backward-compat for
+//         data-edit="img" doesn't fire for this sheet shape after the v3.0.1 form
+//         wrapper change. Pattern matches power-sheet-v2-logic.js.
 // v3.0.1: Regression fix — talent template had a top-level <form> wrapper that nested
 //         inside ItemSheetV2's auto-supplied <form>. Browsers break nested forms apart,
 //         leaving the inputs outside the form V2 listens to, so submitOnChange never
@@ -211,6 +214,24 @@ export class FaseripTalentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
 
     updateSpecialtyDropdown();
     updateRuleSummary();
+
+    // Portrait edit — V2 backward-compat for data-edit="img" doesn't fire for
+    // this sheet shape. Wire it explicitly like power-sheet-v2-logic.js does.
+    html.find('img[data-edit]').on('click', ev => {
+      ev.preventDefault();
+      const img = ev.currentTarget;
+      const field = img.dataset.edit;
+      if (!field) return;
+      const FilePickerClass = foundry.applications?.apps?.FilePicker?.implementation
+        ?? foundry.applications?.apps?.FilePicker
+        ?? globalThis.FilePicker;
+      if (!FilePickerClass) return;
+      new FilePickerClass({
+        type: "image",
+        current: img.getAttribute("src") || "",
+        callback: path => this.item.update({ [field]: path })
+      }).render(true);
+    });
 
     // Activate Foundry tooltips for data-tooltip elements in this sheet
     html.find('[data-tooltip]').each((i, el) => {
