@@ -32,6 +32,26 @@ export class FaseripInitiative {
     ui.combat?.render(true);
   }
 
+  /**
+   * Movement multiplier from RAW action declaration.
+   * Returns null when no cap should be applied (RAW phases off, no combat,
+   * token isn't an active combatant, or no declaration yet — full move).
+   * Returns 1 for declared "charge" (RAW exemption from half-move rule).
+   * Returns 0.5 for any other declared type (attack / defend / other / multi).
+   */
+  static getDeclaredMoveMultiplier(token) {
+    if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return null;
+    const combat = game.combat;
+    if (!combat?.started) return null;
+    const tokenId = token?.id ?? token?.document?.id;
+    if (!tokenId) return null;
+    const combatant = combat.combatants.find(c => c.tokenId === tokenId);
+    if (!combatant) return null;
+    const decl = combatant.getFlag("msh-faserip", "declaredAction");
+    if (!decl?.type) return null;
+    return decl.type === "charge" ? 1 : 0.5;
+  }
+
   static registerSettings() {
     game.settings.register("msh-faserip", "initiativeMode", {
       name: "Initiative Mode",
@@ -506,8 +526,8 @@ export class FaseripInitiative {
       if (phase === this.PHASE_DECLARE) {
         // Declaration phase: compact icon badge or declare button
         const declared = c.getFlag("msh-faserip", "declaredAction");
-        const declIcons = { attack: "fa-fist-raised", defend: "fa-shield-alt", other: "fa-ellipsis-h", multi: "fa-burst" };
-        const declTips = { attack: "Attack", defend: "Defend", other: "Other", multi: "Multi-Action" };
+        const declIcons = { attack: "fa-fist-raised", defend: "fa-shield-alt", other: "fa-ellipsis-h", multi: "fa-burst", charge: "fa-bolt" };
+        const declTips = { attack: "Attack", defend: "Defend", other: "Other", multi: "Multi-Action", charge: "Charge" };
         if (declared) {
           const icon = declIcons[declared.type] || "fa-question";
           const tip = (declTips[declared.type] || declared.type) + (declared.note ? `: ${declared.note}` : "") + " — Right-click to change";
@@ -520,8 +540,8 @@ export class FaseripInitiative {
       } else if (phase === this.PHASE_PREACTION) {
         // Pre-action phase: dodge/block/evade + change action (either side per RAW)
         const declared = c.getFlag("msh-faserip", "declaredAction");
-        const declIcons = { attack: "fa-fist-raised", defend: "fa-shield-alt", other: "fa-ellipsis-h", multi: "fa-burst" };
-        const declTips = { attack: "Attack", defend: "Defend", other: "Other", multi: "Multi-Action" };
+        const declIcons = { attack: "fa-fist-raised", defend: "fa-shield-alt", other: "fa-ellipsis-h", multi: "fa-burst", charge: "fa-bolt" };
+        const declTips = { attack: "Attack", defend: "Defend", other: "Other", multi: "Multi-Action", charge: "Charge" };
         let buttons = `
           <button class="faserip-tracker-ctrl" data-action="dodging" data-actor-id="${c.actor.id}" title="Dodge (Agility)"><i class="fas fa-running"></i></button>
           <button class="faserip-tracker-ctrl" data-action="blocking" data-actor-id="${c.actor.id}" title="Block (Strength)"><i class="fas fa-shield-alt"></i></button>
@@ -894,6 +914,11 @@ export class FaseripInitiative {
                 <i class="fas fa-burst" style="width:16px;color:#1E90FF;"></i> <strong>Multi-Action</strong>
                 <span style="color:#666;font-size:0.85em;">(Fighting FEAT required)</span>
               </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="declaration" value="charge" ${chk("charge")}/>
+                <i class="fas fa-bolt" style="width:16px;color:#cc7a00;"></i> <strong>Charge</strong>
+                <span style="color:#666;font-size:0.85em;">(full move; no half-move penalty)</span>
+              </label>
             </div>
             <div style="margin-top:8px;">
               <label style="font-size:0.85em;color:#666;">Notes (optional):</label>
@@ -918,7 +943,7 @@ export class FaseripInitiative {
     });
     if (!choice) return;
 
-    const labels = { attack: "⚔ Attack", defend: "🛡 Defend", other: "… Other", multi: "⚔×2 Multi" };
+    const labels = { attack: "⚔ Attack", defend: "🛡 Defend", other: "… Other", multi: "⚔×2 Multi", charge: "⚡ Charge" };
     const label = labels[choice.type] || choice.type;
 
     // Save declaration on combatant — players can't modify Combatant docs directly

@@ -6,6 +6,8 @@
 // Reads token.document.movementAction (V13 Token HUD selection)
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
 
+import { FaseripInitiative } from "../../faserip-initiative.js";
+
 const TokenRuler = foundry.canvas.placeables.tokens.TokenRuler ?? CONFIG.Token.rulerClass;
 
 // Colors
@@ -85,12 +87,18 @@ export class FaseripTokenRuler extends TokenRuler {
 
     // Active Effect modifier (e.g. 0.5 from Dodging)
     const movementMult = Number(actor.system.combatMods?.movementMult) || 1;
-    const effectiveAreas = baseAreas * movementMult;
+    let effectiveAreas = baseAreas * movementMult;
+
+    // RAW action declaration cap (half-move when acting; full when charging).
+    // Null when the cap doesn't apply (setting off, out of combat, no declaration).
+    const declMult = FaseripInitiative.getDeclaredMoveMultiplier?.(this.token);
+    const declHalved = declMult !== null && declMult !== undefined && declMult < 1;
+    if (declMult !== null && declMult !== undefined) effectiveAreas *= declMult;
 
     // Speed FEAT grants +1 area
     const featAreas = effectiveAreas + 1;
 
-    return { normal: effectiveAreas, feat: featAreas, movementMult, action, modeLabel };
+    return { normal: effectiveAreas, feat: featAreas, movementMult, action, modeLabel, declHalved };
   }
 
   /* ---------------------------------------- */
@@ -224,7 +232,9 @@ export class FaseripTokenRuler extends TokenRuler {
       swim: "Swim", teleport: "Tel", climb: "Climb"
     };
     const baseLabel = actionLabels[ranges.action] || "Run";
-    const actionLabel = ranges.modeLabel ? `${baseLabel} (${ranges.modeLabel})` : baseLabel;
+    const modeSuffix = ranges.modeLabel ? ` (${ranges.modeLabel})` : "";
+    const halfSuffix = ranges.declHalved ? " ½" : "";
+    const actionLabel = `${baseLabel}${modeSuffix}${halfSuffix}`;
 
     // If the grid unit is area-based, show "X / Y areas (Mode)"
     if (gridUnits.toLowerCase().includes("area")) {
