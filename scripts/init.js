@@ -3098,7 +3098,10 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       try {
         await Effects.renameEffectWithRemaining(eff);
       } catch (e) {
-        console.warn("Failed to rename effect:", e);
+        // Synthetic-actor delta quirk: inherited effects can throw "does not
+        // exist" on update before they're materialized in the token's delta.
+        // Match the auto-expire block above and silence that specific case.
+        if (!/does not exist/i.test(e?.message ?? "")) console.warn("Failed to rename effect:", e);
       }
     }
   }
