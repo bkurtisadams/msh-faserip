@@ -185,6 +185,10 @@ export async function renameEffectWithRemaining(effect) {
 
     await effect.update({ name: next });
   } catch (e) {
+    // Synthetic-actor delta quirk: inherited effects can throw "does not
+    // exist" on update before they're materialized in the token's delta.
+    // The label rename is cosmetic — silence that specific case.
+    if (/does not exist/i.test(e?.message ?? "")) return;
     console.warn("[FASERIP] renameEffectWithRemaining failed:", e);
   }
 }
@@ -311,7 +315,14 @@ export async function removeEffectBy(predicate, actor) {
     : (eff) => getFlagPath(eff, predicate) === true;
 
   const eff = actor.effects.find(e => pred(e));
-  if (eff) await eff.delete();
+  if (!eff) return;
+  try {
+    await eff.delete();
+  } catch (e) {
+    // Synthetic-actor delta quirk: inherited effect not yet materialized.
+    if (/does not exist/i.test(e?.message ?? "")) return;
+    console.warn("[FASERIP] removeEffectBy delete failed:", e);
+  }
 }
 
 /** Read nested flag path "status.isStunned" */

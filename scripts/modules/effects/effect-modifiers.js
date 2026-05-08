@@ -382,6 +382,8 @@ export async function consumeEvasionAttackBonus(attacker, effectId) {
       effectId
     });
   } catch (e) {
+    // Synthetic-actor delta quirk: inherited effect not yet materialized.
+    if (/does not exist/i.test(e?.message ?? "")) return;
     console.error("[FASERIP ERROR] Failed to consume evasion bonus:", e);
   }
 }

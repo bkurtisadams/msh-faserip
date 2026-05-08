@@ -329,8 +329,15 @@ async function updateActiveEffect({ targetActorUuid, effectId, updateData }) {
   if (!actor) throw new Error(`updateActiveEffect: actor not found: ${targetActorUuid}`);
   const effect = actor.effects.get(effectId);
   if (!effect) throw new Error(`updateActiveEffect: effect not found: ${effectId}`);
-  await effect.update(updateData);
-  return true;
+  try {
+    await effect.update(updateData);
+    return true;
+  } catch (e) {
+    // Synthetic-actor delta: inherited effect not yet materialized as override.
+    // Return false instead of propagating to the socket caller.
+    if (/does not exist/i.test(e?.message ?? "")) return false;
+    throw e;
+  }
 }
 
 async function gmRenameEffectWithRemaining({ targetActorUuid, effectId }) {
@@ -382,10 +389,14 @@ async function manageRecoveryEffect({ actorUuid, action, effectData = null, effe
   else if (action === "delete") {
     if (!effectId) throw new Error("manageRecoveryEffect: effectId required for delete action");
     const effect = actor.effects.get(effectId);
-    if (effect) {
+    if (!effect) return null;
+    try {
       return await effect.delete();
+    } catch (e) {
+      // Synthetic-actor delta: inherited effect not yet materialized.
+      if (/does not exist/i.test(e?.message ?? "")) return null;
+      throw e;
     }
-    return null;
   }
   else {
     throw new Error(`manageRecoveryEffect: unknown action: ${action}`);
