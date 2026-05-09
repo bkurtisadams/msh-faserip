@@ -19,7 +19,8 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     window: { resizable: true, contentClasses: ["faserip-sheet-content"] },
     form: { submitOnChange: true, closeOnSubmit: false },
     tag: "form",
-    actions: {}
+    actions: {},
+    dragDrop: [{ dragSelector: ".item", dropSelector: null }]
   };
 
   /** @override */
@@ -109,6 +110,36 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 activateListeners shim failed", err);
     }
+  }
+
+  /* -------------------------------------------- */
+  /*  Drag & drop (delegated to v1)               */
+  /* -------------------------------------------- */
+
+  /** @override */
+  _onDragStart(event) {
+    try {
+      const v1 = this._v1();
+      return v1._onDragStart?.call(this._adapterThis(v1), event);
+    } catch (err) {
+      console.error("FaseripActorSheetV2 | v1 _onDragStart shim failed", err);
+    }
+  }
+
+  /** @override */
+  async _onDrop(event) {
+    try {
+      const v1 = this._v1();
+      return await v1._onDrop?.call(this._adapterThis(v1), event);
+    } catch (err) {
+      console.error("FaseripActorSheetV2 | v1 _onDrop shim failed", err);
+    }
+  }
+
+  /** @override */
+  async close(options) {
+    this.#v1 = null;
+    return super.close(options);
   }
 
   /** @override */
