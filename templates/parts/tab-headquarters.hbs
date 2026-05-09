@@ -1,0 +1,80 @@
+        <div class="tab" data-tab="headquarters">
+
+          {{#if teamHQs.length}}
+          <div class="team-hq-label">Team HQs</div>
+          <table class="headquarters-table team-hq-table">
+            <tbody>
+              {{#each teamHQs}}
+              <tr class="headquarters-row team-hq-row" data-hq-id="{{this.id}}">
+                <td class="headquarters-name">
+                  <img src="{{this.img}}" class="headquarters-icon team-hq-view" data-hq-id="{{this.id}}" width="24" height="24" />
+                  <span class="headquarters-name-text team-hq-view" data-hq-id="{{this.id}}">{{this.name}}</span>
+                </td>
+                <td class="headquarters-location">{{this.location}}</td>
+                <td class="headquarters-size">{{this.size}}</td>
+                <td class="headquarters-material">{{this.materialStrength}}</td>
+                <td class="headquarters-cost">
+                  {{#if (eq this.ownership "owned")}}
+                  {{this.purchaseCost}} (Owner)
+                  {{else}}
+                  {{this.rentCost}} (Rent)
+                  {{#if this.rentStatus}}<span class="hq-rent-badge {{this.rentStatus.cssClass}}">{{this.rentStatus.label}}</span>{{/if}}
+                  {{/if}}
+                </td>
+                <td class="headquarters-controls"></td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+          {{/if}}
+
+          <div class="team-hq-label">Personal</div>
+          <table class="headquarters-table">
+            <thead>
+              <tr>
+                <th class="name-col">Name</th>
+                <th class="location-col">Location</th>
+                <th class="size-col">Size</th>
+                <th class="material-col">Material</th>
+                <th class="cost-col">Cost</th>
+                <th class="th-actions">
+                  <a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a>
+                  <a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each headquarters as |hq|}}
+              <tr class="headquarters-row item" data-item-id="{{hq._id}}">
+                <td class="headquarters-name">
+                  <img src="{{hq.img}}" class="headquarters-icon headquarters-info" data-item-id="{{hq._id}}" width="24" height="24" />
+                  <span class="headquarters-name-text headquarters-draggable" data-item-id="{{hq._id}}" draggable="true">{{hq.name}}</span>
+                </td>
+                
+                <td class="headquarters-location">{{hq.system.location}}</td>
+                <td class="headquarters-size">{{hq.system.size}}</td>
+                <td class="headquarters-material">{{hq.system.materialStrength}}</td>
+                <td class="headquarters-cost">
+                  {{#if (eq hq.system.ownership "owned")}}
+                  {{hq.system.purchaseCost}} (Owner)
+                  {{else}}
+                  {{#if hq.system.rentCost}}{{hq.system.rentCost}}{{else}}{{hq.system.rentalCost}}{{/if}} (Rent)
+                  {{#with (lookup ../hqRentStatus hq._id)}}
+                  <span class="hq-rent-badge {{this.cssClass}}">{{this.label}}</span>
+                  {{/with}}
+                  {{/if}}
+                </td>
+                <td class="headquarters-controls">
+                  <a class="item-control item-edit" title="Edit" data-item-id="{{hq._id}}"><i class="fas fa-edit"></i></a>
+                  <a class="item-control item-delete" title="Delete" data-item-id="{{hq._id}}"><i
+                      class="fas fa-trash"></i></a>
+                </td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+
+          {{#unless headquarters.length}}
+          <p class="no-headquarters">No headquarters added yet.</p>
+          {{/unless}}
+        </div>

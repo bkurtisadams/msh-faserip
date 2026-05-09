@@ -1463,7 +1463,20 @@ Hooks.once("init", async () => {
   };
 
   await foundry.applications.handlebars.loadTemplates([
-    "systems/msh-faserip/templates/universal-table-tab.hbs"
+    "systems/msh-faserip/templates/universal-table-tab.hbs",
+    "systems/msh-faserip/templates/parts/header.hbs",
+    "systems/msh-faserip/templates/parts/nav.hbs",
+    "systems/msh-faserip/templates/parts/tab-powers.hbs",
+    "systems/msh-faserip/templates/parts/tab-talents.hbs",
+    "systems/msh-faserip/templates/parts/tab-contacts.hbs",
+    "systems/msh-faserip/templates/parts/tab-equipment.hbs",
+    "systems/msh-faserip/templates/parts/tab-headquarters.hbs",
+    "systems/msh-faserip/templates/parts/tab-vehicles.hbs",
+    "systems/msh-faserip/templates/parts/tab-stunts.hbs",
+    "systems/msh-faserip/templates/parts/tab-actions.hbs",
+    "systems/msh-faserip/templates/parts/tab-universal-table.hbs",
+    "systems/msh-faserip/templates/parts/tab-effects.hbs",
+    "systems/msh-faserip/templates/parts/tab-chargen.hbs"
   ]);
 
   game.msh.getRankValue = function(rankName) {

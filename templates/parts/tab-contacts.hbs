@@ -1,0 +1,27 @@
+        <div class="tab" data-tab="contacts">
+          <div class="tab-list-header">
+            <span>Contacts</span>
+            <div class="th-actions">
+              <a class="th-action-link add-contact" title="Add Contact">+ add</a>
+              <a class="th-action-link browse-compendium" data-type="contacts" title="Browse Contacts Compendium">browse</a>
+            </div>
+          </div>
+          <div class="contacts-list">
+            {{#each contacts as |contact|}}
+            <div class="contact-item item" data-item-id="{{contact._id}}" draggable="true">
+              <a class="item-control contact-roll" title="Roll" data-item-id="{{contact._id}}"><i
+                  class="fas fa-dice-d20"></i></a>
+                  <img src="{{contact.img}}" class="contact-icon contact-info" width="24" height="24"
+                    data-item-id="{{contact._id}}"
+                    title="Click for info. Shift+drag to reorder." />
+              <span class="contact-name-text">{{contact.name}}</span>
+              <div class="item-controls">
+                <a class="item-control item-edit" title="Edit" data-item-id="{{contact._id}}"><i
+                    class="fas fa-edit"></i></a>
+                <a class="item-control item-delete" title="Delete" data-item-id="{{contact._id}}"><i
+                    class="fas fa-trash"></i></a>
+              </div>
+            </div>
+            {{/each}}
+          </div>
+        </div>

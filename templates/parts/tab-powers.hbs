@@ -1,0 +1,73 @@
+        <div class="tab" data-tab="powers">
+          <!-- Powers content here -->
+          <table class="powers-table">
+            <colgroup>
+              <col style="width: auto;" />
+              <col style="width: 85px;" />
+              <col style="width: 45px;" />
+              <col style="width: 45px;" />
+              <col style="width: 120px;" />
+              <col style="width: 30px;" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style="text-align: left; padding-left: 8px;">Name</th>
+                <th>Rank</th>
+                <th>Value</th>
+                <th>Range</th>
+                <th colspan="2" style="text-align: center;">
+                  Type
+                  <span class="th-actions">
+                    <a class="th-action-link add-power" title="Add Power">+ add</a>
+                    <a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a>
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each powers as |power|}}
+              <tr class="power-row item {{#unless power.system.isActive}}power-inactive{{/unless}}" data-item-id="{{power._id}}" draggable="true">
+                <td class="power-name">
+                  <a class="item-control power-roll" title="Roll" data-item-id="{{power._id}}">
+                    <i class="fas fa-dice-d20"></i>
+                  </a>
+                  <img src="{{power.img}}" class="power-icon power-info" width="24" height="24"
+                    data-item-id="{{power._id}}" 
+                    title="Click for info. Shift+drag to reorder." />
+                  {{#if (eq power.system.activationType "passive")}}
+                  <span class="power-passive-indicator" title="Passive (always on)">
+                    <i class="fas fa-shield-alt"></i>
+                  </span>
+                  {{else}}
+                  <a class="power-active-toggle" data-item-id="{{power._id}}" title="Toggle Active">
+                    <i class="fas fa-bolt {{#if power.system.isActive}}active{{/if}}"></i>
+                  </a>
+                  {{/if}}
+                  <span class="power-name-text 
+                            {{#if (getFlag power 'msh-faserip' 'isBonusPower')}} bonus-power {{/if}}
+                            {{#if (getFlag power 'msh-faserip' 'isStuntPower')}} stunt-power {{/if}}">
+                    {{power.name}}
+                  </span>
+                </td>
+
+                <td class="power-rank">{{power.system.rank}}</td>
+                <td class="power-value">{{power.system.value}}</td>
+                <td class="power-range">{{power.system.range}}</td>
+                <td class="power-type">{{power.system.type}}</td>
+                <td class="power-controls">
+                  <a class="item-control item-edit" title="Edit" data-item-id="{{power._id}}">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <a class="item-control item-delete" title="Delete" data-item-id="{{power._id}}">
+                    <i class="fas fa-trash"></i>
+                  </a>
+                </td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+
+          {{#unless powers.length}}
+          <p class="no-powers">No powers added yet.</p>
+          {{/unless}}
+        </div>

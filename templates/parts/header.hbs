@@ -1,0 +1,654 @@
+  <!-- COMPACT HEADER (merged — logo+portrait left, fields right, 2 rows) -->
+<div class="msh-compact-header">
+  <!-- Left: Logo over Portrait -->
+  <div class="msh-left">
+    <div class="msh-logo">
+      <div class="msh-marvel">MARVEL</div>
+      <div class="msh-super">SUPER HEROES</div>
+    </div>
+    <div class="msh-portrait">
+      <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
+    </div>
+  </div>
+
+  <!-- Row 1 middle: Hero Name | Identity S/P | Age -->
+  <div class="msh-row1">
+    <div class="msh-field">
+      <label>Name</label>
+      <input type="text" name="name" value="{{actor.name}}" />
+    </div>
+    <div class="msh-field">
+      <div class="msh-inline">
+        <label>Identity</label>
+        <span class="msh-radios">
+          <label class="msh-radio">
+            <input type="radio" name="system.identityType" value="secret"
+              {{#if (eq system.identityType "secret")}}checked{{/if}} /> Secret
+          </label>
+          <label class="msh-radio">
+            <input type="radio" name="system.identityType" value="public"
+              {{#if (eq system.identityType "public")}}checked{{/if}} /> Public
+          </label>
+        </span>
+      </div>
+      <input type="text" name="system.identity" value="{{system.identity}}" />
+    </div>
+    <div class="msh-field msh-field-age">
+      <label>Age</label>
+      <input type="text" name="system.age" value="{{system.age}}" />
+    </div>
+  </div>
+
+  <!-- Row 1 right: Player + Compact toggle -->
+  <div class="msh-player-top">
+    <label>{{#if isNPC}}Judge{{else}}Player{{/if}}</label>
+    <div class="msh-player-top-row">
+      <input type="text" name="system.player" value="{{system.player}}" {{#if isNPC}}placeholder="GM"{{/if}} />
+      <button type="button" class="compact-toggle {{#if compactSheet}}active{{/if}}"
+              title="{{#if compactSheet}}Expand Sheet{{else}}Compact Sheet{{/if}}">
+        <i class="fas {{#if compactSheet}}fa-expand{{else}}fa-compress{{/if}}"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Row 2 middle: Origin | Group | Base | Bio -->
+  <div class="msh-row2">
+    <div class="msh-field msh-field-origin">
+      <label>Origin</label>
+      <input type="text" name="system.origin" value="{{system.origin}}" list="origin-options" />
+      <datalist id="origin-options">
+        <option value="Normal Human">
+        <option value="Altered Human">
+        <option value="Mutant">
+        <option value="Hi-Tech">
+        <option value="Robot">
+        <option value="Alien">
+      </datalist>
+    </div>
+    <div class="msh-field msh-field-group">
+      <label>Group</label>
+      <input type="text" name="system.group" value="{{system.group}}" />
+    </div>
+    <div class="msh-field msh-field-base">
+      <label>Base</label>
+      <input type="text" name="system.base" value="{{system.base}}" />
+    </div>
+    <div class="msh-field msh-field-bio">
+      <button type="button" class="biography-toggle">
+        Bio {{#if isBiographyOpen}}▲{{else}}▼{{/if}}
+      </button>
+    </div>
+  </div>
+
+  <!-- Row 2 right: Character Type + Lock -->
+  <div class="msh-player-bottom">
+    <select name="system.characterType">
+      <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
+      <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
+      <option value="npc-villain" {{#if (eq system.characterType "npc-villain")}}selected{{/if}}>NPC Villain</option>
+      <option value="civilian" {{#if (eq system.characterType "civilian")}}selected{{/if}}>Civilian</option>
+    </select>
+    <button type="button" class="sheet-lock-toggle {{#if flags.msh-faserip.sheetLocked}}locked{{/if}}" 
+            title="{{#if flags.msh-faserip.sheetLocked}}Unlock Sheet{{else}}Lock Sheet{{/if}}">
+      <i class="fas {{#if flags.msh-faserip.sheetLocked}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+    </button>
+  </div>
+</div>
+
+<!-- BIOGRAPHY (expandable) -->
+{{#if isBiographyOpen}}
+<div class="msh-bio">
+  <div class="msh-biorow msh-biorow-4col">
+    <div class="msh-biofield"><label>Race</label><input type="text" name="system.race" value="{{system.race}}" /></div>
+    <div class="msh-biofield"><label>Sex</label><input type="text" name="system.sex" value="{{system.sex}}" /></div>
+    <div class="msh-biofield"><label>Date of Birth</label><input type="text" name="system.dob" value="{{system.dob}}" /></div>
+    <div class="msh-biofield"><label>Handedness</label><input type="text" name="system.handedness" value="{{system.handedness}}" /></div>
+  </div>
+  <div class="msh-biorow msh-biorow-4col">
+    <div class="msh-biofield"><label>Height</label><input type="text" name="system.height" value="{{system.height}}" /></div>
+    <div class="msh-biofield"><label>Weight</label><input type="text" name="system.weight" value="{{system.weight}}" /></div>
+    <div class="msh-biofield"><label>Eye Color</label><input type="text" name="system.eyeColor" value="{{system.eyeColor}}" /></div>
+    <div class="msh-biofield"><label>Hair Color</label><input type="text" name="system.hairColor" value="{{system.hairColor}}" /></div>
+  </div>
+  <div class="msh-biorow msh-biorow-4col">
+    <div class="msh-biofield"><label>Nationality</label><input type="text" name="system.nationality" value="{{system.nationality}}" /></div>
+    <div class="msh-biofield"><label>Legal Status</label><input type="text" name="system.legalStatus" value="{{system.legalStatus}}" /></div>
+    <div class="msh-biofield"><label>Marital Status</label><input type="text" name="system.maritalStatus" value="{{system.maritalStatus}}" /></div>
+    <div class="msh-biofield"><label>Occupation</label><input type="text" name="system.occupation" value="{{system.occupation}}" /></div>
+  </div>
+  <div class="msh-biofield msh-full biography-details">
+    <label>History</label>
+    {{editor system.history
+            target="system.history"
+            button=true
+            owner=owner
+            editable=editable
+            collaborate=false
+            documents=true
+            relativeTo=actor}}
+  </div>
+</div>
+{{/if}}
+
+  <div class="sheet-body">
+    <div class="abilities-section">
+      <!-- Primary Abilities Container (FASERIP) -->
+      <div class="abilities-container primary-abilities">
+        <table class="abilities-table">
+          <thead>
+            <tr>
+<th>
+  <a class="initial-columns-toggle" title="Toggle Initial Roll/Rank Columns">
+    <i class="fas fa-columns"></i>
+  </a>
+</th>              </th>
+              <th class="narrow-column initial toggle-header" 
+                  title="Hold CTRL + click to hide/show initial columns">Initial<br>Roll</th>
+              <th class="narrow-column initial toggle-header" 
+                  title="Hold CTRL + click to hide/show initial columns">Initial<br>Rank</th>
+              <th class="narrow-column">Current<br>Rank</th>
+              <th class="narrow-column">Current<br>Rank #</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ability-key" title="Roll Fighting FEAT">F</td>
+              <td><input type="number" name="system.abilities.fighting.initialRoll"
+                  value="{{system.abilities.fighting.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.fighting.initialRank"
+                  value="{{system.abilities.fighting.initialRank}}" /></td>
+              <td>
+                <!-- For the Fighting ability dropdown -->
+                <select name="system.abilities.fighting.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.fighting.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.fighting.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.fighting.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.fighting.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.fighting.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.fighting.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.fighting.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.fighting.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.fighting.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.fighting.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.fighting.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.fighting.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.fighting.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.fighting.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.fighting.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.fighting.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.fighting.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.fighting.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.fighting.value"
+                  value="{{system.abilities.fighting.value}}" /></td>
+            </tr>
+            <tr>
+              <td class="ability-key" title="Roll Agility FEAT">A</td>
+              <td><input type="number" name="system.abilities.agility.initialRoll"
+                  value="{{system.abilities.agility.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.agility.initialRank"
+                  value="{{system.abilities.agility.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.agility.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.agility.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.agility.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.agility.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.agility.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.agility.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.agility.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.agility.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.agility.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.agility.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.agility.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.agility.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.agility.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.agility.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.agility.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.agility.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.agility.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.agility.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.agility.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.agility.value"
+                  value="{{system.abilities.agility.value}}" />
+              </td>
+            </tr>
+            <tr>
+              <td class="ability-key" title="Roll Strength FEAT">S</td>
+              <td><input type="number" name="system.abilities.strength.initialRoll"
+                  value="{{system.abilities.strength.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.strength.initialRank"
+                  value="{{system.abilities.strength.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.strength.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.strength.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.strength.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.strength.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.strength.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.strength.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.strength.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.strength.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.strength.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.strength.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.strength.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.strength.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.strength.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.strength.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.strength.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.strength.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.strength.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.strength.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.strength.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.strength.value"
+                  value="{{system.abilities.strength.value}}" /></td>
+            </tr>
+            <tr>
+              <td class="ability-key" title="Roll Endurance FEAT">E</td>
+              <td><input type="number" name="system.abilities.endurance.initialRoll"
+                  value="{{system.abilities.endurance.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.endurance.initialRank"
+                  value="{{system.abilities.endurance.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.endurance.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.endurance.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.endurance.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.endurance.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.endurance.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.endurance.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.endurance.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.endurance.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.endurance.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.endurance.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.endurance.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.endurance.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.endurance.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.endurance.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.endurance.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.endurance.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.endurance.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.endurance.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.endurance.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.endurance.value"
+                  value="{{system.abilities.endurance.value}}" /></td>
+            </tr>
+            <tr>
+              <td class="ability-key" title="Roll Reason FEAT">R</td>
+              <td><input type="number" name="system.abilities.reason.initialRoll"
+                  value="{{system.abilities.reason.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.reason.initialRank"
+                  value="{{system.abilities.reason.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.reason.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.reason.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.reason.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.reason.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.reason.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.reason.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.reason.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.reason.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.reason.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.reason.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.reason.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.reason.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.reason.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.reason.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.reason.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.reason.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.reason.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.reason.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.reason.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.reason.value" value="{{system.abilities.reason.value}}" />
+              </td>
+            </tr>
+            <tr>
+              <td class="ability-key" title="Roll Intuition FEAT">I</td>
+              <td><input type="number" name="system.abilities.intuition.initialRoll"
+                  value="{{system.abilities.intuition.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.intuition.initialRank"
+                  value="{{system.abilities.intuition.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.intuition.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.intuition.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.intuition.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.intuition.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.intuition.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.intuition.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.intuition.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.intuition.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.intuition.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.intuition.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.intuition.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.intuition.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.intuition.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.intuition.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.intuition.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.intuition.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.intuition.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.intuition.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.intuition.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.intuition.value"
+                  value="{{system.abilities.intuition.value}}" /></td>
+            </tr>
+            <tr>
+              <td class="ability-key" title="Roll Psyche FEAT">P</td>
+              <td><input type="number" name="system.abilities.psyche.initialRoll"
+                  value="{{system.abilities.psyche.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.psyche.initialRank"
+                  value="{{system.abilities.psyche.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.psyche.rank">
+                  <option value="Shift-0" {{#if (eq system.abilities.psyche.rank "Shift-0" )}}selected{{/if}}>Shift-0
+                  </option>
+                  <option value="Feeble" {{#if (eq system.abilities.psyche.rank "Feeble" )}}selected{{/if}}>Feeble
+                  </option>
+                  <option value="Poor" {{#if (eq system.abilities.psyche.rank "Poor" )}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq system.abilities.psyche.rank "Typical" )}}selected{{/if}}>Typical
+                  </option>
+                  <option value="Good" {{#if (eq system.abilities.psyche.rank "Good" )}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq system.abilities.psyche.rank "Excellent" )}}selected{{/if}}>
+                    Excellent</option>
+                  <option value="Remarkable" {{#if (eq system.abilities.psyche.rank "Remarkable" )}}selected{{/if}}>
+                    Remarkable</option>
+                  <option value="Incredible" {{#if (eq system.abilities.psyche.rank "Incredible" )}}selected{{/if}}>
+                    Incredible</option>
+                  <option value="Amazing" {{#if (eq system.abilities.psyche.rank "Amazing" )}}selected{{/if}}>Amazing
+                  </option>
+                  <option value="Monstrous" {{#if (eq system.abilities.psyche.rank "Monstrous" )}}selected{{/if}}>
+                    Monstrous</option>
+                  <option value="Unearthly" {{#if (eq system.abilities.psyche.rank "Unearthly" )}}selected{{/if}}>
+                    Unearthly</option>
+                  <option value="Shift-X" {{#if (eq system.abilities.psyche.rank "Shift-X" )}}selected{{/if}}>Shift-X
+                  </option>
+                  <option value="Shift-Y" {{#if (eq system.abilities.psyche.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
+                  </option>
+                  <option value="Shift-Z" {{#if (eq system.abilities.psyche.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
+                  </option>
+                  <option value="Class 1000" {{#if (eq system.abilities.psyche.rank "Class 1000" )}}selected{{/if}}>
+                    Class 1000</option>
+                  <option value="Class 3000" {{#if (eq system.abilities.psyche.rank "Class 3000" )}}selected{{/if}}>
+                    Class 3000</option>
+                  <option value="Class 5000" {{#if (eq system.abilities.psyche.rank "Class 5000" )}}selected{{/if}}>
+                    Class 5000</option>
+                  <option value="Beyond" {{#if (eq system.abilities.psyche.rank "Beyond" )}}selected{{/if}}>Beyond
+                  </option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.psyche.value" value="{{system.abilities.psyche.value}}" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Secondary Abilities Container -->
+      <div class="abilities-container secondary-abilities">
+  <div class="sec-grid">
+    <!-- HEALTH -->
+    <div class="sec-col health">
+      <div class="sec-head health-recovery-link" title="Click to open Recovery & Rest">
+        <span>Health</span>
+        <small>F + A + S + E</small>
+      </div>
+      <div class="sec-body">
+        <div class="stacked-values">
+          <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" />
+          <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}" disabled />
+        </div>
+      </div>
+      <div class="sec-msg">
+        <button type="button"
+                class="health-recovery-inline-btn{{#if recoveryDisabledReason}} is-disabled{{/if}}"
+                data-action="sheet-recovery"
+                {{#if recoveryDisabledReason}}disabled{{/if}}
+                title="{{#if recoveryDisabledReason}}{{recoveryDisabledReason}}{{else}}Take Recovery: +{{recoveryHealAmount}} HP (once per day, RAW p.31){{/if}}">
+          Recovery +{{recoveryHealAmount}}
+        </button>
+        {{#if healingEligible}}
+        <button type="button" class="health-healing-inline-btn" data-action="sheet-healing"
+                title="Take Healing: +{{healingHealAmount}} HP (per hour since last damage{{#if healingMedicalCare}}, with medical care{{/if}}, RAW p.32)">
+          Heal +{{healingHealAmount}}
+        </button>
+        {{/if}}
+        {{#if wakeUpEligible}}
+        <button type="button" class="health-wake-inline-btn" data-action="sheet-wake-up"
+                title="Attempt to regain consciousness (Endurance FEAT, RAW p.31)">
+          Wake Up
+        </button>
+        {{/if}}
+        {{#if stabilizeEligible}}
+        <button type="button" class="health-stabilize-inline-btn" data-action="sheet-stabilize"
+                title="Stabilize dying character — spend Karma, take aid, or open the Stabilize dialog">
+          Stabilize Dying
+        </button>
+        {{/if}}
+      </div>
+    </div>
+
+    <!-- KARMA -->
+    <div class="sec-col karma">
+      <div class="sec-head karma-history-link" title="Click to open Karma History">
+        <span>Karma</span>
+        <small>R + I + P</small>
+      </div>
+      <div class="sec-body">
+        <div class="stacked-values">
+          <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" title="Current Karma" />
+          <input type="number" value="{{system.attributes.karma.max}}" disabled data-field="karma-max" title="Base Karma (R+I+P)" />
+        </div>
+      </div>
+      <div class="sec-msg"></div>
+    </div>
+
+    <!-- RESOURCES -->
+    <div class="sec-col resources">
+      <div class="sec-head resources-header-link" title="Click to roll Resources. Hold CTRL for info.">
+        <span>Resources</span>
+        <small>FEAT</small>
+      </div>
+      <div class="sec-body resources-row">
+        <select name="system.attributes.resources.rank" title="Resources rank">
+          <option value="Shift-0"   title="Shift-0"    {{#if (eq system.attributes.resources.rank "Shift-0")}}selected{{/if}}>Sh0</option>
+          <option value="Feeble"    title="Feeble"     {{#if (eq system.attributes.resources.rank "Feeble")}}selected{{/if}}>Fe</option>
+          <option value="Poor"      title="Poor"       {{#if (eq system.attributes.resources.rank "Poor")}}selected{{/if}}>Pr</option>
+          <option value="Typical"   title="Typical"    {{#if (eq system.attributes.resources.rank "Typical")}}selected{{/if}}>Ty</option>
+          <option value="Good"      title="Good"       {{#if (eq system.attributes.resources.rank "Good")}}selected{{/if}}>Gd</option>
+          <option value="Excellent" title="Excellent"  {{#if (eq system.attributes.resources.rank "Excellent")}}selected{{/if}}>Ex</option>
+          <option value="Remarkable" title="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable")}}selected{{/if}}>Rm</option>
+          <option value="Incredible" title="Incredible" {{#if (eq system.attributes.resources.rank "Incredible")}}selected{{/if}}>In</option>
+          <option value="Amazing"   title="Amazing"    {{#if (eq system.attributes.resources.rank "Amazing")}}selected{{/if}}>Am</option>
+          <option value="Monstrous" title="Monstrous"  {{#if (eq system.attributes.resources.rank "Monstrous")}}selected{{/if}}>Mn</option>
+          <option value="Unearthly" title="Unearthly"  {{#if (eq system.attributes.resources.rank "Unearthly")}}selected{{/if}}>Un</option>
+        </select>
+        <input type="number" name="system.attributes.resources.value" value="{{system.attributes.resources.value}}" />
+      </div>
+      {{#if useResourcePoints}}
+      <div class="rp-tracker">
+        <input type="number" name="system.attributes.resources.points"
+               value="{{system.attributes.resources.points}}"
+               class="rp-current"
+               title="Resource Points: {{system.attributes.resources.points}} / {{rpMaxLabel}} (Max)&#10;Click Resources header to buy items" />
+        <button type="button" class="rp-collect-btn" title="Collect weekly income (+{{rpWeekly}} RP)">
+          +{{rpWeekly}}
+        </button>
+      </div>
+      {{/if}}
+
+      <div class="sec-msg"></div>
+
+    </div>
+
+<!-- POPULARITY -->
+    <div class="sec-col popularity">
+      <div class="sec-head popularity-header-link" title="Click to roll Popularity.">
+        <span>Popularity</span>
+        <small>FEAT</small>
+      </div>
+      <div class="sec-body">
+        <div class="stacked-values popularity-values">
+          <input type="number"
+                 name="system.attributes.popularity.hero.value"
+                 value="{{system.attributes.popularity.hero.value}}"
+                 title="Hero Identity Popularity" />
+          {{#if (eq system.identityType "secret")}}
+            <input type="number"
+                   name="system.attributes.popularity.secretId.value"
+                   value="{{system.attributes.popularity.secretId.value}}"
+                   title="Secret Identity Popularity" />
+          {{/if}}
+        </div>
+      </div>
+      <div class="sec-msg"></div>
+    </div>
+  </div> <!-- closes sec-grid -->
+
+      <!-- Movement (inline, replaces Recovery & Rest) -->
+      <div class="movement-inline">
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="run" title="Click to roll Run FEAT">RUN</label>
+          <input type="number" name="system.movement.run" value="{{system.movement.run}}" 
+                 placeholder="{{suggestedMovement}}" 
+                 title="Base: {{suggestedMovement}} areas/turn (from Endurance)&#10;Speed: {{movementInfo.run.mph}} mph&#10;&#10;Actions while moving: half speed&#10;Turning >90°: half speed" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="leap" title="Click to roll Leap FEAT">LEAP</label>
+          <input type="number" name="system.movement.leap" value="{{system.movement.leap}}" 
+                 placeholder="{{leapingData.acrossAreas}}"
+                 title="Across: {{leapingData.acrossFeet}}' ({{leapingData.acrossAreas}} areas)&#10;Up: {{leapingData.upFeet}}' ({{leapingData.upFloors}} floors)&#10;Down: {{leapingData.downFeet}}' ({{leapingData.downFloors}} floors)&#10;(Based on Strength rank)" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="swim" title="Click to roll Swim FEAT">SWIM</label>
+          <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" 
+                 placeholder="1"
+                 title="Default: 1 area/turn without powers&#10;Max: 9 areas/turn (Monstrous)&#10;&#10;Drowning: Hold breath for Endurance rank # of rounds" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="fly" title="Click to roll Fly FEAT">FLY</label>
+          <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" 
+                 placeholder="0"
+                 title="Max speed subject to exhaustion&#10;Cruising (2 ranks lower): no exhaustion&#10;Low altitude max: ground speed for rank&#10;Acceleration: {{suggestedMovement}} areas/turn&#10;90° turn costs 1 area&#10;>90° turn requires Agility FEAT" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="teleport" title="Click to roll Teleport FEAT">TELE</label>
+          <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" 
+                 placeholder="0"
+                 title="Instantaneous - no speed&#10;Multiple teleports: Endurance FEAT&#10;Carrying others: Power Stunt required" />
+        </div>
+        <div class="movement-inline-item movement-info-btn">
+          <a class="movement-chat-btn" title="Send movement info to chat"><i class="fas fa-comment-dots"></i></a>
+        </div>
+      </div>
+
+</div> <!-- closes secondary-abilities -->
+ <!-- end of ability section -->
+
+    </div>
+    </div>
+
+  
+
