@@ -103,18 +103,55 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     // Tabs (manual binding for S1; declarative TABS arrives in S2).
     this._activateTabsShim(html);
 
-    // Legacy listeners.
+    // Wire v2 DragDrop ourselves; ApplicationV2 declares the option in
+    // DEFAULT_OPTIONS but does not auto-instantiate the handlers.
+    this._bindDragDrop();
+
+    // Legacy listeners. Null v1's own _dragDrop array first so its
+    // activateListeners doesn't try to double-bind on top of ours with
+    // callbacks that close over the unrendered v1 instance.
     try {
       const v1 = this._v1();
+      if (v1._dragDrop) v1._dragDrop = [];
       v1.activateListeners.call(this._adapterThis(v1), html);
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 activateListeners shim failed", err);
     }
   }
 
-  /* -------------------------------------------- */
+/* -------------------------------------------- */
   /*  Drag & drop (delegated to v1)               */
   /* -------------------------------------------- */
+
+  /** Bind DragDrop handlers from DEFAULT_OPTIONS.dragDrop. ApplicationV2
+   *  declares the option but does not auto-init the handlers, so we
+   *  instantiate and bind them explicitly. Once-only flag prevents
+   *  duplicate listeners on subsequent re-renders. */
+  _bindDragDrop() {
+    if (this._dragDropBound) return;
+    const DragDrop = foundry.applications?.ux?.DragDrop ?? globalThis.DragDrop;
+    if (!DragDrop) {
+      console.warn("FaseripActorSheetV2 | DragDrop class not available");
+      return;
+    }
+    for (const cfg of (this.options.dragDrop ?? [])) {
+      const dd = new DragDrop({
+        dragSelector: cfg.dragSelector,
+        dropSelector: cfg.dropSelector,
+        permissions: {
+          dragstart: () => this.isEditable,
+          drop:      () => this.isEditable
+        },
+        callbacks: {
+          dragstart: this._onDragStart.bind(this),
+          dragover:  this._onDragOver.bind(this),
+          drop:      this._onDrop.bind(this)
+        }
+      });
+      dd.bind(this.element);
+    }
+    this._dragDropBound = true;
+  }
 
   /** @override */
   _onDragStart(event) {
@@ -125,6 +162,9 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
       console.error("FaseripActorSheetV2 | v1 _onDragStart shim failed", err);
     }
   }
+
+  /** @override */
+  _onDragOver(event) { /* no-op; DragDrop's drop handler manages preventDefault */ }
 
   /** @override */
   async _onDrop(event) {
