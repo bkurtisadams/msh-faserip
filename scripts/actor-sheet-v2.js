@@ -129,6 +129,11 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 activateListeners shim failed", err);
     }
+
+    // Wire {{editor}} helper outputs (pencil-edit + save). ApplicationV2
+    // doesn't auto-activate v1-style editor blocks, so we delegate to
+    // v1's _activateEditor on each render.
+    this._activateLegacyEditors();
   }
 
 /* -------------------------------------------- */
@@ -173,12 +178,15 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /** @override */
   _onDragOver(event) { /* no-op; DragDrop's drop handler manages preventDefault */ }
 
-  /** Bind a delegated click handler on the sheet root for [data-edit]
-   *  elements (portraits, image fields). v2-native FilePicker open. */
+  /** Bind a delegated click handler on the sheet root for <img> elements
+   *  with data-edit (portraits / actor img). Selector is narrowed to img
+   *  so it does NOT fire on the editor-content div, which also carries
+   *  data-edit (e.g. data-edit="system.history") and would otherwise
+   *  open the FilePicker with editor HTML as a bogus "current path."  */
   _bindEditImage() {
     if (this._editImageBound) return;
     this.element.addEventListener("click", ev => {
-      const el = ev.target.closest("[data-edit]");
+      const el = ev.target.closest("img[data-edit]");
       if (!el || !this.element.contains(el)) return;
       ev.preventDefault();
       this._onEditImage(el);
@@ -201,6 +209,28 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
       top: (this.position?.top ?? 0) + 40,
       left: (this.position?.left ?? 0) + 10
     }).browse();
+  }
+
+  /** Activate v1-style {{editor}} helper outputs ({.editor-content[data-edit]})
+   *  on the v2 sheet. v1's FormApplication._render wires the pencil-edit
+   *  button and the eventual save → _onSubmit → _updateObject → actor.update
+   *  chain. ApplicationV2 doesn't run that path, so we delegate to v1's
+   *  _activateEditor through the proxy on each render. */
+  _activateLegacyEditors() {
+    if (!this.isEditable) return;
+    const v1 = this._v1();
+    if (typeof v1._activateEditor !== "function") return;
+    const divs = this.element.querySelectorAll(".editor-content[data-edit]");
+    for (const div of divs) {
+      try {
+        v1._activateEditor.call(this._adapterThis(v1), div);
+      } catch (err) {
+        console.warn(
+          "FaseripActorSheetV2 | _activateEditor failed for",
+          div.dataset.edit, err
+        );
+      }
+    }
   }
 
   /**
