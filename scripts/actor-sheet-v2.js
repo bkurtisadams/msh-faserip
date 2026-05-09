@@ -25,8 +25,11 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
 
   /** @override */
   static PARTS = {
+    header: {
+      template: "systems/msh-faserip/templates/parts/header.hbs"
+    },
     body: {
-      template: "systems/msh-faserip/templates/actor-sheet.html",
+      template: "systems/msh-faserip/templates/parts/body.hbs",
       scrollable: [".sheet-tab-content"]
     }
   };
@@ -149,6 +152,11 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
 
     // jQuery shim — preserves the v1 activateListeners(html) signature.
     const html = $(this.element);
+
+    // Compact-mode class lived on the inner wrapper div in v1; that wrapper
+    // is gone now that header and body are separate PARTS, so apply the
+    // class to the v2 outer form element directly.
+    this.element.classList.toggle("compact-mode", !!context?.compactSheet);
 
     // Tabs (manual binding for S1; declarative TABS arrives in S2).
     this._activateTabsShim(html);

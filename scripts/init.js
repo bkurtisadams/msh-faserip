@@ -1466,6 +1466,7 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/universal-table-tab.hbs",
     "systems/msh-faserip/templates/parts/header.hbs",
     "systems/msh-faserip/templates/parts/nav.hbs",
+    "systems/msh-faserip/templates/parts/body.hbs",
     "systems/msh-faserip/templates/parts/tab-powers.hbs",
     "systems/msh-faserip/templates/parts/tab-talents.hbs",
     "systems/msh-faserip/templates/parts/tab-contacts.hbs",
