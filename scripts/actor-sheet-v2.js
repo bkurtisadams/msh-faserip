@@ -84,7 +84,12 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 getData adapter failed", err);
     }
-    return foundry.utils.mergeObject(base, legacy, { inplace: false });
+    // Shallow merge — legacy getData() returns a flat template context.
+    // Deep mergeObject() recurses into the live Actor document and tries
+    // to assign to read-only Collection getters (actor.items, etc.).
+    // v1 keys (actor, system, items, flags, ...) intentionally win over
+    // v2 base keys; the legacy template expects the v1 shape.
+    return Object.assign(base, legacy);
   }
 
   /** @override */
