@@ -73,6 +73,49 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
           };
           case "submit":     return (...a) => v2.submit?.(...a);
           case "close":      return (...a) => v2.close(...a);
+
+          // V2-native saveEditor. v1's editor save callback (bound by
+          // _activateEditor) calls this.saveEditor(name); v14's appv1 shim
+          // routes that through submit() → _onSubmit chain that depends on
+          // a rendered v1 instance, which we never have. Intercept here:
+          // commit the active editor's content via its own save(), pull the
+          // resulting HTML from the editor instance (or the form field it
+          // wrote to), and update the live actor directly. Then tear the
+          // editor down and re-render to restore the static view.
+          case "saveEditor": return async (name, opts = {}) => {
+            const ed = v1.editors?.[name];
+            if (!ed) return;
+
+            // ed.active is a boolean editing-state flag in v14's appv1 shim,
+            // not the editor instance. The ProseMirrorEditor lives at
+            // ed.instance, with .editor / .mce as fallbacks for older shims
+            // and tinymce respectively.
+            const editor = ed.instance ?? ed.editor ?? ed.mce ?? null;
+
+            try { await editor?.save?.(); } catch (_) {}
+
+            // Pull the new content from whichever source the active editor
+            // surfaces; the form field and serializeString cover ProseMirror,
+            // dom/innerHTML covers tinymce or fallback shapes, and
+            // contentDivHTML is the last-resort writeback target.
+            const content =
+                 v2.element.querySelector(`[name="${name}"]`)?.value
+              ?? editor?.serializeString?.()
+              ?? editor?.serializeHTMLString?.()
+              ?? editor?.view?.dom?.innerHTML
+              ?? editor?.dom?.innerHTML
+              ?? (typeof editor?.value === "string" ? editor.value : undefined)
+              ?? v2.element.querySelector(`[data-edit="${name}"]`)?.innerHTML
+              ?? null;
+
+            if (content !== null && content !== undefined) {
+              await v2.actor.update({ [name]: content });
+            }
+
+            try { editor?.destroy?.(); } catch (_) {}
+            v1.editors[name] = null;
+            await v2.render({ force: true });
+          };
           default:           return Reflect.get(target, prop, target);
         }
       }
