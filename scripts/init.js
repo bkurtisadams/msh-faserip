@@ -107,6 +107,7 @@ import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
+import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 
 // ── Player-color tint on chat cards ──
 Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
@@ -1115,6 +1116,16 @@ Hooks.once("init", async () => {
       default: false
     });
 
+    game.settings.register("msh-faserip", "useActorSheetV2", {
+      name: "Use V2 Character Sheet",
+      hint: "Render the FASERIP character sheet using the ApplicationV2 framework. Opt-in during the v14 port; defaults to off so the legacy sheet remains in use until parity is verified. Reload required.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false,
+      requiresReload: true
+    });;
+
     // ========== Action HUD Settings ==========
     game.settings.register("msh-faserip", "actionHudEnabled", {
       name: "Action HUD: Show on Login",
@@ -1766,10 +1777,25 @@ Hooks.once("init", async () => {
   foundry.documents.collections.Actors.unregisterSheet("core", foundry.applications.sheets.ActorSheetV2);
   foundry.documents.collections.Items.unregisterSheet("core", foundry.applications.sheets.ItemSheetV2);
 
-  foundry.documents.collections.Actors.registerSheet("msh-faserip", FaseripActorSheet, {
+   foundry.documents.collections.Actors.registerSheet("msh-faserip", FaseripActorSheet, {
     types: ["hero", "villain", "npc"],
     makeDefault: true
   });
+
+  // V2 actor sheet (opt-in). Registered after v1 so it wins makeDefault for
+  // hero/villain when the toggle is on. NPCs stay on v1 regardless.
+  if (game.settings.get("msh-faserip", "useActorSheetV2") === true) {
+    foundry.applications.apps.DocumentSheetConfig.registerSheet(
+      Actor,
+      "msh-faserip",
+      FaseripActorSheetV2,
+      {
+        types: ["hero", "villain"],
+        label: "MSH FASERIP V2 Sheet",
+        makeDefault: true
+      }
+    );
+  }
   
   // Make sure to register vehicle items with FaseripItemSheet
   foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripItemSheet, { 
