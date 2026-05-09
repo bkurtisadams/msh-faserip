@@ -63,7 +63,14 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
           case "options":    return v2.options;
           case "isEditable": return v2.isEditable;
           case "rendered":   return v2.rendered;
-          case "render":     return (...a) => v2.render(...a);
+          case "render":     return (...a) => {
+            // v1 callers use render(force, options); v2 expects (options, _options).
+            // Promote a leading boolean to { force } so the re-render actually fires.
+            if (a.length && typeof a[0] === "boolean") {
+              a = [{ force: a[0] }, ...a.slice(1)];
+            }
+            return v2.render(...a);
+          };
           case "submit":     return (...a) => v2.submit?.(...a);
           case "close":      return (...a) => v2.close(...a);
           default:           return Reflect.get(target, prop, target);
@@ -106,6 +113,11 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     // Wire v2 DragDrop ourselves; ApplicationV2 declares the option in
     // DEFAULT_OPTIONS but does not auto-instantiate the handlers.
     this._bindDragDrop();
+
+    // Wire data-edit clicks for portraits / image fields. v1's base
+    // _onEditImage doesn't reach the right FilePicker through our adapter
+    // in v14, so we handle it natively via a delegated root listener.
+    this._bindEditImage();
 
     // Legacy listeners. Null v1's own _dragDrop array first so its
     // activateListeners doesn't try to double-bind on top of ours with
@@ -160,6 +172,36 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
 
   /** @override */
   _onDragOver(event) { /* no-op; DragDrop's drop handler manages preventDefault */ }
+
+  /** Bind a delegated click handler on the sheet root for [data-edit]
+   *  elements (portraits, image fields). v2-native FilePicker open. */
+  _bindEditImage() {
+    if (this._editImageBound) return;
+    this.element.addEventListener("click", ev => {
+      const el = ev.target.closest("[data-edit]");
+      if (!el || !this.element.contains(el)) return;
+      ev.preventDefault();
+      this._onEditImage(el);
+    });
+    this._editImageBound = true;
+  }
+
+  async _onEditImage(target) {
+    if (!this.isEditable) return;
+    const attr = target.dataset.edit;
+    if (!attr) return;
+    const FP = foundry.applications.apps.FilePicker?.implementation
+            ?? globalThis.FilePicker;
+    if (!FP) return;
+    const current = foundry.utils.getProperty(this.actor, attr);
+    return new FP({
+      type: "image",
+      current,
+      callback: path => this.actor.update({ [attr]: path }),
+      top: (this.position?.top ?? 0) + 40,
+      left: (this.position?.left ?? 0) + 10
+    }).browse();
+  }
 
   /**
    * V2-native drop. The v1 base ActorSheet._onDrop chain depends on the
