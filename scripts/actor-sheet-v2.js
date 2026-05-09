@@ -123,38 +123,33 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /*  Drag & drop (delegated to v1)               */
   /* -------------------------------------------- */
 
-  /** Bind DragDrop handlers from DEFAULT_OPTIONS.dragDrop. ApplicationV2
-   *  declares the option but does not auto-init the handlers, so we
-   *  instantiate and bind them explicitly. Once-only flag prevents
-   *  duplicate listeners on subsequent re-renders. */
+  /** Bind a single drop handler directly on this.element. ApplicationV2's
+   *  DEFAULT_OPTIONS.dragDrop key is not reliably propagated to this.options
+   *  in v14, and the DragDrop class wrapper masks failures; native
+   *  addEventListener avoids both pitfalls. Drag-from-sheet continues to
+   *  flow through v1's per-row dragstart listeners bound by activateListeners
+   *  (PowerSort, FaseripItem, etc.). Once-only flag prevents duplicate
+   *  listeners on re-render. */
   _bindDragDrop() {
     if (this._dragDropBound) return;
-    const DragDrop = foundry.applications?.ux?.DragDrop ?? globalThis.DragDrop;
-    if (!DragDrop) {
-      console.warn("FaseripActorSheetV2 | DragDrop class not available");
-      return;
-    }
-    for (const cfg of (this.options.dragDrop ?? [])) {
-      const dd = new DragDrop({
-        dragSelector: cfg.dragSelector,
-        dropSelector: cfg.dropSelector,
-        permissions: {
-          dragstart: () => this.isEditable,
-          drop:      () => this.isEditable
-        },
-        callbacks: {
-          dragstart: this._onDragStart.bind(this),
-          dragover:  this._onDragOver.bind(this),
-          drop:      this._onDrop.bind(this)
-        }
-      });
-      dd.bind(this.element);
-    }
+    const root = this.element;
+    if (!root) return;
+
+    root.addEventListener("dragover", ev => ev.preventDefault());
+    root.addEventListener("drop", async ev => {
+      ev.preventDefault();
+      await this._onDrop(ev);
+    });
+
     this._dragDropBound = true;
+    console.log("FaseripActorSheetV2 | drop listener bound on", root);
   }
 
   /** @override */
   _onDragStart(event) {
+    // Drag-off-the-sheet still flows through v1's per-row listeners
+    // (PowerSort / FaseripItem / etc.); fall back to v1 here only if
+    // the row didn't already handle the dragstart and set dataTransfer.
     try {
       const v1 = this._v1();
       return v1._onDragStart?.call(this._adapterThis(v1), event);
@@ -166,20 +161,64 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /** @override */
   _onDragOver(event) { /* no-op; DragDrop's drop handler manages preventDefault */ }
 
-  /** @override */
+  /**
+   * V2-native drop. The v1 base ActorSheet._onDrop chain depends on the
+   * legacy global TextEditor and a fully-rendered v1 instance, neither of
+   * which survives the unrendered adapter pattern in v14. We implement the
+   * standard Item / ActiveEffect / Folder dispatch directly against the
+   * live actor and let the inline per-row drop listeners (PowerSort,
+   * FaseripItem, etc.) keep handling their own intra-sheet sort payloads.
+   *
+   * @override
+   */
   async _onDrop(event) {
-    try {
-      const v1 = this._v1();
-      return await v1._onDrop?.call(this._adapterThis(v1), event);
-    } catch (err) {
-      console.error("FaseripActorSheetV2 | v1 _onDrop shim failed", err);
+    console.log("FaseripActorSheetV2 | _onDrop", { target: event.target });
+    if (!this.isEditable) return;
+
+    const TE = foundry.applications.ux.TextEditor?.implementation
+            ?? globalThis.TextEditor;
+    const data = await TE.getDragEventData(event);
+    if (!data) return;
+
+    // Preserve the dropActorSheetData hook for modules/system listeners.
+    if (Hooks.call("dropActorSheetData", this.actor, this, data) === false) return;
+
+    switch (data.type) {
+      case "Item":         return this._onDropItem(event, data);
+      case "ActiveEffect": return this._onDropActiveEffect(event, data);
+      case "Folder":       return this._onDropFolder(event, data);
+      case "Actor":        return false;
     }
   }
 
-  /** @override */
-  async close(options) {
-    this.#v1 = null;
-    return super.close(options);
+  async _onDropItem(event, data) {
+    if (!this.actor.isOwner) return false;
+    const item = await Item.implementation.fromDropData(data);
+    if (!item) return false;
+
+    // Drop from this same actor: leave intra-sheet sort to v1's row handlers.
+    if (this.actor.uuid === item.parent?.uuid) return false;
+
+    return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
+  }
+
+  async _onDropActiveEffect(event, data) {
+    if (!this.actor.isOwner) return false;
+    const effect = await ActiveEffect.implementation.fromDropData(data);
+    if (!effect) return false;
+    if (effect.target === this.actor) return false;
+    return ActiveEffect.implementation.create(effect.toObject(), { parent: this.actor });
+  }
+
+  async _onDropFolder(event, data) {
+    if (!this.actor.isOwner) return [];
+    if (data.documentName !== "Item") return [];
+    const folder = await Folder.implementation.fromDropData(data);
+    if (!folder) return [];
+    return this.actor.createEmbeddedDocuments(
+      "Item",
+      folder.contents.map(i => i.toObject())
+    );
   }
 
   /** @override */
