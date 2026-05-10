@@ -134,6 +134,7 @@
             {{#if b.isIndividual}}
             <select class="bonus-hero-select" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" title="Recipient (present heroes only)">
               {{#if b.heroOptions.length}}
+                {{#unless b.heroId}}<option value="" selected>— pick recipient —</option>{{/unless}}
                 {{#each b.heroOptions as |o|}}
                 <option value="{{o.id}}" {{#if o.selected}}selected{{/if}}>{{o.name}}</option>
                 {{/each}}

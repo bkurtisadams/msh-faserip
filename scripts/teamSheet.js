@@ -401,12 +401,27 @@ export class TeamSheet extends Application {
         if (summaryLine) summaryLine += ` &nbsp;|&nbsp; `;
         summaryLine += `<strong style="color:#c00;">⚠ ${pendingCount} bonus${pendingCount === 1 ? '' : 'es'} need hero assignment</strong>`;
       }
-      netLine = `Net: <strong>${perHeroNet}/ea</strong> to ${heroCount} hero${heroCount === 1 ? '' : 'es'}`;
       if (individualLines.length) {
+        // Per-hero take-home (common + their individual portion, post-multiplier)
+        const heroTotals = (context.teamMembers || [])
+          .filter(tm => presentIds.includes(tm.id))
+          .map(tm => {
+            const items = individualByHero[tm.id] || [];
+            const indPostMult = items.reduce((s, it) => {
+              const m = it.amount > 0 ? encMult : lossMult;
+              return s + (it.amount > 0 ? Math.floor(it.amount * m) : Math.ceil(it.amount * m));
+            }, 0);
+            return { name: tm.name, total: perHeroNet + indPostMult };
+          });
+        netLine = heroTotals
+          .map(h => `<strong>${h.name}</strong>: ${h.total > 0 ? '+' : ''}${h.total}`)
+          .join(' &nbsp;|&nbsp; ');
         const indStr = individualLines.map(l =>
           `${l.heroName}: ${l.label || 'Award'} ${l.amount > 0 ? '+' : ''}${l.amount}`
         ).join('; ');
-        netLine += ` &nbsp;|&nbsp; Individual: ${indStr}`;
+        netLine += `<br><span style="color:#666; font-size: 11px;">Detail: ${indStr}</span>`;
+      } else {
+        netLine = `Net: <strong>${perHeroNet}/ea</strong> to ${heroCount} hero${heroCount === 1 ? '' : 'es'}`;
       }
 
       const heroChecks = (context.teamMembers || []).map(tm => ({
@@ -1006,6 +1021,31 @@ export class TeamSheet extends Application {
 
     if (!enc.name && enc.villains.length) {
       enc.name = enc.villains.map(v => v.name).join(", ");
+    }
+
+    // Auto-resolve heroId for individual-scope bonuses by matching
+    // team-member names mentioned in the bonus label.
+    const teamIds = game.settings?.get?.("msh-faserip", "teamMembers") || [];
+    const teamActors = teamIds.map(id => game.actors?.get?.(id)).filter(Boolean);
+    const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const b of enc.bonuses) {
+      if (b.scope !== "individual" || b.heroId) continue;
+      const label = b.label || "";
+      const matches = teamActors.filter(a => {
+        if (new RegExp(`\\b${escapeRe(a.name)}\\b`, "i").test(label)) return true;
+        const first = a.name.split(/[\s\-]+/)[0];
+        if (first && first.length >= 3) {
+          return new RegExp(`\\b${escapeRe(first)}\\b`, "i").test(label);
+        }
+        return false;
+      });
+      if (matches.length === 1) {
+        b.heroId = matches[0].id;
+      } else if (matches.length > 1) {
+        warnings.push(`BONUS "${label}" matched multiple heroes — assign manually`);
+      } else {
+        warnings.push(`BONUS "${label}" is individual scope but no team-member name found in label — assign manually`);
+      }
     }
 
     return { encounter: enc, warnings };
