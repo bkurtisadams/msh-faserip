@@ -101,7 +101,7 @@
 //           sessionRIPBonus setting; button hidden when off.
 // v4.1.0: Add Event type (foe-less karma events) alongside encounters.
 //         GM Award field on both events and encounters. Missing karma types added.
-import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier } from "./karma-multipliers.js";
+import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey } from "./karma-rules.js";
 
 export class TeamSheet extends Application {
@@ -384,9 +384,14 @@ export class TeamSheet extends Application {
         };
       });
 
-      let summaryLine, netLine;
-      summaryLine = `Split: +${splitPositive} ×${encMult} = +${splitMultiplied} ÷${heroCount} = <strong>+${perHeroFromSplit}/ea</strong>`;
-      if (perHeroPosShown) summaryLine += ` &nbsp;|&nbsp; Per-hero: <strong>+${perHeroPosShown}/ea</strong>`;
+      let summaryLine = "", netLine;
+      if (splitPositive > 0) {
+        summaryLine = `Split: +${splitPositive} ×${encMult} = +${splitMultiplied} ÷${heroCount} = <strong>+${perHeroFromSplit}/ea</strong>`;
+      }
+      if (perHeroPosShown) {
+        if (summaryLine) summaryLine += ` &nbsp;|&nbsp; `;
+        summaryLine += `Per-hero: <strong>+${perHeroPosShown}/ea</strong>`;
+      }
       if (splitLossPerHero) summaryLine += ` &nbsp;|&nbsp; Loss: <strong>${splitLossPerHero}/ea</strong>`;
       if (perHeroLossShown) summaryLine += ` &nbsp;|&nbsp; Per-hero loss: <strong>${perHeroLossShown}/ea</strong>`;
       netLine = `Net: <strong>${perHeroNet}/ea</strong> to ${heroCount} hero${heroCount === 1 ? '' : 'es'}`;
@@ -1834,11 +1839,13 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       }
     }
 
-    const splitPositive = foeTotal + stopValue + arrestValue + rescueKarma + gmAward + buckets.splitPos;
+    const combatScope = getCombatAwardScope();
+    const combatTotal = foeTotal + stopValue + arrestValue + rescueKarma;
+    const splitPositive = (combatScope === "individual" ? 0 : combatTotal) + gmAward + buckets.splitPos;
     const splitLoss = rawLoss + buckets.splitNeg; // RAW losses default to split
     const lossScope = enc.lossScope || "split";
     // If lossScope === "per_hero", move the raw `losses` field into perHero bucket
-    const perHeroPositive = buckets.perHeroPos;
+    const perHeroPositive = buckets.perHeroPos + (combatScope === "individual" ? combatTotal : 0);
     const perHeroLoss = (lossScope === "per_hero" ? rawLoss : 0) + buckets.perHeroNeg;
     const splitLossFinal = lossScope === "per_hero" ? buckets.splitNeg : splitLoss;
 

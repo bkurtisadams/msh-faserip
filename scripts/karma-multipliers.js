@@ -123,6 +123,14 @@ export function getGroupAwardMode() {
   return raw;
 }
 
+// Returns "split" (RAW) or "individual" (each hero gets full base amount).
+// Applies to auto-computed encounter combat totals: foe defeats, stop crime,
+// arrest, rescue. GM-discretion bonuses are unaffected.
+export function getCombatAwardScope() {
+  const raw = game.settings.get("msh-faserip", "combatAwardScope") || "split";
+  return raw === "individual" ? "individual" : "split";
+}
+
 export const CATEGORY_LABELS = {
   combat: "Combat / Heroic",
   rescue: "Rescue",
@@ -134,4 +142,9 @@ export const CATEGORY_LABELS = {
 export const GROUP_MODE_LABELS = {
   split: "Split (RAW)",
   pool: "To karma pool"
+};
+
+export const COMBAT_SCOPE_LABELS = {
+  split: "Split (RAW)",
+  individual: "Individual (full to each hero)"
 };

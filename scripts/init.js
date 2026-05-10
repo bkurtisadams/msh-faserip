@@ -983,6 +983,19 @@ Hooks.once("init", async () => {
       default: "split"
     });
 
+    game.settings.register("msh-faserip", "combatAwardScope", {
+      name: "Combat Award Scope",
+      hint: "How auto-computed combat awards (foe defeats, stop crime, arrest, rescue) are distributed in encounters. Split (RAW): goes through Group Karma Award Mode. Individual: each present hero gets the full base amount (matches the common houserule that RAW awards are too small). GM-discretion bonuses still follow Group Karma Award Mode.",
+      scope: "world",
+      config: true,
+      type: String,
+      choices: {
+        split: "Split (RAW)",
+        individual: "Individual (full to each hero)"
+      },
+      default: "split"
+    });
+
     for (const cat of ["combat", "rescue", "personal", "gaming", "penalty"]) {
       game.settings.register("msh-faserip", `karmaMultiplier_${cat}`, {
         name: `Karma Multiplier: ${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
