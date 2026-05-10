@@ -375,6 +375,7 @@ export class TeamSheet extends Application {
           isSplit: scope === "split",
           isIndividual: scope === "individual",
           isPerHero: scope === "per_hero",
+          needsHero: scope === "individual" && !b.heroId,
           ruleGroups: getRuleOptionsGrouped(rule),
           scopeOptions: getScopeOptionsForRule(rule, scope),
           ruleBase, cap, overCap,
@@ -394,6 +395,11 @@ export class TeamSheet extends Application {
       }
       if (splitLossPerHero) summaryLine += ` &nbsp;|&nbsp; Loss: <strong>${splitLossPerHero}/ea</strong>`;
       if (perHeroLossShown) summaryLine += ` &nbsp;|&nbsp; Per-hero loss: <strong>${perHeroLossShown}/ea</strong>`;
+      const pendingCount = (totals.pendingHeroAssignment || []).length;
+      if (pendingCount > 0) {
+        if (summaryLine) summaryLine += ` &nbsp;|&nbsp; `;
+        summaryLine += `<strong style="color:#c00;">⚠ ${pendingCount} bonus${pendingCount === 1 ? '' : 'es'} need hero assignment</strong>`;
+      }
       netLine = `Net: <strong>${perHeroNet}/ea</strong> to ${heroCount} hero${heroCount === 1 ? '' : 'es'}`;
       if (individualLines.length) {
         const indStr = individualLines.map(l =>
@@ -1583,10 +1589,15 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       const sum = items.reduce((s, it) => s + it.amount, 0);
       indLines.push(`${h.name}: ${sum > 0 ? '+' : ''}${sum}`);
     }
+    const pending = t.pendingHeroAssignment || [];
+    const pendingWarning = pending.length
+      ? `<p style="color:#c00;"><strong>⚠ Skipping ${pending.length} bonus${pending.length === 1 ? '' : 'es'} — needs hero assignment:</strong> ${pending.map(p => `${p.label || 'Award'} ${p.amount > 0 ? '+' : ''}${p.amount}`).join('; ')}</p>`
+      : '';
     const confirmBody = [
       `<p>${breakdown}</p>`,
       `<p>Base per hero (shared + per-hero scope): <strong>${perHeroCommon}</strong></p>`,
       indLines.length ? `<p>Plus individual: ${indLines.join('; ')}</p>` : '',
+      pendingWarning,
       `<p>Apply to <strong>${heroes.length}</strong> hero${heroes.length === 1 ? '' : 'es'}?</p>`
     ].join('');
     if (!await Dialog.confirm({
@@ -1717,11 +1728,15 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       indSummary.push(`${h.name}: ${sum > 0 ? '+' : ''}${sum}`);
     }
 
+    const poolPending = t.pendingHeroAssignment || [];
+    const poolPendingWarning = poolPending.length
+      ? `<p style="color:#c00;"><strong>⚠ Skipping ${poolPending.length} bonus${poolPending.length === 1 ? '' : 'es'} — needs hero assignment:</strong> ${poolPending.map(p => `${p.label || 'Award'} ${p.amount > 0 ? '+' : ''}${p.amount}`).join('; ')}</p>`
+      : '';
     if (!await Dialog.confirm({
       title: `Award to Pool — ${encLabel}`,
       content: `<p>Add <strong>${poolDelta}</strong> karma to team pool?</p>${
         indSummary.length ? `<p>Individual awards (to named heroes): ${indSummary.join('; ')}</p>` : ''
-      }`
+      }${poolPendingWarning}`
     })) return;
 
     const pool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
@@ -1814,15 +1829,21 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const buckets = {
       splitPos: 0, splitNeg: 0,
       perHeroPos: 0, perHeroNeg: 0,
-      individual: {} // { heroId: [{label, amount}] }
+      individual: {}, // { heroId: [{label, amount}] }
+      pending: []     // individual-scope bonuses awaiting heroId assignment
     };
     for (const b of bonuses) {
       const amt = Number(b.amount) || 0;
       if (!amt) continue;
       const scope = b.scope || "split";
-      if (scope === "individual" && b.heroId) {
-        if (!buckets.individual[b.heroId]) buckets.individual[b.heroId] = [];
-        buckets.individual[b.heroId].push({ label: b.label || "", amount: amt });
+      if (scope === "individual") {
+        if (b.heroId) {
+          if (!buckets.individual[b.heroId]) buckets.individual[b.heroId] = [];
+          buckets.individual[b.heroId].push({ label: b.label || "", amount: amt });
+        } else {
+          // Awaiting heroId — do NOT silently fall back to split.
+          buckets.pending.push({ label: b.label || "", amount: amt });
+        }
       } else if (scope === "per_hero") {
         if (amt > 0) buckets.perHeroPos += amt; else buckets.perHeroNeg += amt;
       } else {
@@ -1863,7 +1884,8 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       perHeroPositive, perHeroLoss,
       individualByHero: buckets.individual,
       individualPos, individualNeg,
-      lossScope
+      lossScope,
+      pendingHeroAssignment: buckets.pending
     };
   }
 

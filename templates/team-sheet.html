@@ -301,7 +301,7 @@
               {{#if enc.bonuses.length}}
               <div class="bonus-list">
                 {{#each enc.bonuses as |b|}}
-                <div class="bonus-row">
+                <div class="bonus-row{{#if b.needsHero}} needs-hero{{/if}}">
                   <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Befriending Felicia" />
                   <input type="number" class="bonus-amount-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.amount}}" />
                   <select class="bonus-scope-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Scope">
