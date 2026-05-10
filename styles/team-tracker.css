@@ -645,3 +645,142 @@
   background: #ffe9a0; border-color: #b8860b;
 }
 .team-tracker .tt-action-row .award-session-bonus i { color: #d4a017; }
+
+/* ═══ EncounterEditor popout ═══ */
+.faserip.sheet.team-tracker .popout-encounter {
+  color: #888; cursor: pointer; padding: 0 4px; font-size: 12px;
+}
+.faserip.sheet.team-tracker .popout-encounter:hover { color: #8b0000; }
+
+.faserip.sheet.team-tracker.encounter-editor .window-content {
+  padding: 0; overflow: hidden; display: flex; flex-direction: column;
+}
+.team-tracker.encounter-editor-form {
+  display: flex; flex-direction: column; height: 100%; overflow: hidden;
+}
+.team-tracker .ee-titlebar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: linear-gradient(180deg, #8b0000 0%, #6b0000 100%);
+  color: #fff8e7; border-bottom: 1px solid #4a0000;
+}
+.team-tracker .ee-title-input {
+  flex: 1; font-family: 'Barlow Condensed', sans-serif; font-size: 16px !important;
+  font-weight: 600; padding: 4px 8px; background: rgba(255,255,255,0.95) !important;
+  border: 1px solid #4a0000 !important; border-radius: 3px; color: #000 !important;
+}
+.team-tracker .ee-title-meta {
+  font-size: 11px; color: rgba(255,248,231,0.7); font-family: 'Barlow Condensed', sans-serif;
+}
+
+.team-tracker .ee-body {
+  flex: 1; overflow-y: auto; padding: 10px 14px; background: #faf8f2;
+}
+.team-tracker .ee-date-strip {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.team-tracker .ee-date-strip input[type="text"] {
+  height: 26px; padding: 2px 6px; font-size: 12px !important;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  background: #fff !important; color: #000 !important;
+}
+.team-tracker .enc-date-input { width: 100px; }
+.team-tracker .enc-time-input { width: 100px; }
+.team-tracker .enc-realdate-input { width: 100px; }
+.team-tracker .ee-spacer { flex: 1; }
+.team-tracker .ee-btn-mini {
+  height: 26px; padding: 2px 8px; font-size: 11px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  background: #c0a070 !important; color: #fff !important;
+  border: 1px solid #8b0000 !important; border-radius: 3px; cursor: pointer;
+}
+.team-tracker .ee-btn-mini:hover { background: #8b0000 !important; }
+
+.team-tracker .ee-mini-label {
+  font-size: 9px; font-weight: 700; color: #666;
+  text-transform: uppercase; letter-spacing: 0.5px; margin: 4px 0 4px 0;
+}
+.team-tracker .ee-heroes-strip {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;
+}
+.team-tracker .ee-hero-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px 2px 4px; border: 1px solid #c0a070; border-radius: 14px;
+  background: #fff; cursor: pointer; font-size: 11px; line-height: 1;
+  font-family: 'Barlow Condensed', sans-serif; user-select: none;
+}
+.team-tracker .ee-hero-chip:hover { border-color: #8b0000; }
+.team-tracker .ee-hero-chip.absent { opacity: 0.4; background: #f0eee8; }
+.team-tracker .ee-hero-chip input[type="checkbox"] { display: none; }
+.team-tracker .ee-hero-av {
+  width: 18px; height: 18px; border-radius: 50%; object-fit: cover;
+  border: 1px solid #ccc;
+}
+.team-tracker .ee-hero-name { font-weight: 600; color: #000; }
+
+.team-tracker .ee-section {
+  border: 1px solid #c0a070; border-radius: 4px;
+  margin-bottom: 6px; overflow: hidden; background: #fff;
+}
+.team-tracker .ee-section-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; cursor: pointer; user-select: none;
+  background: #faf8f2; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 600; color: #4a3020;
+}
+.team-tracker .ee-section-header:hover { background: #f0e8d8; }
+.team-tracker .ee-section.open .ee-section-header {
+  background: #fff; border-bottom: 1px solid #e0d0a0;
+}
+.team-tracker .ee-chev {
+  width: 12px; transition: transform 0.15s; color: #888;
+}
+.team-tracker .ee-section.open .ee-chev { transform: rotate(90deg); }
+.team-tracker .ee-section-title { font-weight: 700; color: #4a3020; }
+.team-tracker .ee-section-tag {
+  background: #c0a070; color: #fff; padding: 1px 6px; border-radius: 8px;
+  font-size: 10px; font-weight: 700; margin-left: 2px;
+}
+.team-tracker .ee-section-sub {
+  margin-left: auto; font-size: 11px; font-weight: 600;
+}
+.team-tracker .ee-section-sub .sum-pos { color: #2d5a2d; }
+.team-tracker .ee-section-sub .sum-neg { color: #8b0000; }
+.team-tracker .ee-section-sub .ee-sub-empty { color: #999; font-style: italic; font-weight: 400; }
+.team-tracker .ee-section-body { display: none; padding: 8px 10px; }
+.team-tracker .ee-section.open .ee-section-body { display: block; }
+
+.team-tracker .ee-footer {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 14px; background: #faf8f2;
+  border-top: 1px solid #c0a070; flex-wrap: wrap;
+}
+.team-tracker .ee-foot-stats {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 12px;
+}
+.team-tracker .ee-foot-stats > span { display: inline-flex; gap: 3px; }
+.team-tracker .ee-foot-lbl { color: #888; }
+.team-tracker .ee-foot-stats strong { color: #2d5a2d; font-weight: 700; }
+.team-tracker .ee-foot-loss strong { color: #8b0000; }
+.team-tracker .ee-foot-net {
+  flex: 1; min-width: 200px; font-size: 11px; color: #4a3020;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.team-tracker .ee-foot-actions { display: flex; gap: 6px; align-items: center; }
+.team-tracker .ee-awarded-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #2d5a2d; color: #fff; padding: 4px 10px; border-radius: 3px;
+  font-size: 11px; font-weight: 600; font-family: 'Barlow Condensed', sans-serif;
+}
+.team-tracker .ee-done {
+  height: 28px; padding: 4px 12px; font-size: 11px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  background: #c0a070 !important; color: #fff !important;
+  border: 1px solid #8b0000 !important; border-radius: 3px; cursor: pointer;
+}
+.team-tracker .ee-done:hover { background: #8b0000 !important; }
+.team-tracker .encounter-editor-missing {
+  padding: 24px; text-align: center; color: #888;
+  font-family: 'Barlow Condensed', sans-serif;
+}

@@ -103,6 +103,7 @@
 //         GM Award field on both events and encounters. Missing karma types added.
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey } from "./karma-rules.js";
+import { EncounterEditor } from "./apps/encounter-editor.js";
 
 export class TeamSheet extends Application {
 
@@ -514,6 +515,9 @@ export class TeamSheet extends Application {
       else this._expandedEncounters.add(idx);
       this.render(false);
     });
+
+    // Pop encounter into its own editor window
+    html.find('.popout-encounter').click(ev => this._onPopoutEncounter(ev));
 
     // Encounter controls
     html.find('.hero-present-toggle').change(ev => this._onToggleHeroPresent(ev));
@@ -1510,6 +1514,21 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     }
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
     this.render(true);
+  }
+
+  _onPopoutEncounter(ev) {
+    ev.stopPropagation();
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    const list = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const enc = list[idx];
+    if (!enc) return;
+    if (this._encEditor && this._encEditor.rendered && this._encEditor.encId === enc.id) {
+      this._encEditor.bringToTop();
+      return;
+    }
+    if (this._encEditor && this._encEditor.rendered) this._encEditor.close();
+    this._encEditor = new EncounterEditor(this, enc.id);
+    this._encEditor.render(true);
   }
 
   async _onDeleteEncounter(ev) {
