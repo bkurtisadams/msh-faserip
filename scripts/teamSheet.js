@@ -1,4 +1,16 @@
-// teamSheet.js v4.11.0 - 2026-04-17
+// teamSheet.js v4.12.1 - 2026-05-12
+// v4.12.1: Collapsed encounter row carries precomputed isEvent /
+//          iconClass / typeLabel so the template can render a leading
+//          fa-calendar-day (EVENT) or fa-skull (ENCOUNTER) icon and
+//          a stable type label without the old nested-if branch.
+// v4.12.0: Inline encounter expansion now renders the same partial
+//          (encounter-editor-body.hbs) as the popout — collapsible
+//          Foes / Crimes / Awards / Misc sections with per-section
+//          summary tags, compact date strip, hero chips, sticky
+//          footer with live totals. Per-encounter section open/closed
+//          state tracked on the sheet via _inlineEncSections.
+//          Fixes "+0" karma value rendering in green on rows with no
+//          positive karma — hasPositive now driven by displayed total.
 // v4.11.0: Encounter tracks a real-world session date (enc.realDate)
 //          independent of in-fiction gameDate and the internal
 //          timestamp. When an encounter is awarded, karma history
@@ -151,6 +163,7 @@ export class TeamSheet extends Application {
     super(options);
     this._removeMode = false;
     this._expandedEncounters = new Set();
+    this._inlineEncSections = new Map();
     this._activeTab = null; // "team" | "encounters" | "hq" — defaulted in getData
     this._timeUpdateHook = Hooks.on("msh-faserip.timeUpdated", () => {
       if (this.rendered) this.render(false);
@@ -432,10 +445,23 @@ export class TeamSheet extends Application {
       const villainNames = villainRows.map(v => v.name).join(', ');
       const displayName = hasName ? enc.name : (villainNames || "Encounter");
       const dateDisplay = [enc.gameDate, enc.gameTime].filter(Boolean).join(' ');
+      const isEvent = hasName && !hasFoes;
+      const iconClass = isEvent ? "fas fa-calendar-day" : "fas fa-skull";
+      const typeLabel = isEvent ? "EVENT" : "ENCOUNTER";
 
       // Header pill: show net/ea when sensible; fall back to gross positive
       const headerKarma = perHeroNet !== 0 ? perHeroNet : (splitPositive + perHeroPositive + totals.individualPos);
-      const hasPositive = headerKarma > 0 || splitPositive > 0 || perHeroPositive > 0 || totals.individualPos > 0;
+      const hasPositive = headerKarma > 0;
+
+      // Per-encounter inline section open/closed state. Defaults: awards open.
+      const sectionsSet = this._inlineEncSections.get(enc.id);
+      const sectionOpen = (key) => sectionsSet ? sectionsSet.has(key) : (key === "awards");
+      const sections = {
+        foesOpen: sectionOpen("foes"),
+        crimesOpen: sectionOpen("crimes"),
+        awardsOpen: sectionOpen("awards"),
+        miscOpen: sectionOpen("misc")
+      };
 
       return {
         ...enc, expanded, hasFoes, hasName, villainRows, foeTotal,
@@ -445,14 +471,15 @@ export class TeamSheet extends Application {
         bonuses: bonusRows, bonusPositive, bonusNegative: bonusNegative || 0,
         splitPositive, perHeroBonusRaw: perHeroPositive, perHeroBonusShown: perHeroPosShown,
         individualLines,
-        positiveTotal: splitPositive, // legacy alias
+        positiveTotal: headerKarma > 0 ? headerKarma : 0,
         heroCount,
         perHeroFromSplit,
         perHeroLoss: splitLossPerHero, perHeroLossExtra: perHeroLossShown,
         perHeroNet, summaryLine, netLine, encMult,
         heroChecks, villainNames, displayName, dateDisplay,
+        isEvent, iconClass, typeLabel,
         crimes, crimeType: enc.crimeType || "",
-        headerKarma, hasPositive
+        headerKarma, hasPositive, sections
       };
     });
 
@@ -528,6 +555,27 @@ export class TeamSheet extends Application {
       const idx = Number(ev.currentTarget.dataset.encIdx);
       if (this._expandedEncounters.has(idx)) this._expandedEncounters.delete(idx);
       else this._expandedEncounters.add(idx);
+      this.render(false);
+    });
+
+    // Inline collapsible section toggle (Foes / Crimes / Awards / Misc).
+    // Scoped to .encounter-entry so the popout's own handler keeps working.
+    html.find('.encounter-entry .ee-section-header').click(ev => {
+      const entry = ev.currentTarget.closest('.encounter-entry');
+      const section = ev.currentTarget.closest('.ee-section');
+      if (!entry || !section) return;
+      const idx = Number(entry.dataset.encIdx);
+      const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+      const enc = encounters[idx];
+      if (!enc?.id) return;
+      let openSet = this._inlineEncSections.get(enc.id);
+      if (!openSet) {
+        openSet = new Set(["awards"]);
+        this._inlineEncSections.set(enc.id, openSet);
+      }
+      const key = section.dataset.section;
+      if (openSet.has(key)) openSet.delete(key);
+      else openSet.add(key);
       this.render(false);
     });
 
@@ -1581,6 +1629,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     if (!await Dialog.confirm({ title: "Delete Encounter", content: `<p>Delete ${entry.type === "event" ? "event" : "encounter"} (${names})?</p>` })) return;
     encounters.splice(idx, 1);
     this._rebuildExpandedSet(idx);
+    if (entry.id) this._inlineEncSections.delete(entry.id);
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
     this.render(true);
   }

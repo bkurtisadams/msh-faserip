@@ -1,4 +1,19 @@
-/* team-tracker.css v4.3.0 - 2026-04-16
+/* team-tracker.css v4.4.1 - 2026-05-12
+ * v4.4.1: Collapsed encounter row gets a leading type icon (calendar
+ *         for EVENT, skull for ENCOUNTER), min-width on label and
+ *         date columns so rows align. .encounter-entry.awarded opacity
+ *         scoped to the collapsed header only — expanded body now
+ *         renders at full strength. .section-btns button styling
+ *         hardened with !important against Foundry v14 button
+ *         defaults that were inflating Import / Add Encounter.
+ * v4.4.0: Inline encounter expansion shares the .ee-* layout with the
+ *         popout editor (collapsible Foes / Crimes / Awards / Misc
+ *         sections, hero chips, sticky footer). Collapsed-row action
+ *         icons darkened from #888-999 to #5a5a5a for visibility.
+ *         Award row +0 in green replaced by muted -- when nothing
+ *         positive is awarded (driver: hasPositive logic in JS).
+ *         .encounter-detail wrapper drops its inner padding/bg so
+ *         the partial's .ee-body owns the surface.
  * v4.3.0: Tab bar (Team / Encounters / HQ), Team tab panel, pool + session
  *         actions panels. Team name in header. Preserves existing member-row
  *         and encounter-entry styles unchanged.
@@ -133,14 +148,25 @@
   font-size: 13px; font-weight: 600; color: #8b0000;
   text-transform: uppercase; letter-spacing: 0.5px;
 }
-.team-tracker .section-btns { display: flex; gap: 3px; }
+.team-tracker .section-btns { display: flex; gap: 4px; flex-shrink: 0; }
 .team-tracker .section-btns button {
-  padding: 2px 7px; font-size: 10px; font-weight: 600;
-  font-family: 'Barlow Condensed', sans-serif;
-  color: #fff; background: #8b0000; border: 0; border-radius: 3px; cursor: pointer;
+  padding: 3px 9px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  font-family: 'Barlow Condensed', sans-serif !important;
+  color: #fff !important;
+  background: #8b0000 !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  cursor: pointer;
+  min-height: 0 !important;
+  height: auto !important;
+  line-height: 1.3 !important;
+  white-space: nowrap;
+  width: auto !important;
 }
-.team-tracker .section-btns button:hover { background: #660000; }
-.team-tracker .section-btns button i { margin-right: 2px; }
+.team-tracker .section-btns button:hover { background: #660000 !important; }
+.team-tracker .section-btns button i { margin-right: 3px; }
 
 /* ===== ENCOUNTER LIST ===== */
 .team-tracker .encounters-list { display: flex; flex-direction: column; gap: 4px; }
@@ -148,7 +174,8 @@
   background: #fff !important; border: 1px solid #ccc; border-radius: 3px; overflow: hidden;
 }
 .faserip.sheet.team-tracker .encounter-entry.expanded { border-color: #8b0000; }
-.faserip.sheet.team-tracker .encounter-entry.awarded { opacity: 0.6; }
+.faserip.sheet.team-tracker .encounter-entry.awarded { opacity: 1; }
+.faserip.sheet.team-tracker .encounter-entry.awarded > .encounter-header { opacity: 0.55; }
 
 /* ===== ENCOUNTER HEADER (collapsed) ===== */
 .faserip.sheet.team-tracker .encounter-header {
@@ -157,13 +184,19 @@
 }
 .faserip.sheet.team-tracker .encounter-header:hover { background: #f5f5f5; }
 .faserip.sheet.team-tracker .expand-toggle { width: 14px; text-align: center; font-size: 10px; color: #555; }
+.faserip.sheet.team-tracker .enc-type-icon {
+  font-size: 12px !important; color: #6b1717 !important; flex-shrink: 0;
+  width: 14px; text-align: center;
+}
 .faserip.sheet.team-tracker .enc-label {
   font-family: 'Oswald', sans-serif; font-size: 11px !important;
   font-weight: 700 !important; color: #8b0000 !important;
   text-transform: uppercase; letter-spacing: 0.5px;
+  min-width: 78px;
 }
 .faserip.sheet.team-tracker .enc-date {
   font-size: 11px !important; color: #555 !important; white-space: nowrap;
+  min-width: 130px;
 }
 .faserip.sheet.team-tracker .enc-villains-summary {
   flex: 1; min-width: 0; font-weight: 600 !important; color: #000 !important; font-size: 13px !important;
@@ -176,19 +209,21 @@
 .faserip.sheet.team-tracker .karma-val.no-award { color: #888 !important; font-weight: 400 !important; }
 .faserip.sheet.team-tracker .awarded-badge { color: #2e7d32; font-size: 12px; }
 .faserip.sheet.team-tracker .btn-undo {
-  background: none; border: none; color: #888; cursor: pointer; font-size: 11px; padding: 0 2px;
+  background: none; border: none; color: #5a5a5a; cursor: pointer; font-size: 11px; padding: 0 2px;
 }
 .faserip.sheet.team-tracker .btn-undo:hover { color: #c62828; }
 .faserip.sheet.team-tracker .delete-encounter {
-  color: #999; cursor: pointer; font-size: 11px; padding: 0 2px;
+  color: #5a5a5a; cursor: pointer; font-size: 11px; padding: 0 2px;
 }
 .faserip.sheet.team-tracker .delete-encounter:hover { color: #c62828; }
 
-/* ===== ENCOUNTER DETAIL (expanded) ===== */
+/* ===== ENCOUNTER DETAIL (expanded inline wrapper) =====
+ * Inline rendering uses the shared encounter-editor-body partial, which
+ * supplies its own .ee-body surface. .encounter-detail is now a thin
+ * wrapper providing only the red divider above the partial.
+ */
 .faserip.sheet.team-tracker .encounter-detail {
-  padding: 10px 12px; border-top: 2px solid #8b0000;
-  background: #ffffff !important;
-  display: flex; flex-direction: column; gap: 10px;
+  border-top: 2px solid #8b0000;
 }
 .faserip.sheet.team-tracker .encounter-detail .detail-section > label {
   font-size: 13px !important; font-weight: 700 !important; color: #000 !important;
@@ -648,7 +683,7 @@
 
 /* ═══ EncounterEditor popout ═══ */
 .faserip.sheet.team-tracker .popout-encounter {
-  color: #888; cursor: pointer; padding: 0 4px; font-size: 12px;
+  color: #5a5a5a; cursor: pointer; padding: 0 4px; font-size: 12px;
 }
 .faserip.sheet.team-tracker .popout-encounter:hover { color: #8b0000; }
 

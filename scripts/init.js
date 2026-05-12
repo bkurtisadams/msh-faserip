@@ -1490,7 +1490,8 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/parts/tab-actions.hbs",
     "systems/msh-faserip/templates/parts/tab-universal-table.hbs",
     "systems/msh-faserip/templates/parts/tab-effects.hbs",
-    "systems/msh-faserip/templates/parts/tab-chargen.hbs"
+    "systems/msh-faserip/templates/parts/tab-chargen.hbs",
+    "systems/msh-faserip/templates/parts/encounter-editor-body.hbs"
   ]);
 
   game.msh.getRankValue = function(rankName) {

@@ -1,0 +1,199 @@
+<div class="ee-body">
+
+  <div class="ee-date-strip">
+    <input type="text" class="enc-name-input ee-name-strip-input" data-enc-idx="{{encIdx}}" value="{{enc.name}}" placeholder="Encounter name" />
+    <input type="text" class="enc-date-input" data-enc-idx="{{encIdx}}" value="{{enc.gameDate}}" placeholder="Game date" />
+    <input type="text" class="enc-time-input" data-enc-idx="{{encIdx}}" value="{{enc.gameTime}}" placeholder="14:30" />
+    <button type="button" class="enc-date-now ee-btn-mini" data-enc-idx="{{encIdx}}" title="Set to current campaign date/time"><i class="fas fa-clock"></i> Now</button>
+    <input type="text" class="enc-realdate-input" data-enc-idx="{{encIdx}}" value="{{enc.realDate}}" placeholder="Real date" title="Real-world session date" />
+    <button type="button" class="enc-realdate-today ee-btn-mini" data-enc-idx="{{encIdx}}" title="Set to today"><i class="fas fa-calendar-day"></i> Today</button>
+  </div>
+
+  <p class="ee-mini-label">Heroes present</p>
+  <div class="ee-heroes-strip">
+    {{#each enc.heroChecks as |hc|}}
+    <label class="ee-hero-chip {{#unless hc.present}}absent{{/unless}}" title="{{hc.name}}">
+      <input type="checkbox" class="hero-present-toggle" data-enc-idx="{{../encIdx}}" data-hero-id="{{hc.id}}" {{#if hc.present}}checked{{/if}} />
+      <img src="{{hc.img}}" class="ee-hero-av" />
+      <span class="ee-hero-name">{{hc.name}}</span>
+    </label>
+    {{/each}}
+  </div>
+
+  <div class="ee-section {{#if sections.foesOpen}}open{{/if}}" data-section="foes">
+    <div class="ee-section-header">
+      <span class="ee-chev"><i class="fas fa-chevron-right"></i></span>
+      <span class="ee-section-title">Foes</span>
+      {{#if enc.hasFoes}}<span class="ee-section-tag">{{enc.villainRows.length}}</span>{{/if}}
+      <span class="ee-section-sub">{{#if enc.foeTotal}}<span class="sum-pos">+{{enc.foeTotal}}</span>{{else}}<span class="ee-sub-empty">none</span>{{/if}}</span>
+    </div>
+    <div class="ee-section-body">
+      {{#if enc.hasFoes}}
+      <div class="foe-list">
+        {{#each enc.villainRows as |v|}}
+        <div class="foe-row">
+          <img src="{{v.img}}" class="foe-portrait" />
+          <span class="foe-name">{{v.name}}{{#unless (eq v.count 1)}} <span class="foe-count">×{{v.count}}</span>{{/unless}}</span>
+          <span class="rank-badge {{#if v.subRemarkable}}sub-rm{{/if}}">{{v.rankLabel}}({{v.rankValue}})</span>
+          {{#if v.eligible}}<span class="foe-karma">+{{v.foeKarma}}</span>{{else}}<span class="foe-karma sub">--</span>{{/if}}
+          <a class="delete-foe" data-enc-idx="{{../encIdx}}" data-foe-idx="{{@index}}" title="Remove foe"><i class="fas fa-times"></i></a>
+        </div>
+        {{/each}}
+        {{#if enc.hasFoes}}
+        <div class="foe-row foe-total-row">
+          <span class="foe-total-label">Foe Total:</span>
+          <span class="foe-total-val">+{{enc.foeTotal}}</span>
+        </div>
+        {{/if}}
+      </div>
+      {{else}}
+      <span class="no-foes-note">No foes. Add below or leave empty for event-only karma.</span>
+      {{/if}}
+      {{#unless enc.awarded}}
+      <button type="button" class="add-foe-to-encounter btn-add-foe" data-enc-idx="{{encIdx}}"><i class="fas fa-skull"></i> Add Foe</button>
+      {{/unless}}
+    </div>
+  </div>
+
+  <div class="ee-section {{#if sections.crimesOpen}}open{{/if}}" data-section="crimes">
+    <div class="ee-section-header">
+      <span class="ee-chev"><i class="fas fa-chevron-right"></i></span>
+      <span class="ee-section-title">Crimes</span>
+      {{#if enc.crimes.length}}<span class="ee-section-tag">{{enc.crimes.length}}</span>{{/if}}
+      <span class="ee-section-sub">{{#if enc.stopValue}}<span class="sum-pos">+{{enc.stopValue}}</span>{{/if}}{{#if enc.arrestValue}} <span class="sum-pos">+{{enc.arrestValue}}</span>{{/if}}{{#unless enc.stopValue}}{{#unless enc.arrestValue}}<span class="ee-sub-empty">none</span>{{/unless}}{{/unless}}</span>
+    </div>
+    <div class="ee-section-body">
+      {{#if enc.crimes.length}}
+      <div class="crime-list">
+        {{#each enc.crimes as |c|}}
+        <div class="crime-row">
+          <select class="crime-type-row" data-enc-idx="{{../encIdx}}" data-crime-idx="{{@index}}">
+            {{#each c.typeOptions as |o|}}
+            <option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>
+            {{/each}}
+          </select>
+          {{#if c.type}}
+          <label class="crime-flag"><input type="checkbox" class="crime-stopped-row" data-enc-idx="{{../encIdx}}" data-crime-idx="{{@index}}" {{#if c.stopped}}checked{{/if}} /> Stop +{{c.stopValue}}</label>
+          <label class="crime-flag"><input type="checkbox" class="crime-arrested-row" data-enc-idx="{{../encIdx}}" data-crime-idx="{{@index}}" {{#if c.arrested}}checked{{/if}} /> Arrest +{{c.arrestValue}}</label>
+          {{else}}
+          <span class="crime-pick-note">Pick a crime type.</span>
+          {{/if}}
+          <a class="delete-crime" data-enc-idx="{{../encIdx}}" data-crime-idx="{{@index}}" title="Remove this crime"><i class="fas fa-times"></i></a>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <span class="no-foes-note">No crimes attached. Add one or more to claim Stop/Arrest karma per RAW.</span>
+      {{/if}}
+      {{#unless enc.awarded}}
+      <button type="button" class="add-crime btn-add-foe" data-enc-idx="{{encIdx}}"><i class="fas fa-gavel"></i> Add Crime</button>
+      {{/unless}}
+    </div>
+  </div>
+
+  <div class="ee-section {{#if sections.awardsOpen}}open{{/if}}" data-section="awards">
+    <div class="ee-section-header">
+      <span class="ee-chev"><i class="fas fa-chevron-right"></i></span>
+      <span class="ee-section-title">Awards</span>
+      {{#if enc.bonuses.length}}<span class="ee-section-tag">{{enc.bonuses.length}}</span>{{/if}}
+      <span class="ee-section-sub">{{#if enc.bonusPositive}}<span class="sum-pos">+{{enc.bonusPositive}}</span>{{/if}}{{#if enc.bonusNegative}} <span class="sum-neg">{{enc.bonusNegative}}</span>{{/if}}{{#unless enc.bonusPositive}}{{#unless enc.bonusNegative}}<span class="ee-sub-empty">none</span>{{/unless}}{{/unless}}</span>
+    </div>
+    <div class="ee-section-body">
+      {{#if enc.bonuses.length}}
+      <div class="bonus-list">
+        {{#each enc.bonuses as |b|}}
+        <div class="bonus-row{{#if b.needsHero}} needs-hero{{/if}}">
+          <input type="text" class="bonus-label-input" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Befriending Felicia" />
+          <input type="number" class="bonus-amount-input" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" value="{{b.amount}}" />
+          <select class="bonus-scope-select" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" title="Scope">
+            {{#each b.scopeOptions as |s|}}
+            <option value="{{s.value}}" {{#if s.selected}}selected{{/if}} {{#if s.disabled}}disabled{{/if}}>{{s.label}}{{#if s.disabled}} (RAW: no){{/if}}</option>
+            {{/each}}
+          </select>
+          <select class="bonus-rule-select {{#unless b.ruleIsCustom}}bonus-rule-set{{/unless}}" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" title="RAW rule category">
+            {{#each b.ruleGroups as |g|}}
+            <optgroup label="{{g.group}}">
+              {{#each g.options as |o|}}
+              <option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>
+              {{/each}}
+            </optgroup>
+            {{/each}}
+          </select>
+          {{#if b.isIndividual}}
+          <select class="bonus-hero-select" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" title="Recipient (present heroes only)">
+            {{#if b.heroOptions.length}}
+              {{#unless b.heroId}}<option value="" selected>— pick recipient —</option>{{/unless}}
+              {{#each b.heroOptions as |o|}}
+              <option value="{{o.id}}" {{#if o.selected}}selected{{/if}}>{{o.name}}</option>
+              {{/each}}
+            {{else}}
+              <option value="">— no present heroes —</option>
+            {{/if}}
+          </select>
+          {{/if}}
+          {{#if b.overCap}}
+          <span class="bonus-cap-warn" title="RAW caps {{b.ruleLabel}} at {{b.cap}}">!</span>
+          {{/if}}
+          <a class="delete-bonus" data-enc-idx="{{../encIdx}}" data-bonus-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <span class="no-foes-note">No custom awards. Use for task/milestone rewards (Split / Individual / Per-hero).</span>
+      {{/if}}
+      {{#unless enc.awarded}}
+      <button type="button" class="add-bonus-item btn-add-foe" data-enc-idx="{{encIdx}}"><i class="fas fa-plus"></i> Add Award</button>
+      {{/unless}}
+    </div>
+  </div>
+
+  <div class="ee-section {{#if sections.miscOpen}}open{{/if}}" data-section="misc">
+    <div class="ee-section-header">
+      <span class="ee-chev"><i class="fas fa-chevron-right"></i></span>
+      <span class="ee-section-title">Rescues, losses, GM award</span>
+      <span class="ee-section-sub">{{#if enc.rescueKarma}}<span class="sum-pos">+{{enc.rescueKarma}}</span>{{/if}}{{#if enc.lossKarma}} <span class="sum-neg">{{enc.lossKarma}}</span>{{/if}}{{#if enc.gmAward}} <span class="sum-pos">GM +{{enc.gmAward}}</span>{{/if}}{{#unless enc.rescueKarma}}{{#unless enc.lossKarma}}{{#unless enc.gmAward}}<span class="ee-sub-empty">none</span>{{/unless}}{{/unless}}{{/unless}}</span>
+    </div>
+    <div class="ee-section-body">
+      <div class="detail-row extras">
+        <label>Rescues: <input type="number" class="rescue-count" data-enc-idx="{{encIdx}}" value="{{enc.rescues}}" min="0" max="99" /></label>
+        <label>Losses: <input type="number" class="loss-amount" data-enc-idx="{{encIdx}}" value="{{enc.losses}}" min="0" max="9999" /></label>
+        <label class="loss-scope-label">
+          Loss Scope:
+          <select class="loss-scope-select" data-enc-idx="{{encIdx}}">
+            <option value="split" {{#if enc.lossScopeSplit}}selected{{/if}}>Split</option>
+            <option value="per_hero" {{#if enc.lossScopePerHero}}selected{{/if}}>Per hero</option>
+          </select>
+        </label>
+        <label class="gm-award-label">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{encIdx}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="ee-footer">
+  <div class="ee-foot-stats">
+    {{#if enc.foeTotal}}<span><span class="ee-foot-lbl">Foe</span> <strong>+{{enc.foeTotal}}</strong></span>{{/if}}
+    {{#if enc.stopValue}}<span><span class="ee-foot-lbl">Stop</span> <strong>+{{enc.stopValue}}</strong></span>{{/if}}
+    {{#if enc.arrestValue}}<span><span class="ee-foot-lbl">Arrest</span> <strong>+{{enc.arrestValue}}</strong></span>{{/if}}
+    {{#if enc.rescueKarma}}<span><span class="ee-foot-lbl">Rescue</span> <strong>+{{enc.rescueKarma}}</strong></span>{{/if}}
+    {{#if enc.gmAward}}<span><span class="ee-foot-lbl">GM</span> <strong>+{{enc.gmAward}}</strong></span>{{/if}}
+    {{#if enc.bonusPositive}}<span><span class="ee-foot-lbl">Awards</span> <strong>+{{enc.bonusPositive}}</strong></span>{{/if}}
+    {{#if enc.lossKarma}}<span class="ee-foot-loss"><span class="ee-foot-lbl">Loss</span> <strong>{{enc.lossKarma}}</strong></span>{{/if}}
+  </div>
+  <div class="ee-foot-net">{{{enc.summaryLine}}}</div>
+  <div class="ee-foot-actions">
+    {{#if enc.awarded}}
+    <span class="ee-awarded-pill"><i class="fas fa-check-circle"></i> Awarded</span>
+    <button type="button" class="undo-award btn-undo" data-enc-idx="{{encIdx}}" title="Undo award"><i class="fas fa-undo"></i> Undo</button>
+    {{else}}
+    <button type="button" class="award-encounter-heroes btn-award" data-enc-idx="{{encIdx}}"><i class="fas fa-check"></i> Award to Heroes</button>
+    {{#if useKarmaPool}}
+    <button type="button" class="award-encounter-pool btn-pool" data-enc-idx="{{encIdx}}"><i class="fas fa-piggy-bank"></i> Award to Pool</button>
+    {{/if}}
+    {{/if}}
+    {{#if showCloseButton}}
+    <button type="button" class="ee-done"><i class="fas fa-times"></i> Close</button>
+    {{/if}}
+  </div>
+</div>

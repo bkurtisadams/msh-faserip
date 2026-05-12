@@ -1,4 +1,9 @@
-// encounter-editor.js v0.1.0 - 2026-05-10
+// encounter-editor.js v0.2.0 - 2026-05-12
+// v0.2.0: Template body extracted to shared partial
+//         (templates/parts/encounter-editor-body.hbs); inline expansion
+//         in the team sheet renders the same partial so the two views
+//         stay in lockstep. Popout keeps its own _openSections set;
+//         inline state lives on TeamSheet._inlineEncSections.
 // EncounterEditor: pop-out window for editing a single encounter.
 // Reuses TeamSheet's data shape and event handlers; the popout's
 // activateListeners delegates to TeamSheet so all existing form
