@@ -131,4 +131,13 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
     this.#v1 = null;
     return super.close(options);
   }
+
+  /** @override
+   *  ApplicationV2 hides the detach control unless this returns true.
+   *  ActorSheetV2 / ItemSheetV2 inherit a true default; the base
+   *  DocumentSheetV2 we extend does not, which is why the chevron was
+   *  absent on the karma sheet despite being a real v2 application. */
+  _canDetach() {
+    return true;
+  }
 }

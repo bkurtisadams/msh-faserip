@@ -1705,8 +1705,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
     // Karma History — click the Karma header in secondary abilities
     html.find('.karma-history-link').click(ev => {
-      import('./karma.js').then(module => {
-        const sheet = new module.KarmaSheet(this.actor);
+      import('./karma-sheet-v2.js').then(module => {
+        const sheet = new module.KarmaSheetV2(this.actor);
         sheet.render(true);
       });
     });
