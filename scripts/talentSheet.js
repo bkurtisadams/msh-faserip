@@ -14,6 +14,8 @@
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
 
+import { RANKS_ORDERED } from "./rules/rules-reference.js";
+
 const TALENT_SPECIALTIES = {
   "Weapon Skill": ["Guns", "Thrown Weapons", "Bows", "Blunt Weapons", "Sharp Weapons",
                   "Oriental Weapons", "Marksman", "Weapons Master", "Weapons Specialist"],
@@ -106,6 +108,8 @@ export class FaseripTalentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
     context.item = this.item;
     context.system = this.item.system;
     context.cssClass = "faserip-dialog talent-dialog";
+    // Feeble → Shift-Z, matches the pre-extraction rankOverride list.
+    context.rankListTalentOverride = RANKS_ORDERED.slice(1, 14);
     return context;
   }
 

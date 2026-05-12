@@ -50,9 +50,7 @@
         <div class="ps2-field">
           <label>Rank</label>
           <select name="system.rank" id="ps2-rank">
-            {{#each (array "Shift-0" "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
-              <option value="{{r}}" {{#if (eq ../system.rank r)}}selected{{/if}}>{{r}}</option>
-            {{/each}}
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.rank}}
           </select>
         </div>
         <div class="ps2-field">

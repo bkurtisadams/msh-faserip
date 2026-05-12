@@ -2375,6 +2375,32 @@ Hooks.once("ready", async () => {
     }
   }
 
+  // Migrate equipment.intensityRank: "Shift X" (with space, accidental
+  // typo in the original dropdown) -> "Shift-X" (hyphen — the canonical
+  // form used everywhere else in the rules tables). Idempotent: re-running
+  // finds no matches once cleaned. Actor-owned items only — world Items
+  // directory is not migrated by existing patterns; if a user has loose
+  // equipment items in the Items sidebar with the typo, they can fix them
+  // by hand or call this loop with game.items in place of actor.items.
+  if (game.user.isGM) {
+    try {
+      let fixed = 0;
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type !== "equipment") continue;
+          if (item.system?.intensityRank === "Shift X") {
+            await item.update({ "system.intensityRank": "Shift-X" });
+            fixed++;
+            console.log(`[FASERIP] intensityRank typo fixed: ${actor.name} / ${item.name}`);
+          }
+        }
+      }
+      if (fixed) console.log(`[FASERIP] intensityRank migration: ${fixed} equipment item(s) updated`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] intensityRank migration failed:", e);
+    }
+  }
+
   // Slam collision handlers (optional, safe)
   try {
     initializeSlamHandlers?.();

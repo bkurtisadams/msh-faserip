@@ -28,6 +28,7 @@
 // v1.7.0: Power Sheet layout reorganization
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
+import { RANKS_ORDERED } from "./rules/rules-reference.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -134,6 +135,14 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         ];
         context.vehicleTypes = ["Road","Off-Road","Railed","GEV","Air","Space","Water","Submersible"];
       }
+
+    // Rank lists consumed by templates/parts/rank-options.hbs.
+    // rankListMortal — capped at Unearthly. Used for material / price /
+    //   powerRank where game-balance instinct calls for a hard ceiling.
+    // rankListFull — Shift-0 → Beyond. Used wherever the full rank
+    //   range should be selectable (intensity fields, power.rank, etc.).
+    context.rankListMortal = RANKS_ORDERED.slice(0, 11);
+    context.rankListFull = RANKS_ORDERED;
 
     return context;
   }

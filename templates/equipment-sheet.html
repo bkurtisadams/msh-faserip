@@ -39,32 +39,12 @@
 
         <label>Material:</label>
         <select name="system.materialStrength">
-          <option value="Shift-0" {{#if (eq system.materialStrength "Shift-0")}}selected{{/if}}>Shift-0</option>
-          <option value="Feeble" {{#if (eq system.materialStrength "Feeble")}}selected{{/if}}>Feeble</option>
-          <option value="Poor" {{#if (eq system.materialStrength "Poor")}}selected{{/if}}>Poor</option>
-          <option value="Typical" {{#if (eq system.materialStrength "Typical")}}selected{{/if}}>Typical</option>
-          <option value="Good" {{#if (eq system.materialStrength "Good")}}selected{{/if}}>Good</option>
-          <option value="Excellent" {{#if (eq system.materialStrength "Excellent")}}selected{{/if}}>Excellent</option>
-          <option value="Remarkable" {{#if (eq system.materialStrength "Remarkable")}}selected{{/if}}>Remarkable</option>
-          <option value="Incredible" {{#if (eq system.materialStrength "Incredible")}}selected{{/if}}>Incredible</option>
-          <option value="Amazing" {{#if (eq system.materialStrength "Amazing")}}selected{{/if}}>Amazing</option>
-          <option value="Monstrous" {{#if (eq system.materialStrength "Monstrous")}}selected{{/if}}>Monstrous</option>
-          <option value="Unearthly" {{#if (eq system.materialStrength "Unearthly")}}selected{{/if}}>Unearthly</option>
+          {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListMortal selected=system.materialStrength}}
         </select>
 
         <label>Price:</label>
         <select name="system.price">
-          <option value="Shift-0" {{#if (eq system.price "Shift-0")}}selected{{/if}}>Shift-0</option>
-          <option value="Feeble" {{#if (eq system.price "Feeble")}}selected{{/if}}>Feeble</option>
-          <option value="Poor" {{#if (eq system.price "Poor")}}selected{{/if}}>Poor</option>
-          <option value="Typical" {{#if (eq system.price "Typical")}}selected{{/if}}>Typical</option>
-          <option value="Good" {{#if (eq system.price "Good")}}selected{{/if}}>Good</option>
-          <option value="Excellent" {{#if (eq system.price "Excellent")}}selected{{/if}}>Excellent</option>
-          <option value="Remarkable" {{#if (eq system.price "Remarkable")}}selected{{/if}}>Remarkable</option>
-          <option value="Incredible" {{#if (eq system.price "Incredible")}}selected{{/if}}>Incredible</option>
-          <option value="Amazing" {{#if (eq system.price "Amazing")}}selected{{/if}}>Amazing</option>
-          <option value="Monstrous" {{#if (eq system.price "Monstrous")}}selected{{/if}}>Monstrous</option>
-          <option value="Unearthly" {{#if (eq system.price "Unearthly")}}selected{{/if}}>Unearthly</option>
+          {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListMortal selected=system.price}}
         </select>
 
         <label>Broken:</label>
@@ -317,21 +297,7 @@
               <label>Stun/Gas Intensity:</label>
               <select name="system.stunIntensity">
                 <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
-                <option value="Shift-0" {{#if (eq system.stunIntensity "Shift-0")}}selected{{/if}}>Shift-0</option>
-                <option value="Feeble" {{#if (eq system.stunIntensity "Feeble")}}selected{{/if}}>Feeble</option>
-                <option value="Poor" {{#if (eq system.stunIntensity "Poor")}}selected{{/if}}>Poor</option>
-                <option value="Typical" {{#if (eq system.stunIntensity "Typical")}}selected{{/if}}>Typical</option>
-                <option value="Good" {{#if (eq system.stunIntensity "Good")}}selected{{/if}}>Good</option>
-                <option value="Excellent" {{#if (eq system.stunIntensity "Excellent")}}selected{{/if}}>Excellent</option>
-                <option value="Remarkable" {{#if (eq system.stunIntensity "Remarkable")}}selected{{/if}}>Remarkable</option>
-                <option value="Incredible" {{#if (eq system.stunIntensity "Incredible")}}selected{{/if}}>Incredible</option>
-                <option value="Amazing" {{#if (eq system.stunIntensity "Amazing")}}selected{{/if}}>Amazing</option>
-                <option value="Monstrous" {{#if (eq system.stunIntensity "Monstrous")}}selected{{/if}}>Monstrous</option>
-                <option value="Unearthly" {{#if (eq system.stunIntensity "Unearthly")}}selected{{/if}}>Unearthly</option>
-                <option value="Shift-X" {{#if (eq system.stunIntensity "Shift-X")}}selected{{/if}}>Shift-X</option>
-                <option value="Class 1000" {{#if (eq system.stunIntensity "Class 1000")}}selected{{/if}}>Class 1000</option>
-                <option value="Class 3000" {{#if (eq system.stunIntensity "Class 3000")}}selected{{/if}}>Class 3000</option>
-                <option value="Class 5000" {{#if (eq system.stunIntensity "Class 5000")}}selected{{/if}}>Class 5000</option>
+                {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.stunIntensity}}
               </select>
             </div>
 
@@ -996,17 +962,7 @@
         <div class="form-group">
           <label>Power Rank:</label>
           <select name="system.powerRank">
-            <option value="Shift-0" {{#if (eq system.powerRank "Shift-0")}}selected{{/if}}>Shift-0</option>
-            <option value="Feeble" {{#if (eq system.powerRank "Feeble")}}selected{{/if}}>Feeble</option>
-            <option value="Poor" {{#if (eq system.powerRank "Poor")}}selected{{/if}}>Poor</option>
-            <option value="Typical" {{#if (eq system.powerRank "Typical")}}selected{{/if}}>Typical</option>
-            <option value="Good" {{#if (eq system.powerRank "Good")}}selected{{/if}}>Good</option>
-            <option value="Excellent" {{#if (eq system.powerRank "Excellent")}}selected{{/if}}>Excellent</option>
-            <option value="Remarkable" {{#if (eq system.powerRank "Remarkable")}}selected{{/if}}>Remarkable</option>
-            <option value="Incredible" {{#if (eq system.powerRank "Incredible")}}selected{{/if}}>Incredible</option>
-            <option value="Amazing" {{#if (eq system.powerRank "Amazing")}}selected{{/if}}>Amazing</option>
-            <option value="Monstrous" {{#if (eq system.powerRank "Monstrous")}}selected{{/if}}>Monstrous</option>
-            <option value="Unearthly" {{#if (eq system.powerRank "Unearthly")}}selected{{/if}}>Unearthly</option>
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListMortal selected=system.powerRank}}
           </select>
         </div>
         
@@ -1269,19 +1225,7 @@
         <div class="form-fields" style="display:flex;gap:4px;align-items:center;">
           <select name="system.intensityRank" style="width:auto;">
             <option value="" {{#if (eq system.intensityRank "")}}selected{{/if}}>None</option>
-            <option value="Shift-0" {{#if (eq system.intensityRank "Shift-0")}}selected{{/if}}>Shift-0</option>
-            <option value="Feeble" {{#if (eq system.intensityRank "Feeble")}}selected{{/if}}>Feeble</option>
-            <option value="Poor" {{#if (eq system.intensityRank "Poor")}}selected{{/if}}>Poor</option>
-            <option value="Typical" {{#if (eq system.intensityRank "Typical")}}selected{{/if}}>Typical</option>
-            <option value="Good" {{#if (eq system.intensityRank "Good")}}selected{{/if}}>Good</option>
-            <option value="Excellent" {{#if (eq system.intensityRank "Excellent")}}selected{{/if}}>Excellent</option>
-            <option value="Remarkable" {{#if (eq system.intensityRank "Remarkable")}}selected{{/if}}>Remarkable</option>
-            <option value="Incredible" {{#if (eq system.intensityRank "Incredible")}}selected{{/if}}>Incredible</option>
-            <option value="Amazing" {{#if (eq system.intensityRank "Amazing")}}selected{{/if}}>Amazing</option>
-            <option value="Monstrous" {{#if (eq system.intensityRank "Monstrous")}}selected{{/if}}>Monstrous</option>
-            <option value="Unearthly" {{#if (eq system.intensityRank "Unearthly")}}selected{{/if}}>Unearthly</option>
-            <option value="Shift X" {{#if (eq system.intensityRank "Shift X")}}selected{{/if}}>Shift X</option>
-            <option value="Class 1000" {{#if (eq system.intensityRank "Class 1000")}}selected{{/if}}>Class 1000</option>
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.intensityRank}}
           </select>
           <span style="font-size:0.75em;color:#888;">For FEAT vs Intensity rolls (gas, flash, etc.)</span>
         </div>
