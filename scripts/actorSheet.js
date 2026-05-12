@@ -396,6 +396,8 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       }
     }
 
+    context.rankList = _RANKS;
+
     return context;
   }
 

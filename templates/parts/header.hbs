@@ -161,40 +161,7 @@
               <td>
                 <!-- For the Fighting ability dropdown -->
                 <select name="system.abilities.fighting.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.fighting.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.fighting.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.fighting.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.fighting.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.fighting.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.fighting.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.fighting.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.fighting.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.fighting.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.fighting.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.fighting.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.fighting.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.fighting.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.fighting.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.fighting.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.fighting.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.fighting.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.fighting.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.fighting.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.fighting.value"
@@ -208,40 +175,7 @@
                   value="{{system.abilities.agility.initialRank}}" /></td>
               <td>
                 <select name="system.abilities.agility.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.agility.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.agility.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.agility.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.agility.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.agility.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.agility.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.agility.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.agility.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.agility.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.agility.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.agility.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.agility.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.agility.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.agility.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.agility.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.agility.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.agility.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.agility.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.agility.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.agility.value"
@@ -256,40 +190,7 @@
                   value="{{system.abilities.strength.initialRank}}" /></td>
               <td>
                 <select name="system.abilities.strength.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.strength.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.strength.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.strength.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.strength.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.strength.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.strength.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.strength.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.strength.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.strength.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.strength.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.strength.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.strength.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.strength.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.strength.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.strength.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.strength.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.strength.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.strength.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.strength.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.strength.value"
@@ -303,40 +204,7 @@
                   value="{{system.abilities.endurance.initialRank}}" /></td>
               <td>
                 <select name="system.abilities.endurance.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.endurance.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.endurance.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.endurance.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.endurance.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.endurance.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.endurance.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.endurance.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.endurance.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.endurance.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.endurance.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.endurance.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.endurance.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.endurance.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.endurance.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.endurance.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.endurance.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.endurance.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.endurance.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.endurance.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.endurance.value"
@@ -350,40 +218,7 @@
                   value="{{system.abilities.reason.initialRank}}" /></td>
               <td>
                 <select name="system.abilities.reason.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.reason.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.reason.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.reason.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.reason.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.reason.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.reason.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.reason.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.reason.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.reason.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.reason.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.reason.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.reason.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.reason.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.reason.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.reason.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.reason.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.reason.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.reason.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.reason.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.reason.value" value="{{system.abilities.reason.value}}" />
@@ -397,40 +232,7 @@
                   value="{{system.abilities.intuition.initialRank}}" /></td>
               <td>
                 <select name="system.abilities.intuition.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.intuition.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.intuition.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.intuition.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.intuition.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.intuition.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.intuition.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.intuition.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.intuition.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.intuition.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.intuition.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.intuition.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.intuition.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.intuition.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.intuition.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.intuition.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.intuition.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.intuition.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.intuition.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.intuition.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.intuition.value"
@@ -444,40 +246,7 @@
                   value="{{system.abilities.psyche.initialRank}}" /></td>
               <td>
                 <select name="system.abilities.psyche.rank">
-                  <option value="Shift-0" {{#if (eq system.abilities.psyche.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                  </option>
-                  <option value="Feeble" {{#if (eq system.abilities.psyche.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.abilities.psyche.rank "Poor" )}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq system.abilities.psyche.rank "Typical" )}}selected{{/if}}>Typical
-                  </option>
-                  <option value="Good" {{#if (eq system.abilities.psyche.rank "Good" )}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq system.abilities.psyche.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.abilities.psyche.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.abilities.psyche.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.abilities.psyche.rank "Amazing" )}}selected{{/if}}>Amazing
-                  </option>
-                  <option value="Monstrous" {{#if (eq system.abilities.psyche.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.abilities.psyche.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                  <option value="Shift-X" {{#if (eq system.abilities.psyche.rank "Shift-X" )}}selected{{/if}}>Shift-X
-                  </option>
-                  <option value="Shift-Y" {{#if (eq system.abilities.psyche.rank "Shift-Y" )}}selected{{/if}}>Shift-Y
-                  </option>
-                  <option value="Shift-Z" {{#if (eq system.abilities.psyche.rank "Shift-Z" )}}selected{{/if}}>Shift-Z
-                  </option>
-                  <option value="Class 1000" {{#if (eq system.abilities.psyche.rank "Class 1000" )}}selected{{/if}}>
-                    Class 1000</option>
-                  <option value="Class 3000" {{#if (eq system.abilities.psyche.rank "Class 3000" )}}selected{{/if}}>
-                    Class 3000</option>
-                  <option value="Class 5000" {{#if (eq system.abilities.psyche.rank "Class 5000" )}}selected{{/if}}>
-                    Class 5000</option>
-                  <option value="Beyond" {{#if (eq system.abilities.psyche.rank "Beyond" )}}selected{{/if}}>Beyond
-                  </option>
+                  {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankList selected=system.abilities.psyche.rank}}
                 </select>
               </td>
               <td><input type="number" name="system.abilities.psyche.value" value="{{system.abilities.psyche.value}}" />
