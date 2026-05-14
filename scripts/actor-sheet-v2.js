@@ -248,17 +248,35 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   }
 
   async _onEditImage(target) {
-    if (!this.isEditable) return;
-    const attr = target.dataset.edit;
+    const attr = target?.dataset?.edit;
     if (!attr) return;
-    const FP = foundry.applications.apps.FilePicker?.implementation
-            ?? globalThis.FilePicker;
-    if (!FP) return;
+
+    // Editability: V2's isEditable should be true for GMs/owners, but in
+    // some v14 builds it briefly returns false on first render. Fall back
+    // to a direct permission check + GM role so the picker still opens.
+    const canEdit = this.isEditable
+      || this.actor?.canUserModify?.(game.user, "update")
+      || game.user?.isGM;
+    if (!canEdit) return;
+
+    // FilePicker in v14: foundry.applications.apps.FilePicker is the V2
+    // class; .implementation is the resolved subclass on builds that
+    // expose it. globalThis.FilePicker is the appv1 shim which newer
+    // v14 patches have started removing. Try them in order.
+    const FilePickerClass =
+         foundry.applications?.apps?.FilePicker?.implementation
+      ?? foundry.applications?.apps?.FilePicker
+      ?? globalThis.FilePicker;
+    if (!FilePickerClass) {
+      console.warn("FaseripActorSheetV2 | FilePicker class not found; cannot edit", attr);
+      return;
+    }
+
     const current = foundry.utils.getProperty(this.actor, attr);
-    return new FP({
+    return new FilePickerClass({
       type: "image",
       current,
-      callback: path => this.actor.update({ [attr]: path }),
+      callback: (path) => this.actor.update({ [attr]: path }),
       top: (this.position?.top ?? 0) + 40,
       left: (this.position?.left ?? 0) + 10
     }).browse();
