@@ -1812,14 +1812,14 @@ Hooks.once("init", async () => {
   });
 
   // V2 actor sheet (opt-in). Registered after v1 so it wins makeDefault for
-  // hero/villain when the toggle is on. NPCs stay on v1 regardless.
+  // hero/villain/npc when the toggle is on.
   if (game.settings.get("msh-faserip", "useActorSheetV2") === true) {
     foundry.applications.apps.DocumentSheetConfig.registerSheet(
       Actor,
       "msh-faserip",
       FaseripActorSheetV2,
       {
-        types: ["hero", "villain"],
+        types: ["hero", "villain", "npc"],
         label: "MSH FASERIP V2 Sheet",
         makeDefault: true
       }
