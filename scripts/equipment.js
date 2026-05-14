@@ -1,4 +1,9 @@
-// equipment.js v2.1.0 - 2026-05-06
+// equipment.js v2.2.0 - 2026-05-14
+// v2.2.0: Fix empty Material/Price selects (rankListMortal was never set in context;
+//         rank-options.hbs iterated undefined and emitted zero options). Port live-form
+//         rescan into _prepareSubmitData so V2's partial formData no longer drops the
+//         Damage/Damage-Type and other combat-section fields on submitOnChange (same
+//         workaround itemSheet.js v2.1.0 applies).
 // v2.1.0: Per-attack-mode Resistance FEAT fields (resistRank/resistAbility/resistEffect/
 //         resistDuration/resistDescription). Multi-mode weapons can now declare an
 //         intensity-style FEAT-to-resist alongside their damage attack — e.g. Air Pistol
@@ -133,6 +138,11 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       context.deviceFunctionsDisplay = this._buildDeviceFunctionsDisplay();
     }
 
+    // Rank list for material / price dropdowns (rank-options.hbs partial).
+    // Mortal cap: Shift-0 through Unearthly.
+    context.rankListMortal = this.constructor.RANKS_ORDERED.slice(0, 11);
+    context.rankListFull = this.constructor.RANKS_ORDERED;
+
     return context;
   }
 
@@ -145,7 +155,13 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
    * which defaults to this.document.update(submitData).
    */
   _prepareSubmitData(event, form, formData) {
-    const data = foundry.utils.expandObject(formData.object);
+    // V2 passes a formData snapshot that drops late-rendered / untracked
+    // fields. Rescan the live on-screen form instead (same workaround
+    // itemSheet.js applies for power/talent/contact sheets).
+    const FDE = foundry.applications.ux?.FormDataExtended ?? FormDataExtended;
+    const liveForm = this.element?.querySelector?.("form") ?? form;
+    const fresh = (liveForm instanceof HTMLFormElement) ? new FDE(liveForm) : formData;
+    const data = foundry.utils.expandObject(fresh.object);
     if (!data.system) data.system = {};
     const category = (data.system.category !== undefined) ? data.system.category : this.item.system.category;
 
