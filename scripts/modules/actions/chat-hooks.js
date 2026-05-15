@@ -602,6 +602,41 @@ export function installActionChatHandlers() {
       }
     });
 
+    // 3a) Wash continuing damage (corrosive, acid, etc.)
+    html.on("click", '[data-action="wash-continuing-damage"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorUuid = btn.dataset.actorUuid;
+      const effectId = btn.dataset.effectId;
+      if (!actorUuid || !effectId) return;
+      try {
+        const doc = await fromUuid(actorUuid);
+        const actor = doc?.actor ?? doc ?? null;
+        if (!actor) return;
+        if (!actor.isOwner && !game.user.isGM) {
+          ui.notifications.warn("You don't own this actor.");
+          return;
+        }
+        const { washContinuingDamage } = await import("../effects/ongoing-engine.js");
+        const ok = await washContinuingDamage(actor, effectId);
+        if (ok) {
+          btn.disabled = true;
+          btn.style.opacity = "0.5";
+          btn.innerHTML = '<i class="fas fa-check"></i> Washed';
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `<div style="background:#e3f2fd;border:1px solid #0277bd;padding:6px;border-radius:4px;">
+              <strong>${actor.name}</strong> washes off the corrosive — ongoing damage halted.
+            </div>`
+          });
+        } else {
+          ui.notifications.warn("Effect not found or cannot be washed.");
+        }
+      } catch (e) {
+        console.error("[FASERIP] Wash continuing damage handler failed:", e);
+      }
+    });
+
     // 4) Collision Damage Calculator chip
     html.on("click", '[data-action="calculate-collision"]', async (ev) => {
       ev.preventDefault();

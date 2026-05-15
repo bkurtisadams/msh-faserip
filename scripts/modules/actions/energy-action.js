@@ -452,7 +452,7 @@ export class EnergyAction extends RangedAttackAction {
             const isAdHoc = srcVal === "adhoc";
             html.find('#adhoc-row').css('display', isAdHoc ? 'block' : 'none');
 
-            let currentDamage = 0, currentRank = "Remarkable", isEnergyGeneration = false;
+            let currentDamage = 0, currentRank = "Remarkable", isEnergyGeneration = false, isCorrosive = false;
             if (isAdHoc) {
               currentDamage = Number(html.find('[name="adhocDamage"]').val()) || 0;
               currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
@@ -466,6 +466,8 @@ export class EnergyAction extends RangedAttackAction {
                 const nameLower = item.name.toLowerCase();
                 isEnergyGeneration = nameLower.includes('energy generation') ||
                   s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
+                const dtLower = String(s.damageType || "").toLowerCase();
+                isCorrosive = /corrosive|acid/.test(nameLower) || /corrosive|acid/.test(dtLower);
               }
             }
 
@@ -479,6 +481,18 @@ export class EnergyAction extends RangedAttackAction {
               $resultCapControls.hide();
               html.find('[name="resultCap"][value="none"]').prop('checked', true);
               $effectNote.text('Effect ≠ reduced').css('color', '#888');
+            }
+
+            // Corrosive: cannot reduce damage per rules. Lock reduce controls off.
+            const $reduceToggle = html.find('#reduce-damage-enabled');
+            const $reduceInput  = html.find('[name="reducedDamage"]');
+            if (isCorrosive) {
+              $reduceToggle.prop('checked', false).prop('disabled', true);
+              $reduceInput.prop('disabled', true);
+              $effectNote.text('Corrosive: damage cannot be reduced').css('color', '#bf360c');
+            } else {
+              $reduceToggle.prop('disabled', false);
+              $reduceInput.prop('disabled', !$reduceToggle.is(':checked'));
             }
 
             html.find('#dmg-val').text(currentDamage);

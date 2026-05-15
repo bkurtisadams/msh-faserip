@@ -1359,6 +1359,36 @@ export class AttackAction extends BaseAction {
           wasKillResult: showKill,
           forceKilling: showKill  // ensure kill save triggers on red
         });
+
+        // ── Continuing damage (corrosive, acid, etc.) ──
+        // If the source power has continuingDamage flagged OR is an inherently
+        // ongoing type (corrosive, rotting per RAW), register an ongoing effect
+        // on the target for subsequent-round damage per the schedule.
+        const weapon = choice?.weapon;
+        const wSys = weapon?.system || {};
+        const nameLc = String(weapon?.name || "").toLowerCase();
+        const dtLc = String(wSys.damageType || "").toLowerCase();
+        const isCorrosive = /corrosive|acid/.test(nameLc) || /corrosive|acid/.test(dtLc);
+        const isRotting = /rotting|decay/.test(nameLc);
+        const continuingByRule = isCorrosive || isRotting;
+        const continuingByAuthor = wSys.continuingDamage === true;
+        if (weapon?.type === "power" && (continuingByAuthor || continuingByRule) && afterArmor > 0) {
+          const { applyContinuingDamage } = await import("../effects/ongoing-engine.js");
+          const totalRounds = Math.max(1, Number(wSys.continuingDamageRounds) || 3);
+          const pattern = continuingByRule ? "diminishing-2cs" : "constant";
+          const canWash = isCorrosive;
+          await applyContinuingDamage(targetActor, {
+            name: `${weapon.name} — Continuing`,
+            initialRank: wSys.rank || "Typical",
+            pattern,
+            rounds: totalRounds,
+            includeInitial: false,  // initial hit already applied via applyDamageToTargets
+            canWash,
+            damageType: wSys.damageType || damageType,
+            originUuid: actor.uuid,
+            img: isCorrosive ? "icons/svg/acid.svg" : "icons/svg/blood.svg",
+          });
+        }
       }
 
       // ============================================================

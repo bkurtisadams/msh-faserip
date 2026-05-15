@@ -319,6 +319,13 @@ Hooks.once("init", async () => {
   game.msh._classifyWeapon = classifyWeapon;
   game.msh.fx = fxService;
 
+  // Continuing damage helpers (corrosive, acid, etc.)
+  import("./modules/effects/ongoing-engine.js").then(m => {
+    game.msh.washContinuingDamage = m.washContinuingDamage;
+    game.msh.listContinuingDamageEffects = m.listContinuingDamageEffects;
+    game.msh.applyContinuingDamage = m.applyContinuingDamage;
+  }).catch(() => {});
+
   // Guard so we don't wrap twice if code reloads
   if (!ActiveEffect.prototype._mshFlagShimApplied) {
     const _origGetFlag = ActiveEffect.prototype.getFlag;

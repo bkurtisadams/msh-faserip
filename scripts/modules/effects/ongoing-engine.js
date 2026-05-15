@@ -83,6 +83,7 @@
 
 import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect, safeActorUpdateEffect } from "../../gm-utils.js";
+import { RANKS_ORDERED } from "../../rules/rules-reference.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -461,6 +462,8 @@ async function executeEffect(actor, ae, effectId, config, rawAmount, cycles, wor
     await executeHealthHeal(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName);
   } else if (type === "damage" && stat === "health") {
     await executeHealthDamage(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName);
+  } else if (type === "continuing-damage") {
+    await executeContinuingDamage(actor, ae, effectId, config, cycles, worldTime, scope, cycleSeconds, startedAt, effectName);
   } else if (type === "stat.loss" && stat === "endurance") {
     await executeEnduranceLoss(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName);
   } else if (type === "stat.gain" && stat === "endurance") {
@@ -552,6 +555,112 @@ async function executeHealthDamage(actor, ae, effectId, config, dmgPerCycle, cyc
   );
 
   console.log(`[FASERIP] ${actor.name}: ${effectName} dealt ${totalDmg} damage (${cycles} cycle(s)), HP ${currentHP} → ${newHP}`);
+}
+
+// ─── Continuing damage (schedule-driven, e.g. corrosive) ──────────────────────
+
+function shiftRankByCS(rankName, deltaCS) {
+  const idx = RANKS_ORDERED.indexOf(rankName);
+  if (idx < 0) return rankName;
+  const newIdx = Math.max(0, Math.min(RANKS_ORDERED.length - 1, idx + deltaCS));
+  return RANKS_ORDERED[newIdx];
+}
+
+function rankToValue(rankName) {
+  return game.msh?.getRankValue?.(rankName) ?? 0;
+}
+
+/**
+ * Compute damage-per-round schedule.
+ * @param {object} opts
+ * @param {string} opts.pattern - "constant" | "diminishing-1cs" | "diminishing-2cs" | "custom"
+ * @param {number} opts.rounds
+ * @param {string} opts.initialRank - rank name (e.g. "Incredible")
+ * @param {number[]} [opts.customSchedule]
+ * @returns {number[]} damage value per round
+ */
+export function computeDamageSchedule({ pattern = "constant", rounds = 1, initialRank, customSchedule } = {}) {
+  if (pattern === "custom" && Array.isArray(customSchedule)) {
+    return customSchedule.slice(0, rounds);
+  }
+  const initial = rankToValue(initialRank);
+  if (pattern === "constant") {
+    return Array(Math.max(0, rounds)).fill(initial);
+  }
+  const stepCS = pattern === "diminishing-1cs" ? -1 : pattern === "diminishing-2cs" ? -2 : 0;
+  if (stepCS === 0) return [initial];
+  const out = [];
+  for (let i = 0; i < rounds; i++) {
+    out.push(rankToValue(shiftRankByCS(initialRank, stepCS * i)));
+  }
+  return out;
+}
+
+async function executeContinuingDamage(actor, ae, effectId, config, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
+  const schedule = Array.isArray(config.schedule) ? config.schedule : [];
+  if (!schedule.length) return;
+
+  const startTick = config.triggerCount || 0;
+  let totalDmg = 0;
+  let ticksApplied = 0;
+  for (let i = 0; i < cycles; i++) {
+    const tickIdx = startTick + i;
+    if (tickIdx >= schedule.length) break;
+    totalDmg += Number(schedule[tickIdx] || 0);
+    ticksApplied++;
+  }
+  if (ticksApplied === 0) return;
+
+  const currentHP = actor.system?.attributes?.health?.value ?? 0;
+  const newHP = Math.max(0, currentHP - totalDmg);
+  await actor.update({ "system.attributes.health.value": newHP });
+
+  const newStartedAt = startedAt + (cycles * cycleSeconds);
+  const newTriggerCount = startTick + ticksApplied;
+  await actor.setFlag(scope, `ongoing.${effectId}`, {
+    ...config,
+    startedAt: newStartedAt,
+    lastTriggered: worldTime,
+    triggerCount: newTriggerCount,
+  });
+
+  const exhausted = newTriggerCount >= schedule.length;
+  if (exhausted && config.autoDisable !== false) {
+    await ae.update({ disabled: true });
+  }
+
+  const dmgType = config.damageType ? ` ${config.damageType}` : "";
+  const remaining = schedule.length - newTriggerCount;
+  const tail = exhausted
+    ? `<div style="margin-top:4px;font-size:0.85em;color:#7a3d00;">Continuing damage exhausted.</div>`
+    : `<div style="margin-top:4px;font-size:0.85em;color:#555;">Rounds remaining: ${remaining}</div>`;
+
+  const washBtn = (!exhausted && config.canWash !== false)
+    ? `<div style="margin-top:6px;text-align:right;">
+         <button type="button" data-action="wash-continuing-damage"
+                 data-actor-uuid="${actor.uuid}" data-effect-id="${effectId}"
+                 style="font-size:11px;padding:3px 8px;background:#0277bd;color:#fff;border:none;border-radius:3px;cursor:pointer;">
+           <i class="fas fa-tint"></i> Wash off
+         </button>
+       </div>`
+    : "";
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<div style="background:#fff3e0;border:2px solid #e65100;padding:10px;border-radius:5px;">
+      <div style="font-size:1.1em;font-weight:bold;color:#bf360c;margin-bottom:4px;">
+        <i class="fas fa-flask"></i> ${effectName}
+      </div>
+      <div>
+        <strong>${actor.name}</strong> took <strong>${totalDmg}${dmgType} damage</strong>
+        <div style="margin-top:4px;font-size:0.9em;color:#555;">
+          Round ${newTriggerCount}/${schedule.length} | Health: ${currentHP} &rarr; ${newHP}
+        </div>${tail}${washBtn}
+      </div>
+    </div>`
+  });
+
+  console.log(`[FASERIP] ${actor.name}: ${effectName} continuing-damage tick ${newTriggerCount}/${schedule.length} dealt ${totalDmg}, HP ${currentHP} → ${newHP}`);
 }
 
 async function executeEnduranceLoss(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
@@ -1273,4 +1382,122 @@ function _recalcMaxHealth(actor, newEnduranceValue) {
   const a = actor.system?.abilities?.agility?.value ?? 0;
   const s = actor.system?.abilities?.strength?.value ?? 0;
   return f + a + s + newEnduranceValue;
+}
+
+// ─── Continuing damage convenience wrappers ───────────────────────────────────
+
+/**
+ * Register a continuing-damage ongoing effect on a target.
+ * The initial-hit damage is NOT applied here — that's the attack's job.
+ * This schedules subsequent rounds (typically rounds 2..N).
+ *
+ * @param {Actor|Token} target
+ * @param {object} opts
+ * @param {string} opts.name - Display name (e.g. "Corrosive Damage")
+ * @param {string} opts.initialRank - Power rank for schedule generation
+ * @param {string} [opts.pattern="constant"] - "constant" | "diminishing-1cs" | "diminishing-2cs" | "custom"
+ * @param {number} [opts.rounds=3] - Total rounds the effect lasts (including initial if includeInitial)
+ * @param {boolean} [opts.includeInitial=false] - If false, schedule starts at round 2 (initial hit already applied)
+ * @param {number[]} [opts.customSchedule] - Explicit damage array (pattern="custom")
+ * @param {boolean} [opts.canWash=true]
+ * @param {string} [opts.damageType="physical"]
+ * @param {string} [opts.originUuid=null]
+ * @param {string} [opts.img="icons/svg/acid.svg"]
+ * @param {string} [opts.effectId] - Custom effect id; auto-generated if omitted
+ * @returns {Promise<ActiveEffect|null>}
+ */
+export async function applyContinuingDamage(target, {
+  name = "Continuing Damage",
+  initialRank,
+  pattern = "constant",
+  rounds = 3,
+  includeInitial = false,
+  customSchedule,
+  canWash = true,
+  damageType = "physical",
+  originUuid = null,
+  img = "icons/svg/acid.svg",
+  effectId = null,
+} = {}) {
+  const actor = target?.actor ?? target;
+  if (!actor || !initialRank) return null;
+
+  let schedule = computeDamageSchedule({ pattern, rounds, initialRank, customSchedule });
+  if (!includeInitial) {
+    schedule = schedule.slice(1);
+  }
+  if (!schedule.length) return null;
+
+  const id = effectId || `continuing-${foundry.utils.randomID(8)}`;
+
+  return registerOngoingEffect(actor, id, {
+    type: "continuing-damage",
+    stat: "health",
+    schedule,
+    pattern,
+    initialRank,
+    rounds: schedule.length,
+    canWash,
+    damageType,
+    rate: 1,
+    cycle: "round",
+    count: schedule.length,
+    gate: "none",
+    interruptOnDamage: false,
+    autoDisable: true,
+    originUuid,
+  }, {
+    name,
+    img,
+    disabled: false,
+    duration: { rounds: schedule.length, expiry: "roundEnd" },
+    extraFlags: {
+      continuingDamage: true,
+      canWash,
+      schedule,
+      damageType,
+    }
+  });
+}
+
+/**
+ * Remove a continuing-damage effect early (wash off).
+ * @param {Actor} actor
+ * @param {string} effectId
+ * @returns {Promise<boolean>} true if washed, false if not eligible or not found
+ */
+export async function washContinuingDamage(actor, effectId) {
+  if (!actor) return false;
+  const scope = SCOPE();
+  const config = actor.getFlag(scope, `ongoing.${effectId}`);
+  if (!config) return false;
+  if (config.canWash === false) return false;
+  await removeOngoingEffect(actor, effectId);
+  return true;
+}
+
+/**
+ * Find all wash-able continuing-damage effects on an actor.
+ * @param {Actor} actor
+ * @returns {{effectId: string, name: string, schedule: number[], damageType: string}[]}
+ */
+export function listContinuingDamageEffects(actor) {
+  if (!actor) return [];
+  const scope = SCOPE();
+  const map = actor.getFlag(scope, "ongoing") || {};
+  const results = [];
+  for (const [id, cfg] of Object.entries(map)) {
+    if (cfg?.type === "continuing-damage") {
+      const ae = actor.effects.find(e => e.flags?.[scope]?.ongoingId === id);
+      results.push({
+        effectId: id,
+        name: ae?.name || cfg.name || "Continuing Damage",
+        schedule: cfg.schedule || [],
+        damageType: cfg.damageType || "physical",
+        canWash: cfg.canWash !== false,
+        triggerCount: cfg.triggerCount || 0,
+      });
+    }
+  }
+  return results;
 }
