@@ -1,4 +1,7 @@
-// scripts/modules/actions/mental-power-action.js v2.3.2 - 2026-05-15
+// scripts/modules/actions/mental-power-action.js v2.3.3 - 2026-05-15
+// v2.3.3: Telepathy dialog constrained to 280px width. Drop redundant Power
+//         row (title shows it). Reminder block stacked one-rule-per-line.
+//         Dialog title simplified from "X - Telepathy" to "X".
 // v2.3.2: Telepathy dialog uses .frp-dlg + .frp-box compact layout
 //         (Barlow Condensed 13px, grid rows) to match other action dialogs.
 // v2.3.1: Telepathy: measure distance vs power range — out-of-range = auto-fail.
@@ -316,32 +319,38 @@ export class MentalPowerAction extends BaseAction {
       const dialogHtml = `
         <div class="frp-dlg" style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:13px;">
           <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;">
-            <div style="display:grid;grid-template-columns:70px 1fr;gap:1px 8px;line-height:1.35;">
-              <span style="font-weight:600;color:#555;">Power:</span><span>${powerName} — <strong>${powerRank}</strong> (${powerValue})</span>
+            <div style="display:grid;grid-template-columns:56px 1fr;gap:1px 6px;line-height:1.35;">
+              <span style="font-weight:600;color:#555;">Rank:</span><span><strong>${powerRank}</strong> (${powerValue})</span>
               <span style="font-weight:600;color:#555;">Range:</span><span>${calculatedRange}</span>
-              <span style="font-weight:600;color:#555;">Distance:</span><span>${distanceDisplay}</span>
+              <span style="font-weight:600;color:#555;">Dist:</span><span>${distanceDisplay}</span>
               <span style="font-weight:600;color:#555;">Target:</span><span>${targetName}</span>
             </div>
           </div>
           <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;background:#f3e5f5;border-color:#ce93d8;">
-            <div style="display:grid;grid-template-columns:90px 1fr;gap:1px 8px;line-height:1.35;">
-              <span style="font-weight:600;color:#555;">Telepath Psy:</span><span><strong>${telepathPsycheRank}</strong> (${telepathPsycheValue})</span>
-              <span style="font-weight:600;color:#555;">Target Psy:</span><span><strong>${targetPsycheRank}</strong> (${targetPsycheValue})${hasMentalDefense ? ` <span style="color:#5e35b1;">— ${mentalDef.source} (${mentalDef.rank})</span>` : ""}</span>
+            <div style="display:grid;grid-template-columns:78px 1fr;gap:1px 6px;line-height:1.35;">
+              <span style="font-weight:600;color:#555;">Telepath:</span><span><strong>${telepathPsycheRank}</strong> (${telepathPsycheValue})</span>
+              <span style="font-weight:600;color:#555;">Target Psy:</span><span><strong>${targetPsycheRank}</strong> (${targetPsycheValue})${hasMentalDefense ? `<br><span style="color:#5e35b1;font-size:11px;">${mentalDef.source} (${mentalDef.rank})</span>` : ""}</span>
             </div>
           </div>
           <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;">
             <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" name="willing"> <span>Target is willing</span></label>
           </div>
           ${generateKarmaControlsHTML(actor, 0)}
-          <div style="font-size:11px;color:#555;margin-top:4px;padding:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;line-height:1.3;">
-            Power rank FEAT. Willing/lower Psy = Auto · Equal Psy = Yellow · Mental Powers/Psi-Screen = Red · Higher unwilling Psy = Impossible · Out of range = auto-fail.
+          <div style="font-size:10px;color:#555;margin-top:4px;padding:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;line-height:1.35;">
+            <div style="font-weight:600;color:#e65100;margin-bottom:2px;">Power rank FEAT</div>
+            <div>Willing / lower Psy → Auto</div>
+            <div>Equal Psy → Yellow</div>
+            <div>Mental Pow / Psi-Screen → Red</div>
+            <div>Higher unwilling Psy → Impossible</div>
+            <div>Out of range → Auto-fail</div>
           </div>
         </div>
       `;
 
       const choice = await new Promise((resolve) => {
         showFaseripButtonDialog({
-          title: `${powerName} - Telepathy`,
+          title: powerName,
+          width: 280,
           content: dialogHtml,
           buttons: {
             use: {
