@@ -18,6 +18,7 @@ import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
 import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
 import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
+import { POWER_RANGE } from "../../rules/rules-reference.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
@@ -49,7 +50,7 @@ export class MentalPowerAction extends BaseAction {
     const powerName = item.name;
     const powerRank = item.system.rank || "Typical";
     const powerValue = item.system.value || 6;
-    const calculatedRange = item.system.calculatedRange || this._getRangeByRank(powerRank);
+    const calculatedRange = item.system.calculatedRange || POWER_RANGE[powerRank] || "Unknown";
 
     // ── Nullifying Power: toggle on/off, no target needed ──
     const nameLc = (powerName || "").toLowerCase();
@@ -775,9 +776,13 @@ export class MentalPowerAction extends BaseAction {
         effectName   = "Unconscious";
         failMessage  = "is knocked unconscious";
         abilityLabel = "psyche";
-      } else if (nameLc.includes("mind control") || nameLc.includes("possession")) {
+      } else if (nameLc.includes("mind control")) {
         effectName   = "Controlled";
         failMessage  = "falls under psychic control";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("possession")) {
+        effectName   = "Possessed";
+        failMessage  = "is mentally possessed";
         abilityLabel = "psyche";
       } else if (nameLc.includes("emotion control")) {
         effectName   = "Emotion Controlled";
@@ -868,31 +873,5 @@ export class MentalPowerAction extends BaseAction {
 
     // Most mental powers use Psyche
     return "psyche";
-  }
-
-  /**
-   * Get range by rank (same as in itemSheet.js)
-   */
-  _getRangeByRank(rank) {
-    const rankRanges = {
-      "Feeble": "Touch only",
-      "Poor": "Touch only",
-      "Typical": "1 area",
-      "Good": "2 areas",
-      "Excellent": "4 areas",
-      "Remarkable": "6 areas",
-      "Incredible": "8 areas",
-      "Amazing": "10 areas",
-      "Monstrous": "20 areas",
-      "Unearthly": "40 areas",
-      "Shift-X": "60 areas",
-      "Shift-Y": "80 areas",
-      "Shift-Z": "160 areas",
-      "Class 1000": "400 areas",
-      "Class 3000": "100 miles",
-      "Class 5000": "10,000 miles",
-      "Beyond": "1,000,000 miles"
-    };
-    return rankRanges[rank] || "Unknown";
   }
 }

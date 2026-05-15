@@ -28,7 +28,7 @@
 // v1.7.0: Power Sheet layout reorganization
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
-import { RANKS_ORDERED } from "./rules/rules-reference.js";
+import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -114,9 +114,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
       // ----- NEW: provide a safe calculatedRange string when range === "rank"
       if (context.system?.range === "rank") {
-        // If you have a proper range engine, call it here instead.
-        const rankValue = Number(context.system?.value ?? 0);
-        context.calculatedRange = rankValue ? `${rankValue} areas (by rank)` : "";
+        context.calculatedRange = POWER_RANGE[context.system?.rank] || "";
       }
 
       // Helpful logging (kept from your original)
@@ -792,26 +790,7 @@ _updatePowerTypeOptions(html, category) {
 }
 
   _getRangeByRank(rank) {
-    const rankRanges = {
-      "Feeble": "1 area",
-      "Poor": "2 areas",
-      "Typical": "4 areas",
-      "Good": "6 areas",
-      "Excellent": "8 areas",
-      "Remarkable": "10 areas",
-      "Incredible": "20 areas",
-      "Amazing": "40 areas",
-      "Monstrous": "60 areas",
-      "Unearthly": "80 areas",
-      "Shift-X": "160 areas",
-      "Shift-Y": "400 areas",
-      "Shift-Z": "Line of Sight",
-      "Class 1000": "Line of Sight",
-      "Class 3000": "Line of Sight",
-      "Class 5000": "Line of Sight",
-      "Beyond": "Unlimited"
-    };
-    return rankRanges[rank] || "Unknown";
+    return POWER_RANGE[rank] || "Unknown";
   }
     
 }
