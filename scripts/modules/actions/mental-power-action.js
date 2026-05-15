@@ -1,4 +1,7 @@
-// scripts/modules/actions/mental-power-action.js v2.3.0 - 2026-05-15
+// scripts/modules/actions/mental-power-action.js v2.3.1 - 2026-05-15
+// v2.3.1: Telepathy: measure distance vs power range — out-of-range = auto-fail.
+//         Show Distance row on dialog and chat card. Result row replaces Roll
+//         row with descriptive content for auto/impossible/out-of-range cases.
 // v2.3.0: Telepathy uses contested Power rank FEAT (not Nullify save).
 //         Required color from Psyche comparison: willing/lower=auto,
 //         equal=yellow, mental defenses=red, higher unwilling=impossible.
@@ -8,7 +11,8 @@
 // v1.1.0: Unified chat card layout via buildCardShell/buildContentBox utilities
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
-import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField, universalColor } from "./action-utils.js";
+import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
+import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
@@ -297,9 +301,20 @@ export class MentalPowerAction extends BaseAction {
       const mentalDef = scanMentalDefenses(targetActor, "psyche");
       const hasMentalDefense = mentalDef.source !== "Psyche";
 
+      // Range check: telepath token vs target token
+      const srcToken = actor.getActiveTokens()?.[0];
+      const dstToken = target;
+      const distanceAreas = (srcToken && dstToken) ? measureAreasBetweenTokens(srcToken, dstToken) : null;
+      const maxRangeAreas = POWER_RANGE_VALUES[powerRank] ?? null;
+      const outOfRange = (distanceAreas !== null && maxRangeAreas !== null && distanceAreas > maxRangeAreas);
+      const distanceDisplay = distanceAreas === null
+        ? "<em>unknown (no tokens)</em>"
+        : `${distanceAreas} area${distanceAreas === 1 ? "" : "s"} / ${maxRangeAreas ?? "?"} max${outOfRange ? ' <span style="color:#b71c1c;font-weight:700;">OUT OF RANGE</span>' : ""}`;
+
       const dialogHtml = `
         <div style="margin-bottom:6px;"><strong>Power:</strong> ${powerName} — ${powerRank} (${powerValue})</div>
         <div style="margin-bottom:6px;"><strong>Range:</strong> ${calculatedRange}</div>
+        <div style="margin-bottom:6px;"><strong>Distance:</strong> ${distanceDisplay}</div>
         <div style="margin-bottom:6px;"><strong>Target:</strong> ${targetName}</div>
         <div style="padding:6px 8px;background:#f3e5f5;border:1px solid #ce93d8;border-radius:3px;margin-bottom:8px;">
           <div style="font-size:.9em;"><strong>Telepath Psyche:</strong> ${telepathPsycheRank} (${telepathPsycheValue})</div>
@@ -310,7 +325,7 @@ export class MentalPowerAction extends BaseAction {
         </div>
         ${generateKarmaControlsHTML(actor, 0)}
         <div style="font-size:0.82em;color:#555;margin-top:8px;padding:6px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-          Power rank FEAT. Willing/lower Psyche = Auto. Equal Psyche = Yellow. Mental Powers/Psi-Screen = Red. Higher unwilling Psyche = Impossible.
+          Power rank FEAT. Willing/lower Psyche = Auto. Equal Psyche = Yellow. Mental Powers/Psi-Screen = Red. Higher unwilling Psyche = Impossible. Out of range = automatic failure.
         </div>
       `;
 
@@ -339,7 +354,10 @@ export class MentalPowerAction extends BaseAction {
       if (!choice) return;
 
       let required, requiredReason;
-      if (choice.willing) {
+      if (outOfRange) {
+        required = "out-of-range";
+        requiredReason = `Target ${distanceAreas} areas away (max ${maxRangeAreas})`;
+      } else if (choice.willing) {
         required = "auto-success";
         requiredReason = "Target is willing";
       } else if (targetPsycheValue > telepathPsycheValue) {
@@ -361,7 +379,7 @@ export class MentalPowerAction extends BaseAction {
       let rollTotal = 0, rolledColor = "—", success = false, karmaUsed = 0;
       if (required === "auto-success") {
         success = true;
-      } else if (required === "auto-fail") {
+      } else if (required === "auto-fail" || required === "out-of-range") {
         success = false;
       } else {
         const roll = await (new Roll("1d100")).evaluate();
@@ -387,27 +405,42 @@ export class MentalPowerAction extends BaseAction {
 
       const reqDisplay = required === "auto-fail" ? "Impossible"
                        : required === "auto-success" ? "Automatic"
+                       : required === "out-of-range" ? "Out of Range"
                        : required.charAt(0).toUpperCase() + required.slice(1);
       const colorBg = { white: "#e0e0e0", green: "#c8e6c9", yellow: "#fff9c4", red: "#ffcdd2" };
-      const rollDisplay = (required === "auto-fail" || required === "auto-success")
-        ? "—"
-        : (karmaUsed > 0
-            ? `<s>${rollTotal - karmaUsed}</s> ${rollTotal} (+${karmaUsed} K) <span style="font-weight:600;">${rolledColor}</span>`
-            : `${rollTotal} <span style="font-weight:600;">${rolledColor}</span>`);
-      const rollBg = colorBg[rolledColor] || "#e0e0e0";
+
+      let resultCell;
+      if (required === "auto-success") {
+        resultCell = `<span style="color:#2e7d32;font-weight:600;">No roll needed — automatic</span>`;
+      } else if (required === "auto-fail") {
+        resultCell = `<span style="color:#b71c1c;font-weight:600;">No roll possible — impossible FEAT</span>`;
+      } else if (required === "out-of-range") {
+        resultCell = `<span style="color:#b71c1c;font-weight:600;">No roll — target out of range</span>`;
+      } else {
+        const rollBg = colorBg[rolledColor] || "#e0e0e0";
+        const rollText = karmaUsed > 0
+          ? `<s>${rollTotal - karmaUsed}</s> ${rollTotal} (+${karmaUsed} K) ${rolledColor}`
+          : `${rollTotal} ${rolledColor}`;
+        resultCell = `<span style="padding:1px 6px;background:${rollBg};border-radius:3px;display:inline-block;font-weight:600;">${rollText}</span>`;
+      }
+
+      const cardDistanceDisplay = distanceAreas === null
+        ? "<em>unknown</em>"
+        : `${distanceAreas} area${distanceAreas === 1 ? "" : "s"}${maxRangeAreas !== null ? ` / ${maxRangeAreas} max` : ""}${outOfRange ? ' <span style="color:#b71c1c;font-weight:700;">OUT OF RANGE</span>' : ""}`;
 
       const infoGrid = `<div style="display:grid;grid-template-columns:90px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
         <span style="font-weight:600;">Rank:</span><span>${powerRank} (${powerValue})</span>
         <span style="font-weight:600;">Range:</span><span>${calculatedRange}</span>
+        <span style="font-weight:600;">Distance:</span><span>${cardDistanceDisplay}</span>
         <span style="font-weight:600;">Required:</span><span>${reqDisplay} <span style="color:#666;font-size:.9em;">— ${requiredReason}</span></span>
-        <span style="font-weight:600;">Roll:</span><span style="padding:1px 6px;background:${rollBg};border-radius:3px;display:inline-block;">${rollDisplay}</span>
+        <span style="font-weight:600;">Result:</span><span>${resultCell}</span>
       </div>`;
 
       const resultBox = success
         ? `<div style="font-weight:700;color:#2e7d32;margin-bottom:4px;">Telepathic Contact Established</div>
            <div style="font-size:.9em;">${actor.name} reads ${targetName}'s surface thoughts. No visible or audible signs.</div>`
         : `<div style="font-weight:700;color:#b71c1c;margin-bottom:4px;">Contact Failed</div>
-           <div style="font-size:.9em;">${actor.name} cannot establish telepathic contact with ${targetName}.</div>`;
+           <div style="font-size:.9em;">${actor.name} cannot establish telepathic contact with ${targetName}${outOfRange ? " — beyond Telepathy range" : ""}.</div>`;
 
       const powerDesc = (item.system?.description || "").trim();
       const descSection = powerDesc
