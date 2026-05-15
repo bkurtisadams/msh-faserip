@@ -1,4 +1,10 @@
-﻿// init.js v1.12.3 - 2026-04-19
+﻿// init.js v1.12.4 - 2026-05-14
+// v1.12.4: syncPowerOngoingEffects now removes any existing generic
+//          "healing" ongoing when a Regen-rest or Regen-solar power is
+//          registered on an actor. Per RAW the standard End-rank/day
+//          healing is replaced, not stacked, while Regen is active.
+//          Pairs with rest-system.js ensureHealingEffect which now
+//          short-circuits while a Regen ongoing exists.
 // v1.12.3: Fix Regeneration auto-sync churn on every world load. The
 //          cleanup loop's isCorrect check and the hasAE re-create
 //          guard both used effectType === "regeneration" — the
@@ -2696,6 +2702,15 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");
     if (hasSolar) await OngoingEngine.removeOngoingEffect(actor, "solarRegeneration");
 
+    // Remove generic hourly Healing ongoing — per RAW, Regen replaces the
+    // normal "End rank# HP per day" rate, not stacks on top. The standard
+    // healer comes back via ensureHealingEffect when Regen is removed.
+    const hasGenericHealRest = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "healing");
+    if (hasGenericHealRest) {
+      await OngoingEngine.removeOngoingEffect(actor, "healing");
+      console.log(`[FASERIP] Generic Healing removed from ${actor.name} — superseded by Regeneration`);
+    }
+
     // Register resting regeneration (skip if already exists)
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
     if (!hasRegen) {
@@ -2714,6 +2729,13 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     // Remove resting if it was previously set
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
     if (hasRegen) await OngoingEngine.removeOngoingEffect(actor, "regeneration");
+
+    // Remove generic hourly Healing — same supersession as rest-regen.
+    const hasGenericHealSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "healing");
+    if (hasGenericHealSolar) {
+      await OngoingEngine.removeOngoingEffect(actor, "healing");
+      console.log(`[FASERIP] Generic Healing removed from ${actor.name} — superseded by Solar Regeneration`);
+    }
 
     // Register solar regeneration
     const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");

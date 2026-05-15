@@ -1,3 +1,13 @@
+// scripts/modules/effects/ongoing-engine.js v1.7.5 - 2026-05-14
+// v1.7.5: Regen reliability — noDamage gate now accepts simultaneous
+//         lastDmgWT === startedAt as "before start" (was strict <,
+//         silently stalled when recordDamage and timer-init landed on
+//         the same worldTime second). executeHealthHeal stamps
+//         autoDisabledAtCap when disabling an at-cap effect, and
+//         interruptOngoingEffects re-arms (enables + nulls startedAt)
+//         any AE carrying that flag on fresh damage, so resting after
+//         a full-heal-then-new-damage cycle no longer requires a
+//         manual AE toggle. User-disabled effects (no flag) untouched.
 // scripts/modules/effects/ongoing-engine.js v1.7.4 - 2026-04-19
 // v1.7.4: Migrate legacy `icon:` to `img:` on the processDyingRound
 //         Impaired Endurance creation site (line ~731). The sibling
@@ -199,12 +209,16 @@ function checkGate(gateName, actor, _config) {
       return true;
 
     case "noDamage": {
-      // Must not have taken damage since timer started
+      // Must not have taken damage since timer started. Same-instant
+      // (lastDmgWT === startedAt) is treated as "before start" so the
+      // timer can run immediately after a damage tick on the same
+      // worldTime — the alternative was a silent stall whenever
+      // recordDamage and timer-init landed on the same second.
       const scope = SCOPE();
       const lastDmgWT = actor.getFlag(scope, "lastDamageWorldTime");
       const startedAt = _config?.startedAt;
       if (!Number.isFinite(lastDmgWT) || !Number.isFinite(startedAt)) return true;
-      return lastDmgWT < startedAt;
+      return lastDmgWT <= startedAt;
     }
 
     case "daylight": {
@@ -469,6 +483,7 @@ async function executeHealthHeal(actor, ae, effectId, config, healPerCycle, cycl
     if (config.autoDisable !== false) {
       await ae.update({ disabled: true });
       await actor.setFlag(scope, `ongoing.${effectId}.startedAt`, null);
+      await actor.setFlag(scope, `ongoing.${effectId}.autoDisabledAtCap`, true);
       console.log(`[FASERIP] ${actor.name}: ${effectName} auto-disabled (at cap)`);
     }
     return;
@@ -897,16 +912,35 @@ export async function interruptOngoingEffects(actor) {
   for (const [effectId, config] of Object.entries(ongoingMap)) {
     if (!config?.interruptOnDamage) continue;
 
-    // Find and disable the AE
-    const ae = actor.effects.find(e =>
-      e.flags?.[scope]?.ongoingId === effectId && !e.disabled
-    );
+    // Match the AE regardless of disabled state — we may need to flip
+    // an auto-disabled (at-cap) effect back on, not just disable a
+    // running one.
+    const ae = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
     if (!ae) continue;
 
+    const effectName = ae.name.replace(/\s*\([^)]*\)\s*$/u, "").trim();
+
+    if (ae.disabled) {
+      // The engine disabled this at full health on a prior cycle. Fresh
+      // damage drops HP below cap, so re-arm: enable the AE, clear the
+      // timer (next worldTime tick will re-init), clear the cap flag.
+      // No "interrupted!" chat — there was nothing running to interrupt.
+      if (config.autoDisabledAtCap) {
+        await ae.update({ disabled: false });
+        await actor.setFlag(scope, `ongoing.${effectId}.startedAt`, null);
+        await actor.setFlag(scope, `ongoing.${effectId}.autoDisabledAtCap`, false);
+        console.log(`[FASERIP] ${effectName} re-armed for ${actor.name} — damage taken after at-cap auto-disable`);
+      }
+      // User-disabled (no autoDisabledAtCap flag): leave alone, respects intent.
+      continue;
+    }
+
+    // Live cycle interrupted by damage — RAW rule: rest restarts.
+    // Disable the AE so the engine skips it, null startedAt so a future
+    // re-enable + tick restarts from zero.
     await ae.update({ disabled: true });
     await actor.setFlag(scope, `ongoing.${effectId}.startedAt`, null);
 
-    const effectName = ae.name.replace(/\s*\([^)]*\)\s*$/u, "").trim();
     await sendOngoingChat(actor, effectName, "damage",
       `<strong>${actor.name}</strong> took damage — <strong>${effectName}</strong> interrupted!`
     );

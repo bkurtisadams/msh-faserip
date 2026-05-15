@@ -1,3 +1,10 @@
+// scripts/modules/rest-system.js v1.4.7 - 2026-05-14
+// v1.4.7: ensureHealingEffect now short-circuits when Regen-rest or
+//         Regen-solar is configured on the actor. The generic hourly
+//         Healing ongoing must not co-exist with a Regeneration power
+//         per RAW — Regen replaces the End-rank/day baseline, doesn't
+//         stack with it. Paired with init.js syncPowerOngoingEffects
+//         which removes any pre-existing Healing when Regen registers.
 // scripts/modules/rest-system.js v1.4.6 - 2026-04-19
 // v1.4.6: Re-register hourly Healing on consciousness regain. The
 //         attemptRegainConsciousness success branch removed Dying, set
@@ -1193,6 +1200,19 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   if (dyingEffect && !dyingEffect.disabled) {
     if (game.settings.get(SCOPE, "debugMode")) {
       console.log(`FASERIP | Skipping healing registration for ${actor.name} (dying)`);
+    }
+    return;
+  }
+
+  // Skip if a Regeneration power supersedes normal healing. Regen-rest and
+  // Regen-solar replace the End-rank/day baseline rather than stacking
+  // on top, so the generic hourly healer must not co-exist with them.
+  const hasRegenRest  = !!actor.getFlag(SCOPE, "ongoing.regeneration");
+  const hasRegenSolar = !!actor.getFlag(SCOPE, "ongoing.solarRegeneration");
+  if (hasRegenRest || hasRegenSolar) {
+    if (game.settings.get(SCOPE, "debugMode")) {
+      const which = hasRegenRest ? "Regeneration" : "Solar Regeneration";
+      console.log(`FASERIP | Skipping healing registration for ${actor.name} — ${which} active`);
     }
     return;
   }
