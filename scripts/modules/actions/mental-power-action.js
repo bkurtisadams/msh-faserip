@@ -1,4 +1,6 @@
-// scripts/modules/actions/mental-power-action.js v2.3.1 - 2026-05-15
+// scripts/modules/actions/mental-power-action.js v2.3.2 - 2026-05-15
+// v2.3.2: Telepathy dialog uses .frp-dlg + .frp-box compact layout
+//         (Barlow Condensed 13px, grid rows) to match other action dialogs.
 // v2.3.1: Telepathy: measure distance vs power range — out-of-range = auto-fail.
 //         Show Distance row on dialog and chat card. Result row replaces Roll
 //         row with descriptive content for auto/impossible/out-of-range cases.
@@ -312,20 +314,28 @@ export class MentalPowerAction extends BaseAction {
         : `${distanceAreas} area${distanceAreas === 1 ? "" : "s"} / ${maxRangeAreas ?? "?"} max${outOfRange ? ' <span style="color:#b71c1c;font-weight:700;">OUT OF RANGE</span>' : ""}`;
 
       const dialogHtml = `
-        <div style="margin-bottom:6px;"><strong>Power:</strong> ${powerName} — ${powerRank} (${powerValue})</div>
-        <div style="margin-bottom:6px;"><strong>Range:</strong> ${calculatedRange}</div>
-        <div style="margin-bottom:6px;"><strong>Distance:</strong> ${distanceDisplay}</div>
-        <div style="margin-bottom:6px;"><strong>Target:</strong> ${targetName}</div>
-        <div style="padding:6px 8px;background:#f3e5f5;border:1px solid #ce93d8;border-radius:3px;margin-bottom:8px;">
-          <div style="font-size:.9em;"><strong>Telepath Psyche:</strong> ${telepathPsycheRank} (${telepathPsycheValue})</div>
-          <div style="font-size:.9em;"><strong>Target Psyche:</strong> ${targetPsycheRank} (${targetPsycheValue})${hasMentalDefense ? ` <span style="color:#5e35b1;">— ${mentalDef.source} (${mentalDef.rank})</span>` : ""}</div>
-        </div>
-        <div style="margin-bottom:8px;">
-          <label><input type="checkbox" name="willing"> Target is willing</label>
-        </div>
-        ${generateKarmaControlsHTML(actor, 0)}
-        <div style="font-size:0.82em;color:#555;margin-top:8px;padding:6px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-          Power rank FEAT. Willing/lower Psyche = Auto. Equal Psyche = Yellow. Mental Powers/Psi-Screen = Red. Higher unwilling Psyche = Impossible. Out of range = automatic failure.
+        <div class="frp-dlg" style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:13px;">
+          <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;">
+            <div style="display:grid;grid-template-columns:70px 1fr;gap:1px 8px;line-height:1.35;">
+              <span style="font-weight:600;color:#555;">Power:</span><span>${powerName} — <strong>${powerRank}</strong> (${powerValue})</span>
+              <span style="font-weight:600;color:#555;">Range:</span><span>${calculatedRange}</span>
+              <span style="font-weight:600;color:#555;">Distance:</span><span>${distanceDisplay}</span>
+              <span style="font-weight:600;color:#555;">Target:</span><span>${targetName}</span>
+            </div>
+          </div>
+          <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;background:#f3e5f5;border-color:#ce93d8;">
+            <div style="display:grid;grid-template-columns:90px 1fr;gap:1px 8px;line-height:1.35;">
+              <span style="font-weight:600;color:#555;">Telepath Psy:</span><span><strong>${telepathPsycheRank}</strong> (${telepathPsycheValue})</span>
+              <span style="font-weight:600;color:#555;">Target Psy:</span><span><strong>${targetPsycheRank}</strong> (${targetPsycheValue})${hasMentalDefense ? ` <span style="color:#5e35b1;">— ${mentalDef.source} (${mentalDef.rank})</span>` : ""}</span>
+            </div>
+          </div>
+          <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;">
+            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" name="willing"> <span>Target is willing</span></label>
+          </div>
+          ${generateKarmaControlsHTML(actor, 0)}
+          <div style="font-size:11px;color:#555;margin-top:4px;padding:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;line-height:1.3;">
+            Power rank FEAT. Willing/lower Psy = Auto · Equal Psy = Yellow · Mental Powers/Psi-Screen = Red · Higher unwilling Psy = Impossible · Out of range = auto-fail.
+          </div>
         </div>
       `;
 
