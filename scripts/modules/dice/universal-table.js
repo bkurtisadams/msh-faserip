@@ -118,8 +118,8 @@ export const rankRows = [
 export const POWER_RANGE_VALUES = {
   "Shift-0": 0, "Feeble": 0, "Poor": 1, "Typical": 2, "Good": 4,
   "Excellent": 6, "Remarkable": 8, "Incredible": 10, "Amazing": 20,
-  "Monstrous": 40, "Unearthly": 60, "Shift X": 80, "Shift Y": 160,
-  "Shift Z": 400,
+  "Monstrous": 40, "Unearthly": 60, "Shift-X": 80, "Shift-Y": 160,
+  "Shift-Z": 400,
   // Converted miles to areas (1 mile = 1760 yards/areas)
   "Class 1000": 176000,   // 100 miles
   "Class 3000": 17600000, // 10,000 miles

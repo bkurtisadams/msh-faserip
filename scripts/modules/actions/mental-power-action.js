@@ -866,6 +866,11 @@ export class MentalPowerAction extends BaseAction {
     const type = (item.system.type || "").toLowerCase();
     const name = (item.name || "").toLowerCase();
 
+    // Image Generation / Illusions: Int (Reason) FEAT to disbelieve
+    if (name.includes("image generation") || name.includes("illusion")) {
+      return "reason";
+    }
+
     // Emotion-based powers use Intuition
     if (type.includes("emotion") || name.includes("emotion")) {
       return "intuition";
