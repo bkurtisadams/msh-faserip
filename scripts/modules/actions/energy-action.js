@@ -24,7 +24,7 @@ import {
   shiftRank
 } from "./action-utils.js";
 
-import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { RANK_ABBR, POWER_RANGE } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { isAuraMaintained } from "./nullify.js";
 
@@ -391,7 +391,9 @@ export class EnergyAction extends RangedAttackAction {
               powerName = item.name;
               powerDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
               powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
-              prettyRange = String(s.calculatedRange || "");
+              prettyRange = s.range === "rank"
+                ? (POWER_RANGE[powerRank] || "")
+                : String(s.calculatedRange || "");
               powerDamageType = s.damageType || "energy-generic";
             }
 

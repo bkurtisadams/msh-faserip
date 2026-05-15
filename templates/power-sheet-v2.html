@@ -86,6 +86,12 @@
         <input type="text" name="system.customRange" value="{{system.customRange}}" placeholder="e.g., 10 areas or 500m">
       </div>
       {{/if}}
+      {{#if (eq system.range "rank")}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Calculated Range</label>
+        <input type="text" value="{{calculatedRange}}" readonly placeholder="(based on rank)">
+      </div>
+      {{/if}}
       {{#if (eq system.duration "custom")}}
       <div class="ps2-field" style="margin-top:4px;">
         <label>Custom Duration</label>

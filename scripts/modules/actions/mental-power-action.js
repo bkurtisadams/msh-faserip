@@ -50,7 +50,9 @@ export class MentalPowerAction extends BaseAction {
     const powerName = item.name;
     const powerRank = item.system.rank || "Typical";
     const powerValue = item.system.value || 6;
-    const calculatedRange = item.system.calculatedRange || POWER_RANGE[powerRank] || "Unknown";
+    const calculatedRange = item.system.range === "rank"
+      ? (POWER_RANGE[powerRank] || "Unknown")
+      : (item.system.calculatedRange || POWER_RANGE[powerRank] || "Unknown");
 
     // ── Nullifying Power: toggle on/off, no target needed ──
     const nameLc = (powerName || "").toLowerCase();
