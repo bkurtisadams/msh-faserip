@@ -50,6 +50,7 @@ export class GrapplingAction extends AttackAction {
     const passedItem = this.opts?.item || this.opts?.sourceItem || this.opts?.equipment || null;
     const isWeaponGrapple = passedItem?.type === "equipment" && 
                             passedItem?.system?.damageType?.toUpperCase() === "GP";
+    const isPowerGrapple = passedItem?.type === "power";
     
     // For weapon grapples, use material strength; otherwise use actor's Strength
     let strength;
@@ -59,6 +60,15 @@ export class GrapplingAction extends AttackAction {
       strength = {
         rank: materialRank,
         value: game.msh.getRankValue(materialRank) || 6
+      };
+      strengthSource = passedItem.name;
+    } else if (isPowerGrapple) {
+      const powerRank = passedItem.system?.materialStrength
+        || passedItem.system?.rank
+        || "Typical";
+      strength = {
+        rank: powerRank,
+        value: game.msh.getRankValue(powerRank) || 6
       };
       strengthSource = passedItem.name;
     } else {
@@ -82,7 +92,8 @@ export class GrapplingAction extends AttackAction {
       savedRemember, 
       savedSkipDice,
       isWeaponGrapple,
-      weaponName: isWeaponGrapple ? passedItem.name : null,
+      isPowerGrapple,
+      weaponName: (isWeaponGrapple || isPowerGrapple) ? passedItem.name : null,
       strengthSource
     });
     if (!choice) return;
@@ -240,7 +251,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedRemember = false, savedSkipDice = false, isWeaponGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedRemember = false, savedSkipDice = false, isWeaponGrapple = false, isPowerGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
     // ── Target data ──
     let prefillTargetName = this.opts?.prefill?.targetName || "";
     let prefillTargetStr  = this.opts?.prefill?.targetStrength || "";
@@ -331,6 +342,7 @@ export class GrapplingAction extends AttackAction {
           <span style="font-size:11px;color:#777;text-transform:uppercase;letter-spacing:0.3px;font-weight:600;">Grapple with</span>
           <span style="font-family:'Oswald',sans-serif;font-weight:700;font-size:16px;color:#1a1a1a;">${strengthSource}: ${strengthAbbr} ${strength.value}</span>
           ${isWeaponGrapple ? `<span style="font-size:11px;color:#6a1b9a;">weapon material</span>` : ''}
+          ${isPowerGrapple ? `<span style="font-size:11px;color:#1565c0;">power rank</span>` : ''}
           <span style="margin-left:auto;font-size:12px;color:#777;">Hold dmg: ${strength.value}</span>
         </div>
       </div>

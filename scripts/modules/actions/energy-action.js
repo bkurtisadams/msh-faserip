@@ -46,7 +46,7 @@ export class EnergyAction extends RangedAttackAction {
       const cat = String(s.category || "").toLowerCase();
       const typ = String(s.type || "").toLowerCase();
       const catIsEnergy = cat === "energycontrol";
-      const typeLooksEnergy = /\b(energy|light|electric|plasma|beam|blast|fire|ice|cold|darkforce|radiation|heat|lightning)\b/.test(typ);
+      const typeLooksEnergy = /\b(energy|light|electric|plasma|beam|blast|fire|cold|darkforce|radiation|heat|lightning)\b/.test(typ);
       return catIsEnergy || typeLooksEnergy;
     });
 
