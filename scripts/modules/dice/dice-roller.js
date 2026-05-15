@@ -316,17 +316,12 @@ export async function deductKarma(actor, amount, sourceName) {
   
   const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
   const newHistory = currentHistory.concat([historyEntry]);
-  
+
   await runAsGM({
     operation: 'update',
     targetActorUuid: actor.uuid,
     args: [{ "system.karma.history": newHistory }]
   });
-  
-  // Update displayed current karma
-  if (game.msh?.FaseripRolls?._updateCurrentKarma) {
-    await game.msh.FaseripRolls._updateCurrentKarma(actor);
-  }
 }
 
 /**

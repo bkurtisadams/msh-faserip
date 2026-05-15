@@ -639,7 +639,7 @@ export async function rollWithKarma(actor, actionLabel, requestedKarma = 0) {
     
     const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
     currentHistory.push(historyEntry);
-    
+
     await game.msh.runAsGM({
       operation: 'update',
       targetActorUuid: actor.uuid,

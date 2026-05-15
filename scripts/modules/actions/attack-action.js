@@ -115,7 +115,7 @@ export class AttackAction extends BaseAction {
     const USE_IMPOSSIBLE = true;
     const IMPOSSIBLE_DIFF = -2;
 
-    const availableKarma = actor.system.karma.value || 0;
+    const availableKarma = actor.system.attributes?.karma?.value || 0;
     
     // Get intensity rank value for comparison
     const intensityIndex = RANKS.indexOf(intensity);
@@ -329,10 +329,19 @@ export class AttackAction extends BaseAction {
               // Apply karma if spending
               if (spendKarma && karmaToSpend > 0) {
                 totalRoll = Math.min(100, totalRoll + karmaToSpend);
-                // Deduct karma
-                const currentKarma = actor.system.karma.value || 0;
-                const newKarma = Math.max(0, currentKarma - karmaToSpend);
-                await actor.update({ "system.karma.value": newKarma });
+
+                const historyEntry = {
+                  timestamp: new Date().toISOString(),
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -karmaToSpend,
+                  type: "Die Roll",
+                  description: `Spent karma on Multiple Attack FEAT`
+                };
+                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                await actor.update({
+                  "system.karma.history": currentHistory.concat([historyEntry])
+                });
               }
               
               const resultColor = game.msh.rollUniversalTable(effFeatRank, totalRoll);

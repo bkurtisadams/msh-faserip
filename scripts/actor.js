@@ -1,3 +1,13 @@
+// actor.js v1.4.0 - 2026-05-15
+// v1.4.0: Karma reconciliation moved into prepareDerivedData. The displayed
+//         system.attributes.karma.value is now derived from karma.history
+//         every prep (formula: max(0, sumPositive - sumAbsNegative -
+//         advancement)). karma.lifetime is also re-synced to sumPositive.
+//         Empty-history actors are skipped to preserve the chargen baseline
+//         on legacy data; chargen now seeds a starting-karma history entry
+//         so new actors derive correctly from creation. Spend code paths
+//         no longer need to write attributes.karma.value alongside
+//         karma.history — history is the only source of truth.
 // actor.js v1.3.1 - 2026-04-03
 // v1.3.1: Replace local RANK_ORDER with import from rules-reference.js
 // v1.3.0: Fix karma display — max = R+I+P (computed), value = available lifetime karma (derived)
@@ -188,6 +198,29 @@ export class FaseripActor extends Actor {
       const val = Number.isFinite(s.bodyHP)    ? Number(s.bodyHP)    : 0;
       const max = Number.isFinite(s.bodyHPMax) ? Number(s.bodyHPMax) : 0;
       s.resources.body = { value: val, max };
+    }
+
+    // Karma reconciliation: history is the source of truth. Recompute the
+    // displayed current-karma value on every prep so spend-paths that only
+    // write history (stunts, equipment use, action dialogs, vehicle control,
+    // dying stabilize, etc.) keep the header in sync without each site
+    // having to remember to write both fields. Empty-history actors are
+    // skipped to preserve the chargen baseline on legacy actors that
+    // pre-date the chargen seed entry.
+    const k = this.system?.karma;
+    const attrK = this.system?.attributes?.karma;
+    const history = k?.history;
+    if (attrK && Array.isArray(history) && history.length > 0) {
+      let earned = 0;
+      let spent  = 0;
+      for (const ev of history) {
+        const amt = Number(ev?.amount) || 0;
+        if (amt > 0) earned += amt;
+        else if (amt < 0) spent += Math.abs(amt);
+      }
+      const advancement = Number(k?.advancement) || 0;
+      attrK.value = Math.max(0, earned - spent - advancement);
+      k.lifetime  = earned;
     }
   }
 

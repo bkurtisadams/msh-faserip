@@ -1,5 +1,11 @@
 // chargen.js - Marvel Super Heroes Random Character Generation
 // Based on the Advanced Set rules
+//
+// 2026-05-15: _buildUpdates now seeds system.karma.lifetime and a
+//   "Starting karma (chargen)" entry in system.karma.history at the value
+//   of s.karma (R+I+P). Required so actor.prepareDerivedData's
+//   history-derived karma reconciliation has something to work from on
+//   freshly chargen'd actors; without the seed, derive would zero them out.
 
 import { POWER_DATA, TALENT_DATA, CONTACT_DATA } from './chargen-data.js';
 
@@ -1238,6 +1244,15 @@ export class CharacterGenerator {
       "system.attributes.health.max": s.health,
       "system.attributes.karma.value": s.karma,
       "system.attributes.karma.max": s.karma,
+      "system.karma.lifetime": s.karma,
+      "system.karma.history": [{
+        timestamp: new Date().toISOString(),
+        realDate: new Date().toLocaleDateString(),
+        gameDate: "",
+        amount: s.karma,
+        type: "Session Award",
+        description: "Starting karma (chargen)"
+      }],
       "system.attributes.resources.rank": s.resources.rank,
       "system.attributes.resources.value": s.resources.value,
       "system.attributes.popularity.hero.value": s.popularity.hero,
