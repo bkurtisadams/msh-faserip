@@ -777,6 +777,51 @@ export function installActionChatHandlers() {
 
         debugLog("Chat Apply results", results);
 
+        // ── Continuing damage (corrosive, acid, etc.) — manual-apply path ──
+        // Mirrors the auto-apply registration in attack-action.js. Source item
+        // UUID is stamped on the apply-damage button at card-render time.
+        const sourceItemUuid = btn.dataset.sourceItemUuid || "";
+        if (sourceItemUuid && Array.isArray(results) && results.length) {
+          try {
+            const sourceItem = await fromUuid(sourceItemUuid);
+            const wSys = sourceItem?.system || {};
+            const nameLc = String(sourceItem?.name || "").toLowerCase();
+            const dtLc = String(wSys.damageType || "").toLowerCase();
+            const isCorrosive = /corrosive|acid/.test(nameLc) || /corrosive|acid/.test(dtLc);
+            const isRotting = /rotting|decay/.test(nameLc);
+            const continuingByRule = isCorrosive || isRotting;
+            const continuingByAuthor = wSys.continuingDamage === true;
+            if (sourceItem?.type === "power" && (continuingByAuthor || continuingByRule)) {
+              const { applyContinuingDamage } = await import("../effects/ongoing-engine.js");
+              const totalRounds = Math.max(1, Number(wSys.continuingDamageRounds) || 3);
+              const pattern = continuingByRule ? "diminishing-2cs" : "constant";
+              const canWash = isCorrosive;
+              for (const r of results) {
+                const tgtUuid = r.actorUuid ?? r.tokenUuid ?? null;
+                if (!tgtUuid) continue;
+                const tgtDoc = await fromUuid(tgtUuid);
+                const tgtActor = tgtDoc?.actor ?? tgtDoc ?? null;
+                if (!tgtActor) continue;
+                const damageDealt = Number(r.hpBefore ?? 0) - Number(r.hpAfter ?? 0);
+                if (damageDealt <= 0) continue;
+                await applyContinuingDamage(tgtActor, {
+                  name: `${sourceItem.name} — Continuing`,
+                  initialRank: wSys.rank || "Typical",
+                  pattern,
+                  rounds: totalRounds,
+                  includeInitial: false,
+                  canWash,
+                  damageType: wSys.damageType || damageType,
+                  originUuid: attackerUuid || null,
+                  img: isCorrosive ? "icons/svg/acid.svg" : "icons/svg/blood.svg",
+                });
+              }
+            }
+          } catch (e) {
+            console.warn("[FASERIP] Continuing damage registration via manual apply failed:", e);
+          }
+        }
+
         // 3) Persist undo info on the *correct* chat message
         const $msgEl = $(btn).closest("li.chat-message, .message, .chat-card, .message-content");
         const messageId =

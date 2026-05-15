@@ -934,7 +934,8 @@ export function buildActionsBox({
   autoApply = false,  // attacker-side auto apply (damage)
   autoSave  = false,  // defender-side auto save (disable save chips)
   bypassArmor = false,
-  bypassForceField = false
+  bypassForceField = false,
+  sourceItemUuid = ""  // UUID of source power/weapon; lets manual-apply path fire follow-ups (continuing damage, etc.)
 }) {
 
   // Small helper to render a chip
@@ -977,7 +978,8 @@ export function buildActionsBox({
         data-armor-piercing="${Number(armorPiercing || 0)}"
         data-armor-piercing-cs="${Number(armorPiercingCS || 0)}"
         data-ap-mode="${apMode}"
-        data-bypass-force-field="${bypassForceField ? 'true' : 'false'}"`
+        data-bypass-force-field="${bypassForceField ? 'true' : 'false'}"
+        data-source-item-uuid="${sourceItemUuid || ''}"`
       )
     );
   }

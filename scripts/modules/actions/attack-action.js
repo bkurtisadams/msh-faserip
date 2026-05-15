@@ -1023,6 +1023,7 @@ export class AttackAction extends BaseAction {
             bypassForceField: !!choice?.bypassForceField,
             autoApply: !!this.opts?.autoApply,
             autoSave: false,  // prevent chat button duplicates
+            sourceItemUuid: choice?.weapon?.uuid || "",
           })
         : "";
 

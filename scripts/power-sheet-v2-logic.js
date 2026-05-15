@@ -76,22 +76,19 @@ function updateSectionVisibility(html, category) {
     el.attr('data-suggested', isSuggested ? 'true' : 'false');
   }
   // Auto-expand section bodies and sub-sections for this category
+  // We force-show the section body so it's *available* for the category, but
+  // do NOT auto-check the underlying toggle — that would flip the persisted
+  // system flag (e.g. requiresSave) on every sheet open, overriding the user's
+  // explicit choice. The toggle stays as authored; visibility is just the hint.
   const autoExp = CATEGORY_AUTO_EXPAND[category];
   if (autoExp) {
     for (const sectionKey of autoExp.sections) {
       const sectionEl = html.find(`.ps2-section[data-section="${sectionKey}"]`);
-      const toggle = sectionEl.find('.ps2-section-check');
-      if (toggle.length && !toggle.prop('checked')) {
-        toggle.prop('checked', true).trigger('change');
-      }
-      // Also force-show the body in case it was hidden by inline style
+      sectionEl.attr("data-hidden", "false");
+      sectionEl.attr("data-suggested", "true");
       sectionEl.find('.ps2-section-body').show();
     }
     for (const subKey of autoExp.subs) {
-      const subCheck = html.find(`.ps2-sub-check[data-sub="${subKey}"]`);
-      if (subCheck.length && !subCheck.prop('checked')) {
-        subCheck.prop('checked', true).trigger('change');
-      }
       html.find(`.ps2-sub-body[data-sub="${subKey}"]`).show();
     }
   }
