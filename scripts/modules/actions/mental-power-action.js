@@ -1,11 +1,15 @@
-// scripts/modules/actions/mental-power-action.js v2.2.0 - 2026-03-19
+// scripts/modules/actions/mental-power-action.js v2.3.0 - 2026-05-15
+// v2.3.0: Telepathy uses contested Power rank FEAT (not Nullify save).
+//         Required color from Psyche comparison: willing/lower=auto,
+//         equal=yellow, mental defenses=red, higher unwilling=impossible.
 // v2.2.0: Nullifying Power auto-activates aura + self-suppresses caster's inborn powers.
 //         Adds Toggle Nullify Aura button to chat card. Sets isNullifyAura flag.
 //         Save ability defaults to Endurance for Nullifying Power.
 // v1.1.0: Unified chat card layout via buildCardShell/buildContentBox utilities
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
-import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField } from "./action-utils.js";
+import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField, universalColor } from "./action-utils.js";
+import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 /**
@@ -270,7 +274,175 @@ export class MentalPowerAction extends BaseAction {
       }
       return;
     }
-    
+
+    // ── Telepathy: contested Power rank FEAT (not a save vs intensity) ──
+    if (nameLc.includes("telepathy")) {
+      const targets = Array.from(game.user.targets);
+      if (targets.length === 0) {
+        ui.notifications.warn("No target selected for Telepathy");
+        return;
+      }
+      if (targets.length > 1) {
+        ui.notifications.warn("Telepathy affects one target at a time. Using first target.");
+      }
+      const target = targets[0];
+      const targetActor = target.actor;
+      const targetName = targetActor?.name || "Unknown";
+
+      const telepathPsycheRank  = actor.system?.abilities?.psyche?.rank  || "Typical";
+      const telepathPsycheValue = actor.system?.abilities?.psyche?.value ?? rankValue(telepathPsycheRank);
+      const targetPsycheRank    = targetActor?.system?.abilities?.psyche?.rank  || "Typical";
+      const targetPsycheValue   = targetActor?.system?.abilities?.psyche?.value ?? rankValue(targetPsycheRank);
+
+      const mentalDef = scanMentalDefenses(targetActor, "psyche");
+      const hasMentalDefense = mentalDef.source !== "Psyche";
+
+      const dialogHtml = `
+        <div style="margin-bottom:6px;"><strong>Power:</strong> ${powerName} — ${powerRank} (${powerValue})</div>
+        <div style="margin-bottom:6px;"><strong>Range:</strong> ${calculatedRange}</div>
+        <div style="margin-bottom:6px;"><strong>Target:</strong> ${targetName}</div>
+        <div style="padding:6px 8px;background:#f3e5f5;border:1px solid #ce93d8;border-radius:3px;margin-bottom:8px;">
+          <div style="font-size:.9em;"><strong>Telepath Psyche:</strong> ${telepathPsycheRank} (${telepathPsycheValue})</div>
+          <div style="font-size:.9em;"><strong>Target Psyche:</strong> ${targetPsycheRank} (${targetPsycheValue})${hasMentalDefense ? ` <span style="color:#5e35b1;">— ${mentalDef.source} (${mentalDef.rank})</span>` : ""}</div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label><input type="checkbox" name="willing"> Target is willing</label>
+        </div>
+        ${generateKarmaControlsHTML(actor, 0)}
+        <div style="font-size:0.82em;color:#555;margin-top:8px;padding:6px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
+          Power rank FEAT. Willing/lower Psyche = Auto. Equal Psyche = Yellow. Mental Powers/Psi-Screen = Red. Higher unwilling Psyche = Impossible.
+        </div>
+      `;
+
+      const choice = await new Promise((resolve) => {
+        showFaseripButtonDialog({
+          title: `${powerName} - Telepathy`,
+          content: dialogHtml,
+          buttons: {
+            use: {
+              icon: '<i class="fas fa-brain"></i>',
+              label: "Attempt Contact",
+              callback: (html) => {
+                const { spendKarma } = extractKarmaFromDialog(html);
+                resolve({
+                  willing: html.find('[name="willing"]').is(':checked'),
+                  spendKarma
+                });
+              }
+            },
+            cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => resolve(null) }
+          },
+          default: "use"
+        });
+      });
+
+      if (!choice) return;
+
+      let required, requiredReason;
+      if (choice.willing) {
+        required = "auto-success";
+        requiredReason = "Target is willing";
+      } else if (targetPsycheValue > telepathPsycheValue) {
+        required = "auto-fail";
+        requiredReason = `Target Psyche higher (${targetPsycheRank} > ${telepathPsycheRank}), unwilling`;
+      } else if (hasMentalDefense) {
+        required = "red";
+        requiredReason = `Target has ${mentalDef.source}`;
+      } else if (targetPsycheValue === telepathPsycheValue) {
+        required = "yellow";
+        requiredReason = `Target Psyche equal (${targetPsycheRank})`;
+      } else {
+        required = "auto-success";
+        requiredReason = `Target Psyche lower (${targetPsycheRank} < ${telepathPsycheRank})`;
+      }
+
+      const order = { white: 0, green: 1, yellow: 2, red: 3 };
+
+      let rollTotal = 0, rolledColor = "—", success = false, karmaUsed = 0;
+      if (required === "auto-success") {
+        success = true;
+      } else if (required === "auto-fail") {
+        success = false;
+      } else {
+        const roll = await (new Roll("1d100")).evaluate();
+        rollTotal = roll.total;
+
+        if (choice.spendKarma) {
+          const initialColor = universalColor(powerRank, roll.total);
+          const result = await showKarmaDecisionDialog(actor, roll.total, powerRank, `Telepathy vs ${targetName}`, initialColor);
+          rollTotal = result.finalResult;
+          karmaUsed = result.karmaSpent;
+        }
+
+        await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: `${actor.name} — Telepathy FEAT (${powerRank})`,
+          rollMode: game.settings.get("core", "rollMode")
+        });
+
+        const color = universalColor(powerRank, rollTotal);
+        rolledColor = String(color || "white").toLowerCase();
+        success = order[rolledColor] >= order[required];
+      }
+
+      const reqDisplay = required === "auto-fail" ? "Impossible"
+                       : required === "auto-success" ? "Automatic"
+                       : required.charAt(0).toUpperCase() + required.slice(1);
+      const colorBg = { white: "#e0e0e0", green: "#c8e6c9", yellow: "#fff9c4", red: "#ffcdd2" };
+      const rollDisplay = (required === "auto-fail" || required === "auto-success")
+        ? "—"
+        : (karmaUsed > 0
+            ? `<s>${rollTotal - karmaUsed}</s> ${rollTotal} (+${karmaUsed} K) <span style="font-weight:600;">${rolledColor}</span>`
+            : `${rollTotal} <span style="font-weight:600;">${rolledColor}</span>`);
+      const rollBg = colorBg[rolledColor] || "#e0e0e0";
+
+      const infoGrid = `<div style="display:grid;grid-template-columns:90px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
+        <span style="font-weight:600;">Rank:</span><span>${powerRank} (${powerValue})</span>
+        <span style="font-weight:600;">Range:</span><span>${calculatedRange}</span>
+        <span style="font-weight:600;">Required:</span><span>${reqDisplay} <span style="color:#666;font-size:.9em;">— ${requiredReason}</span></span>
+        <span style="font-weight:600;">Roll:</span><span style="padding:1px 6px;background:${rollBg};border-radius:3px;display:inline-block;">${rollDisplay}</span>
+      </div>`;
+
+      const resultBox = success
+        ? `<div style="font-weight:700;color:#2e7d32;margin-bottom:4px;">Telepathic Contact Established</div>
+           <div style="font-size:.9em;">${actor.name} reads ${targetName}'s surface thoughts. No visible or audible signs.</div>`
+        : `<div style="font-weight:700;color:#b71c1c;margin-bottom:4px;">Contact Failed</div>
+           <div style="font-size:.9em;">${actor.name} cannot establish telepathic contact with ${targetName}.</div>`;
+
+      const powerDesc = (item.system?.description || "").trim();
+      const descSection = powerDesc
+        ? `<div style="padding:0 10px 6px;">
+             <details style="font-size:.85em;color:#555;">
+               <summary style="cursor:pointer;font-weight:600;color:#8b0000;user-select:none;">Power Description</summary>
+               <div style="margin-top:4px;padding:6px 8px;background:#faf8f2;border:1px solid #e0d8c8;border-radius:3px;line-height:1.4;">${powerDesc}</div>
+             </details>
+           </div>`
+        : "";
+
+      const cardHtml = buildCardShell({
+        actionLabel: powerName,
+        headerRight: "Telepathy",
+        actorHtml: buildActorTargetHtml(actor.name, targetName),
+        sections: [
+          buildContentBox(infoGrid),
+          buildContentBox(resultBox),
+          descSection
+        ]
+      });
+
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: cardHtml
+      });
+
+      if (game.msh?.playCombatSFX) {
+        await game.msh.playCombatSFX({
+          item, actionType: "mental-power", damageType: "mental", rollResult: rolledColor, isHit: success
+        });
+      }
+      return;
+    }
+
     // Determine save ability from power system or default to Psyche
     const saveAbility = item.system.save?.ability || this._getDefaultSaveAbility(item);
     const saveIntensity = item.system.save?.intensity || "power-rank";
