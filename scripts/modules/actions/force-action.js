@@ -55,14 +55,15 @@ export class ForceAction extends RangedAttackAction {
       if (s.isForceAttack === true) return true;
       if (s.isEnergyAttack || s.isBluntAttack || s.isEdgedAttack || s.isShootingAttack || s.isMentalAttack) return false;
 
-      const looksEnergy = /\b(energy|light|electric|plasma|beam|fire|ice|cold|sound|darkforce|radiation|heat|lightning)\b/.test(typ) ||
-                          /\b(energy|light|electric|plasma|beam|fire|ice|cold|sound|darkforce|radiation|heat|lightning)\b/.test(nam);
+      const looksEnergy = /\b(energy|light|electric|plasma|beam|fire|ice|cold|darkforce|radiation|heat|lightning)\b/.test(typ) ||
+                          /\b(energy|light|electric|plasma|beam|fire|ice|cold|darkforce|radiation|heat|lightning)\b/.test(nam);
       if (looksEnergy) return false;
 
       const catLooksForce = cat === "mattercontrol" ||
         /\b(force|telekinesis|kinetic|concussion|shockwave)\b/.test(cat);
       const typeLooksForce =
-        /\b(force|telekinesis|kinetic|pressure|concussion|shockwave|ram|air|wind|earth|water|magnetic|gravity)\b/.test(typ);
+        /\b(force|telekinesis|kinetic|pressure|concussion|shockwave|ram|air|wind|earth|water|magnetic|gravity|sound|sonic)\b/.test(typ) ||
+        /\b(force|telekinesis|kinetic|pressure|concussion|shockwave|ram|air|wind|earth|water|magnetic|gravity|sound|sonic)\b/.test(nam);
 
       return catLooksForce || typeLooksForce;
     });
