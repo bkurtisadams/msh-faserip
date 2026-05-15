@@ -55,8 +55,10 @@ export class MentalPowerAction extends BaseAction {
       : (item.system.calculatedRange || POWER_RANGE[powerRank] || "Unknown");
 
     // ── Nullifying Power: toggle on/off, no target needed ──
+    // Nullifier Missile (single-target concentration) falls through to
+    // the default mental dispatch — the aura model is for inborn nullify only.
     const nameLc = (powerName || "").toLowerCase();
-    if (nameLc.includes("nullif")) {
+    if (nameLc.includes("nullif") && !nameLc.includes("missile")) {
       const { isAuraMaintained, startAura, stopAura } = await import("./nullify.js");
       const { getNullifyRange, rIdx, requiredColorFromDelta, meetsThreshold } = await import("./nullify-utils.js");
       const { drawAuraVisual, refreshAllAuraVisuals, setActivationCooldown } = await import("./nullify-aura.js");
@@ -793,6 +795,10 @@ export class MentalPowerAction extends BaseAction {
       } else if (nameLc.includes("mental probe")) {
         effectName   = "Mentally Fatigued";
         failMessage  = "suffers mental strain";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("nullif") && nameLc.includes("missile")) {
+        effectName   = "Nullified";
+        failMessage  = "is nullified";
         abilityLabel = "psyche";
       }
     }
