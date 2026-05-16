@@ -266,7 +266,44 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
               speaker: ChatMessage.getSpeaker({ actor })
             });
           } else {
-            if (effect.parent?.effects?.has(effect.id)) await effect.delete();
+            // Defer the delete past Foundry's mark-expired batch.
+            // Foundry's #updateExpiredEffects (also driven by this same
+            // updateWorldTime tick) queues an updateActiveEffect on the
+            // expiring AE. If FASERIP deletes the AE first, that batch's
+            // pre-update validator throws "id does not exist" from inside
+            // ClientDatabaseBackend._updateDocuments (uncaught, surfaces
+            // as a red toast). Wait for the updateActiveEffect hook on
+            // this AE id to fire (Foundry's update landed), then delete.
+            // 500ms timeout fallback handles AEs not in Foundry's
+            // expiration queue. Same pattern CTT uses for its tracker
+            // expirations.
+            const aeId = effect.id;
+            const aeName = effect.name;
+            const actorRef = actor;
+            const doDelete = async () => {
+              const live = actorRef?.effects?.get?.(aeId);
+              if (!live) return;
+              try {
+                await actorRef.deleteEmbeddedDocuments("ActiveEffect", [aeId]);
+              } catch (err) {
+                const msg = String(err?.message ?? err);
+                if (!/does not exist/i.test(msg)) {
+                  console.warn(`[FASERIP WARN] Deferred AE delete failed (${aeName}):`, err);
+                }
+              }
+            };
+            let resolved = false;
+            const finish = () => {
+              if (resolved) return;
+              resolved = true;
+              Hooks.off("updateActiveEffect", hookId);
+              clearTimeout(timeoutId);
+              doDelete();
+            };
+            const hookId = Hooks.on("updateActiveEffect", (eff) => {
+              if (eff?.id === aeId) finish();
+            });
+            const timeoutId = setTimeout(finish, 500);
           }
         } catch (e) {
           if (!/does not exist/i.test(e?.message ?? "")) console.warn("[FASERIP WARN] Effect auto-expire failed", e);

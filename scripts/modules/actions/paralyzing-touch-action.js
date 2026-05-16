@@ -1,4 +1,6 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.1.1 - 2026-05-15
+// scripts/modules/actions/paralyzing-touch-action.js v1.1.2 - 2026-05-15
+// v1.1.2: Replace deprecated game.settings.get("core","rollMode") with v14's
+//         "messageMode" via getRollMode() helper (with v13 fallback).
 // v1.1.1: Fix applyColumnShifts return shape. The helper returns
 //         { index, name, totalCS } not a bare rank string; rollUniversalTable
 //         was being called with the object, producing "[object Object] not
@@ -25,6 +27,13 @@ import { applyColumnShifts } from "../dice/column-shifts.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
+
+// v14 renamed core.rollMode to core.messageMode. Try v14 first, fall back
+// for older worlds. Avoids the per-call deprecation warning.
+function getRollMode() {
+  try { return game.settings.get("core", "messageMode"); }
+  catch { try { return game.settings.get("core", "rollMode"); } catch { return undefined; } }
+}
 
 function colorBg(c) {
   switch ((c || '').toLowerCase()) {
@@ -176,7 +185,7 @@ export async function showParalyzingTouchDialog(hero, item) {
           await endRoll.toMessage({
             speaker: ChatMessage.getSpeaker({ actor: subject }),
             flavor: `${subject.name} rolls End FEAT vs ${powerRank} (Paralyzing Touch)`,
-            rollMode: game.settings.get("core", "rollMode")
+            rollMode: getRollMode()
           });
           displayTotal = endRoll.total;
           karmaLine = "";
@@ -244,7 +253,7 @@ export async function showParalyzingTouchDialog(hero, item) {
         await endRoll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor: hero }),
           flavor: `${hero.name} rolls End FEAT vs ${powerRank} (Paralyzing Touch — self)`,
-          rollMode: game.settings.get("core", "rollMode")
+          rollMode: getRollMode()
         });
 
         let cappedTotal = endRoll.total;
@@ -273,7 +282,7 @@ export async function showParalyzingTouchDialog(hero, item) {
         await fightRoll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor: hero }),
           flavor: `${hero.name} makes a Fighting FEAT to touch ${target.name} (Paralyzing Touch)`,
-          rollMode: game.settings.get("core", "rollMode")
+          rollMode: getRollMode()
         });
 
         let cappedTotal = fightRoll.total;
