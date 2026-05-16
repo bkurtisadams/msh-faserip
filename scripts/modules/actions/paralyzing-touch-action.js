@@ -1,5 +1,9 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.0.0 - 2026-05-15
-// Touch attack dialog for the Paralyzing Touch power.
+// scripts/modules/actions/paralyzing-touch-action.js v1.0.1 - 2026-05-15
+// v1.0.1: Dialog layout normalized to match Health-Drain Touch — strip
+//         the yellow self-warning block and the verbose explanatory text
+//         under the target info. Single frp-box now shows just hero
+//         Fighting (skipped for self), target End, and End FEAT requirement.
+// v1.0.0: Initial. Touch attack dialog for the Paralyzing Touch power.
 // RAW: "End FEAT vs rank or KO 1-10 rounds. Always active. User can be KO'd
 //       by own touch."
 // Flow:
@@ -68,17 +72,6 @@ export async function showParalyzingTouchDialog(hero, item) {
 
   const endFeatReq = determineFeatRequirement(targetEndRank, powerRank);
 
-  const selfWarning = isSelf
-    ? `<div style="margin-top:6px;padding:6px;background:#fff8e1;border:1px solid #c87a00;font-size:0.88em;text-align:center;">
-         <strong>Self-touch</strong> &mdash; ${hero.name} skips the Fighting FEAT and rolls End vs ${powerRank} directly.
-         Failure &rarr; ${hero.name} paralyzed 1d10 rounds (RAW: "user can be KO'd by own touch").
-       </div>`
-    : `<div style="margin-top:6px;color:#666;font-size:0.85em;">
-         Fighting FEAT to hit (${hero.name}: ${heroFightShort} ${heroFightValue}).
-         On hit &rarr; ${target.name} rolls End FEAT vs ${powerRank} (need <strong>${endFeatReq.requirement}</strong>).
-         Failure &rarr; ${target.name} paralyzed 1d10 rounds.
-       </div>`;
-
   const dialogContent = `
     <div class="frp-dlg frp-feat">
       <div class="frp-header-v3">
@@ -96,9 +89,10 @@ export async function showParalyzingTouchDialog(hero, item) {
 
       <div class="frp-box" style="margin-top:8px;">
         <div style="font-size:0.9em;line-height:1.5;">
-          <div>Target: <strong>${target.name}</strong> (End ${targetEndShort} ${targetEndValue})</div>
+          ${!isSelf ? `<div>${hero.name} Fighting: <strong>${heroFightShort} ${heroFightValue}</strong></div>` : ""}
+          <div>Target End: <strong>${targetEndShort} ${targetEndValue}</strong></div>
+          <div>End FEAT vs ${powerRank}: need <strong>${endFeatReq.requirement}</strong></div>
         </div>
-        ${selfWarning}
       </div>
 
       <div class="frp-foot" style="margin-top:8px;">
