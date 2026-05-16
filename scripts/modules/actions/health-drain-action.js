@@ -1,4 +1,10 @@
-// scripts/modules/actions/health-drain-action.js v1.1.0 - 2026-05-15
+// scripts/modules/actions/health-drain-action.js v1.2.0 - 2026-05-15
+// v1.2.0: Auto-apply target/attacker effect-state shifts to the Fighting
+//         FEAT. Mirrors attack-action.js:594: defender combatMods.defenseShift
+//         and attacker combatMods.attackShift combine into a single
+//         effectShift folded into the totalShift alongside manual CS.
+//         Effect breakdown surfaced in dialog info box and chat card.
+//         Common case: Blinded target (-2 defense) → +2CS attacker bonus.
 // v1.1.0: Add Fighting FEAT to hit. CS row + karma checkbox + post-roll
 //         karma decision dialog (Paralyzing Touch v1.1.x pattern). Miss
 //         path skips the drain entirely. Hit path proceeds with the
@@ -23,6 +29,7 @@ import {
 } from "../dice/dice-roller.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -94,6 +101,21 @@ export async function showHealthDrainDialog(hero, item) {
   const maxDrain = Math.min(powerValue, tHp);
   const defaultDrain = Math.min(maxDrain, Math.max(hMissing, 1));
 
+  // ── Effect-state shifts (auto-applied to Fighting FEAT) ───────────────
+  // Mirrors attack-action.js:594 — defender's combatMods.defenseShift and
+  // attacker's combatMods.attackShift become an effective rank shift.
+  // Touch is melee, so isRanged = false.
+  const attackerShiftData = getAttackShiftBreakdown(hero, false);
+  const defenderShiftData = getDefenseShiftBreakdown(target, false);
+  const effectShift = (attackerShiftData.total || 0) - (defenderShiftData.total || 0);
+  const effectBreakdownLines = [
+    ...(attackerShiftData.breakdown || []).map(b => `${b.name} (attacker, ${b.shift > 0 ? "+" : ""}${b.shift} attack)`),
+    ...(defenderShiftData.breakdown || []).map(b => `${b.name} on target (${b.shift > 0 ? "+" : ""}${b.shift} defense)`),
+  ];
+  const effectShiftNoteHtml = effectShift !== 0
+    ? `<div style="color:#1565c0;margin-top:4px;"><strong>Effect shift: ${effectShift > 0 ? "+" : ""}${effectShift}CS</strong> &mdash; ${effectBreakdownLines.join("; ")}</div>`
+    : "";
+
   const csRowHtml = buildCSRow({ savedCS: 0, abilityRank: heroFightRank });
   const karmaHtml = generateKarmaControlsHTML(hero, false);
 
@@ -117,6 +139,7 @@ export async function showHealthDrainDialog(hero, item) {
         <div style="font-size:0.9em;line-height:1.5;">
           <div>${hero.name}: <strong>${hHp} / ${hMax}</strong> (missing ${hMissing})</div>
           <div>${target.name}: <strong>${tHp}</strong> HP</div>
+          ${effectShiftNoteHtml}
         </div>
       </div>
 
@@ -180,10 +203,11 @@ export async function showHealthDrainDialog(hero, item) {
       recompute();
 
       const commit = async () => {
-        // ── Fighting FEAT with CS + karma ──
+        // ── Fighting FEAT with CS + effect-state + karma ──
         const csInfo = csPanel ? csPanel.get() : { totalShift: 0, manualCS: 0 };
-        const shift = Number(csInfo.totalShift) || 0;
-        const effectiveFightRank = shift !== 0 ? applyColumnShifts(heroFightRank, shift).name : heroFightRank;
+        const manualShift = Number(csInfo.totalShift) || 0;
+        const totalShift = manualShift + effectShift;
+        const effectiveFightRank = totalShift !== 0 ? applyColumnShifts(heroFightRank, totalShift).name : heroFightRank;
         const effectiveFightValue = game.msh?.getRankValue?.(effectiveFightRank) ?? heroFightValue;
         const spendKarma = html.find('#spend-karma').is(':checked');
 
@@ -209,6 +233,13 @@ export async function showHealthDrainDialog(hero, item) {
         const fightColor = game.msh.rollUniversalTable(effectiveFightRank, cappedTotal);
         const hit = ["green", "yellow", "red"].includes(String(fightColor).toLowerCase());
 
+        // Shared CS-breakdown HTML for both miss and hit chat output
+        const csBreakdownHtml = totalShift !== 0
+          ? `<div>Column Shift: ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank} (${effectiveFightValue})</div>
+             ${(manualShift !== 0 && effectShift !== 0) ? `<div style="font-size:0.85em;color:#666;padding-left:8px;">manual ${manualShift > 0 ? "+" : ""}${manualShift}, effects ${effectShift > 0 ? "+" : ""}${effectShift}</div>` : ""}
+             ${(effectShift !== 0 && effectBreakdownLines.length) ? `<div style="font-size:0.85em;color:#1565c0;padding-left:8px;">${effectBreakdownLines.join("; ")}</div>` : ""}`
+          : "";
+
         if (!hit) {
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: hero }),
@@ -220,7 +251,7 @@ export async function showHealthDrainDialog(hero, item) {
                 </div>
                 <div style="padding:5px 10px;font-size:0.9em;">
                   <div>Base Rank: ${heroFightRank} (${heroFightValue})</div>
-                  ${shift !== 0 ? `<div>Column Shift: ${shift > 0 ? "+" : ""}${shift} &rarr; ${effectiveFightRank} (${effectiveFightValue})</div>` : ""}
+                  ${csBreakdownHtml}
                   <div>Roll: ${fightRoll.total}${karmaUsed ? ` + Karma: ${karmaUsed}` : ""} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background-color:${colorBg(fightColor)};color:${colorFg(fightColor)};">
@@ -252,11 +283,12 @@ export async function showHealthDrainDialog(hero, item) {
         // ── Hit summary banner for the Fighting FEAT ──
         const fightHitBanner = `
           <div style="padding:5px 10px;font-size:0.88em;background-color:#e8f5e9;border-bottom:1px solid #c0c0c0;">
-            Fighting FEAT (${heroFightShort} ${heroFightValue}${shift !== 0 ? ` ${shift > 0 ? "+" : ""}${shift}CS &rarr; ${effectiveFightRank}` : ""})
+            Fighting FEAT (${heroFightShort} ${heroFightValue}${totalShift !== 0 ? ` ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank}` : ""})
             roll ${fightRoll.total}${karmaUsed ? ` + ${karmaUsed}K` : ""} = ${cappedTotal}
             &mdash; <strong style="color:${colorFg(fightColor)};background-color:${colorBg(fightColor)};padding:1px 6px;border-radius:2px;">${String(fightColor).toUpperCase()}</strong>
             &mdash; HIT
-          </div>`;
+          </div>
+          ${(effectShift !== 0 && effectBreakdownLines.length) ? `<div style="padding:3px 10px;font-size:0.82em;background-color:#e8f5e9;color:#1565c0;border-bottom:1px solid #c0c0c0;">${effectBreakdownLines.join("; ")}</div>` : ""}`;
 
         // ── If target reduced to 0, target rolls End FEAT vs power rank ──
         let endFeatBlock = "";
