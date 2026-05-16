@@ -1,5 +1,8 @@
-// scripts/modules/actions/recovery-action.js v1.0.0 - 2026-05-15
-// Power-rank FEAT for the Recovery power. RAW: "Recover lost End ranks:
+// scripts/modules/actions/recovery-action.js v1.0.1 - 2026-05-15
+// v1.0.1: Fix render-callback signature. showFaseripDialog passes
+//         (html, dlg) — derive $dialog from html.closest('.dialog')
+//         inside the callback, matching generic-feat-dialog pattern.
+// v1.0.0: Initial. Power-rank FEAT for the Recovery power. RAW: "Recover lost End ranks:
 // 1/day, Power rank FEAT." Success on green/yellow/red; white = failure.
 // Once-per-day enforced via actor flag keyed by game date.
 
@@ -88,7 +91,8 @@ export async function showRecoveryFeatDialog(actor, item) {
   await showFaseripDialog({
     title: `Recovery — ${actor.name}`,
     content: dialogContent,
-    render: (html, dlg, $dialog) => {
+    render: async (html, dlg) => {
+      const $dialog = html.closest('.dialog');
       const runRoll = async () => {
         const roll = new Roll("1d100");
         await roll.evaluate();
