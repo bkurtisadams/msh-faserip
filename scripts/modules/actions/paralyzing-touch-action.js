@@ -1,22 +1,24 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.0.1 - 2026-05-15
-// v1.0.1: Dialog layout normalized to match Health-Drain Touch — strip
-//         the yellow self-warning block and the verbose explanatory text
-//         under the target info. Single frp-box now shows just hero
-//         Fighting (skipped for self), target End, and End FEAT requirement.
-// v1.0.0: Initial. Touch attack dialog for the Paralyzing Touch power.
-// RAW: "End FEAT vs rank or KO 1-10 rounds. Always active. User can be KO'd
-//       by own touch."
-// Flow:
-//   - Self-target → skip Fighting FEAT, go straight to hero's End FEAT.
-//   - Other target → Fighting FEAT to hit. White = miss. Hit → target rolls
-//     End FEAT vs power rank.
-//   - End FEAT pass = target unaffected. Fail = applyParalyzed for 1d10
-//     rounds. Power rank as intensity via determineFeatRequirement.
+// scripts/modules/actions/paralyzing-touch-action.js v1.1.0 - 2026-05-15
+// v1.1.0: Add standard combat-dialog elements to match Blunt Attack pattern:
+//         CS row with reference panel for Fighting FEAT (other-target path),
+//         karma checkbox with post-roll decision dialog for both Fighting
+//         and self-End FEATs. Karma not added to target's resistance End
+//         FEAT (separate scope — target-side decision, GM-managed for v1).
+// v1.0.1: Dialog layout normalized to match Health-Drain Touch.
+// v1.0.0: Initial. Save-or-KO touch dialog.
 
 import { showFaseripDialog } from "./dialog-shim.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 import { applyParalyzed } from "../effects/effect-engine.js";
+import {
+  generateKarmaControlsHTML,
+  setupKarmaControlHandlers,
+  getAvailableKarma,
+  showKarmaDecisionDialog,
+} from "../dice/dice-roller.js";
+import { applyColumnShifts } from "../dice/column-shifts.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -66,35 +68,76 @@ export async function showParalyzingTouchDialog(hero, item) {
   const heroFightValue = hero.system?.abilities?.fighting?.value || 0;
   const heroFightShort = RANK_ABBR[heroFightRank] || heroFightRank;
 
+  const heroEndRank = hero.system?.abilities?.endurance?.rank || "Typical";
+  const heroEndValue = hero.system?.abilities?.endurance?.value || 0;
+  const heroEndShort = RANK_ABBR[heroEndRank] || heroEndRank;
+
   const targetEndRank = target.system?.abilities?.endurance?.rank || "Typical";
   const targetEndValue = target.system?.abilities?.endurance?.value || 0;
   const targetEndShort = RANK_ABBR[targetEndRank] || targetEndRank;
 
   const endFeatReq = determineFeatRequirement(targetEndRank, powerRank);
+  const selfEndFeatReq = determineFeatRequirement(heroEndRank, powerRank);
+
+  // CS row only meaningful for the other-target Fighting FEAT
+  const csRowHtml = !isSelf ? buildCSRow({ savedCS: 0, abilityRank: heroFightRank }) : "";
+  const karmaHtml = generateKarmaControlsHTML(hero, false);
+
+  const headerHtml = isSelf
+    ? `<div class="frp-header-v3">
+         <span class="h-actor" title="${hero.name}">${hero.name}</span>
+         <span class="h-paren">(</span>
+         <span class="h-stat">
+           <span class="h-stat-label">Base End:</span>
+           <span class="h-stat-rank">${heroEndShort} ${heroEndValue}</span>
+         </span>
+         <span class="h-paren">)</span>
+         <span class="h-verb">touches</span>
+         <span class="h-target">self</span>
+       </div>`
+    : `<div class="frp-header-v3">
+         <span class="h-actor" title="${hero.name}">${hero.name}</span>
+         <span class="h-paren">(</span>
+         <span class="h-stat">
+           <span class="h-stat-label">Base Fighting:</span>
+           <span class="h-stat-rank">${heroFightShort} ${heroFightValue}</span>
+         </span>
+         <span class="h-paren">)</span>
+         <span class="h-verb">touches</span>
+         <span class="h-target" title="${target.name}">${target.name}</span>
+       </div>`;
+
+  const infoBoxHtml = isSelf
+    ? `<div class="frp-box" style="margin-top:6px;">
+         <div style="font-size:0.9em;line-height:1.5;">
+           <div>Self End FEAT vs ${powerRank}: need <strong>${selfEndFeatReq.requirement}</strong></div>
+         </div>
+       </div>`
+    : `<div class="frp-box" style="margin-top:6px;">
+         <div style="font-size:0.9em;line-height:1.5;">
+           <div>Target End: <strong>${targetEndShort} ${targetEndValue}</strong></div>
+           <div>End FEAT vs ${powerRank}: need <strong>${endFeatReq.requirement}</strong></div>
+         </div>
+       </div>`;
+
+  const resultGridHtml = !isSelf
+    ? `<div class="frp-fx-grid">
+         <div class="frp-fx-cell w">Miss</div>
+         <div class="frp-fx-cell g">Hit &rarr; Save</div>
+         <div class="frp-fx-cell y">Hit &rarr; Save</div>
+         <div class="frp-fx-cell r">Hit &rarr; Save</div>
+       </div>`
+    : "";
 
   const dialogContent = `
     <div class="frp-dlg frp-feat">
-      <div class="frp-header-v3">
-        <span class="h-actor" title="${hero.name}">${hero.name}</span>
-        <span class="h-paren">&rarr;</span>
-        <span class="h-actor" title="${target.name}">${isSelf ? "self" : target.name}</span>
-        <span class="h-paren">(</span>
-        <span class="h-stat">
-          <span class="h-stat-label">Paralyzing Touch</span>
-          <span class="h-stat-rank">${rankShort}</span>
-          <span class="h-stat-val">${powerValue}</span>
-        </span>
-        <span class="h-paren">)</span>
+      ${headerHtml}
+      ${csRowHtml}
+      ${infoBoxHtml}
+      <div class="frp-box frp-opts-box" style="margin-top:6px;">
+        ${karmaHtml}
       </div>
-
-      <div class="frp-box" style="margin-top:8px;">
-        <div style="font-size:0.9em;line-height:1.5;">
-          ${!isSelf ? `<div>${hero.name} Fighting: <strong>${heroFightShort} ${heroFightValue}</strong></div>` : ""}
-          <div>Target End: <strong>${targetEndShort} ${targetEndValue}</strong></div>
-          <div>End FEAT vs ${powerRank}: need <strong>${endFeatReq.requirement}</strong></div>
-        </div>
-      </div>
-
+      ${resultGridHtml}
       <div class="frp-foot" style="margin-top:8px;">
         <button type="button" id="frp-roll" class="frp-btn frp-btn-primary">${isSelf ? "Roll Self End FEAT" : "Touch &amp; Paralyze"}</button>
         <button type="button" id="frp-cancel" class="frp-btn">Cancel</button>
@@ -107,18 +150,35 @@ export async function showParalyzingTouchDialog(hero, item) {
     render: async (html, dlg) => {
       const $dialog = html.closest('.dialog');
 
-      const rollEndFeatAndApply = async (subject, subjectEndRank, subjectEndShort, subjectEndValue, intro) => {
-        const req = determineFeatRequirement(subjectEndRank, powerRank);
-        const endRoll = new Roll("1d100");
-        await endRoll.evaluate();
-        await endRoll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: subject }),
-          flavor: `${subject.name} rolls End FEAT vs ${powerRank} (Paralyzing Touch)`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
+      let csPanel = null;
+      if (!isSelf) {
+        csPanel = wireCSPanel(html, { abilityRank: heroFightRank });
+      }
+      setupKarmaControlHandlers(html);
 
-        let resultColor;
-        let resisted;
+      // Shared End-FEAT resolver. For self-path, caller passes pre-rolled
+      // total + karma so the karma decision is applied to the same End FEAT
+      // (not re-rolled). For other-path, this rolls fresh on the target.
+      const rollEndFeatOnTarget = async (subject, subjectEndRank, subjectEndShort, subjectEndValue, intro, subjectKarmaUsed = 0, preRolledTotal = null) => {
+        const req = determineFeatRequirement(subjectEndRank, powerRank);
+
+        let displayTotal, karmaLine;
+        if (preRolledTotal !== null) {
+          displayTotal = preRolledTotal;
+          karmaLine = subjectKarmaUsed > 0 ? ` + Karma: ${subjectKarmaUsed}` : "";
+        } else {
+          const endRoll = new Roll("1d100");
+          await endRoll.evaluate();
+          await endRoll.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor: subject }),
+            flavor: `${subject.name} rolls End FEAT vs ${powerRank} (Paralyzing Touch)`,
+            rollMode: game.settings.get("core", "rollMode")
+          });
+          displayTotal = endRoll.total;
+          karmaLine = "";
+        }
+
+        let resultColor, resisted;
         if (req.automatic) {
           resultColor = "automatic";
           resisted = true;
@@ -126,7 +186,7 @@ export async function showParalyzingTouchDialog(hero, item) {
           resultColor = "impossible";
           resisted = false;
         } else {
-          resultColor = game.msh.rollUniversalTable(subjectEndRank, endRoll.total);
+          resultColor = game.msh.rollUniversalTable(subjectEndRank, displayTotal);
           resisted = checkFeatSuccess(resultColor, req.requirement);
         }
 
@@ -160,29 +220,50 @@ export async function showParalyzingTouchDialog(hero, item) {
             <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
               <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
                 <strong>Paralyzing Touch</strong><br>
-                <span style="font-size:0.85em;font-weight:400;">${hero.name} &rarr; ${subject.name === hero.name ? "self" : subject.name} &mdash; ${powerRank} (${powerValue})</span>
+                <span style="font-size:0.85em;font-weight:400;">${hero.name} &rarr; ${subject.uuid === hero.uuid ? "self" : subject.name} &mdash; ${powerRank} (${powerValue})</span>
               </div>
               ${intro || ""}
               <div style="padding:5px 10px;font-size:0.9em;">
                 <div>End FEAT (${subjectEndShort} ${subjectEndValue}) vs ${powerRank} (need ${req.requirement})</div>
-                <div>Roll: ${endRoll.total}</div>
+                <div>Roll: ${displayTotal}${karmaLine}</div>
               </div>
               ${outcomeBlock}
             </div>`
         });
       };
 
-      // Self path
       const runSelf = async () => {
-        const heroEndRank = hero.system?.abilities?.endurance?.rank || "Typical";
-        const heroEndValue = hero.system?.abilities?.endurance?.value || 0;
-        const heroEndShort = RANK_ABBR[heroEndRank] || heroEndRank;
-        await rollEndFeatAndApply(hero, heroEndRank, heroEndShort, heroEndValue, "");
+        const spendKarma = html.find('#spend-karma').is(':checked');
+
+        const endRoll = new Roll("1d100");
+        await endRoll.evaluate();
+        await endRoll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor: hero }),
+          flavor: `${hero.name} rolls End FEAT vs ${powerRank} (Paralyzing Touch — self)`,
+          rollMode: game.settings.get("core", "rollMode")
+        });
+
+        let cappedTotal = endRoll.total;
+        let karmaUsed = 0;
+        if (spendKarma && getAvailableKarma(hero) > 0) {
+          const initialColor = game.msh.rollUniversalTable(heroEndRank, endRoll.total);
+          const karmaResult = await showKarmaDecisionDialog(
+            hero, endRoll.total, heroEndRank, "Paralyzing Touch (self End)", initialColor
+          );
+          cappedTotal = karmaResult.finalResult;
+          karmaUsed = karmaResult.karmaSpent;
+        }
+
+        await rollEndFeatOnTarget(hero, heroEndRank, heroEndShort, heroEndValue, "", karmaUsed, cappedTotal);
       };
 
-      // Other-target path
       const runOther = async () => {
-        // Fighting FEAT first
+        const csInfo = csPanel ? csPanel.get() : { totalShift: 0, manualCS: 0 };
+        const shift = Number(csInfo.totalShift) || 0;
+        const effectiveFightRank = shift !== 0 ? applyColumnShifts(heroFightRank, shift) : heroFightRank;
+        const effectiveFightValue = game.msh?.getRankValue?.(effectiveFightRank) ?? heroFightValue;
+        const spendKarma = html.find('#spend-karma').is(':checked');
+
         const fightRoll = new Roll("1d100");
         await fightRoll.evaluate();
         await fightRoll.toMessage({
@@ -190,7 +271,19 @@ export async function showParalyzingTouchDialog(hero, item) {
           flavor: `${hero.name} makes a Fighting FEAT to touch ${target.name} (Paralyzing Touch)`,
           rollMode: game.settings.get("core", "rollMode")
         });
-        const fightColor = game.msh.rollUniversalTable(heroFightRank, fightRoll.total);
+
+        let cappedTotal = fightRoll.total;
+        let karmaUsed = 0;
+        if (spendKarma && getAvailableKarma(hero) > 0) {
+          const initialColor = game.msh.rollUniversalTable(effectiveFightRank, fightRoll.total);
+          const karmaResult = await showKarmaDecisionDialog(
+            hero, fightRoll.total, effectiveFightRank, "Paralyzing Touch (Fighting)", initialColor
+          );
+          cappedTotal = karmaResult.finalResult;
+          karmaUsed = karmaResult.karmaSpent;
+        }
+
+        const fightColor = game.msh.rollUniversalTable(effectiveFightRank, cappedTotal);
         const hit = ["green", "yellow", "red"].includes(String(fightColor).toLowerCase());
 
         if (!hit) {
@@ -203,7 +296,9 @@ export async function showParalyzingTouchDialog(hero, item) {
                   <span style="font-size:0.85em;font-weight:400;">${hero.name} &rarr; ${target.name}</span>
                 </div>
                 <div style="padding:5px 10px;font-size:0.9em;">
-                  <div>Fighting FEAT (${heroFightShort} ${heroFightValue}). Roll: ${fightRoll.total}</div>
+                  <div>Base Rank: ${heroFightRank} (${heroFightValue})</div>
+                  ${shift !== 0 ? `<div>Column Shift: ${shift > 0 ? "+" : ""}${shift} &rarr; ${effectiveFightRank} (${effectiveFightValue})</div>` : ""}
+                  <div>Roll: ${fightRoll.total}${karmaUsed ? ` + Karma: ${karmaUsed}` : ""} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background-color:${colorBg(fightColor)};color:${colorFg(fightColor)};">
                   ${String(fightColor).toUpperCase()} &mdash; MISS
@@ -213,23 +308,29 @@ export async function showParalyzingTouchDialog(hero, item) {
           return;
         }
 
-        // Hit — pass the hit info as intro for the End FEAT card
         const intro = `
           <div style="padding:5px 10px;font-size:0.88em;background-color:#e8f5e9;border-bottom:1px solid #c0c0c0;">
-            Fighting FEAT (${heroFightShort} ${heroFightValue}) roll ${fightRoll.total}
-            &mdash; <strong style="color:${colorFg(fightColor)};background-color:${colorBg(fightColor)};padding:1px 6px;border-radius:2px;">${String(fightColor).toUpperCase()}</strong>
+            Fighting FEAT (${heroFightShort} ${heroFightValue}${shift !== 0 ? ` ${shift > 0 ? "+" : ""}${shift}CS &rarr; ${effectiveFightRank}` : ""})
+            roll ${fightRoll.total}${karmaUsed ? ` + ${karmaUsed}K` : ""} = ${cappedTotal}
+            &mdash; <strong style="color:#fff;background-color:${colorBg(fightColor)};padding:1px 6px;border-radius:2px;">${String(fightColor).toUpperCase()}</strong>
             &mdash; HIT
           </div>`;
-        await rollEndFeatAndApply(target, targetEndRank, targetEndShort, targetEndValue, intro);
+        await rollEndFeatOnTarget(target, targetEndRank, targetEndShort, targetEndValue, intro);
       };
 
       html.find('#frp-roll').on('click', async () => {
         try {
           if (isSelf) await runSelf();
           else await runOther();
-        } finally { dlg.close(); }
+        } finally {
+          if (csPanel) csPanel.destroy();
+          dlg.close();
+        }
       });
-      html.find('#frp-cancel').on('click', () => dlg.close());
+      html.find('#frp-cancel').on('click', () => {
+        if (csPanel) csPanel.destroy();
+        dlg.close();
+      });
       html.find('#frp-roll').focus();
       $dialog.on('keydown', (e) => {
         if (e.key === 'Enter') {
