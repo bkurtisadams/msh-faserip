@@ -1,4 +1,7 @@
-// power-router.js v1.2.0 - 2026-04-03
+// power-router.js v1.3.0 - 2026-05-15
+// v1.3.0: Recovery power early-route — detects by hasRecoveryPower flag or
+//         name match before the NON_ATTACK_TYPES bail; opens
+//         showRecoveryFeatDialog (Power-rank FEAT, oncePerDay).
 // v1.2.0: Wire battleEffectsColumn as explicit action type override.
 // v1.1.0: Route "psionic attack" through mental-power action (was intensity).
 // Shared power routing logic extracted from actorSheet.js .power-roll handler.
@@ -146,6 +149,13 @@ export async function rollPower(actor, item) {
       actor,
       opts: { itemId: item.id, item }
     });
+  }
+
+  // Recovery: Power-rank FEAT to restore one Endurance rank per day.
+  // Matches by name or by the hasRecoveryPower flag on the power item.
+  if (nameLower === "recovery" || item.system?.hasRecoveryPower === true) {
+    const { showRecoveryFeatDialog } = await import("./recovery-action.js");
+    return showRecoveryFeatDialog(actor, item);
   }
 
   // Normalize legacy values

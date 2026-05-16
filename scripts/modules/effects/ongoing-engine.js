@@ -1,4 +1,7 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.6 - 2026-05-15
+// scripts/modules/effects/ongoing-engine.js v1.7.7 - 2026-05-15
+// v1.7.7: restoreOneEnduranceRank export — reusable one-shot rank-step
+//         helper for Recovery power FEAT and any future End-restore caller.
+//         getCurrentGameDate export for oncePerDay gating outside this file.
 // v1.7.6: applyAbsorptionTempHPOngoing — cliff decay at round+10 for temp HP
 //         granted by Absorption power. Per-source AE keying so independent
 //         absorptions decay on their own clocks. stat.loss type, capAtMax:false
@@ -1541,4 +1544,61 @@ export async function applyAbsorptionTempHPOngoing(target, { amount, expiresInRo
     changes: [],
     statuses: ["absorption-temp"],
   });
+}
+
+// ─── Endurance rank restoration (one-shot helper) ────────────────────────────
+// Performs a single rank-step on the actor's Endurance, clamped to a cap
+// (defaults to actor's originalEndurance flag, then current rank as floor).
+// Recalculates max Health (F+A+S+E) and adds the delta to current HP so
+// healing Endurance restores Health per RAW.
+//
+// Returns { restored: boolean, oldRank, newRank, atCap, reason }.
+
+export async function restoreOneEnduranceRank(actor, { originalRankCap = null, source = "" } = {}) {
+  if (!actor) return { restored: false, reason: "no-actor" };
+
+  const scope = SCOPE();
+  const cap = originalRankCap
+    || actor.getFlag(scope, "originalEndurance")
+    || actor.system?.abilities?.endurance?.rank;
+
+  const currentRank = actor.system?.abilities?.endurance?.rank;
+  if (!currentRank) return { restored: false, reason: "no-current-rank" };
+  if (currentRank === cap) return { restored: false, atCap: true, oldRank: currentRank, newRank: currentRank };
+
+  const curIdx = RANKS_ORDERED.findIndex(r => r === currentRank);
+  const capIdx = RANKS_ORDERED.findIndex(r => r === cap);
+  if (curIdx < 0) return { restored: false, reason: "rank-not-in-order" };
+
+  const nextIdx = Math.min(curIdx + 1, capIdx >= 0 ? capIdx : curIdx + 1);
+  const newRank = RANKS_ORDERED[nextIdx] ?? currentRank;
+  if (newRank === currentRank) return { restored: false, atCap: true, oldRank: currentRank, newRank };
+
+  const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+  const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
+  const enduranceDelta = Math.max(0, newValue - currentValue);
+
+  const newMaxHealth = _recalcMaxHealth(actor, newValue);
+  const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+  const newHealth = Math.min(newMaxHealth, currentHealth + enduranceDelta);
+
+  await actor.update({
+    "system.abilities.endurance.rank": newRank,
+    "system.abilities.endurance.value": newValue,
+    "system.attributes.health.value": newHealth,
+    "system.attributes.health.max": newMaxHealth,
+  });
+
+  const sourceLabel = source ? ` (${source})` : "";
+  await sendOngoingChat(actor, `Endurance Restored${sourceLabel}`, "stat.gain",
+    `<strong>${actor.name}</strong> restored 1 Endurance rank: <strong>${currentRank}</strong> &rarr; <strong>${newRank} (${newValue})</strong>
+     <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} &rarr; ${newHealth} / ${newMaxHealth}</div>`
+  );
+
+  return { restored: true, oldRank: currentRank, newRank, atCap: newRank === cap };
+}
+
+// Expose game-date helper for action handlers that need oncePerDay gating.
+export function getCurrentGameDate() {
+  return _getGameDate();
 }

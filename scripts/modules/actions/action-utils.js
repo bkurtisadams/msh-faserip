@@ -1634,6 +1634,7 @@ export async function applyDamageToTargets({
 
       // Calculate mitigation (armor, resistances, etc.)
       let ffBreachData = null;
+      let mitResult = null;
       try {
         if (typeof calculateMitigation === "function" && targetActor) {
           const mit = calculateMitigation(netDamage, targetActor, {
@@ -1645,6 +1646,7 @@ export async function applyDamageToTargets({
             apMode,
             attackIntensity
           });
+          mitResult = mit;
           if (mit && Number.isFinite(mit.netDamage)) {
             netDamage = Math.max(0, mit.netDamage);
           }
@@ -1664,7 +1666,21 @@ export async function applyDamageToTargets({
       // Get health values
       const hpPath = "system.attributes.health.value";
       const before = Number(targetActor?.system?.attributes?.health?.value ?? 0);
-      const after = Math.max(0, before - netDamage);
+      let after = Math.max(0, before - netDamage);
+
+      // ── Absorption heal (post-damage, race-free) ──
+      // Mitigation returned the heal amount; we apply it here in the same
+      // update pass as the damage subtraction. Overheal allowed up to
+      // max + tempHPRank ceiling. Temp overflow scheduled for cliff decay
+      // at round+10 via ongoing-engine.
+      let absorptionTempGained = 0;
+      if (mitResult && mitResult.absorptionHeal > 0) {
+        const maxHP = Number(targetActor?.system?.attributes?.health?.max ?? after);
+        const ceiling = maxHP + (mitResult.absorptionTempHPRank || 0);
+        const next = Math.min(ceiling, after + mitResult.absorptionHeal);
+        absorptionTempGained = Math.max(0, next - maxHP);
+        after = next;
+      }
 
       // ===== HANDLE DAMAGE TO ALREADY 0 HP TARGET =====
       if (before === 0 && netDamage > 0) {
@@ -1753,6 +1769,22 @@ export async function applyDamageToTargets({
         // Record damage timestamp for rest system
         if (before > after && typeof recordDamage === "function") {
           await recordDamage(targetActor);
+        }
+
+        // Schedule absorption temp-HP cliff decay (post-update so the AE
+        // attaches to the actor with the new HP already written).
+        if (absorptionTempGained > 0) {
+          try {
+            const ongoing = await import("../effects/ongoing-engine.js");
+            const sourceAeId = mitResult?.absorptionAeIds?.[0] || null;
+            await ongoing.applyAbsorptionTempHPOngoing?.(targetActor, {
+              amount: absorptionTempGained,
+              expiresInRounds: 10,
+              sourceAeId,
+            });
+          } catch (e) {
+            console.warn("FASERIP | Absorption temp HP scheduling failed:", e);
+          }
         }
       } else if (targetActor) {
         // Non-owner player: delegate to GM
