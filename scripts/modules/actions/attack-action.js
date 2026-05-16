@@ -1,4 +1,9 @@
-// attack-action.js v1.9.26 - 2026-05-16
+// attack-action.js v1.9.27 - 2026-05-16
+// v1.9.27: MA-D engaged badge — reads choice.maDEngaged (set by
+//          blunt-attack dialog's State-3 engage toggle) and renders a
+//          teal "MA-D engaged — armor bypass for Stun/Slam" note in
+//          the per-target chat card. Informational only this slice;
+//          actual Stun/Slam armor bypass pipeline lands next slice.
 // v1.9.26: Talent source badge on chat card — when this.opts.fromTalent
 //          is set (attack launched from the talents tab via rollTalent),
 //          render "Source: <talent name>" badge next to aim/variant badges.
@@ -1029,6 +1034,16 @@ export class AttackAction extends BaseAction {
         ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#534AB7;"><i class="fas fa-bolt"></i> Source: ${talentSourceName}</div>`
         : "";
 
+      // MA-D engaged badge — when the player armed the bypass toggle in
+      // the blunt-attack dialog (study complete on this target). For now
+      // this badge is informational only; the actual Stun/Slam armor
+      // bypass mechanic ships in the next slice. Renders in teal to
+      // visually echo the dialog's State-3 styling.
+      const maDEngaged = choice?.maDEngaged === true;
+      const maDBadge = maDEngaged
+        ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#0F6E56;"><i class="fas fa-bullseye"></i> MA-D engaged — armor bypass for Stun/Slam <span style="color:#888;font-size:.85em;">(mechanic next slice)</span></div>`
+        : "";
+
       // Kill result karma warning for attack card
       const targetIsRobot = targetActor?.system?.origin === "Robot";
       const killWarning = (showKill && !targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;text-align:center;">Kill result — hero loses ALL Karma if target dies</div>` : (showKill && targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;font-size:.85em;color:#1565c0;text-align:center;">Kill result — target is a Robot/construct. No Karma loss for attacker.</div>` : "";
@@ -1288,6 +1303,7 @@ export class AttackAction extends BaseAction {
           ${variantBadge}
           ${aimBadge}
           ${talentBadge}
+          ${maDBadge}
           
           <!-- Ability + Roll + Result -->
           <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">

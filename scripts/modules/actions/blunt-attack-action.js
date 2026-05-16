@@ -1,4 +1,14 @@
-// blunt-attack-action.js v3.5.0 - 2026-03-17
+// blunt-attack-action.js v3.6.0 - 2026-05-16
+// v3.6.0: MA-D / MA-A zone — three-state badge between header and CS row
+//         when attacker has Martial Arts D or A. State 1 (idle/no study)
+//         offers a [Begin study] button when in combat and a target is
+//         selected. State 2 (studying) shows round-of-2 countdown. State
+//         3 (armed) shows the engage-bypass toggle, default-on. Toggle
+//         state captured as choice.maDEngaged and passed through to
+//         _executeSingleAttack for pipeline use (Stun/Slam armor bypass
+//         in attack-action.js — next slice). Begin-study button calls
+//         recordStudy() from ma-d.js and updates the zone in place to
+//         State 2 without resetting other dialog fields.
 // v3.5.0: Manual CS only — remove talent/power auto-detection.
 //         CS row is a simple number input + ? reference panel.
 //         No talent chips, no savedCheckedMods, no talentFlags.
@@ -58,6 +68,7 @@ import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { buildColorOutcome } from "../dice/color-results.js";
+import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
@@ -215,6 +226,83 @@ export class BluntAttackAction extends AttackAction {
     const fightingAbility = getAbilityInfo(actor, "fighting");
     const fightingShort = RANK_ABBR[fightingAbility.rank] || fightingAbility.rank;
 
+    // ── MA-D / MA-A state ─────────────────────────────────────────────
+    // RAW: MA-D ignores Body Armor (not Force Fields) for Stun/Slam
+    // determinations after 2 rounds of studying the target. MA-A ignores
+    // the Str/End comparison (currently a no-op in this codebase since
+    // no such gate exists). The MA-D zone shows three states:
+    //   1) Not studied — neutral hint, "Begin study" button if in combat
+    //   2) Studying (1/2 rounds) — amber countdown, no engage option yet
+    //   3) Armed (2/2 rounds complete on this target) — teal, default-on
+    //      Engage toggle that wires choice.maDEngaged through to the
+    //      Stun/Slam emission logic in attack-action.js.
+    // Zone only renders when the attacker has MA-D and/or MA-A. Hidden
+    // for actors without either talent so the dialog stays compact.
+    const actorHasMAD = hasMartialArtsD(actor);
+    const actorHasMAA = hasMartialArtsA(actor);
+    const primaryTargetUuid = primaryTarget?.document?.uuid || primaryTargetActor?.uuid || null;
+    const studyStatus = (actorHasMAD && primaryTargetUuid)
+      ? getStudyStatus(actor, primaryTargetUuid)
+      : { studying: false, rounds: 0, complete: false, stale: false };
+    const studyComplete = studyStatus.complete;
+    const studyInProgress = studyStatus.studying && !studyStatus.complete;
+    const inCombat = !!game.combat;
+
+    let maDZoneHtml = "";
+    if (actorHasMAD || actorHasMAA) {
+      const taLabel = (() => {
+        if (actorHasMAD && actorHasMAA) return "Martial Arts A + D";
+        if (actorHasMAD)                return "Martial Arts D";
+        return "Martial Arts A";
+      })();
+
+      if (actorHasMAD && studyComplete && primaryTarget) {
+        // STATE 3 — Armed
+        const tname = primaryTarget?.name || primaryTargetActor?.name || "target";
+        maDZoneHtml = `
+        <div class="frp-mad-zone frp-mad-armed" style="background:#E1F5EE;color:#04342C;padding:6px 10px;border-bottom:1px solid #5DCAA5;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px;">
+            <i class="fas fa-bullseye" style="color:#0F6E56;" aria-hidden="true"></i>
+            <strong>${taLabel} armed</strong>
+            <span style="color:#0F6E56;font-size:11px;">— ${studyStatus.rounds} rounds studied · ${tname}'s weak points mapped</span>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;padding-left:22px;font-size:11px;color:#085041;cursor:pointer;">
+            <input type="checkbox" id="ma-d-engage" name="maDEngaged" checked style="margin:0;">
+            <span>Engage bypass — ignore Body Armor for Stun/Slam (Force Fields still apply)</span>
+          </label>
+        </div>`;
+      } else if (actorHasMAD && studyInProgress && primaryTarget) {
+        // STATE 2 — Studying in progress
+        const tname = primaryTarget?.name || primaryTargetActor?.name || "target";
+        const rdsLeft = Math.max(0, 2 - studyStatus.rounds);
+        maDZoneHtml = `
+        <div class="frp-mad-zone frp-mad-studying" style="background:#FAEEDA;color:#633806;padding:6px 10px;border-bottom:1px solid #FAC775;display:flex;align-items:center;gap:8px;font-size:12px;">
+          <i class="fas fa-hourglass-half" style="color:#BA7517;" aria-hidden="true"></i>
+          <span><strong>${taLabel}</strong> — studying ${tname} · ${studyStatus.rounds} of 2 rounds</span>
+          <span style="margin-left:auto;font-size:11px;color:#854F0B;">${rdsLeft === 0 ? "Bypass armed this round" : `${rdsLeft} round to bypass`}</span>
+        </div>`;
+      } else if (actorHasMAD || actorHasMAA) {
+        // STATE 1 — No study (or MA-A only, which has no study mechanic)
+        const targetName = primaryTarget?.name || primaryTargetActor?.name || "selected target";
+        const hint = !inCombat
+          ? "Requires active combat to study"
+          : !primaryTarget
+          ? "Select a target to study"
+          : actorHasMAD
+          ? `Not studied — plain blunt attack`
+          : `Stun/Slam ignore comparative Str/End`;
+        const showStudyBtn = actorHasMAD && inCombat && primaryTarget;
+        maDZoneHtml = `
+        <div class="frp-mad-zone frp-mad-idle" style="background:#F1EFE8;color:#444441;padding:6px 10px;border-bottom:1px solid #D3D1C7;display:flex;align-items:center;gap:8px;font-size:12px;">
+          <i class="fas fa-bullseye" style="color:#5F5E5A;" aria-hidden="true"></i>
+          <span><strong>${taLabel}</strong> — ${hint}</span>
+          ${showStudyBtn
+            ? `<button type="button" id="ma-d-begin-study" style="margin-left:auto;background:#fff;border:1px solid #B4B2A9;border-radius:3px;padding:2px 8px;font-size:11px;color:#2C2C2A;cursor:pointer;">Begin study</button>`
+            : ""}
+        </div>`;
+      }
+    }
+
     // ── Dialog HTML — v3 Ultra Compact Layout ──
     const multiEnabled = savedMultiAttacks || savedMultiAdjacent;
     const dialogHtml = `
@@ -233,6 +321,8 @@ export class BluntAttackAction extends AttackAction {
           ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
           : ''}
       </div>
+
+      ${maDZoneHtml}
 
       <!-- CS row (manual input + ? reference) -->
       ${csRowHtml}
@@ -365,6 +455,33 @@ export class BluntAttackAction extends AttackAction {
             }
           });
 
+          // ── MA-D Begin Study button handler ──
+          // Clicking "Begin study" records a study AE on the attacker
+          // against the primary target. Study tracks rounds against
+          // game.combat.round; the player then carries on with this
+          // attack as a plain blunt (no bypass on the round study is
+          // recorded — study takes effect after 2 round advances).
+          // After recordStudy we update the zone in place to State 2
+          // without re-rendering the whole dialog, so the player
+          // doesn't lose their CS/karma/etc. selections.
+          html.find('#ma-d-begin-study').on('click', async () => {
+            if (!primaryTarget) return;
+            try {
+              await recordStudy(actor, primaryTarget);
+              const tname = primaryTarget?.name || primaryTargetActor?.name || "target";
+              const newZone = `
+              <div class="frp-mad-zone frp-mad-studying" style="background:#FAEEDA;color:#633806;padding:6px 10px;border-bottom:1px solid #FAC775;display:flex;align-items:center;gap:8px;font-size:12px;">
+                <i class="fas fa-hourglass-half" style="color:#BA7517;" aria-hidden="true"></i>
+                <span><strong>Martial Arts D</strong> — studying ${tname} · 0 of 2 rounds</span>
+                <span style="margin-left:auto;font-size:11px;color:#854F0B;">2 rounds to bypass</span>
+              </div>`;
+              html.find('.frp-mad-zone').replaceWith(newZone);
+            } catch (err) {
+              console.error("MA-D | recordStudy failed", err);
+              ui.notifications.error("Could not record study; see console");
+            }
+          });
+
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
             const $dlg = (sel) => html.find(sel);
@@ -405,6 +522,12 @@ export class BluntAttackAction extends AttackAction {
             const multiAdjacent = multiEnabled && multiCountVal === "adjacent";
             const multiAttacks  = multiEnabled && !multiAdjacent;
             const attackCount   = multiCountVal === "3" ? 3 : 2;
+
+            // MA-D bypass — only meaningful when the engage checkbox
+            // exists in the dialog (State 3, study complete). Defaults
+            // to false if the zone is in States 1/2 or absent entirely.
+            const $maDEngage   = $dlg('#ma-d-engage');
+            const maDEngaged   = $maDEngage.length > 0 ? $maDEngage.is(':checked') : false;
 
             // Get CS state from shared utility
             const cs = _csState.get();
@@ -467,6 +590,7 @@ export class BluntAttackAction extends AttackAction {
               shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
               multiAttacks, attackCount, multiAdjacent,
+              maDEngaged,
               csNotes: cs.csNotes,
               effectiveFightingRank: effFightRank
             });
