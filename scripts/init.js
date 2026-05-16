@@ -3454,35 +3454,15 @@ async function createFaseripItemMacro(data, slot) {
 
       switch (item.type) {
         case "power": {
-          const category     = system.category || "";
-          const requiresSave = !!system.requiresSave;
-          const saveAbility  = (system.save && system.save.ability) || system.saveAbility || null;
-          const damageType   = system.damageType || null;
-
-          const isMental =
-            category === "mentalPowers" ||
-            requiresSave ||
-            saveAbility === "psyche" ||
-            saveAbility === "intuition" ||
-            damageType === "mental";
-
-          if (isMental) {
-            // Mental / save-based powers: skip to-hit, go straight to saves
-            await game.msh.actions.roll("mental-power", {
-              actor,
-              abilityName: undefined,
-              opts: { itemId: item.id, item }
-            });
-          } else {
-            // Regular attack powers: route to energy/force actions like the sheet
-            const actionType = system.attackType === "force" ? "force" : "energy";
-
-            await game.msh.actions.roll(actionType, {
-              actor,
-              abilityName: "agility",   // Powers use Agility to hit
-              opts: { itemId: item.id, item }
-            });
-          }
+          // Route through the same power-router used by the .power-roll
+          // click handler — covers Paralyzing/Health-Drain/Blinding touch
+          // early routes, Healing, Damage Transfer, Recovery, the
+          // LEGACY_MAP attackType set, the BEC (Battle Effects Column)
+          // map, FORCE_TYPES, and the mental-power path. The previous
+          // inline mental/energy/force shortcut got the dialog wrong for
+          // every other power category.
+          const { rollPower } = await import(\`/systems/\${game.system.id}/scripts/modules/actions/power-router.js\`);
+          await rollPower(actor, item);
           break;
         }
 
