@@ -37,6 +37,27 @@ import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+// Power types that route to throwing-blunt per power-router (Ice Generation, etc.)
+const THROWING_BLUNT_POWER_TYPES = ["ice generation"];
+
+function isThrowingBluntPower(item) {
+  if (item?.type !== "power") return false;
+  const ptl = String(item.system?.type || "").toLowerCase();
+  const nameLc = String(item.name || "").toLowerCase();
+  return THROWING_BLUNT_POWER_TYPES.some(t => ptl.includes(t) || nameLc.includes(t));
+}
+
+// Damage source dispatcher. Powers use rank value (RAW: damage equals Power rank).
+// Equipment uses thrown-weapon RAW: max(weaponBase, min(STR, MAT)).
+function computeThrowingBluntDamage(actor, item) {
+  if (!item) return 0;
+  if (item.type === "power") {
+    const s = item.system || {};
+    return Number(s.damage || s.value || game.msh.getRankValue(s.rank) || 0);
+  }
+  return computeThrownBluntDamage(actor, item);
+}
+
 // Thrown blunt damage per RAW (Advanced Set Combat, Blunt Throwing Attack):
 // "A blunt thrown weapon inflicts damage equal to the Strength of the thrower,
 //  or the material strength of the thrown item, whichever is less."
@@ -60,8 +81,10 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const effects = effectsFor(actionType);
     const ability = getAbilityInfo(actor, this.abilityName || "agility");
 
-    // Candidate weapons: thrown + blunt
+    // Candidate weapons: thrown + blunt. Also accepts powers that route to
+    // throwing-blunt per the power-router (Ice Generation, etc.)
     let thrownBlunt = actor.items.filter(i => {
+      if (i.type === "power") return isThrowingBluntPower(i);
       if (i.type !== "equipment" || String(i.system?.category ?? "").toLowerCase() !== "weapon") return false;
       const s = i.system ?? {};
       if (s.attackModes) {
@@ -85,7 +108,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
-    if (passedItem && passedItem.type === "equipment") {
+    if (passedItem && (passedItem.type === "equipment" || isThrowingBluntPower(passedItem))) {
       if (!thrownBlunt.find(i => i.id === passedItem.id)) {
         thrownBlunt = [passedItem, ...thrownBlunt];
       }
@@ -130,7 +153,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     // Initial damage calc
     const isAdHocInit = savedAdHoc || !thrownBlunt.length;
     const initialWeapon = isAdHocInit ? null : thrownBlunt.find(i => i.id === savedItemId) || thrownBlunt[0];
-    const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrownBluntDamage(actor, initialWeapon);
+    const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrowingBluntDamage(actor, initialWeapon);
     const initialAfterArmor = Math.max(0, initialDamage - targetArmor);
 
     // Karma info
@@ -403,7 +426,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
             } else {
               const wid = html.find('[name="weapon"]').val();
               const w = thrownBlunt.find(i => i.id === wid);
-              dmg = computeThrownBluntDamage(actor, w);
+              dmg = computeThrowingBluntDamage(actor, w);
               const after = Math.max(0, dmg - targetArmor);
               html.find('#dmg-val').text(dmg);
               html.find('#after-armor-display').text(primaryTarget ? `${after} after armor` : `${dmg} damage`);
@@ -505,7 +528,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     // Delegate to shared resolution pipeline
     const weaponItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
     const rawDamage = choice.weaponId
-      ? computeThrownBluntDamage(actor, weaponItem)
+      ? computeThrowingBluntDamage(actor, weaponItem)
       : Number(choice.weaponDamage || 0);
 
     await this._executeSingleAttack({

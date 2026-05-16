@@ -32,6 +32,27 @@ import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+// Power types that route to throwing-edged per power-router (Slashing Missile, etc.)
+const THROWING_EDGED_POWER_TYPES = ["slashing missile"];
+
+function isThrowingEdgedPower(item) {
+  if (item?.type !== "power") return false;
+  const ptl = String(item.system?.type || "").toLowerCase();
+  const nameLc = String(item.name || "").toLowerCase();
+  return THROWING_EDGED_POWER_TYPES.some(t => ptl.includes(t) || nameLc.includes(t));
+}
+
+// Damage source dispatcher. Powers use rank value (RAW: Slashing Missile damage
+// equals Power rank). Equipment uses thrown-edged RAW: max(min(STR, MAT), weaponBase).
+function computeThrowingEdgedDamage(actor, item) {
+  if (!item) return 0;
+  if (item.type === "power") {
+    const s = item.system || {};
+    return Number(s.damage || s.value || game.msh.getRankValue(s.rank) || 0);
+  }
+  return computeThrownEdgedDamage(actor, item);
+}
+
 // Compute thrown edged damage the same way melee edged does:
 // max(min(STR, MAT), weaponBase). Edged has no bump-to-next-rank rule.
 function computeThrownEdgedDamage(actor, weaponItem) {
@@ -60,8 +81,10 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       return Number(ap) || 0;
     };
 
-    // Candidate weapons: thrown + edged
+    // Candidate weapons: thrown + edged. Also accepts powers that route to
+    // throwing-edged per the power-router (Slashing Missile, etc.)
     let thrownEdged = actor.items.filter(i => {
+      if (i.type === "power") return isThrowingEdgedPower(i);
       if (i.type !== "equipment" || String(i.system?.category ?? "").toLowerCase() !== "weapon") return false;
       const s = i.system ?? {};
       if (s.attackModes) {
@@ -85,7 +108,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
-    if (passedItem && passedItem.type === "equipment") {
+    if (passedItem && (passedItem.type === "equipment" || isThrowingEdgedPower(passedItem))) {
       if (!thrownEdged.find(i => i.id === passedItem.id)) {
         thrownEdged = [passedItem, ...thrownEdged];
       }
@@ -131,7 +154,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     // Initial damage calc
     const isAdHocInit = savedAdHoc || !thrownEdged.length;
     const initialWeapon = isAdHocInit ? null : thrownEdged.find(i => i.id === savedItemId) || thrownEdged[0];
-    const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrownEdgedDamage(actor, initialWeapon);
+    const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrowingEdgedDamage(actor, initialWeapon);
     const initialAP = initialWeapon ? getArmorPiercing(initialWeapon) : 0;
     const initialEffArmor = Math.max(0, targetArmor - initialAP);
     const initialAfterArmor = Math.max(0, initialDamage - initialEffArmor);
@@ -314,7 +337,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             } else {
               const wid = html.find('[name="weapon"]').val();
               const w = thrownEdged.find(i => i.id === wid);
-              dmg = computeThrownEdgedDamage(actor, w);
+              dmg = computeThrowingEdgedDamage(actor, w);
               ap = w ? getArmorPiercing(w) : 0;
               const effArmor = Math.max(0, targetArmor - ap);
               const after = Math.max(0, dmg - effArmor);
@@ -326,6 +349,30 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               } else {
                 html.find('#ap-display').hide();
               }
+            }
+
+            // Slashing Missile power: per RAW "may not reduce the effect of the
+            // attack." Force pull-punch and result-cap off and disable both.
+            const $pullChk = html.find('#pull-punch-enabled');
+            const $pullInput = html.find('[name="pulledDamage"]');
+            const $resCap = html.find('[name="resultCap"]');
+            if (!isAdHoc) {
+              const wid2 = html.find('[name="weapon"]').val();
+              const w2 = thrownEdged.find(i => i.id === wid2);
+              if (w2 && isThrowingEdgedPower(w2)) {
+                $pullChk.prop('checked', false).prop('disabled', true);
+                $pullInput.prop('disabled', true);
+                $resCap.val('none').prop('disabled', true);
+                $pullChk.closest('.frp-opt-row').addClass('inactive');
+              } else {
+                $pullChk.prop('disabled', false);
+                $pullInput.prop('disabled', !$pullChk.is(':checked'));
+                $resCap.prop('disabled', !$pullChk.is(':checked'));
+              }
+            } else {
+              $pullChk.prop('disabled', false);
+              $pullInput.prop('disabled', !$pullChk.is(':checked'));
+              $resCap.prop('disabled', !$pullChk.is(':checked'));
             }
 
             // Update pull punch max
@@ -508,7 +555,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     // Delegate to shared resolution pipeline
     const weaponItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
     const rawDamage = choice.weaponId
-      ? computeThrownEdgedDamage(actor, weaponItem)
+      ? computeThrowingEdgedDamage(actor, weaponItem)
       : Number(choice.weaponDamage || 0);
 
     await this._executeSingleAttack({
