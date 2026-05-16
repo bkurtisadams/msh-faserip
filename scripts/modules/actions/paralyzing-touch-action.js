@@ -1,4 +1,8 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.1.2 - 2026-05-15
+// scripts/modules/actions/paralyzing-touch-action.js v1.1.3 - 2026-05-15
+// v1.1.3: Fix chat card readability — "WHITE — PARALYZED" outcome block
+//         hardcoded color:#fff on the white-result background (#f5f5f0),
+//         making the text invisible. Use colorFg(resultColor) like the
+//         RESISTED block already does.
 // v1.1.2: Replace deprecated game.settings.get("core","rollMode") with v14's
 //         "messageMode" via getRollMode() helper (with v13 fallback).
 // v1.1.1: Fix applyColumnShifts return shape. The helper returns
@@ -219,7 +223,7 @@ export async function showParalyzingTouchDialog(hero, item) {
           await applyParalyzed(subject, { rounds, originUuid: hero.uuid });
 
           outcomeBlock = `
-            <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background-color:${req.impossible ? "#6a0000" : colorBg(resultColor)};color:#fff;">
+            <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background-color:${req.impossible ? "#6a0000" : colorBg(resultColor)};color:${req.impossible ? "#fff" : colorFg(resultColor)};">
               ${req.impossible ? "IMPOSSIBLE" : String(resultColor).toUpperCase()} &mdash; PARALYZED
             </div>
             <div style="padding:5px 10px;text-align:center;font-size:0.95em;color:#c62828;">

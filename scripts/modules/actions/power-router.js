@@ -1,4 +1,7 @@
-// power-router.js v1.7.0 - 2026-05-15
+// power-router.js v1.8.0 - 2026-05-15
+// v1.8.0: Blinding Touch early-route — dedicated dialog (was previously in
+//         ENERGY_TYPES list, misrouted to EnergyAction as energy damage).
+//         Matches by name or isBlindingTouch flag.
 // v1.7.0: Paralyzing Touch early-route — dedicated dialog (was previously
 //         in ENERGY_TYPES list, misrouted to EnergyAction as energy damage).
 //         Matches by name or isParalyzingTouch flag. Self-target permitted
@@ -63,8 +66,7 @@ const ENERGY_TYPES = [
   "fire control", "fire generation", "energy generation",
   "electrical manipulation", "light manipulation",
   "energy touch", "darkforce manipulation", "darkforce generation",
-  "shocking touch", "corrosive touch", "rotting touch",
-  "blinding touch"
+  "shocking touch", "corrosive touch", "rotting touch"
 ];
 
 const THROWING_BLUNT_TYPES = ["ice generation"];
@@ -201,6 +203,13 @@ export async function rollPower(actor, item) {
   if (nameLower === "paralyzing touch" || item.system?.isParalyzingTouch === true) {
     const { showParalyzingTouchDialog } = await import("./paralyzing-touch-action.js");
     return showParalyzingTouchDialog(actor, item);
+  }
+
+  // Blinding Touch: Fighting FEAT touch. On Slam (Y) or Stun (R) color
+  // result, target blinded 1d10 rounds. Protected Senses bypasses.
+  if (nameLower === "blinding touch" || item.system?.isBlindingTouch === true) {
+    const { showBlindingTouchDialog } = await import("./blinding-touch-action.js");
+    return showBlindingTouchDialog(actor, item);
   }
 
   // Normalize legacy values
