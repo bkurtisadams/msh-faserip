@@ -1,4 +1,9 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.1.3 - 2026-05-15
+// scripts/modules/actions/paralyzing-touch-action.js v1.2.0 - 2026-05-15
+// v1.2.0: Auto-apply target/attacker effect-state shifts to the other-target
+//         Fighting FEAT (mirrors attack-action.js:594 and Health-Drain v1.2.0).
+//         Effect shift folded into totalShift alongside manual CS; breakdown
+//         surfaced in info box and chat card. Self-path unaffected — no
+//         Fighting FEAT, so effect shifts don't apply.
 // v1.1.3: Fix chat card readability — "WHITE — PARALYZED" outcome block
 //         hardcoded color:#fff on the white-result background (#f5f5f0),
 //         making the text invisible. Use colorFg(resultColor) like the
@@ -29,6 +34,7 @@ import {
 } from "../dice/dice-roller.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -96,6 +102,20 @@ export async function showParalyzingTouchDialog(hero, item) {
   const endFeatReq = determineFeatRequirement(targetEndRank, powerRank);
   const selfEndFeatReq = determineFeatRequirement(heroEndRank, powerRank);
 
+  // ── Effect-state shifts (other-target Fighting FEAT only) ─────────────
+  // Self path has no Fighting FEAT, so effect-shift application is moot.
+  // Mirrors attack-action.js:594. Touch is melee → isRanged=false.
+  const attackerShiftData = !isSelf ? getAttackShiftBreakdown(hero, false) : { total: 0, breakdown: [] };
+  const defenderShiftData = !isSelf ? getDefenseShiftBreakdown(target, false) : { total: 0, breakdown: [] };
+  const effectShift = (attackerShiftData.total || 0) - (defenderShiftData.total || 0);
+  const effectBreakdownLines = [
+    ...(attackerShiftData.breakdown || []).map(b => `${b.name} (attacker, ${b.shift > 0 ? "+" : ""}${b.shift} attack)`),
+    ...(defenderShiftData.breakdown || []).map(b => `${b.name} on target (${b.shift > 0 ? "+" : ""}${b.shift} defense)`),
+  ];
+  const effectShiftNoteHtml = (!isSelf && effectShift !== 0)
+    ? `<div style="color:#1565c0;margin-top:4px;"><strong>Effect shift: ${effectShift > 0 ? "+" : ""}${effectShift}CS</strong> &mdash; ${effectBreakdownLines.join("; ")}</div>`
+    : "";
+
   // CS row only meaningful for the other-target Fighting FEAT
   const csRowHtml = !isSelf ? buildCSRow({ savedCS: 0, abilityRank: heroFightRank }) : "";
   const karmaHtml = generateKarmaControlsHTML(hero, false);
@@ -134,6 +154,7 @@ export async function showParalyzingTouchDialog(hero, item) {
          <div style="font-size:0.9em;line-height:1.5;">
            <div>Target End: <strong>${targetEndShort} ${targetEndValue}</strong></div>
            <div>End FEAT vs ${powerRank}: need <strong>${endFeatReq.requirement}</strong></div>
+           ${effectShiftNoteHtml}
          </div>
        </div>`;
 
@@ -276,8 +297,9 @@ export async function showParalyzingTouchDialog(hero, item) {
 
       const runOther = async () => {
         const csInfo = csPanel ? csPanel.get() : { totalShift: 0, manualCS: 0 };
-        const shift = Number(csInfo.totalShift) || 0;
-        const effectiveFightRank = shift !== 0 ? applyColumnShifts(heroFightRank, shift).name : heroFightRank;
+        const manualShift = Number(csInfo.totalShift) || 0;
+        const totalShift = manualShift + effectShift;
+        const effectiveFightRank = totalShift !== 0 ? applyColumnShifts(heroFightRank, totalShift).name : heroFightRank;
         const effectiveFightValue = game.msh?.getRankValue?.(effectiveFightRank) ?? heroFightValue;
         const spendKarma = html.find('#spend-karma').is(':checked');
 
@@ -303,6 +325,13 @@ export async function showParalyzingTouchDialog(hero, item) {
         const fightColor = game.msh.rollUniversalTable(effectiveFightRank, cappedTotal);
         const hit = ["green", "yellow", "red"].includes(String(fightColor).toLowerCase());
 
+        // Shared CS-breakdown HTML for miss + hit displays
+        const csBreakdownHtml = totalShift !== 0
+          ? `<div>Column Shift: ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank} (${effectiveFightValue})</div>
+             ${(manualShift !== 0 && effectShift !== 0) ? `<div style="font-size:0.85em;color:#666;padding-left:8px;">manual ${manualShift > 0 ? "+" : ""}${manualShift}, effects ${effectShift > 0 ? "+" : ""}${effectShift}</div>` : ""}
+             ${(effectShift !== 0 && effectBreakdownLines.length) ? `<div style="font-size:0.85em;color:#1565c0;padding-left:8px;">${effectBreakdownLines.join("; ")}</div>` : ""}`
+          : "";
+
         if (!hit) {
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: hero }),
@@ -314,7 +343,7 @@ export async function showParalyzingTouchDialog(hero, item) {
                 </div>
                 <div style="padding:5px 10px;font-size:0.9em;">
                   <div>Base Rank: ${heroFightRank} (${heroFightValue})</div>
-                  ${shift !== 0 ? `<div>Column Shift: ${shift > 0 ? "+" : ""}${shift} &rarr; ${effectiveFightRank} (${effectiveFightValue})</div>` : ""}
+                  ${csBreakdownHtml}
                   <div>Roll: ${fightRoll.total}${karmaUsed ? ` + Karma: ${karmaUsed}` : ""} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background-color:${colorBg(fightColor)};color:${colorFg(fightColor)};">
@@ -327,11 +356,12 @@ export async function showParalyzingTouchDialog(hero, item) {
 
         const intro = `
           <div style="padding:5px 10px;font-size:0.88em;background-color:#e8f5e9;border-bottom:1px solid #c0c0c0;">
-            Fighting FEAT (${heroFightShort} ${heroFightValue}${shift !== 0 ? ` ${shift > 0 ? "+" : ""}${shift}CS &rarr; ${effectiveFightRank}` : ""})
+            Fighting FEAT (${heroFightShort} ${heroFightValue}${totalShift !== 0 ? ` ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank}` : ""})
             roll ${fightRoll.total}${karmaUsed ? ` + ${karmaUsed}K` : ""} = ${cappedTotal}
-            &mdash; <strong style="color:#fff;background-color:${colorBg(fightColor)};padding:1px 6px;border-radius:2px;">${String(fightColor).toUpperCase()}</strong>
+            &mdash; <strong style="color:${colorFg(fightColor)};background-color:${colorBg(fightColor)};padding:1px 6px;border-radius:2px;">${String(fightColor).toUpperCase()}</strong>
             &mdash; HIT
-          </div>`;
+          </div>
+          ${(effectShift !== 0 && effectBreakdownLines.length) ? `<div style="padding:3px 10px;font-size:0.82em;background-color:#e8f5e9;color:#1565c0;border-bottom:1px solid #c0c0c0;">${effectBreakdownLines.join("; ")}</div>` : ""}`;
         await rollEndFeatOnTarget(target, targetEndRank, targetEndShort, targetEndValue, intro);
       };
 

@@ -1,5 +1,9 @@
-// scripts/modules/actions/blinding-touch-action.js v1.0.0 - 2026-05-15
-// Touch attack dialog for the Blinding Touch power.
+// scripts/modules/actions/blinding-touch-action.js v1.1.0 - 2026-05-15
+// v1.1.0: Auto-apply target/attacker effect-state shifts to the Fighting
+//         FEAT (mirrors attack-action.js:594 + Health-Drain v1.2.0 +
+//         Paralyzing v1.2.0). Effect shift folded into totalShift alongside
+//         manual CS; breakdown surfaced in info box and chat card.
+// v1.0.0: Touch attack dialog for the Blinding Touch power.
 // RAW: "Blind unprotected target 1-10 rounds. Must achieve Stun or Slam
 //       result. No avoidance unless Protected Senses or helmet."
 // Flow: Fighting FEAT to touch (CS + karma). Color result:
@@ -22,6 +26,7 @@ import {
 } from "../dice/dice-roller.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -91,6 +96,20 @@ export async function showBlindingTouchDialog(hero, item) {
 
   const protectedSenses = hasProtectedSenses(target);
 
+  // ── Effect-state shifts (auto-applied to Fighting FEAT) ───────────────
+  // Mirrors attack-action.js:594 / Health-Drain v1.2.0 / Paralyzing v1.2.0.
+  // Touch is melee → isRanged = false.
+  const attackerShiftData = getAttackShiftBreakdown(hero, false);
+  const defenderShiftData = getDefenseShiftBreakdown(target, false);
+  const effectShift = (attackerShiftData.total || 0) - (defenderShiftData.total || 0);
+  const effectBreakdownLines = [
+    ...(attackerShiftData.breakdown || []).map(b => `${b.name} (attacker, ${b.shift > 0 ? "+" : ""}${b.shift} attack)`),
+    ...(defenderShiftData.breakdown || []).map(b => `${b.name} on target (${b.shift > 0 ? "+" : ""}${b.shift} defense)`),
+  ];
+  const effectShiftNoteHtml = effectShift !== 0
+    ? `<div style="color:#1565c0;margin-top:4px;"><strong>Effect shift: ${effectShift > 0 ? "+" : ""}${effectShift}CS</strong> &mdash; ${effectBreakdownLines.join("; ")}</div>`
+    : "";
+
   const csRowHtml = buildCSRow({ savedCS: 0, abilityRank: heroFightRank });
   const karmaHtml = generateKarmaControlsHTML(hero, false);
 
@@ -113,6 +132,7 @@ export async function showBlindingTouchDialog(hero, item) {
         <div>Target: <strong>${target.name}</strong></div>
         <div>Blind on <strong>Slam (Y)</strong> or <strong>Stun (R)</strong>; 1d10 rounds.</div>
         ${protectedSenses ? `<div style="color:#2e7d32;"><strong>${target.name}</strong> has Protected Senses &mdash; immune.</div>` : ""}
+        ${effectShiftNoteHtml}
       </div>
     </div>`;
 
@@ -150,8 +170,9 @@ export async function showBlindingTouchDialog(hero, item) {
 
       const runRoll = async () => {
         const csInfo = csPanel ? csPanel.get() : { totalShift: 0, manualCS: 0 };
-        const shift = Number(csInfo.totalShift) || 0;
-        const effectiveFightRank = shift !== 0 ? applyColumnShifts(heroFightRank, shift).name : heroFightRank;
+        const manualShift = Number(csInfo.totalShift) || 0;
+        const totalShift = manualShift + effectShift;
+        const effectiveFightRank = totalShift !== 0 ? applyColumnShifts(heroFightRank, totalShift).name : heroFightRank;
         const effectiveFightValue = game.msh?.getRankValue?.(effectiveFightRank) ?? heroFightValue;
         const spendKarma = html.find('#spend-karma').is(':checked');
 
@@ -224,7 +245,9 @@ export async function showBlindingTouchDialog(hero, item) {
                 <span style="font-size:0.85em;font-weight:400;">${hero.name} &rarr; ${target.name} &mdash; ${powerRank} (${powerValue})</span>
               </div>
               <div style="padding:5px 10px;font-size:0.9em;">
-                <div>Fighting FEAT (${heroFightShort} ${heroFightValue}${shift !== 0 ? ` ${shift > 0 ? "+" : ""}${shift}CS &rarr; ${effectiveFightRank} (${effectiveFightValue})` : ""})</div>
+                <div>Fighting FEAT (${heroFightShort} ${heroFightValue}${totalShift !== 0 ? ` ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank} (${effectiveFightValue})` : ""})</div>
+                ${(manualShift !== 0 && effectShift !== 0) ? `<div style="font-size:0.85em;color:#666;padding-left:8px;">manual ${manualShift > 0 ? "+" : ""}${manualShift}, effects ${effectShift > 0 ? "+" : ""}${effectShift}</div>` : ""}
+                ${(effectShift !== 0 && effectBreakdownLines.length) ? `<div style="font-size:0.85em;color:#1565c0;padding-left:8px;">${effectBreakdownLines.join("; ")}</div>` : ""}
                 <div>Roll: ${fightRoll.total}${karmaUsed ? ` + Karma: ${karmaUsed}` : ""} = ${cappedTotal}</div>
               </div>
               ${outcomeBlock}
