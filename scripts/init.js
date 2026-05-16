@@ -283,6 +283,29 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
     console.error("[FASERIP ERROR] processOngoingEffects failed:", e);
   }
 
+  // Refresh labels for duration-bound effects on all actors outside combat.
+  // Inside combat the updateCombat hook handles this. Outside combat, the
+  // rename loop never fired by default, so AE names like "Paralyzed (36s)"
+  // stayed stuck even when game time advanced (e.g. CTT manual advance).
+  // Skip on dt <= 0 to avoid churn on no-op time events.
+  if (!game.combat?.active && dt > 0) {
+    for (const actor of Effects.getAllTokenActors()) {
+      for (const eff of (actor?.effects ?? [])) {
+        if (!eff?.id) continue;
+        if (eff.disabled) continue;
+        const d = eff.duration;
+        if (!Number.isFinite(d?.remaining) && !Number.isFinite(d?.rounds)) continue;
+        try {
+          await Effects.renameEffectWithRemaining(eff);
+        } catch (e) {
+          if (!/does not exist/i.test(e?.message ?? "")) {
+            console.warn("[FASERIP WARN] worldTime rename failed:", e);
+          }
+        }
+      }
+    }
+  }
+
   // Dying out-of-combat: process 1 rank loss per turn elapsed.
   // combatRound hook owns this during active combat.
   // timeTracker.timeAdvanced hook owns this when CTT is active (avoids race condition,
