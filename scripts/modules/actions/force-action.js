@@ -1,4 +1,11 @@
-// scripts/modules/actions/force-action.js v3.2.0 - 2026-03-17
+// scripts/modules/actions/force-action.js v3.3.0 - 2026-05-16
+// v3.3.0: Aim tactic — Bullseye-effect reinterpretation per RAW Tactics.
+//         New Aim row in options box: Neutralize only. On Force the red
+//         result is already Stun (not Kill), so the "Kill→Bullseye"
+//         downgrade does NOT apply — a Force red stays Stun. Neutralize
+//         simply adds the disarm chat note on a yellow Bullseye. Stun aim
+//         omitted since Force red is already Stun per table. Persisted via
+//         lastForceAim actor flag; resolution logic in attack-action.js v1.9.24.
 // v3.2.0: Custom Roll/Cancel buttons (Roll first, then Cancel).
 //         Footer reordered: [Roll] [Cancel] ... [Remember] [Skip dice].
 //         Hide Foundry native button row, use _resolved guard on close.
@@ -111,6 +118,7 @@ export class ForceAction extends RangedAttackAction {
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForceMultiAdjacent") || false) : false;
     const savedPullEnabled = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForcePullEnabled") || false) : false;
     const savedPulledDamage = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForcePulledDamage") || 0) : 0;
+    const savedAim = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForceAim") || "none") : "none";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target Info ===
@@ -245,7 +253,7 @@ export class ForceAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Options: Reduce / Multi / Karma -->
+      <!-- Options: Reduce / Multi / Aim / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!savedPullEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}> <span class="frp-opt-label orange">Reduce</span></label>
@@ -256,6 +264,13 @@ export class ForceAction extends RangedAttackAction {
         <div class="frp-opt-row${!savedMultiAdjacent ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <span style="font-size:11px;color:#777;margin-left:8px;">Adjacent targets (-4CS)</span>
+        </div>
+        <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
+          <select name="aimMode" ${savedAim === 'none' ? 'disabled' : ''} style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;">
+            <option value="neutralize" ${savedAim !== 'none' ? 'selected' : ''}>Neutralize (disarm)</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">Bullseye effect</span>
         </div>
         <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
           ${hasKarma ? `
@@ -432,6 +447,8 @@ export class ForceAction extends RangedAttackAction {
 
             const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
             const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
+            const aimEnabled = $dlg('#aim-enabled').is(':checked');
+            const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
 
             const csNotes = csData.rangePenalty !== 0 ? `Range ${csData.rangePenalty}` : "";
 
@@ -449,6 +466,7 @@ export class ForceAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastForceMultiAdjacent", multiAdjacent);
               await actor.setFlag("msh-faserip", "lastForcePullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastForcePulledDamage", pulledDamage);
+              await actor.setFlag("msh-faserip", "lastForceAim", aimMode);
             }
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
@@ -459,6 +477,7 @@ export class ForceAction extends RangedAttackAction {
               totalShift: shift,
               multiAdjacent,
               pulledDamage, resultCap: "none",
+              aimMode,
               csNotes
             });
             dlg.close();
@@ -556,6 +575,13 @@ export class ForceAction extends RangedAttackAction {
           // Multi toggle
           html.find('#multi-enabled').on('change', function() {
             $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
+          });
+
+          // Aim tactic toggle
+          html.find('#aim-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="aimMode"]').prop('disabled', !this.checked);
           });
 
           // Karma toggle

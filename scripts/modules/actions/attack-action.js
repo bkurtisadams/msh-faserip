@@ -1,4 +1,18 @@
-// attack-action.js v1.9.23 - 2026-04-30
+// attack-action.js v1.9.25 - 2026-05-16
+// v1.9.25: Aim tactic — chat card now shows an Aim badge ("Aim: Stun" /
+//          "Aim: Neutralize (disarm)") whenever aimMode !== "none", so the
+//          table can see the attacker's declared intent even when the
+//          dice didn't produce a reinterpreted result. Disarm note wording
+//          made explicit about damage applying normally.
+// v1.9.24: Aim tactic (RAW Tactics — Shooting maneuvers): choice.aimMode
+//          handling for "neutralize" (Red→Yellow downgrade gated to tables
+//          where red=Kill, plus disarm chat note on Yellow) and "stun"
+//          (Yellow Bullseye → Stun effect label via effectiveEffects
+//          override + Stun chip emission on Yellow for shooting/energy).
+//          Applies across shooting/energy/force dialogs; Force opts out of
+//          stun (red already = Stun per table) and Force red is preserved
+//          as Stun rather than being stripped by Neutralize.
+//          Disarm is GM-adjudicated — chat note only, no auto-unequip.
 // v1.9.23: Multi-Attack FEAT dialog wrapped in frp-dlg + frp-header-v3 — picks up
 //          all Pass-1 high-contrast styling (boxes, footer, ink). Replaces inline
 //          grey/yellow ctx-cards and CS row with frp-box + frp-cs-box patterns.
@@ -659,9 +673,31 @@ export class AttackAction extends BaseAction {
       }
     }
 
+    // ── Aim tactic (RAW Tactics — Shooting maneuvers) ─────────────────
+    //  • Neutralize: Kill downgrades to Bullseye (Red→Yellow) — but only
+    //    when the table's red IS a Kill (Shooting/Energy). On Force the
+    //    red is Stun, so per RAW ("Kill result is treated as a Bullseye")
+    //    the downgrade does NOT apply — a Force red still resolves as Stun
+    //    with no disarm. Damage applies normally on Yellow; disarm chat
+    //    note posted when final color is Yellow.
+    //    (Green still lands damage but no disarm; White still misses.)
+    //  • Stun (Shooting/Energy only — Force red is already Stun):
+    //    Bullseye → Stun. Effect label override + stun chip on Yellow.
+    //    Kill (Red) still resolves as Kill per RAW.
+    const aimMode = String(choice.aimMode || "none").toLowerCase();
+    const redIsKill = String(effects?.red || "").toLowerCase() === "kill";
+    if (aimMode === "neutralize" && redIsKill && String(color).toLowerCase() === "red") {
+      color = "yellow";
+    }
+
+    // Effective effects table — Stun aim swaps Yellow's effect Bullseye → Stun
+    const effectiveEffects = (aimMode === "stun")
+      ? { ...effects, yellow: "Stun" }
+      : effects;
+
     // Use the (possibly capped) color for effect lookup
     const effectColorLower = String(color || "white").toLowerCase();
-    const effectResult = effects[effectColorLower] || color;
+    const effectResult = effectiveEffects[effectColorLower] || color;
     const { bg, fg } = bannerColors(effectColorLower);
     const isHit = effectColorLower !== 'white';
 
@@ -793,7 +829,7 @@ export class AttackAction extends BaseAction {
       // These may differ from the original roll if evasion blocked or bonus upgraded
       const targetBg = bannerColors(targetEffectColor).bg;
       const targetFg = bannerColors(targetEffectColor).fg;
-      const targetEffectResult = effects[targetEffectColor] || targetEffectColor;
+      const targetEffectResult = effectiveEffects[targetEffectColor] || targetEffectColor;
 
       // Calculate armor and penetrating damage for this specific target
      let penetratingDamage = 0;
@@ -918,7 +954,10 @@ export class AttackAction extends BaseAction {
 
         case "shooting":
         case "energy":
-          // Yellow = Bullseye → no Slam/Stun check; Red = Kill
+          // Yellow = Bullseye → no Slam/Stun check; Red = Kill.
+          // Aim=stun (RAW Tactics): Yellow Bullseye treated as Stun → emit
+          // stun chip; existing stun-FEAT pipeline uses dmgThrough as intensity.
+          showStun = (aimMode === "stun" && targetEffectColor === "yellow");
           showKill = (targetEffectColor === "red");    // ← Kill on red
           break;
 
@@ -963,9 +1002,27 @@ export class AttackAction extends BaseAction {
         ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#1565c0;"><i class="fas fa-crosshairs"></i> ${variantLabel}</div>`
         : "";
 
+      // Aim tactic badge — shows declared intent (Neutralize/Stun) on the
+      // chat card so the table can see what the attacker was trying to do
+      // even when the roll didn't trigger the reinterpretation (e.g. Green
+      // Hit on an aim=stun shot is just a normal Hit; the badge still flags
+      // the declared intent for GM karma/morality adjudication).
+      const aimLabel = aimMode === "neutralize" ? "Aim: Neutralize (disarm)"
+                     : aimMode === "stun"       ? "Aim: Stun"
+                     : "";
+      const aimBadge = aimLabel
+        ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#c62828;"><i class="fas fa-crosshairs"></i> ${aimLabel}</div>`
+        : "";
+
       // Kill result karma warning for attack card
       const targetIsRobot = targetActor?.system?.origin === "Robot";
       const killWarning = (showKill && !targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;text-align:center;">Kill result — hero loses ALL Karma if target dies</div>` : (showKill && targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;font-size:.85em;color:#1565c0;text-align:center;">Kill result — target is a Robot/construct. No Karma loss for attacker.</div>` : "";
+
+      // Aim=neutralize: disarm note when shot lands on Bullseye (RAW Tactics).
+      // Damage still applies normally; the disarm itself is GM-adjudicated.
+      const disarmNote = (aimMode === "neutralize" && targetIsHit && targetEffectColor === "yellow")
+        ? `<div style="padding:4px 8px;margin:4px 10px;background:#fff8e1;border:1px solid #ffa726;border-radius:3px;font-size:.85em;color:#bf360c;text-align:center;"><i class="fas fa-crosshairs"></i> Shoot to Neutralize — damage applies normally; target's weapon knocked from hand (GM adjudicates disarm details)</div>`
+        : "";
 
       // Calculate autoSave before using it
       const { resolveCombatMode } = await import("./action-dispatcher.js");
@@ -1214,6 +1271,7 @@ export class AttackAction extends BaseAction {
           
           ${multiAttackFeatHtml}
           ${variantBadge}
+          ${aimBadge}
           
           <!-- Ability + Roll + Result -->
           <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
@@ -1228,6 +1286,7 @@ export class AttackAction extends BaseAction {
           
           ${evasionNote}
           ${killWarning}
+          ${disarmNote}
           
           <!-- Damage -->
           ${(() => {

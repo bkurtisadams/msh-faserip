@@ -1,4 +1,14 @@
-// scripts/modules/actions/energy-action.js v3.1.0 - 2026-03-17
+// scripts/modules/actions/energy-action.js v3.2.1 - 2026-05-16
+// v3.2.1: Fix Reduce row's Any/Ylw/Grn radios stacking vertically when
+//         Energy Generation triggers .result-cap-controls visibility.
+//         Show with display:inline-flex (was inline) so the wrapper span
+//         participates in the row's flex layout; paired CSS in
+//         action-dialog.css makes the inner labels inline-flex.
+// v3.2.0: Aim tactic — Bullseye-effect reinterpretation per RAW Tactics.
+//         New Aim row in options box: Neutralize (Red→Yellow, disarm chat
+//         note) or Stun (Yellow Bullseye → Stun chip via attack-action.js
+//         pipeline). Persisted via lastEnergyAim actor flag; resolution
+//         logic lives in attack-action.js v1.9.24.
 // v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 //         PwrHit toggle moved to checkbox, uses setAbilityRank().
@@ -94,6 +104,7 @@ export class EnergyAction extends RangedAttackAction {
     const savedReduceDamage = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReduceDamage") || false) : false;
     const savedReducedAmount = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0) : 0;
     const savedResultCap = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyResultCap") || "none") : "none";
+    const savedAim = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAim") || "none") : "none";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target Info ===
@@ -228,7 +239,7 @@ export class EnergyAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Options: Reduce / Multi / Karma -->
+      <!-- Options: Reduce / Multi / Aim / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!savedReduceDamage ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="reduce-damage-enabled" ${savedReduceDamage ? 'checked' : ''}> <span class="frp-opt-label orange">Reduce</span></label>
@@ -244,6 +255,14 @@ export class EnergyAction extends RangedAttackAction {
         <div class="frp-opt-row${!savedMultiAdjacent ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <span style="font-size:11px;color:#777;margin-left:8px;">Adjacent targets (-4CS)</span>
+        </div>
+        <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
+          <select name="aimMode" ${savedAim === 'none' ? 'disabled' : ''} style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;">
+            <option value="neutralize" ${savedAim === 'neutralize' ? 'selected' : ''}>Neutralize (disarm)</option>
+            <option value="stun" ${(savedAim === 'stun' || savedAim === 'none') ? 'selected' : ''}>Stun</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">Bullseye effect</span>
         </div>
         <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
           ${hasKarma ? `
@@ -407,6 +426,8 @@ export class EnergyAction extends RangedAttackAction {
             const reduceDamageEnabled = !!$dlg('#reduce-damage-enabled').is(':checked');
             const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
             const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
+            const aimEnabled = $dlg('#aim-enabled').is(':checked');
+            const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
             const csNotes = cs.csNotes;
 
             if (rememberSettings) {
@@ -423,6 +444,7 @@ export class EnergyAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
               await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
               await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
+              await actor.setFlag("msh-faserip", "lastEnergyAim", aimMode);
             }
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
@@ -434,6 +456,7 @@ export class EnergyAction extends RangedAttackAction {
               totalShift: shift,
               powerDamageType, multiAdjacent,
               reduceDamageEnabled, reducedDamage, resultCap,
+              aimMode,
               csNotes
             });
             dlg.close();
@@ -475,7 +498,7 @@ export class EnergyAction extends RangedAttackAction {
             const $resultCapControls = html.find('.result-cap-controls');
             const $effectNote = html.find('.effect-note');
             if (isEnergyGeneration) {
-              $resultCapControls.css('display', 'inline');
+              $resultCapControls.css('display', 'inline-flex');
               $effectNote.text('Energy Gen: can reduce effect').css('color', '#2e7d32');
             } else {
               $resultCapControls.hide();
@@ -555,6 +578,13 @@ export class EnergyAction extends RangedAttackAction {
           // Multi toggle
           html.find('#multi-enabled').on('change', function() {
             $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
+          });
+
+          // Aim tactic toggle
+          html.find('#aim-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="aimMode"]').prop('disabled', !this.checked);
           });
 
           // Karma toggle

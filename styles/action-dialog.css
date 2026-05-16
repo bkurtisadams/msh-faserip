@@ -320,7 +320,8 @@
 }
 .frp-dlg .frp-opt-row.inactive .frp-opt-label.orange,
 .frp-dlg .frp-opt-row.inactive .frp-opt-label.green,
-.frp-dlg .frp-opt-row.inactive .frp-opt-label.blue {
+.frp-dlg .frp-opt-row.inactive .frp-opt-label.blue,
+.frp-dlg .frp-opt-row.inactive .frp-opt-label.red {
   color: #444;
 }
 .frp-dlg .frp-opt-row.inactive select,
@@ -830,6 +831,7 @@
 .frp-dlg .frp-opt-row .frp-opt-label.orange { color: #e65100; }
 .frp-dlg .frp-opt-row .frp-opt-label.green { color: #2e7d32; }
 .frp-dlg .frp-opt-row .frp-opt-label.blue { color: #1565c0; }
+.frp-dlg .frp-opt-row .frp-opt-label.red { color: #c62828; }
 
 .frp-dlg .frp-pull-input {
   width: 36px;
@@ -842,6 +844,18 @@
   font-weight: 600;
   box-sizing: border-box;
   min-height: 0;
+}
+
+/* Reduce row's result-cap radio cluster — keep radios on one horizontal
+   line. Without this, `.frp-opt-row label { display: flex }` makes each
+   radio's label block-level, so Any/Ylw/Grn would stack vertically when
+   the wrapper span is shown. */
+.frp-dlg .frp-opt-row .result-cap-controls {
+  align-items: center;
+  gap: 8px;
+}
+.frp-dlg .frp-opt-row .result-cap-controls label {
+  display: inline-flex;
 }
 
 .frp-dlg .frp-karma-pool {

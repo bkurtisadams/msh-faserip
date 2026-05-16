@@ -1,4 +1,9 @@
-// shooting-action.js v3.6.0 - 2026-05-06
+// shooting-action.js v3.7.0 - 2026-05-16
+// v3.7.0: Aim tactic — Bullseye-effect reinterpretation per RAW Tactics.
+//         New Aim row in options box: Neutralize (Red→Yellow, disarm chat
+//         note) or Stun (Yellow Bullseye → Stun chip via attack-action.js
+//         pipeline). Persisted via lastShootingAim actor flag; resolution
+//         logic lives in attack-action.js v1.9.24.
 // v3.6.0: Honor opts.attackMode.damage and opts.attackMode.damageType when the equipment
 //         hub dispatched a specific attack mode (e.g. Air Pistol → Explosive Pellet).
 //         _modeDamage / _modeDamageType helpers gate the override to the passed item;
@@ -152,6 +157,7 @@ export class ShootingAction extends RangedAttackAction {
     const savedMultiAttacks = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingMultiAttacks")) || false) : false;
     const savedAttackCount = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAttackCount")) || 2) : 2;
     const savedVariantType = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingVariant")) || "") : "";
+    const savedAim = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAim")) || "none") : "none";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target info ===
@@ -321,12 +327,20 @@ export class ShootingAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Options: Multi / Karma -->
+      <!-- Options: Multi / Aim / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${multiEnabled ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${(!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>
           <label><input type="radio" name="multiCount" value="3" ${savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
+        </div>
+        <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
+          <select name="aimMode" ${savedAim === 'none' ? 'disabled' : ''} style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;">
+            <option value="neutralize" ${savedAim === 'neutralize' ? 'selected' : ''}>Neutralize (disarm)</option>
+            <option value="stun" ${(savedAim === 'stun' || savedAim === 'none') ? 'selected' : ''}>Stun</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">Bullseye effect</span>
         </div>
         <div class="frp-opt-row${!hasKarma ? ' inactive' : ' inactive'}">
           ${hasKarma ? `
@@ -516,6 +530,10 @@ export class ShootingAction extends RangedAttackAction {
             const multiAttacks = multiEnabled;
             const attackCount = (multiCountVal === "3") ? 3 : 2;
 
+            // Aim tactic — Bullseye-effect reinterpretation (Tactics, RAW)
+            const aimEnabled = $dlg('#aim-enabled').is(':checked');
+            const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
+
             // Weapon stats + AP
             const weaponRange = weapon.system?.range || 15;
             const weaponDamage = _modeDamage(weapon);
@@ -536,6 +554,7 @@ export class ShootingAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
               await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
+              await actor.setFlag("msh-faserip", "lastShootingAim", aimMode);
             }
 
             await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
@@ -555,6 +574,7 @@ export class ShootingAction extends RangedAttackAction {
               attackCount,
               variantType,
               canisterSubType,
+              aimMode,
               csNotes: cs.csNotes,
               armorPiercing: _apInfo.ap,
               armorPiercingCS: _apInfo.apCS,
@@ -607,6 +627,13 @@ export class ShootingAction extends RangedAttackAction {
             const $row = $(this).closest('.frp-opt-row');
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
+          });
+
+          // Aim tactic toggle
+          html.find('#aim-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="aimMode"]').prop('disabled', !this.checked);
           });
 
           // Karma toggle
