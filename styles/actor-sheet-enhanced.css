@@ -214,6 +214,15 @@ form.faserip-sheet .secondary-abilities select {
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
 }
 
+/* Center-align all primary ability inputs (Initial Roll, Initial Rank,
+   Current Rank #) — the td cells are already center-aligned, but the
+   <input> element inside left-aligns text by default. Applies to compact
+   mode too since both modes share .primary-abilities .abilities-table. */
+form.faserip-sheet .primary-abilities .abilities-table input[type="number"],
+form.faserip-sheet .primary-abilities .abilities-table input[type="text"] {
+  text-align: center !important;
+}
+
 /* Rank dropdown — bigger text for readability */
 form.faserip-sheet .primary-abilities .abilities-table select {
   font-size: 13px !important;
