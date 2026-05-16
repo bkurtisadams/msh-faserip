@@ -1,4 +1,8 @@
-// power-router.js v1.3.0 - 2026-05-15
+// power-router.js v1.4.0 - 2026-05-15
+// v1.4.0: Healing power early-route — detects by name or isHealingPower
+//         flag (with regenerationType/absorptionType absent, since those
+//         share the same template section). Opens showHealingDialog
+//         (two-mode: Health / Endurance rank).
 // v1.3.0: Recovery power early-route — detects by hasRecoveryPower flag or
 //         name match before the NON_ATTACK_TYPES bail; opens
 //         showRecoveryFeatDialog (Power-rank FEAT, oncePerDay).
@@ -156,6 +160,15 @@ export async function rollPower(actor, item) {
   if (nameLower === "recovery" || item.system?.hasRecoveryPower === true) {
     const { showRecoveryFeatDialog } = await import("./recovery-action.js");
     return showRecoveryFeatDialog(actor, item);
+  }
+
+  // Healing: target-other dialog with Health or Endurance-rank mode.
+  // Matches by name or by the isHealingPower flag with no regenerationType
+  // (regenerationType is the SELF-regen flag — different power, same UI block).
+  if (nameLower === "healing" ||
+      (item.system?.isHealingPower === true && !item.system?.regenerationType && !item.system?.absorptionType)) {
+    const { showHealingDialog } = await import("./healing-action.js");
+    return showHealingDialog(actor, item);
   }
 
   // Normalize legacy values

@@ -1,4 +1,9 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.7 - 2026-05-15
+// scripts/modules/effects/ongoing-engine.js v1.7.8 - 2026-05-15
+// v1.7.8: loseOneEnduranceRank export — mirror of restoreOneEnduranceRank.
+//         Reduces End rank by one step, recalcs max Health, drops current HP
+//         by the delta. Returns belowFeeble flag for the RAW "healer dies"
+//         case (caller decides death pipeline integration). Used by Healing
+//         power on End-rank-mode FEAT failure.
 // v1.7.7: restoreOneEnduranceRank export — reusable one-shot rank-step
 //         helper for Recovery power FEAT and any future End-restore caller.
 //         getCurrentGameDate export for oncePerDay gating outside this file.
@@ -1596,6 +1601,48 @@ export async function restoreOneEnduranceRank(actor, { originalRankCap = null, s
   );
 
   return { restored: true, oldRank: currentRank, newRank, atCap: newRank === cap };
+}
+
+// One-shot Endurance rank LOSS — mirror of restoreOneEnduranceRank.
+// Reduces current End rank by one step. Recalculates max Health and subtracts
+// the delta from current HP (clamped at 0). Returns { lost, oldRank, newRank,
+// belowFeeble } so caller can detect the RAW "below Feeble = healer dies"
+// case. Does NOT trigger the dying pipeline — caller decides what to do at
+// Shift-0.
+
+export async function loseOneEnduranceRank(actor, { source = "" } = {}) {
+  if (!actor) return { lost: false, reason: "no-actor" };
+
+  const currentRank = actor.system?.abilities?.endurance?.rank;
+  if (!currentRank) return { lost: false, reason: "no-current-rank" };
+
+  const curIdx = RANKS_ORDERED.findIndex(r => r === currentRank);
+  if (curIdx < 0) return { lost: false, reason: "rank-not-in-order" };
+  if (curIdx === 0) return { lost: false, atFloor: true, oldRank: currentRank, newRank: currentRank };
+
+  const newRank = RANKS_ORDERED[curIdx - 1];
+  const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+  const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
+  const enduranceDelta = Math.max(0, currentValue - newValue);
+
+  const newMaxHealth = _recalcMaxHealth(actor, newValue);
+  const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+  const newHealth = Math.max(0, Math.min(newMaxHealth, currentHealth - enduranceDelta));
+
+  await actor.update({
+    "system.abilities.endurance.rank": newRank,
+    "system.abilities.endurance.value": newValue,
+    "system.attributes.health.value": newHealth,
+    "system.attributes.health.max": newMaxHealth,
+  });
+
+  const sourceLabel = source ? ` (${source})` : "";
+  await sendOngoingChat(actor, `Endurance Loss${sourceLabel}`, "stat.loss",
+    `<strong>${actor.name}</strong> lost 1 Endurance rank: <strong>${currentRank}</strong> &rarr; <strong>${newRank} (${newValue})</strong>
+     <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} &rarr; ${newHealth} / ${newMaxHealth}</div>`
+  );
+
+  return { lost: true, oldRank: currentRank, newRank, belowFeeble: newRank === "Shift-0" };
 }
 
 // Expose game-date helper for action handlers that need oncePerDay gating.
