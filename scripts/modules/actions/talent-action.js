@@ -1,4 +1,12 @@
-// talent-action.js v1.1.0 - 2026-05-16
+// talent-action.js v1.2.0 - 2026-05-16
+// v1.2.0: Picker-skip — rollTalent now routes unambiguous combat talents
+//         (Fighting Skill with recognized specialty: Wrestling, MA-A/B/C/D/E,
+//         Acrobatics, Thrown Objects) directly to the attack-action dialog,
+//         bypassing the redundant talent picker. Picker still shown for
+//         Weapon Skill (multiple weapon types ambiguous), non-combat
+//         talents (Professional/Scientific/Mystic), or when saved overrides
+//         exist (extraShift, intensity, ability override, custom action
+//         type). Pass options.forcePicker=true to override.
 // v1.1.0: getTalentBonus now suppresses to-hit CS bonus for MA-A,
 //         MA-D, MA-E (RAW: those talents grant no Fighting bonus
 //         to hit; benefits are Stun/Slam-side or initiative-side,
@@ -143,6 +151,30 @@ function suggestDefault(talent) {
   return "Ability FEAT";
 }
 
+// Returns the picker action key (e.g. "Blunt Attack (BA)") if the talent
+// maps unambiguously to a single combat action — null otherwise. Used by
+// rollTalent to bypass the picker dialog and route straight to the
+// attack-action dialog. Weapon Skill is treated as ambiguous because a
+// player may have multiple weapon types in inventory; Fighting Skill
+// specializations all have unambiguous routings.
+function getUnambiguousActionCode(talent) {
+  const type = (talent.system?.type || "").trim();
+  const spec = (talent.system?.specialty || "").trim();
+  const name = (talent.name || "").toLowerCase();
+
+  if (type === "Fighting Skill") {
+    if (spec === "Wrestling" ||
+        /\bmartial arts[ \-:]?\(?\s*c\)?(\b|$)/i.test(name) ||
+        /\bma[ \-]?c\b/i.test(name)) {
+      return "Grappling (GP)";
+    }
+    if (spec === "Acrobatics") return "Dodging (Do)";
+    if (spec === "Thrown Objects") return "Throwing Blunt (TB)";
+    return "Blunt Attack (BA)";
+  }
+  return null;
+}
+
 function isNonCombatTalent(talent) {
   return ["Professional Skill", "Scientific Skill", "Mystic/Mental Skill"].includes(talent.system.type || "");
 }
@@ -208,6 +240,38 @@ export async function rollTalent(actor, talent, options = {}) {
       spendKarma: options.spendKarma || false,
       skipDice:   options.skipDice ?? skipDiceRoll,
       selectedAbility: options.selectedAbility || savedAbility || talent.system.abilityModified
+    });
+  }
+
+  // ── Picker-skip: route unambiguous combat talents straight to the
+  // attack-action dialog. The picker exists for ambiguous cases (Weapon
+  // Skill with multiple weapon types) and override needs (intensity,
+  // ability override, rank override, extra shift). Fighting Skill talents
+  // (Wrestling, MA-A/B/C/D/E, Acrobatics, Thrown Objects) all have
+  // unambiguous routings; without saved overrides the picker is just a
+  // redundant confirmation. Pass options.forcePicker = true to bypass
+  // this and show the picker regardless.
+  const unambiguousActionKey = getUnambiguousActionCode(talent);
+  const _abilityModified = talent.system.abilityModified || "none";
+  const hasOverrides =
+    Number(savedExtraShift) !== 0 ||
+    (savedIntensity && savedIntensity !== "") ||
+    (savedAbility && savedAbility !== "" && savedAbility !== _abilityModified) ||
+    (savedActionType && savedActionType !== unambiguousActionKey);
+
+  if (unambiguousActionKey && !hasOverrides && !options.forcePicker) {
+    const dispatcherCode = COMBAT_ACTION_MAP[unambiguousActionKey];
+    const ability = COMBAT_ACTION_ABILITIES[unambiguousActionKey]
+                 || (_abilityModified !== "none" ? _abilityModified : "fighting");
+    return ActionDispatcher.roll(dispatcherCode, {
+      actor,
+      abilityName: ability,
+      opts: {
+        shift: talentBonus,
+        fromTalent: true,
+        talentName: talent.name,
+        item: talent
+      }
     });
   }
 
