@@ -1,4 +1,8 @@
-// scripts/rules/mitigation.js v3.1.1 - 2026-05-15
+// scripts/rules/mitigation.js v3.1.2 - 2026-05-15
+// v3.1.2: Absorption redirect chat: handle no-combat case. Out of combat,
+//         game.combat.round is undefined and "expires end of round 0" reads
+//         nonsensically. Now reports "may redirect on next action" when no
+//         combat is active; flag's bankedRound/expiresRound store null.
 // v3.1.1: Normalize short-form damage codes (E/S/F/BA/EA/TB/TE/GP/Gb) at the
 //         top of calculateMitigation. attack-action.js passes "E" for energy
 //         attacks; previous isEnergyDamage substring check failed against
@@ -580,20 +584,24 @@ function applyAbsorptionFromAE(damage, absData, options) {
   if (absData.canRedirect && targetActor) {
     try {
       const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-      const round = game.combat?.round ?? -1;
+      const inCombat = !!(game.combat && game.combat.round > 0);
+      const round = inCombat ? game.combat.round : null;
       const pending = {
         amount: absorbThisHit,
         damageType: dmgTypeLower,
         bankedRound: round,
-        expiresRound: round + 1,
+        expiresRound: inCombat ? round + 1 : null,
         sourceAeId: absData.aeId,
       };
       targetActor.setFlag(scope, "pendingRedirect", pending);
       layer.redirectBanked = absorbThisHit;
       // Brief chat reminder. Visible to all — redirect is a player choice next round.
+      const expiryText = inCombat
+        ? `may redirect next round (expires end of round ${round + 1})`
+        : `may redirect on next action (no combat active — flag persists until cleared)`;
       ChatMessage?.create?.({
         speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-        content: `<div class="msh-card"><strong>${targetActor.name}</strong> absorbed <b>${absorbThisHit}</b> ${dmgTypeLower} — may redirect next round (expires end of round ${round + 1}).</div>`,
+        content: `<div class="msh-card"><strong>${targetActor.name}</strong> absorbed <b>${absorbThisHit}</b> ${dmgTypeLower} — ${expiryText}.</div>`,
       });
     } catch (e) {
       console.warn("[FASERIP MITIGATION] Absorption redirect bank failed:", e);
