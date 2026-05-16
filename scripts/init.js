@@ -211,16 +211,37 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
   // Effect expiration: skip during active combat (updateCombat hook handles that)
   if (!game.combat?.active) {
     const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    // When CTT is active, it tracks every duration-bound AE and runs its
+    // own deferred-delete on expiration (faserip-integration.js line 1349
+    // region). Running FASERIP's deferred-delete too produces a second
+    // race: both modules hook updateActiveEffect, both fire delete, the
+    // loser's request reaches the server post-deletion and surfaces as
+    // "ActiveEffect ... does not exist!". Skip non-equipment AE expiry
+    // here when CTT is active; CTT handles them. Equipment AEs (with an
+    // origin pointing to an Item) still need FASERIP's disable-not-delete
+    // path for the recharge button flow — CTT doesn't replicate that.
+    const cttActive = !!game.modules.get("calendar-time-tracker")?.active;
+    const isEquipmentOriginEffect = (ef, actorRef) => {
+      if (!ef?.origin) return false;
+      const parts = String(ef.origin).split(".");
+      const itemIdx = parts.indexOf("Item");
+      if (itemIdx < 0 || !parts[itemIdx + 1]) return false;
+      const candidate = actorRef?.items?.get(parts[itemIdx + 1]);
+      return candidate?.type === "equipment";
+    };
+
     for (const actor of Effects.getAllTokenActors()) {
       const toExpire = [];
 
       // Check actor-level effects
       for (const ef of (actor.effects ?? [])) {
+        if (cttActive && !isEquipmentOriginEffect(ef, actor)) continue;
         const { expired, reason } = Effects.classifyEffectExpiration(ef, { worldTime, curRound: null, scope });
         if (expired) toExpire.push({ effect: ef, item: null, reason });
       }
 
-      // Check effects on owned equipment items (v13: transfer doesn't always put them on actor)
+      // Check effects on owned equipment items (v13: transfer doesn't always put them on actor).
+      // These are inherently equipment effects; CTT-active check doesn't apply.
       for (const item of (actor.items ?? [])) {
         if (item.type !== "equipment") continue;
         for (const ef of (item.effects ?? [])) {
