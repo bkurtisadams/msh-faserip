@@ -1,4 +1,10 @@
-// scripts/rules/mitigation.js v3.1.0 - 2026-05-15
+// scripts/rules/mitigation.js v3.1.1 - 2026-05-15
+// v3.1.1: Normalize short-form damage codes (E/S/F/BA/EA/TB/TE/GP/Gb) at the
+//         top of calculateMitigation. attack-action.js passes "E" for energy
+//         attacks; previous isEnergyDamage substring check failed against
+//         "e".includes("energy"), causing absorption (and FF in non-bypass
+//         paths) to miss the match. Single normalization at entry now feeds
+//         a consistent long-form string to all downstream layers.
 // v3.1.0: Absorption defense layer — applies before BA/FF for matched damage type.
 //         Per-hit absorb cap = power rank value. If convertsToHealth, schedules
 //         temp HP cliff decay at round+10 via ongoing-engine. If canRedirect,
@@ -54,7 +60,19 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     ffBreach: null
   };
   
-  const dmgTypeLower = String(damageType).toLowerCase();
+  // Normalize short-form damage codes (E/S/F/BA/EA/TB/TE/GP/Gb) to long form.
+  // Callers vary: attack-action.js often passes "E"/"BA" while others pass
+  // "energy"/"physical-blunt". Normalize once so all downstream substring
+  // checks (isEnergyDamage, absorption matching, etc) work consistently.
+  let dmgTypeLower = String(damageType).toLowerCase();
+  const _shortToLong = {
+    "e": "energy", "f": "force",
+    "s": "physical-shooting",
+    "ba": "physical-blunt", "ea": "physical-edged",
+    "tb": "physical-throwing-blunt", "te": "physical-throwing-edged",
+    "gp": "grappling", "gb": "grabbing",
+  };
+  if (_shortToLong[dmgTypeLower]) dmgTypeLower = _shortToLong[dmgTypeLower];
   const isEnergyDamage = dmgTypeLower.includes("energy");
   
   let currentDamage = rawDamage;
