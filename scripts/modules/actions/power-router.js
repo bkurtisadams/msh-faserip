@@ -1,4 +1,6 @@
-// power-router.js v1.4.0 - 2026-05-15
+// power-router.js v1.5.0 - 2026-05-15
+// v1.5.0: Damage Transfer early-route — detects by name or isDamageTransfer
+//         flag. Opens showDamageTransferDialog (two-target conduit touch).
 // v1.4.0: Healing power early-route — detects by name or isHealingPower
 //         flag (with regenerationType/absorptionType absent, since those
 //         share the same template section). Opens showHealingDialog
@@ -169,6 +171,13 @@ export async function rollPower(actor, item) {
       (item.system?.isHealingPower === true && !item.system?.regenerationType && !item.system?.absorptionType)) {
     const { showHealingDialog } = await import("./healing-action.js");
     return showHealingDialog(actor, item);
+  }
+
+  // Damage Transfer: two-target conduit touch. Hero transfers HP from
+  // source to sink; hero cannot be either party.
+  if (nameLower === "damage transfer" || item.system?.isDamageTransfer === true) {
+    const { showDamageTransferDialog } = await import("./damage-transfer-action.js");
+    return showDamageTransferDialog(actor, item);
   }
 
   // Normalize legacy values
