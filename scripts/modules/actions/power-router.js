@@ -1,4 +1,8 @@
-// power-router.js v1.5.0 - 2026-05-15
+// power-router.js v1.6.0 - 2026-05-15
+// v1.6.0: Health-Drain Touch early-route — dedicated dialog (was previously
+//         in ENERGY_TYPES list, misrouted to EnergyAction). Removes
+//         "health-drain touch" from ENERGY_TYPES; matches by name or by
+//         isHealthDrain flag.
 // v1.5.0: Damage Transfer early-route — detects by name or isDamageTransfer
 //         flag. Opens showDamageTransferDialog (two-target conduit touch).
 // v1.4.0: Healing power early-route — detects by name or isHealingPower
@@ -56,7 +60,7 @@ const ENERGY_TYPES = [
   "electrical manipulation", "light manipulation",
   "energy touch", "darkforce manipulation", "darkforce generation",
   "shocking touch", "corrosive touch", "rotting touch",
-  "health-drain touch", "paralyzing touch", "blinding touch"
+  "paralyzing touch", "blinding touch"
 ];
 
 const THROWING_BLUNT_TYPES = ["ice generation"];
@@ -178,6 +182,13 @@ export async function rollPower(actor, item) {
   if (nameLower === "damage transfer" || item.system?.isDamageTransfer === true) {
     const { showDamageTransferDialog } = await import("./damage-transfer-action.js");
     return showDamageTransferDialog(actor, item);
+  }
+
+  // Health-Drain Touch: single-target drain. Hero is the sink; overheal
+  // lost per RAW. Target reduced to 0 rolls End FEAT to avoid dying.
+  if (nameLower === "health-drain touch" || nameLower === "health drain touch" || item.system?.isHealthDrain === true) {
+    const { showHealthDrainDialog } = await import("./health-drain-action.js");
+    return showHealthDrainDialog(actor, item);
   }
 
   // Normalize legacy values
