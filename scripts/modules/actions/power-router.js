@@ -1,4 +1,8 @@
-// power-router.js v1.6.0 - 2026-05-15
+// power-router.js v1.7.0 - 2026-05-15
+// v1.7.0: Paralyzing Touch early-route — dedicated dialog (was previously
+//         in ENERGY_TYPES list, misrouted to EnergyAction as energy damage).
+//         Matches by name or isParalyzingTouch flag. Self-target permitted
+//         per RAW "user can be KO'd by own touch".
 // v1.6.0: Health-Drain Touch early-route — dedicated dialog (was previously
 //         in ENERGY_TYPES list, misrouted to EnergyAction). Removes
 //         "health-drain touch" from ENERGY_TYPES; matches by name or by
@@ -60,7 +64,7 @@ const ENERGY_TYPES = [
   "electrical manipulation", "light manipulation",
   "energy touch", "darkforce manipulation", "darkforce generation",
   "shocking touch", "corrosive touch", "rotting touch",
-  "paralyzing touch", "blinding touch"
+  "blinding touch"
 ];
 
 const THROWING_BLUNT_TYPES = ["ice generation"];
@@ -189,6 +193,14 @@ export async function rollPower(actor, item) {
   if (nameLower === "health-drain touch" || nameLower === "health drain touch" || item.system?.isHealthDrain === true) {
     const { showHealthDrainDialog } = await import("./health-drain-action.js");
     return showHealthDrainDialog(actor, item);
+  }
+
+  // Paralyzing Touch: Fighting FEAT (skip if self-target) → target End FEAT
+  // vs power rank → on fail, applyParalyzed for 1d10 rounds. Self-target
+  // permitted per RAW "user can be KO'd by own touch".
+  if (nameLower === "paralyzing touch" || item.system?.isParalyzingTouch === true) {
+    const { showParalyzingTouchDialog } = await import("./paralyzing-touch-action.js");
+    return showParalyzingTouchDialog(actor, item);
   }
 
   // Normalize legacy values
