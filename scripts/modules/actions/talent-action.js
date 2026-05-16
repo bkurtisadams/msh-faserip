@@ -1,4 +1,10 @@
-// talent-action.js v1.0.0 - 2026-03-18
+// talent-action.js v1.1.0 - 2026-05-16
+// v1.1.0: getTalentBonus now suppresses to-hit CS bonus for MA-A,
+//         MA-D, MA-E (RAW: those talents grant no Fighting bonus
+//         to hit; benefits are Stun/Slam-side or initiative-side,
+//         not roll-side). Prevents misconfigured talent items from
+//         leaking a phantom +1 CS into attack rolls launched from
+//         the talents tab.
 // Migrated from rolls.js FaseripRolls.rollTalent.
 // Combat actions route through ActionDispatcher; Ability FEATs handled inline.
 
@@ -99,6 +105,16 @@ function extractActionCode(actionType) {
 }
 
 function getTalentBonus(talent) {
+  // RAW: MA-A, MA-D, MA-E grant no Fighting CS bonus to hit. Their
+  // benefits (Stun/Slam vs Str/End, ignore-armor-for-effects, +1
+  // initiative) are non-roll mechanics handled elsewhere in the
+  // pipeline. Override here even if the talent item is misconfigured
+  // with "+1CS" or "Special" in its bonus field.
+  const name = (talent.name || "").toLowerCase();
+  if (/\bmartial arts[ \-:]?\(?\s*[ade]\)?(\b|$)/i.test(name) ||
+      /\bma[ \-]?[ade]\b/i.test(name)) {
+    return 0;
+  }
   switch (talent.system.bonus) {
     case "+1CS": return 1;
     case "+2CS": return 2;
