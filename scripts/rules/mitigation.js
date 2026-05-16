@@ -1,4 +1,14 @@
-// scripts/rules/mitigation.js v3.1.2 - 2026-05-15
+// scripts/rules/mitigation.js v3.1.3 - 2026-05-15
+// v3.1.3: Pull HP write + temp-HP scheduling out of applyAbsorptionFromAE.
+//         Previously the in-function targetActor.update raced with the
+//         caller's damage-apply update (action-utils.js applyDamageToTargets),
+//         so the heal was invisible or got overwritten. Mitigation now just
+//         reports healAmount/tempHPRank/sourceAeId on the layer and on the
+//         top-level result (absorptionHeal, absorptionTempHPRank,
+//         absorptionAeIds). action-utils.js applyDamageToTargets v-bump
+//         consumes these in the same update pass and schedules the cliff
+//         decay post-update. Redirect bank kept in mitigation (setFlag
+//         doesn't race with HP).
 // v3.1.2: Absorption redirect chat: handle no-combat case. Out of combat,
 //         game.combat.round is undefined and "expires end of round 0" reads
 //         nonsensically. Now reports "may redirect on next action" when no
@@ -61,7 +71,14 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     netDamage: rawDamage,
     absorbed: 0,
     layers: [],
-    ffBreach: null
+    ffBreach: null,
+    // Absorption-specific fields surfaced to caller for race-free HP write:
+    //   absorptionHeal: total HP to add post-damage (only when convertsToHealth)
+    //   absorptionTempHPRank: ceiling for overheal above max
+    //   absorptionAeIds: source defense AE ids for ongoing-engine bookkeeping
+    absorptionHeal: 0,
+    absorptionTempHPRank: 0,
+    absorptionAeIds: [],
   };
   
   // Normalize short-form damage codes (E/S/F/BA/EA/TB/TE/GP/Gb) to long form.
@@ -96,6 +113,11 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       currentDamage -= absLayer.absorbed;
       result.absorbed += absLayer.absorbed;
       result.layers.push(absLayer);
+      if (absLayer.healAmount > 0) {
+        result.absorptionHeal += absLayer.healAmount;
+        result.absorptionTempHPRank = Math.max(result.absorptionTempHPRank, absLayer.tempHPRank || 0);
+        if (absLayer.sourceAeId) result.absorptionAeIds.push(absLayer.sourceAeId);
+      }
     }
   }
 
@@ -549,38 +571,23 @@ function applyAbsorptionFromAE(damage, absData, options) {
     matchedSpecific: absData.specific,
     convertsToHealth: absData.convertsToHealth,
     canRedirect: absData.canRedirect,
+    sourceAeId: absData.aeId,
   };
 
   if (absorbThisHit <= 0) return layer;
 
-  // Heal/temp HP path. Overheal allowed up to current+rank cap so we can't
-  // infinitely stack temp HP from repeated absorptions across rounds.
-  if (absData.convertsToHealth && targetActor) {
-    try {
-      const hp = targetActor.system?.attributes?.health || {};
-      const cur = Number(hp.value) || 0;
-      const max = Number(hp.max) || cur;
-      const tempCeiling = max + rank;
-      const next = Math.min(tempCeiling, cur + absorbThisHit);
-      const tempGained = Math.max(0, next - max);
-      const healed = Math.max(0, next - cur);
-      if (healed > 0) {
-        targetActor.update({ "system.attributes.health.value": next });
-      }
-      layer.healed = healed;
-      layer.tempHP = tempGained;
-      if (tempGained > 0) {
-        // Schedule cliff decay at round+10 via ongoing-engine
-        import("../modules/effects/ongoing-engine.js").then(m => {
-          m.applyAbsorptionTempHPOngoing?.(targetActor, { amount: tempGained, expiresInRounds: 10, sourceAeId: absData.aeId });
-        }).catch(() => { /* engine not loaded yet */ });
-      }
-    } catch (e) {
-      console.warn("[FASERIP MITIGATION] Absorption heal path failed:", e);
-    }
+  // Heal amount is the absorbed quantity; caller (action-utils.js applyDamage)
+  // applies it AFTER subtracting netDamage so the math is race-free and the
+  // temp-HP ceiling is checked against post-damage HP. We DO NOT write HP
+  // here. Caller is also responsible for scheduling the temp HP cliff decay
+  // via applyAbsorptionTempHPOngoing once it knows how much overflow exists.
+  if (absData.convertsToHealth) {
+    layer.healAmount = absorbThisHit;
+    layer.tempHPRank = rank;  // ceiling for overheal
   }
 
-  // Redirect bank (flag-only, one round shelf life)
+  // Redirect bank (flag-only, one round shelf life) — setFlag is independent
+  // of HP and safe to fire here.
   if (absData.canRedirect && targetActor) {
     try {
       const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
@@ -595,7 +602,6 @@ function applyAbsorptionFromAE(damage, absData, options) {
       };
       targetActor.setFlag(scope, "pendingRedirect", pending);
       layer.redirectBanked = absorbThisHit;
-      // Brief chat reminder. Visible to all — redirect is a player choice next round.
       const expiryText = inCombat
         ? `may redirect next round (expires end of round ${round + 1})`
         : `may redirect on next action (no combat active — flag persists until cleared)`;
