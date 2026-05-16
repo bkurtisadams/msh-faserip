@@ -3391,6 +3391,19 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   }
 });
 
+// MA-D study cleanup: when a combat is deleted (ended), purge any
+// Martial Arts D "Studying ${target}" active effects scoped to that
+// combat. See scripts/modules/actions/ma-d.js + DESIGN-martial-arts-d.md.
+Hooks.on("deleteCombat", async (combat, options, userId) => {
+  if (!game.user.isGM) return;
+  try {
+    const { clearStudiesForCombat } = await import(`/systems/${game.system.id}/scripts/modules/actions/ma-d.js`);
+    await clearStudiesForCombat(combat);
+  } catch (e) {
+    console.warn("[FASERIP] deleteCombat MA-D cleanup failed:", e);
+  }
+});
+
 // Add the hotbarDrop hook at module level (like in the older file)
 Hooks.on('hotbarDrop', (bar, data, slot) => {  // Remove async
   console.debug("[FASERIP DEBUG] hotbarDrop received:", data);
