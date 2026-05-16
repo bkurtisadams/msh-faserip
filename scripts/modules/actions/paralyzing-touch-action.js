@@ -1,4 +1,8 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.1.0 - 2026-05-15
+// scripts/modules/actions/paralyzing-touch-action.js v1.1.1 - 2026-05-15
+// v1.1.1: Fix applyColumnShifts return shape. The helper returns
+//         { index, name, totalCS } not a bare rank string; rollUniversalTable
+//         was being called with the object, producing "[object Object] not
+//         found in universal table". Unwrap via .name.
 // v1.1.0: Add standard combat-dialog elements to match Blunt Attack pattern:
 //         CS row with reference panel for Fighting FEAT (other-target path),
 //         karma checkbox with post-roll decision dialog for both Fighting
@@ -260,7 +264,7 @@ export async function showParalyzingTouchDialog(hero, item) {
       const runOther = async () => {
         const csInfo = csPanel ? csPanel.get() : { totalShift: 0, manualCS: 0 };
         const shift = Number(csInfo.totalShift) || 0;
-        const effectiveFightRank = shift !== 0 ? applyColumnShifts(heroFightRank, shift) : heroFightRank;
+        const effectiveFightRank = shift !== 0 ? applyColumnShifts(heroFightRank, shift).name : heroFightRank;
         const effectiveFightValue = game.msh?.getRankValue?.(effectiveFightRank) ?? heroFightValue;
         const spendKarma = html.find('#spend-karma').is(':checked');
 
