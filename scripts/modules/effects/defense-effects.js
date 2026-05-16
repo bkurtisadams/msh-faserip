@@ -1,4 +1,7 @@
-// scripts/modules/effects/defense-effects.js v1.1.1 - 2026-04-03
+// scripts/modules/effects/defense-effects.js v1.2.0 - 2026-05-15
+// v1.2.0: Absorption defense AE — resolveAbsorptionValues, buildAbsorptionAE, sync block.
+//         Gated on sys.absorptionType truthy. Flags: absorptionType, absorptionSpecific,
+//         convertsToHealth, canRedirect, rankValue.
 // v1.1.1: Replace local getRankValue with import from rules-reference.js
 // v1.1.0: syncDefenseEffects respects isActive — inactive powers remove defense AEs
 // v1.0.1: Strip token badge icons from passive defense AEs (body armor, force field, resistance)
@@ -26,6 +29,7 @@ function getClosestRankName(value) {
 // Body Armor:  "defense.bodyArmor.<itemId>"
 // Force Field: "defense.forceField.<itemId>"
 // Resistance:  "defense.resistance.<itemId>"
+// Absorption:  "defense.absorption.<itemId>"
 
 function defenseEffectId(type, itemId) {
   return `defense.${type}.${itemId}`;
@@ -94,6 +98,21 @@ function resolveResistanceValues(item) {
     rankValue: value,
     rank: sys.rank || getClosestRankName(value),
     isInvulnerability: isInvuln,
+  };
+}
+
+function resolveAbsorptionValues(item) {
+  const sys = item.system || {};
+  const rankValue = getRankValue(sys.rank);
+  const value = typeof sys.value === "number" ? sys.value : rankValue;
+
+  return {
+    absorptionType: sys.absorptionType || "",
+    absorptionSpecific: sys.absorptionSpecific || "",
+    convertsToHealth: sys.absorptionConvertsToHealth === true,
+    canRedirect: sys.absorptionCanRedirect === true,
+    rankValue: value,
+    rank: sys.rank || getClosestRankName(value),
   };
 }
 
@@ -185,6 +204,41 @@ function buildResistanceAE(item, values) {
         rankValue: values.rankValue,
         rank: values.rank,
         isInvulnerability: values.isInvulnerability,
+        isForceField: false,
+      }
+    },
+  };
+}
+
+function buildAbsorptionAE(item, values) {
+  const scope = SCOPE();
+  const typeLabel = values.absorptionSpecific
+    || (values.absorptionType ? values.absorptionType.charAt(0).toUpperCase() + values.absorptionType.slice(1) : "Unknown");
+  const modeBits = [];
+  if (values.convertsToHealth) modeBits.push("heals");
+  if (values.canRedirect) modeBits.push("redirect");
+  const modeLabel = modeBits.length ? ` [${modeBits.join("/")}]` : "";
+  const label = `Absorption: ${typeLabel} (${values.rank}: ${values.rankValue})${modeLabel}`;
+
+  return {
+    name: label,
+    img: "",
+    disabled: false,
+    changes: [],
+    statuses: [`absorption-${values.absorptionType}`],
+    flags: {
+      [scope]: {
+        effectCategory: "defense",
+        defenseType: "absorption",
+        ongoingId: defenseEffectId("absorption", item.id),
+        powerItemId: item.id,
+        powerName: item.name,
+        absorptionType: values.absorptionType,
+        absorptionSpecific: values.absorptionSpecific,
+        convertsToHealth: values.convertsToHealth,
+        canRedirect: values.canRedirect,
+        rankValue: values.rankValue,
+        rank: values.rank,
         isForceField: false,
       }
     },
@@ -291,6 +345,18 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   } else {
     await removeDefenseAE(actor, resId);
   }
+
+  // ── Absorption ──
+  const absId = defenseEffectId("absorption", item.id);
+  if (removing) {
+    await removeDefenseAE(actor, absId);
+  } else if (sys.absorptionType) {
+    const values = resolveAbsorptionValues(item);
+    const aeData = buildAbsorptionAE(item, values);
+    await registerDefenseAE(actor, absId, aeData, isInactive);
+  } else {
+    await removeDefenseAE(actor, absId);
+  }
 }
 
 /**
@@ -302,7 +368,7 @@ export async function syncAllDefenseEffects(actor) {
   const powers = actor.items.filter(i => i.type === "power");
   for (const item of powers) {
     const sys = item.system || {};
-    if (sys.isBodyArmor || sys.isForceField || (sys.isResistance && sys.resistanceType)) {
+    if (sys.isBodyArmor || sys.isForceField || (sys.isResistance && sys.resistanceType) || sys.absorptionType) {
       await syncDefenseEffects(actor, item, false);
     }
   }

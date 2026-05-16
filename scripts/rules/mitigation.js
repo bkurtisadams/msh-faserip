@@ -1,4 +1,11 @@
-// scripts/rules/mitigation.js v3.0.1 - 2026-04-19
+// scripts/rules/mitigation.js v3.1.0 - 2026-05-15
+// v3.1.0: Absorption defense layer — applies before BA/FF for matched damage type.
+//         Per-hit absorb cap = power rank value. If convertsToHealth, schedules
+//         temp HP cliff decay at round+10 via ongoing-engine. If canRedirect,
+//         banks pendingRedirect flag (one-round shelf life) and posts chat
+//         reminder. Immunity-only mode (convertsToHealth=false) just sinks the
+//         damage. ffBreach unaffected. Reads from defense-AE flags with
+//         defenseType: "absorption".
 // v3.0.1: Block armor now excluded vs physical-charging per RAW
 //         (Advanced Set Block action: "Not vs Shooting, Energy, or Charging").
 //         Previously charging damage was incorrectly absorbed by blocking armor.
@@ -54,7 +61,21 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
 
   // ── Try defense AEs first, fall back to item-based lookup ──
   const aeDefenses = getDefensesFromAEs(targetActor, dmgTypeLower);
-  const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance;
+  const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance || aeDefenses.hasAbsorption;
+
+  // ── Absorption — applies before BA/FF for matched damage type ──
+  // Per-hit cap = rank#. Absorbed → optionally heals + temp HP. Excess flows
+  // through normal mitigation. Pending-redirect bank for next-round.
+  if (aeDefenses.hasAbsorption) {
+    const absLayer = applyAbsorptionFromAE(currentDamage, aeDefenses.absorption, {
+      dmgTypeLower, isEnergyDamage, targetActor
+    });
+    if (absLayer.absorbed > 0) {
+      currentDamage -= absLayer.absorbed;
+      result.absorbed += absLayer.absorbed;
+      result.layers.push(absLayer);
+    }
+  }
 
   // bypassArmor means body armor was already subtracted upstream (attack-action.js),
   // but force field and resistance were NOT pre-calculated — still need to check them.
@@ -278,14 +299,16 @@ export function resetFFRoundTracker() {
 
 function getDefensesFromAEs(actor, dmgTypeLower) {
   const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-  if (!actor?.effects) return { hasArmor: false, hasForceField: false, hasResistance: false };
+  if (!actor?.effects) return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
 
   const activeDefenses = actor.effects.filter(e =>
     !e.disabled && e.flags?.[scope]?.effectCategory === "defense"
   );
   if (activeDefenses.length === 0) {
-    return { hasArmor: false, hasForceField: false, hasResistance: false };
+    return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
   }
+
+  const isEnergyDamage = dmgTypeLower.includes("energy");
 
   // Aggregate body armor (take highest)
   let armorPhys = 0, armorEner = 0, armorPR = "", armorER = "";
@@ -341,13 +364,54 @@ function getDefensesFromAEs(actor, dmgTypeLower) {
     }
   }
 
+  // Aggregate absorption (take highest matching rank). Match rules:
+  //   absorptionType "both" → any physical or energy damage
+  //   absorptionType "physical" → any physical-* damage
+  //   absorptionType "energy" → any energy or energy-* damage
+  //   absorptionSpecific (when present) → fuzzy substring match against full damage type
+  //     (e.g. "electrical" matches "energy-electrical"). Specific overrides type.
+  let absRank = 0, absRankLabel = "", absConverts = false, absRedirect = false, absAeId = null, absMatched = "", absSpecific = "";
+  for (const ae of activeDefenses) {
+    const f = ae.flags?.[scope];
+    if (f?.defenseType !== "absorption") continue;
+    const at = (f.absorptionType || "").toLowerCase();
+    const spec = String(f.absorptionSpecific || "").toLowerCase().trim();
+
+    let matched = false;
+    if (spec) {
+      // Specific-type match takes priority. Check both the full damage type
+      // and the base subtype after "-".
+      if (dmgTypeLower.includes(spec) || baseType.includes(spec)) matched = true;
+    } else if (at === "both") {
+      matched = true;
+    } else if (at === "physical") {
+      if (dmgTypeLower.includes("physical") || dmgTypeLower.includes("blunt") || dmgTypeLower.includes("edged") || dmgTypeLower.includes("shooting")) matched = true;
+    } else if (at === "energy") {
+      if (isEnergyDamage) matched = true;
+    }
+    if (!matched) continue;
+
+    const rv = Number(f.rankValue) || 0;
+    if (rv > absRank) {
+      absRank = rv;
+      absRankLabel = f.rank || "";
+      absConverts = f.convertsToHealth === true;
+      absRedirect = f.canRedirect === true;
+      absAeId = ae.id;
+      absMatched = at;
+      absSpecific = f.absorptionSpecific || "";
+    }
+  }
+
   return {
     hasArmor: armorPhys > 0 || armorEner > 0,
     hasForceField: ffFull > 0,
     hasResistance: resDR > 0 || resCS > 0 || resImm,
+    hasAbsorption: absRank > 0,
     armor: { physical: armorPhys, energy: armorEner, physicalRank: armorPR, energyRank: armorER },
     forceField: { physical: ffPhys, energy: ffEner, fullValue: ffFull, physicalRank: ffPR, energyRank: ffER, isPersonal: ffPersonal, aeId: ffAeId },
     resistance: { damageReduction: resDR, csBonus: resCS, hasImmunity: resImm, immunityThreshold: resImmThr, type: resType },
+    absorption: { rank: absRank, rankLabel: absRankLabel, convertsToHealth: absConverts, canRedirect: absRedirect, aeId: absAeId, matchedType: absMatched, specific: absSpecific },
   };
 }
 
@@ -446,6 +510,79 @@ function applyForceFieldFromAE(damage, ffData, options) {
   }
 
   return result;
+}
+
+function applyAbsorptionFromAE(damage, absData, options) {
+  const { dmgTypeLower, isEnergyDamage, targetActor } = options;
+  const rank = Number(absData.rank) || 0;
+  const absorbThisHit = Math.min(damage, rank);
+
+  const layer = {
+    type: 'Absorption',
+    absorbed: absorbThisHit,
+    rank,
+    ignoresAP: true,
+    source: "defense-ae",
+    matchedType: absData.matchedType,
+    matchedSpecific: absData.specific,
+    convertsToHealth: absData.convertsToHealth,
+    canRedirect: absData.canRedirect,
+  };
+
+  if (absorbThisHit <= 0) return layer;
+
+  // Heal/temp HP path. Overheal allowed up to current+rank cap so we can't
+  // infinitely stack temp HP from repeated absorptions across rounds.
+  if (absData.convertsToHealth && targetActor) {
+    try {
+      const hp = targetActor.system?.attributes?.health || {};
+      const cur = Number(hp.value) || 0;
+      const max = Number(hp.max) || cur;
+      const tempCeiling = max + rank;
+      const next = Math.min(tempCeiling, cur + absorbThisHit);
+      const tempGained = Math.max(0, next - max);
+      const healed = Math.max(0, next - cur);
+      if (healed > 0) {
+        targetActor.update({ "system.attributes.health.value": next });
+      }
+      layer.healed = healed;
+      layer.tempHP = tempGained;
+      if (tempGained > 0) {
+        // Schedule cliff decay at round+10 via ongoing-engine
+        import("../modules/effects/ongoing-engine.js").then(m => {
+          m.applyAbsorptionTempHPOngoing?.(targetActor, { amount: tempGained, expiresInRounds: 10, sourceAeId: absData.aeId });
+        }).catch(() => { /* engine not loaded yet */ });
+      }
+    } catch (e) {
+      console.warn("[FASERIP MITIGATION] Absorption heal path failed:", e);
+    }
+  }
+
+  // Redirect bank (flag-only, one round shelf life)
+  if (absData.canRedirect && targetActor) {
+    try {
+      const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+      const round = game.combat?.round ?? -1;
+      const pending = {
+        amount: absorbThisHit,
+        damageType: dmgTypeLower,
+        bankedRound: round,
+        expiresRound: round + 1,
+        sourceAeId: absData.aeId,
+      };
+      targetActor.setFlag(scope, "pendingRedirect", pending);
+      layer.redirectBanked = absorbThisHit;
+      // Brief chat reminder. Visible to all — redirect is a player choice next round.
+      ChatMessage?.create?.({
+        speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+        content: `<div class="msh-card"><strong>${targetActor.name}</strong> absorbed <b>${absorbThisHit}</b> ${dmgTypeLower} — may redirect next round (expires end of round ${round + 1}).</div>`,
+      });
+    } catch (e) {
+      console.warn("[FASERIP MITIGATION] Absorption redirect bank failed:", e);
+    }
+  }
+
+  return layer;
 }
 
 function applyResistanceFromAE(damage, resData, options) {

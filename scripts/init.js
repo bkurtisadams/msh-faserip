@@ -2544,7 +2544,7 @@ Hooks.once("ready", async () => {
         if (!actor?.items) continue;
         const hasDefensePower = actor.items.some(i =>
           i.type === "power" && (i.system?.isBodyArmor || i.system?.isForceField ||
-            (i.system?.isResistance && i.system?.resistanceType))
+            (i.system?.isResistance && i.system?.resistanceType) || i.system?.absorptionType)
         );
         if (!hasDefensePower) continue;
 
@@ -2804,6 +2804,10 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
     || changes.system?.forceFieldType !== undefined
     || changes.system?.forceFieldPersonal !== undefined
     || changes.system?.forceFieldCoverage !== undefined
+    || changes.system?.absorptionType !== undefined
+    || changes.system?.absorptionSpecific !== undefined
+    || changes.system?.absorptionConvertsToHealth !== undefined
+    || changes.system?.absorptionCanRedirect !== undefined
     || changes.system?.isActive !== undefined
     || changes.system?.activationType !== undefined;
   if (!relevantChange) return;
@@ -2823,7 +2827,7 @@ Hooks.on("createToken", async (tokenDoc, options, userId) => {
   const actor = tokenDoc.actor;
   if (!actor || tokenDoc.actorLink) return;
   const powers = actor.items.filter(i => i.type === "power");
-  const hasDefense = powers.some(p => p.system?.isBodyArmor || p.system?.isForceField || p.system?.isResistance);
+  const hasDefense = powers.some(p => p.system?.isBodyArmor || p.system?.isForceField || p.system?.isResistance || p.system?.absorptionType);
   if (!hasDefense) return;
   try {
     const { syncAllDefenseEffects } = await import("./modules/effects/defense-effects.js");

@@ -1,4 +1,8 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.5 - 2026-05-14
+// scripts/modules/effects/ongoing-engine.js v1.7.6 - 2026-05-15
+// v1.7.6: applyAbsorptionTempHPOngoing — cliff decay at round+10 for temp HP
+//         granted by Absorption power. Per-source AE keying so independent
+//         absorptions decay on their own clocks. stat.loss type, capAtMax:false
+//         so the strip succeeds even when current HP is above max.
 // v1.7.5: Regen reliability — noDamage gate now accepts simultaneous
 //         lastDmgWT === startedAt as "before start" (was strict <,
 //         silently stalled when recordDamage and timer-init landed on
@@ -1500,4 +1504,41 @@ export function listContinuingDamageEffects(actor) {
     }
   }
   return results;
+}
+
+// ─── Absorption temp HP cliff decay ──────────────────────────────────────────
+// RAW: extra Health dissipates in 10 rounds. Cliff implementation: schedule a
+// single HP-loss trigger at round+10 that strips the granted amount. Multiple
+// absorption events stack additively into a single ledger keyed by source AE.
+// On trigger, the engine subtracts the recorded amount from current HP (clamped
+// at 0). The AE is auto-disabled when ledger drains. Per-source so independent
+// absorptions decay on their own clocks.
+
+export async function applyAbsorptionTempHPOngoing(target, { amount, expiresInRounds = 10, sourceAeId = null } = {}) {
+  const actor = target?.actor ?? target;
+  if (!actor || !(amount > 0)) return null;
+
+  const effectId = sourceAeId
+    ? `absorptionTemp.${sourceAeId}`
+    : `absorptionTemp.${foundry.utils.randomID()}`;
+
+  return registerOngoingEffect(actor, effectId, {
+    type: "stat.loss",
+    stat: "health",
+    formula: amount,
+    rate: expiresInRounds,
+    cycle: "round",
+    count: 1,
+    gate: "none",
+    interruptOnDamage: false,
+    capAtMax: false,
+    autoDisable: true,
+    sourceAeId,
+  }, {
+    name: `Absorption Temp HP (${amount}, ${expiresInRounds}r)`,
+    img: "icons/svg/aura.svg",
+    disabled: false,
+    changes: [],
+    statuses: ["absorption-temp"],
+  });
 }
