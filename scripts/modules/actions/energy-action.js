@@ -629,8 +629,21 @@ export class EnergyAction extends RangedAttackAction {
     const powerItem = choice.powerId ? actor.items.get(choice.powerId) : null;
     const targetCount = choice.multiAdjacent ? targets.length : 1;
 
+    // Corrosive attacks bypass Force Fields per RAW:
+    // "Corrosive attacks must hit the target, and as such have no effect on
+    // Force Fields and the like." Body Armor still applies normally — the
+    // burn-through FEAT is a separate optional check, not a bypass.
+    const _pwNameLc = String(powerItem?.name || choice.powerName || "").toLowerCase();
+    const _pwDtLc = String(powerItem?.system?.damageType || choice.powerDamageType || "").toLowerCase();
+    const _isCorrosive = /corrosive|acid/.test(_pwNameLc) || /corrosive|acid/.test(_pwDtLc);
+    const choiceForAttack = {
+      ...choice,
+      weapon: powerItem,
+      bypassForceField: !!choice.bypassForceField || _isCorrosive
+    };
+
     await this._executeSingleAttack({
-      choice: { ...choice, weapon: powerItem },
+      choice: choiceForAttack,
       actor,
       ability: toHitAbility,
       actionType, actionName, effects,
