@@ -860,7 +860,8 @@ export class AttackAction extends BaseAction {
        if (targetActor) {
          armorData = getBodyArmorValues(targetActor, damageType, {
            ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
-           ignoresArtificialArmor: !!choice?.ignoresArtificialArmor
+           ignoresArtificialArmor: !!choice?.ignoresArtificialArmor,
+           bypassForceField: !!choice?.bypassForceField
          });
          // Ensure numbers whether rawDamage arrived as "20" or 20
          const rd = Number(rawDamage) || 0;

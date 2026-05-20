@@ -2201,13 +2201,18 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
  */
 export function getBodyArmorValues(targetActor, damageType = "physical-blunt", opts = {}) {
   const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
-  const { ignoresNaturalArmor = false, ignoresArtificialArmor = false } = opts;
+  const {
+    ignoresNaturalArmor = false,
+    ignoresArtificialArmor = false,
+    bypassForceField = false
+  } = opts;
 
   console.log("FASERIP DEBUG | getBodyArmorValues called:", {
     targetName: targetActor.name,
     damageType: damageType,
     ignoresNaturalArmor,
-    ignoresArtificialArmor
+    ignoresArtificialArmor,
+    bypassForceField
   });
 
   let physicalArmor = 0;
@@ -2219,7 +2224,11 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
   // Check equipment armor. Equipment-source armor has no armorNature field
   // and is treated as artificial by convention (suits, vests, plate). Skip
   // entirely when ignoresArtificialArmor is set, unless the equipment is
-  // explicitly a Force Field (FF bypass is governed separately).
+  // explicitly a Force Field (FF bypass is governed separately). Conversely
+  // when bypassForceField is set, filter out FF equipment so it isn't
+  // folded into the armorValue here (the downstream mitigation step also
+  // respects bypassForceField; without this filter FF would be subtracted
+  // upstream by attack-action's penetratingDamage = rd - armorValue).
   let armorItems = targetActor.items.filter(i =>
     i.type === "equipment" &&
     i.system.category === "armor" &&
@@ -2227,6 +2236,9 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
   );
   if (ignoresArtificialArmor) {
     armorItems = armorItems.filter(i => i.system.isForceField === true);
+  }
+  if (bypassForceField) {
+    armorItems = armorItems.filter(i => i.system.isForceField !== true);
   }
   
   if (armorItems.length > 0) {
@@ -2288,11 +2300,15 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
 
   bodyArmorPowers.forEach(power => {
     // Filter by armorNature when the attack ignores natural / artificial BA.
-    // Force Field powers are exempt — they don't carry an armor nature, and
-    // FF bypass is governed separately via bypassForceField. Missing
-    // armorNature defaults to "natural" to match schema default.
+    // Force Field powers are exempt from the nature filter — they don't
+    // carry an armor nature. FF bypass is governed by bypassForceField:
+    // when set, skip FF powers entirely so they're not folded into
+    // physicalArmor/energyArmor (which attack-action subtracts upstream).
+    // Missing armorNature defaults to "natural" to match schema default.
     const powerIsFF = power.system.isForceField === true;
-    if (!powerIsFF) {
+    if (powerIsFF) {
+      if (bypassForceField) return;
+    } else {
       const nature = power.system.armorNature || "natural";
       if (ignoresNaturalArmor && nature === "natural") return;
       if (ignoresArtificialArmor && nature === "artificial") return;
