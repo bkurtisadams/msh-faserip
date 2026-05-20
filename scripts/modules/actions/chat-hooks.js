@@ -178,8 +178,15 @@ export function installActionChatHandlers() {
     const hasActiveGM = game.users?.some(u => u.isGM && u.active);
     const canDriveAutoSaves = hasActiveGM ? game.user.isGM : message.isOwner;
 
-    // Auto-save logic block — only runs for message owner/GM, only once per message
-    if (canDriveAutoSaves && !alreadyHandled) {
+    // Auto-save logic block — only runs for message owner/GM, only once per message.
+    // Synchronous in-memory claim guards against the race where two renders of
+    // the same message fire close together (e.g. flag-commit re-render) before
+    // the persisted autoChecksDone flag commits — both hook iterations read
+    // autoChecksDone=false and both fire the auto-save. Symptom: Psionic Attack
+    // rolls the save twice (one GREEN/Resisted, one WHITE/Failed → unconscious).
+    const _autoSaveClaims = (game.msh._autoCheckClaims ??= new Set());
+    if (canDriveAutoSaves && !alreadyHandled && !_autoSaveClaims.has(message.id)) {
+    _autoSaveClaims.add(message.id);
 
     let firedAnyCheck = false; // <— track if we actually ran something
 
