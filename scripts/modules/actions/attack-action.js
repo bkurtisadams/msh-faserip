@@ -1,4 +1,14 @@
-// attack-action.js v1.9.27 - 2026-05-16
+// attack-action.js v1.9.28 - 2026-05-20
+// v1.9.28: Thread choice.ignoresNaturalArmor / choice.ignoresArtificialArmor
+//          (and fix choice.bypassForceField forwarding) through the two
+//          downstream consumers: getBodyArmorValues for the upstream BA
+//          pre-subtraction, and applyDamageToTargets for the FF/resistance
+//          stage. Also stamp both ignore flags onto the actionsBox prefill
+//          so the manual chat-card Apply Damage path honors them too.
+//          Caller (energy-action.js v3.x, edged-attack-action.js for claws)
+//          sets the flags on the choice; mitigation.js v3.2.0 +
+//          getBodyArmorValues v2.x consume them. No behavior change when
+//          all three flags are unset.
 // v1.9.27: MA-D engaged badge — reads choice.maDEngaged (set by
 //          blunt-attack dialog's State-3 engage toggle) and renders a
 //          teal "MA-D engaged — armor bypass for Stun/Slam" note in
@@ -848,7 +858,10 @@ export class AttackAction extends BaseAction {
      let isBorderline = false;
      if (targetIsHit && rawDamage > 0) {
        if (targetActor) {
-         armorData = getBodyArmorValues(targetActor, damageType);
+         armorData = getBodyArmorValues(targetActor, damageType, {
+           ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
+           ignoresArtificialArmor: !!choice?.ignoresArtificialArmor
+         });
          // Ensure numbers whether rawDamage arrived as "20" or 20
          const rd = Number(rawDamage) || 0;
          const _apFlat = Number(choice?.armorPiercing || 0);
@@ -1108,6 +1121,8 @@ export class AttackAction extends BaseAction {
             armorPiercingCS: Number(choice?.armorPiercingCS || 0),
             apMode: choice?.apMode || "value",
             bypassForceField: !!choice?.bypassForceField,
+            ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
+            ignoresArtificialArmor: !!choice?.ignoresArtificialArmor,
             autoApply: !!this.opts?.autoApply,
             autoSave: false,  // prevent chat button duplicates
             sourceItemUuid: choice?.weapon?.uuid || "",
@@ -1446,6 +1461,8 @@ export class AttackAction extends BaseAction {
           attackForm: attackForm,
           armorPiercing: choice.armorPiercing || 0,
           bypassForceField: !!choice?.bypassForceField,
+          ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
+          ignoresArtificialArmor: !!choice?.ignoresArtificialArmor,
           targets: [target],
           // === FIX: Pass kill result flag ===
           wasKillResult: showKill,

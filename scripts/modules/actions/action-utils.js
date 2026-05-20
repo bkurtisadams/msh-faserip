@@ -935,6 +935,8 @@ export function buildActionsBox({
   autoSave  = false,  // defender-side auto save (disable save chips)
   bypassArmor = false,
   bypassForceField = false,
+  ignoresNaturalArmor = false,
+  ignoresArtificialArmor = false,
   sourceItemUuid = ""  // UUID of source power/weapon; lets manual-apply path fire follow-ups (continuing damage, etc.)
 }) {
 
@@ -979,6 +981,8 @@ export function buildActionsBox({
         data-armor-piercing-cs="${Number(armorPiercingCS || 0)}"
         data-ap-mode="${apMode}"
         data-bypass-force-field="${bypassForceField ? 'true' : 'false'}"
+        data-ignores-natural-armor="${ignoresNaturalArmor ? 'true' : 'false'}"
+        data-ignores-artificial-armor="${ignoresArtificialArmor ? 'true' : 'false'}"
         data-source-item-uuid="${sourceItemUuid || ''}"`
       )
     );
@@ -1577,7 +1581,10 @@ export async function applyDamageToTargets({
   armorPiercing = 0,
   armorPiercingCS = 0,
   apMode = "value",
-  attackIntensity = 0
+  attackIntensity = 0,
+  bypassForceField = false,
+  ignoresNaturalArmor = false,
+  ignoresArtificialArmor = false
 } = {}) {
   const results = [];
   
@@ -1644,7 +1651,10 @@ export async function applyDamageToTargets({
             armorPiercing,
             armorPiercingCS,
             apMode,
-            attackIntensity
+            attackIntensity,
+            bypassForceField,
+            ignoresNaturalArmor,
+            ignoresArtificialArmor
           });
           mitResult = mit;
           if (mit && Number.isFinite(mit.netDamage)) {
@@ -2189,12 +2199,15 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
  * @param {string} damageType - Type of damage (e.g., "energy-fire", "physical-blunt")
  * @returns {Object} { physical, energy, applicable }
  */
-export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
+export function getBodyArmorValues(targetActor, damageType = "physical-blunt", opts = {}) {
   const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
-  
+  const { ignoresNaturalArmor = false, ignoresArtificialArmor = false } = opts;
+
   console.log("FASERIP DEBUG | getBodyArmorValues called:", {
     targetName: targetActor.name,
-    damageType: damageType
+    damageType: damageType,
+    ignoresNaturalArmor,
+    ignoresArtificialArmor
   });
 
   let physicalArmor = 0;
@@ -2203,12 +2216,18 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
   let energyRank = "";
   let isForceField = false;
 
-  // Check equipment armor
-  const armorItems = targetActor.items.filter(i => 
-    i.type === "equipment" && 
-    i.system.category === "armor" && 
+  // Check equipment armor. Equipment-source armor has no armorNature field
+  // and is treated as artificial by convention (suits, vests, plate). Skip
+  // entirely when ignoresArtificialArmor is set, unless the equipment is
+  // explicitly a Force Field (FF bypass is governed separately).
+  let armorItems = targetActor.items.filter(i =>
+    i.type === "equipment" &&
+    i.system.category === "armor" &&
     i.system.protection
   );
+  if (ignoresArtificialArmor) {
+    armorItems = armorItems.filter(i => i.system.isForceField === true);
+  }
   
   if (armorItems.length > 0) {
     const bestArmor = armorItems.reduce((best, current) => {
@@ -2268,8 +2287,19 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
   });
 
   bodyArmorPowers.forEach(power => {
+    // Filter by armorNature when the attack ignores natural / artificial BA.
+    // Force Field powers are exempt — they don't carry an armor nature, and
+    // FF bypass is governed separately via bypassForceField. Missing
+    // armorNature defaults to "natural" to match schema default.
+    const powerIsFF = power.system.isForceField === true;
+    if (!powerIsFF) {
+      const nature = power.system.armorNature || "natural";
+      if (ignoresNaturalArmor && nature === "natural") return;
+      if (ignoresArtificialArmor && nature === "artificial") return;
+    }
+
     const type = power.system.bodyArmorType || "both";
-    
+
     // Check if this power is a force field
     if (power.system.isForceField === true) {
       isForceField = true;
@@ -2433,7 +2463,9 @@ export async function applyDamageNow({
   apMode = "value",
   bypassForceField = false,
   showNotification = true,
-  attackIntensity = 0
+  attackIntensity = 0,
+  ignoresNaturalArmor = false,
+  ignoresArtificialArmor = false
 }) {
   try {
     const results = [];
@@ -2456,7 +2488,9 @@ export async function applyDamageNow({
         armorPiercingCS: apCS,
         apMode,
         bypassForceField: !!bypassForceField,
-        attackIntensity
+        attackIntensity,
+        ignoresNaturalArmor: !!ignoresNaturalArmor,
+        ignoresArtificialArmor: !!ignoresArtificialArmor
       });
 
       // FF breach consequences

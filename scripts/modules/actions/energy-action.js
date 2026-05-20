@@ -1,4 +1,12 @@
-// scripts/modules/actions/energy-action.js v3.2.1 - 2026-05-16
+// scripts/modules/actions/energy-action.js v3.3.0 - 2026-05-20
+// v3.3.0: Rotting Touch parity with Corrosive Touch. Dialog update() now
+//         detects rotting alongside corrosive and applies the same reduce-
+//         lock + effect note. execute() sets ignoresNaturalArmor on the
+//         choice when corrosive (chews through inorganic BA), and
+//         ignoresArtificialArmor when rotting (directed against organic
+//         BA). bypassForceField remains corrosive-only per RAW. Consumed
+//         downstream by getBodyArmorValues + applyDamageToTargets +
+//         calculateMitigation.
 // v3.2.1: Fix Reduce row's Any/Ylw/Grn radios stacking vertically when
 //         Energy Generation triggers .result-cap-controls visibility.
 //         Show with display:inline-flex (was inline) so the wrapper span
@@ -475,7 +483,7 @@ export class EnergyAction extends RangedAttackAction {
             const isAdHoc = srcVal === "adhoc";
             html.find('#adhoc-row').css('display', isAdHoc ? 'block' : 'none');
 
-            let currentDamage = 0, currentRank = "Remarkable", isEnergyGeneration = false, isCorrosive = false;
+            let currentDamage = 0, currentRank = "Remarkable", isEnergyGeneration = false, isCorrosive = false, isRotting = false;
             if (isAdHoc) {
               currentDamage = Number(html.find('[name="adhocDamage"]').val()) || 0;
               currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
@@ -491,6 +499,7 @@ export class EnergyAction extends RangedAttackAction {
                   s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
                 const dtLower = String(s.damageType || "").toLowerCase();
                 isCorrosive = /corrosive|acid/.test(nameLower) || /corrosive|acid/.test(dtLower);
+                isRotting = /rotting|rot.touch|decay/.test(nameLower) || /rotting|decay/.test(dtLower);
               }
             }
 
@@ -506,13 +515,19 @@ export class EnergyAction extends RangedAttackAction {
               $effectNote.text('Effect ≠ reduced').css('color', '#888');
             }
 
-            // Corrosive: cannot reduce damage per rules. Lock reduce controls off.
+            // Corrosive / Rotting: cannot reduce damage per rules. Lock
+            // reduce controls off. Rotting parallels corrosive per design
+            // (DESIGN-material-strength.md §2 Rotting Touch).
             const $reduceToggle = html.find('#reduce-damage-enabled');
             const $reduceInput  = html.find('[name="reducedDamage"]');
             if (isCorrosive) {
               $reduceToggle.prop('checked', false).prop('disabled', true);
               $reduceInput.prop('disabled', true);
               $effectNote.text('Corrosive: damage cannot be reduced').css('color', '#bf360c');
+            } else if (isRotting) {
+              $reduceToggle.prop('checked', false).prop('disabled', true);
+              $reduceInput.prop('disabled', true);
+              $effectNote.text('Rotting: damage cannot be reduced').css('color', '#5d4037');
             } else {
               $reduceToggle.prop('disabled', false);
               $reduceInput.prop('disabled', !$reduceToggle.is(':checked'));
@@ -663,13 +678,22 @@ export class EnergyAction extends RangedAttackAction {
     // "Corrosive attacks must hit the target, and as such have no effect on
     // Force Fields and the like." Body Armor still applies normally — the
     // burn-through FEAT is a separate optional check, not a bypass.
+    //
+    // Corrosive also ignores natural BA (chews through inorganic BA only;
+    // organic skin/BA is not its target). Rotting is the inverse: directed
+    // against organic BA, so it ignores artificial BA. FF is not bypassed
+    // by rotting (rules silent; default fail-safe). See
+    // DESIGN-material-strength.md §2 for the full table.
     const _pwNameLc = String(powerItem?.name || choice.powerName || "").toLowerCase();
     const _pwDtLc = String(powerItem?.system?.damageType || choice.powerDamageType || "").toLowerCase();
     const _isCorrosive = /corrosive|acid/.test(_pwNameLc) || /corrosive|acid/.test(_pwDtLc);
+    const _isRotting = /rotting|rot.touch|decay/.test(_pwNameLc) || /rotting|decay/.test(_pwDtLc);
     const choiceForAttack = {
       ...choice,
       weapon: powerItem,
-      bypassForceField: !!choice.bypassForceField || _isCorrosive
+      bypassForceField: !!choice.bypassForceField || _isCorrosive,
+      ignoresNaturalArmor: !!choice.ignoresNaturalArmor || _isCorrosive,
+      ignoresArtificialArmor: !!choice.ignoresArtificialArmor || _isRotting
     };
 
     await this._executeSingleAttack({
