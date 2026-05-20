@@ -1,4 +1,11 @@
-// scripts/rules/mitigation.js v3.1.3 - 2026-05-15
+// scripts/rules/mitigation.js v3.2.0 - 2026-05-20
+// v3.2.0: Consume ignoresNaturalArmor / ignoresArtificialArmor from options.
+//         Body-armor AE aggregation now filters AEs by armorNature when an
+//         ignore flag is set. Additive: with both flags false (default) the
+//         BA aggregation is identical to v3.1.3. Item-based fallback path
+//         (applyPassiveArmor for un-synced actors) unchanged for now; the
+//         touch powers that drive these flags only land on actors with
+//         current defense AEs in practice.
 // v3.1.3: Pull HP write + temp-HP scheduling out of applyAbsorptionFromAE.
 //         Previously the in-function targetActor.update raced with the
 //         caller's damage-apply update (action-utils.js applyDamageToTargets),
@@ -50,7 +57,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     armorPiercingCS = 0,
     apMode = "value",
     bypassForceField = false,
-    attackIntensity = 0
+    attackIntensity = 0,
+    ignoresNaturalArmor = false,
+    ignoresArtificialArmor = false
   } = options;
   
   if (debug) {
@@ -62,7 +71,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       bypassArmor,
       armorPiercing,
       armorPiercingCS,
-      apMode
+      apMode,
+      ignoresNaturalArmor,
+      ignoresArtificialArmor
     });
   }
   
@@ -99,7 +110,10 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   let currentDamage = rawDamage;
 
   // ── Try defense AEs first, fall back to item-based lookup ──
-  const aeDefenses = getDefensesFromAEs(targetActor, dmgTypeLower);
+  const aeDefenses = getDefensesFromAEs(targetActor, dmgTypeLower, {
+    ignoresNaturalArmor,
+    ignoresArtificialArmor
+  });
   const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance || aeDefenses.hasAbsorption;
 
   // ── Absorption — applies before BA/FF for matched damage type ──
@@ -341,9 +355,11 @@ export function resetFFRoundTracker() {
 
 // ─── Defense AE reader (synchronous — AEs are in memory) ─────────────────────
 
-function getDefensesFromAEs(actor, dmgTypeLower) {
+function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
   if (!actor?.effects) return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
+
+  const { ignoresNaturalArmor = false, ignoresArtificialArmor = false } = opts;
 
   const activeDefenses = actor.effects.filter(e =>
     !e.disabled && e.flags?.[scope]?.effectCategory === "defense"
@@ -354,11 +370,17 @@ function getDefensesFromAEs(actor, dmgTypeLower) {
 
   const isEnergyDamage = dmgTypeLower.includes("energy");
 
-  // Aggregate body armor (take highest)
+  // Aggregate body armor (take highest). When the attack ignores natural or
+  // artificial armor (claws, corrosive, rotting), skip non-matching AEs by
+  // armorNature. Unknown / missing armorNature defaults to "natural" to match
+  // the schema default and pre-v3.2.0 data.
   let armorPhys = 0, armorEner = 0, armorPR = "", armorER = "";
   for (const ae of activeDefenses) {
     const f = ae.flags?.[scope];
     if (f?.defenseType !== "bodyArmor") continue;
+    const nature = f.armorNature || "natural";
+    if (ignoresNaturalArmor && nature === "natural") continue;
+    if (ignoresArtificialArmor && nature === "artificial") continue;
     const p = Number(f.physical) || 0;
     const e = Number(f.energy) || 0;
     if (p > armorPhys) { armorPhys = p; armorPR = f.physicalRank || ""; }
