@@ -400,8 +400,16 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
   async _onRender(context, options) {
     await super._onRender(context, options);
-    if (!this.isEditable) return;
     const html = $(this.element);
+
+    // v2 power sheet: visibility logic runs even for read-only (compendium)
+    // sheets so sections gate by category. Event-handler wiring is still
+    // gated on isEditable inside ps2ActivateListeners.
+    if (this.item.type === "power") {
+      ps2ActivateListeners(html, this);
+    }
+
+    if (!this.isEditable) return;
 
     // ── Repair button (equipment broken banner) ──
     html.find('.faserip-repair-btn').on('click', async (ev) => {
@@ -505,9 +513,6 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
     // Auto-expand combat section if combat data exists
     if (this.item.type === "power") {
-      // Power sheet v2: category-driven section visibility and all toggle logic
-      ps2ActivateListeners(html, this);
-
       // Battle effects column data (kept for action dialogs / combat-handler references)
       const BATTLE_EFFECTS_COLUMNS = {
         "BA": { name: "Blunt Attack", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }, canPullPunch: true, canReduceEffect: true },

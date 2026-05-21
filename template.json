@@ -451,9 +451,16 @@
         "transferral": false,
         "animateDrawings": false,
         "pheromones": false,
+        "precognition": false,
+        "postcognition": false,
+        "mechanicalIntuition": false,
         "emotionType": "",
         "singleEmotionBonus": false
       },
+      "bodyDefensive": {
+        "pheromones": false
+      },
+      "isWaterBreathing": false,
       "transformation": {
         "affects": "self",
         "transformType": "",

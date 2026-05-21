@@ -487,10 +487,7 @@
         <div class="ps2-flags">
           <label><input type="checkbox" name="system.detection.combatSense"         {{checked system.detection.combatSense}}> Combat Sense</label>
           <label><input type="checkbox" name="system.detection.cosmicAwareness"     {{checked system.detection.cosmicAwareness}}> Cosmic Awareness</label>
-          <label><input type="checkbox" name="system.detection.precognition"        {{checked system.detection.precognition}}> Precognition</label>
-          <label><input type="checkbox" name="system.detection.postcognition"       {{checked system.detection.postcognition}}> Postcognition</label>
           <label><input type="checkbox" name="system.detection.computerLinks"       {{checked system.detection.computerLinks}}> Computer Links</label>
-          <label><input type="checkbox" name="system.detection.mechanicalIntuition" {{checked system.detection.mechanicalIntuition}}> Mechanical Intuition</label>
           <label><input type="checkbox" name="system.detection.canTrack"            {{checked system.detection.canTrack}}> Tracking</label>
         </div>
       </div>
@@ -606,7 +603,9 @@
           <label><input type="checkbox" name="system.mental.psionicAttack"    {{checked system.mental.psionicAttack}}> Psionic Attack</label>
           <label><input type="checkbox" name="system.mental.transferral"      {{checked system.mental.transferral}}> Transferral</label>
           <label><input type="checkbox" name="system.mental.animateDrawings"  {{checked system.mental.animateDrawings}}> Animate Drawings</label>
-          <label><input type="checkbox" name="system.mental.pheromones"       {{checked system.mental.pheromones}}> Pheromones</label>
+          <label><input type="checkbox" name="system.mental.precognition"     {{checked system.mental.precognition}}> Precognition</label>
+          <label><input type="checkbox" name="system.mental.postcognition"    {{checked system.mental.postcognition}}> Postcognition</label>
+          <label><input type="checkbox" name="system.mental.mechanicalIntuition" {{checked system.mental.mechanicalIntuition}}> Mechanical Intuition</label>
         </div>
         {{#if system.mental.emotionControl}}
         <div class="ps2-conditional-block">
@@ -742,6 +741,8 @@
           <label><input type="checkbox" name="system.absorptionConvertsToHealth" {{checked system.absorptionConvertsToHealth}} data-dtype="Boolean"> Absorb &rarr; Health</label>
           <label><input type="checkbox" name="system.absorptionCanRedirect" {{checked system.absorptionCanRedirect}} data-dtype="Boolean"> Can Redirect</label>
           <label><input type="checkbox" name="system.isLifeSupport" {{checked system.isLifeSupport}} data-dtype="Boolean"> Life Support</label>
+          <label><input type="checkbox" name="system.isWaterBreathing" {{checked system.isWaterBreathing}} data-dtype="Boolean"> Water Breathing</label>
+          <label title="Affects opposite sex (rulebook: Body Defensive)"><input type="checkbox" name="system.bodyDefensive.pheromones" {{checked system.bodyDefensive.pheromones}} data-dtype="Boolean"> Pheromones</label>
         </div>
       </div>
     </fieldset>

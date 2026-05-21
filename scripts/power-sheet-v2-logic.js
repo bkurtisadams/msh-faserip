@@ -1,4 +1,10 @@
-// power-sheet-v2-logic.js v1.7.0 - 2026-05-20
+// power-sheet-v2-logic.js v1.7.1 - 2026-05-20
+// v1.7.1: Run section-visibility computation for read-only (compendium)
+//         sheets too. Previously the call from itemSheet._onRender was
+//         gated by isEditable, so compendium items leaked every section
+//         (data-hidden never got set). Visibility is now read-only-safe;
+//         the rest of the listener wiring is gated locally on
+//         sheet.isEditable instead.
 // v1.7.0: Category-driven section-flag auto-tick + sub-field defaults on
 //         category CHANGE only (not on render). CATEGORY_FLAG_AUTO_TICK
 //         maps category -> section flags to tick if currently unset.
@@ -118,6 +124,16 @@ function updateSectionVisibility(html, category) {
 }
 
 export function ps2ActivateListeners(html, sheet) {
+  // Visibility computation runs for both editable and read-only sheets so
+  // compendium-opened items honor category-driven section gating. Without
+  // this, the early-return in itemSheet._onRender for !isEditable would
+  // leave every section visible because data-hidden never gets set.
+  const category = html.find('#ps2-category').val();
+  updateSectionVisibility(html, category);
+
+  // Everything below requires write access (data migrations + event handlers).
+  if (!sheet.isEditable) return;
+
   // One-time migration: infer specialStrengthType from existing fields
   const sys = sheet.item?.system ?? {};
   if (!sys.specialStrengthType) {
@@ -129,9 +145,6 @@ export function ps2ActivateListeners(html, sheet) {
       sheet.item.update({ "system.specialStrengthType": inferred }, { render: false });
     }
   }
-
-  const category = html.find('#ps2-category').val();
-  updateSectionVisibility(html, category);
 
   // Category change -> re-evaluate visibility, auto-tick section flags,
   // and apply sensible sub-field defaults. Only sets values that are
