@@ -1,4 +1,8 @@
-// action-utils.js v1.8.1 - 2026-04-22
+// action-utils.js v1.8.2 - 2026-05-20
+// v1.8.2: inferArmorNature helper in getBodyArmorValues — armorNature
+//         derives from source === "equipment" or grantedByEquipment ===
+//         true when not explicitly set. Explicit values always win.
+//         Per DESIGN-material-strength §4 / §7.6.
 // v1.8.1: Fix getArea* helpers: `??` doesn't fall through on empty strings, and
 //         template.json initializes damage/damageType/areaRadius to "" rather than
 //         null. Use _blank() helper so "" falls through to grenade* legacy fields.
@@ -2199,6 +2203,13 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
  * @param {string} damageType - Type of damage (e.g., "energy-fire", "physical-blunt")
  * @returns {Object} { physical, energy, applicable }
  */
+function inferArmorNature(sys) {
+  if (sys?.armorNature) return sys.armorNature;
+  if (sys?.grantedByEquipment === true) return "artificial";
+  if (sys?.source === "equipment") return "artificial";
+  return "natural";
+}
+
 export function getBodyArmorValues(targetActor, damageType = "physical-blunt", opts = {}) {
   const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
   const {
@@ -2304,12 +2315,13 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     // carry an armor nature. FF bypass is governed by bypassForceField:
     // when set, skip FF powers entirely so they're not folded into
     // physicalArmor/energyArmor (which attack-action subtracts upstream).
-    // Missing armorNature defaults to "natural" to match schema default.
+    // inferArmorNature falls back through source / grantedByEquipment
+    // before defaulting to "natural" (per DESIGN-material-strength §7.6).
     const powerIsFF = power.system.isForceField === true;
     if (powerIsFF) {
       if (bypassForceField) return;
     } else {
-      const nature = power.system.armorNature || "natural";
+      const nature = inferArmorNature(power.system);
       if (ignoresNaturalArmor && nature === "natural") return;
       if (ignoresArtificialArmor && nature === "artificial") return;
     }

@@ -1,4 +1,8 @@
-// scripts/modules/effects/defense-effects.js v1.4.0 - 2026-05-21
+// scripts/modules/effects/defense-effects.js v1.4.1 - 2026-05-20
+// v1.4.1: inferArmorNature helper — armorNature derives from source ===
+//         "equipment" or grantedByEquipment === true when not explicitly
+//         set on the power. Explicit values always win. Per
+//         DESIGN-material-strength §4 / §7.6.
 // v1.4.0: Align BA/FF detection with getBodyArmorValues — name-fallback
 //         detection (item.name or system.type contains "body armor" /
 //         "force field") in syncDefenseEffects and syncAllDefenseEffects.
@@ -54,6 +58,13 @@ function isDefenseEffect(ae) {
 
 // ─── Resolve protection values from a power item ─────────────────────────────
 
+function inferArmorNature(sys) {
+  if (sys?.armorNature) return sys.armorNature;
+  if (sys?.grantedByEquipment === true) return "artificial";
+  if (sys?.source === "equipment") return "artificial";
+  return "natural";
+}
+
 function resolveBodyArmorValues(item) {
   const sys = item.system || {};
   const rankValue = getRankValue(sys.rank);
@@ -74,7 +85,7 @@ function resolveBodyArmorValues(item) {
     physicalRank: sys.rank || getClosestRankName(physical),
     energyRank: getClosestRankName(energy),
     armorType,
-    armorNature: sys.armorNature || "natural",
+    armorNature: inferArmorNature(sys),
     // Material strength of the BA itself — used by Shred FEAT.
     // Per RAW the power rank IS the BA's material strength (same
     // convention as the Claws power "Power rank lists both the damage
