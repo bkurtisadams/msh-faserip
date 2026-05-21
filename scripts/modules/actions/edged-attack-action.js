@@ -1,4 +1,12 @@
-// edged-attack-action.js v3.2.0 - 2026-05-20
+// edged-attack-action.js v3.2.1 - 2026-05-20
+// v3.2.1: Revert v3.2.0's isClawsPower flag-stamping. Per
+//         DESIGN-material-strength.md rev 2 §6, claws use the
+//         normal damage pipeline (all armor soaks normally) and
+//         the shred mechanic is a separate FEAT, not a damage-
+//         pipeline filter. The natural-BA / FF bypass behavior
+//         from v3.2.0 was based on a misread of the rules.
+//         executeShredFeat (forthcoming) will consume the schema
+//         flags via its own path, not via this action.
 // v3.2.0: Claws-as-power source detection. When this.opts.item is a
 //         claws power (system.type or name matches /claws/i), the
 //         outgoing choice on both _executeSingleAttack call sites
@@ -92,15 +100,6 @@ export class EdgedAttackAction extends AttackAction {
         attackItems = [passedItem, ...attackItems];
       }
     }
-
-    // Claws power detection: when the power-router invokes EdgedAttackAction
-    // with a Claws power as opts.item, the resulting attack must ignore
-    // natural BA and bypass FF (RAW bodyOffensive.claws). Detect once here
-    // and stamp the choice at both _executeSingleAttack call sites below.
-    const _srcPower = (passedItem?.type === "power") ? passedItem : null;
-    const _powerName = String(_srcPower?.name || "").toLowerCase();
-    const _powerType = String(_srcPower?.system?.type || "").toLowerCase();
-    const isClawsPower = !!_srcPower && (/claws/.test(_powerName) || /claws/.test(_powerType));
 
     // --- INITIALIZATION & DEFAULTS ---
     const lsRememberKey = "msh.ea.remember";
@@ -632,12 +631,7 @@ export class EdgedAttackAction extends AttackAction {
 
     if (choice.multiAdjacent && targetCount > 1) {
       await this._executeSingleAttack({
-        choice: {
-          ...choice,
-          multiAttackFeatResult,
-          ignoresNaturalArmor: isClawsPower || !!choice.ignoresNaturalArmor,
-          bypassForceField: isClawsPower || !!choice.bypassForceField
-        },
+        choice: { ...choice, multiAttackFeatResult },
         actor, ability,
         actionType, actionName, effects,
         damageType: "physical-edged",
@@ -664,13 +658,7 @@ export class EdgedAttackAction extends AttackAction {
           : (selected.length ? selected[i % selected.length] : null);
 
         await this._executeSingleAttack({
-          choice: {
-            ...choice,
-            specificTarget: tgt,
-            multiAttackFeatResult: i === 0 ? multiAttackFeatResult : null,
-            ignoresNaturalArmor: isClawsPower || !!choice.ignoresNaturalArmor,
-            bypassForceField: isClawsPower || !!choice.bypassForceField
-          },
+          choice: { ...choice, specificTarget: tgt, multiAttackFeatResult: i === 0 ? multiAttackFeatResult : null },
           actor, ability,
           actionType, actionName, effects,
           damageType: "physical-edged",

@@ -1,4 +1,14 @@
-// scripts/modules/actions/energy-action.js v3.3.0 - 2026-05-20
+// scripts/modules/actions/energy-action.js v3.3.1 - 2026-05-20
+// v3.3.1: Revert v3.3.0's ignoresNaturalArmor / ignoresArtificialArmor
+//         setters on choiceForAttack in execute(). Per
+//         DESIGN-material-strength.md rev 2 §6, corrosive and rotting
+//         use the normal damage pipeline (all armor soaks normally)
+//         and the shred mechanic is a separate FEAT. The
+//         damage-pipeline flag-stamping from v3.3.0 was based on a
+//         misread. The isRotting detection + reduce-lock in the
+//         dialog update() are correct and stay. bypassForceField
+//         on corrosive stays as pre-rev-1 (still §3 open question;
+//         corrosive vs FF interpretation pending).
 // v3.3.0: Rotting Touch parity with Corrosive Touch. Dialog update() now
 //         detects rotting alongside corrosive and applies the same reduce-
 //         lock + effect note. execute() sets ignoresNaturalArmor on the
@@ -674,26 +684,20 @@ export class EnergyAction extends RangedAttackAction {
     const powerItem = choice.powerId ? actor.items.get(choice.powerId) : null;
     const targetCount = choice.multiAdjacent ? targets.length : 1;
 
-    // Corrosive attacks bypass Force Fields per RAW:
-    // "Corrosive attacks must hit the target, and as such have no effect on
-    // Force Fields and the like." Body Armor still applies normally — the
-    // burn-through FEAT is a separate optional check, not a bypass.
-    //
-    // Corrosive also ignores natural BA (chews through inorganic BA only;
-    // organic skin/BA is not its target). Rotting is the inverse: directed
-    // against organic BA, so it ignores artificial BA. FF is not bypassed
-    // by rotting (rules silent; default fail-safe). See
-    // DESIGN-material-strength.md §2 for the full table.
+    // Corrosive attacks bypass Force Fields per RAW (pre-rev-1
+    // existing behavior — note this is the §3 open question in
+    // DESIGN-material-strength.md rev 2; the rules text "Corrosive
+    // attacks must hit the target, and as such have no effect on
+    // Force Fields and the like" can be read either as "FF blocks
+    // corrosive entirely" or "corrosive bypasses FF." Code currently
+    // implements the latter pending decision.
     const _pwNameLc = String(powerItem?.name || choice.powerName || "").toLowerCase();
     const _pwDtLc = String(powerItem?.system?.damageType || choice.powerDamageType || "").toLowerCase();
     const _isCorrosive = /corrosive|acid/.test(_pwNameLc) || /corrosive|acid/.test(_pwDtLc);
-    const _isRotting = /rotting|rot.touch|decay/.test(_pwNameLc) || /rotting|decay/.test(_pwDtLc);
     const choiceForAttack = {
       ...choice,
       weapon: powerItem,
-      bypassForceField: !!choice.bypassForceField || _isCorrosive,
-      ignoresNaturalArmor: !!choice.ignoresNaturalArmor || _isCorrosive,
-      ignoresArtificialArmor: !!choice.ignoresArtificialArmor || _isRotting
+      bypassForceField: !!choice.bypassForceField || _isCorrosive
     };
 
     await this._executeSingleAttack({
