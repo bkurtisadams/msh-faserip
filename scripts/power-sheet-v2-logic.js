@@ -1,4 +1,10 @@
-// power-sheet-v2-logic.js v1.6.0 - 2026-05-20
+// power-sheet-v2-logic.js v1.7.0 - 2026-05-20
+// v1.7.0: Category-driven section-flag auto-tick + sub-field defaults on
+//         category CHANGE only (not on render). CATEGORY_FLAG_AUTO_TICK
+//         maps category -> section flags to tick if currently unset.
+//         CATEGORY_FIELD_DEFAULTS sets sensible sub-field defaults (e.g.
+//         transformation.affects="self" for bodyControl) if currently
+//         unset. Explicit user values always win.
 // v1.6.0: Damage type auto-tick for ignoresNaturalArmor (touch-rotting) and
 //         ignoresArtificialArmor (touch-corrosive). New armor-bypass flag
 //         checkboxes in Attack section.
@@ -53,6 +59,20 @@ const CATEGORY_AUTO_EXPAND = {
   mentalPowers:             { sections: ["save"], subs: [] },
   distanceAttacks:          { sections: ["save"], subs: [] },
   bodyAlterationsOffensive: { sections: ["save"], subs: [] }
+};
+
+// Category -> section flags to auto-tick on category CHANGE (not on render).
+// Only ticks flags that are currently unset. Explicit user choices always win.
+const CATEGORY_FLAG_AUTO_TICK = {
+  resistances:              { isDefensePower: true, isResistance: true },
+  bodyAlterationsDefensive: { isDefensePower: true },
+  distanceAttacks:          { isAttackPower: true },
+  bodyAlterationsOffensive: { isAttackPower: true }
+};
+
+// Category -> sensible sub-field defaults. Same "unset only" rule.
+const CATEGORY_FIELD_DEFAULTS = {
+  bodyControl: { "transformation.affects": "self" }
 };
 
 // Sections always shown regardless of category
@@ -113,14 +133,46 @@ export function ps2ActivateListeners(html, sheet) {
   const category = html.find('#ps2-category').val();
   updateSectionVisibility(html, category);
 
-  // Category change -> re-evaluate visibility
-  html.find('#ps2-category').on('change', ev => {
-    updateSectionVisibility(html, ev.currentTarget.value);
-    // Auto-suggest activationType if it hasn't been manually set or is still default
-    const suggested = CATEGORY_ACTIVATION_TYPE[ev.currentTarget.value];
+  // Category change -> re-evaluate visibility, auto-tick section flags,
+  // and apply sensible sub-field defaults. Only sets values that are
+  // currently unset; explicit user choices always win.
+  html.find('#ps2-category').on('change', async ev => {
+    const cat = ev.currentTarget.value;
+    updateSectionVisibility(html, cat);
+
+    // Auto-suggest activationType (handler at .ps2-activation-type persists + enables AEs)
+    const suggested = CATEGORY_ACTIVATION_TYPE[cat];
     if (suggested) {
       const atSelect = html.find('.ps2-activation-type');
       atSelect.val(suggested).trigger('change');
+    }
+
+    // Auto-tick section flags + sub-field defaults (only if currently unset)
+    const sys = sheet.item.system;
+    const updates = {};
+
+    const flagTicks = CATEGORY_FLAG_AUTO_TICK[cat];
+    if (flagTicks) {
+      for (const [key, val] of Object.entries(flagTicks)) {
+        if (!sys[key]) updates[`system.${key}`] = val;
+      }
+    }
+
+    const fieldDefaults = CATEGORY_FIELD_DEFAULTS[cat];
+    if (fieldDefaults) {
+      for (const [path, val] of Object.entries(fieldDefaults)) {
+        const parts = path.split('.');
+        let cur = sys;
+        for (const p of parts) {
+          cur = cur?.[p];
+          if (cur === undefined || cur === null) break;
+        }
+        if (!cur) updates[`system.${path}`] = val;
+      }
+    }
+
+    if (Object.keys(updates).length) {
+      await sheet.item.update(updates);
     }
   });
 
