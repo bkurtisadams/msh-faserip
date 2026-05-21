@@ -1,4 +1,13 @@
-// scripts/modules/effects/defense-effects.js v1.3.0 - 2026-05-20
+// scripts/modules/effects/defense-effects.js v1.4.0 - 2026-05-21
+// v1.4.0: Align BA/FF detection with getBodyArmorValues — name-fallback
+//         detection (item.name or system.type contains "body armor" /
+//         "force field") in syncDefenseEffects and syncAllDefenseEffects.
+//         Powers like "Body Armor" with isBodyArmor unset now get a
+//         proper defense AE built on sync; previously only the
+//         damage-pipeline path recognized them, leaving the AE pipeline
+//         (shred FEAT target, resistance pipeline) blind. Helpers
+//         isBodyArmorByName / isForceFieldByName / looksLikeDefensivePower
+//         centralize the fallback.
 // v1.3.0: Body Armor defense AE now carries materialStrength field
 //         (defaults to power rank). Consumed by executeShredFeat for
 //         the target-side intensity in the Shred FEAT pipeline.
@@ -123,6 +132,27 @@ function resolveAbsorptionValues(item) {
     rankValue: value,
     rank: sys.rank || getClosestRankName(value),
   };
+}
+
+function isBodyArmorByName(item) {
+  const name = String(item.name || "").toLowerCase();
+  const type = String(item.system?.type || "").toLowerCase();
+  return name.includes("body armor") || name.includes("body armour")
+      || type.includes("body armor");
+}
+
+function isForceFieldByName(item) {
+  const name = String(item.name || "").toLowerCase();
+  const type = String(item.system?.type || "").toLowerCase();
+  return name.includes("force field") || type.includes("force field");
+}
+
+function looksLikeDefensivePower(item) {
+  const sys = item.system || {};
+  return sys.isBodyArmor || isBodyArmorByName(item)
+      || sys.isForceField || isForceFieldByName(item)
+      || (sys.isResistance && sys.resistanceType)
+      || sys.absorptionType;
 }
 
 // ─── AE builders ─────────────────────────────────────────────────────────────
@@ -324,7 +354,7 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   const baId = defenseEffectId("bodyArmor", item.id);
   if (removing) {
     await removeDefenseAE(actor, baId);
-  } else if (sys.isBodyArmor) {
+  } else if (sys.isBodyArmor || isBodyArmorByName(item)) {
     const values = resolveBodyArmorValues(item);
     const aeData = buildBodyArmorAE(item, values);
     await registerDefenseAE(actor, baId, aeData, isInactive);
@@ -336,7 +366,7 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   const ffId = defenseEffectId("forceField", item.id);
   if (removing) {
     await removeDefenseAE(actor, ffId);
-  } else if (sys.isForceField) {
+  } else if (sys.isForceField || isForceFieldByName(item)) {
     const values = resolveForceFieldValues(item);
     const aeData = buildForceFieldAE(item, values);
     await registerDefenseAE(actor, ffId, aeData, isInactive);
@@ -377,8 +407,7 @@ export async function syncAllDefenseEffects(actor) {
   if (!actor) return;
   const powers = actor.items.filter(i => i.type === "power");
   for (const item of powers) {
-    const sys = item.system || {};
-    if (sys.isBodyArmor || sys.isForceField || (sys.isResistance && sys.resistanceType) || sys.absorptionType) {
+    if (looksLikeDefensivePower(item)) {
       await syncDefenseEffects(actor, item, false);
     }
   }
