@@ -1,4 +1,13 @@
-// breaking-feat.js v1.4.0 - 2026-03-23
+// breaking-feat.js v1.5.0 - 2026-05-20
+// v1.5.0: Add executeShredFeat() + buildShredFeatCardHtml() for the
+//         claws / corrosive / rotting Shred FEAT path. Per DESIGN-
+//         material-strength.md rev 2 §5: comparator is power rank
+//         (acting as Strength per Rotting/Corrosive "Power rank
+//         Strength" wording), pre-check uses claws material strength
+//         vs target material strength as a capability gate. Auto-
+//         shred at rankGap >= +3, impossible at rankGap <= -2.
+//         executeBreakingFeat unchanged — still wielderStr comparator
+//         for the generic "character bashes through wall" case.
 // v1.4.0: Extract executeBreakingFeat() for auto/semi mode; dialog uses shared logic
 // v1.3.0: Fix inverted break result (success=breaks), auto-success/fail for 3+ rank gap
 // v1.2.1: Add debug logging
@@ -155,6 +164,231 @@ export function buildBreakingFeatCardHtml(result) {
       </div>
     </div>`;
 }
+
+// ─── Shred FEAT (claws / corrosive / rotting) ──────────────────────────────
+
+/**
+ * Execute a Shred FEAT — material-strength-driven attempt to destroy
+ * armor or non-living object material. Used by the claws, corrosive
+ * touch, and rotting touch shred actions.
+ *
+ * Per DESIGN-material-strength.md rev 2 §5 and the explicit RAW
+ * "Power rank Strength" wording in Rotting/Corrosive: the comparator
+ * is the power's rank (acting as Strength); the attacker material
+ * strength is a separate pre-check capability gate. For most claws
+ * powers attackerMatRank === powerRank; Wolverine's adamantium case
+ * separates them (Class 1000 material strength, Excellent power rank).
+ *
+ * @param {Object} opts
+ * @param {string} opts.attackerMatRank - Claws/power material strength
+ *                                        (pre-check value).
+ * @param {string} opts.powerRank       - Power rank acting as Strength.
+ *                                        FEAT comparator.
+ * @param {string} opts.targetMatRank   - Target material strength
+ *                                        (BA material rank or object
+ *                                        material rank). FEAT intensity.
+ * @param {string} [opts.attackerName]
+ * @param {string} [opts.powerName]
+ * @param {Actor}  [opts.actor]         - Shredding actor (for speaker).
+ * @param {Actor}  [opts.targetActor]   - Target actor (for AE disable).
+ * @param {string} [opts.targetBaAeId]  - BA defense AE ongoingId to
+ *                                        disable on shred success.
+ * @param {boolean} [opts.postChat=false]
+ * @returns {Promise<Object|null>} result object or null on bad input
+ */
+export async function executeShredFeat({
+  attackerMatRank = "",
+  powerRank = "",
+  targetMatRank = "",
+  attackerName = "",
+  powerName = "",
+  actor = null,
+  targetActor = null,
+  targetBaAeId = null,
+  postChat = false
+}) {
+  const atkMatIdx = RANKS.indexOf(attackerMatRank);
+  const powerIdx  = RANKS.indexOf(powerRank);
+  const tgtMatIdx = RANKS.indexOf(targetMatRank);
+
+  if (atkMatIdx === -1 || powerIdx === -1 || tgtMatIdx === -1) {
+    console.warn("[FASERIP] Shred FEAT: bad ranks", { attackerMatRank, powerRank, targetMatRank });
+    return null;
+  }
+
+  // Pre-check: claws material strength must be >= target material
+  // strength. Without this the claws aren't physically capable of
+  // denting the material and the FEAT is refused before rolling.
+  const preCheckFailed = atkMatIdx < tgtMatIdx;
+  if (preCheckFailed) {
+    const result = {
+      attackerMatRank, powerRank, targetMatRank,
+      attackerName, powerName,
+      preCheckFailed: true,
+      colorLower: "white",
+      reqColor: "red",
+      roll: null,
+      autoResult: "pre-check-fail",
+      shredded: false,
+      actorName: actor?.name ?? "Character"
+    };
+    if (postChat) {
+      const cardHtml = buildShredFeatCardHtml(result);
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: cardHtml
+      });
+    }
+    return result;
+  }
+
+  // FEAT: Power rank (Ability) vs target material strength (Intensity).
+  // rankGap >= +3 = auto-shred; rankGap <= -2 = impossible per Judges
+  // Book; otherwise roll on the power rank column.
+  const rankGap = powerIdx - tgtMatIdx;
+
+  let color, roll = null, autoResult = null, passed = false;
+
+  if (rankGap >= 3) {
+    autoResult = "auto-shred";
+    color = "green";
+    passed = true;
+  } else if (rankGap <= -2) {
+    autoResult = "impossible";
+    color = "white";
+    passed = false;
+  } else {
+    roll = new Roll("1d100");
+    await roll.evaluate();
+    color = game.msh.rollUniversalTable(powerRank, roll.total);
+    const reqColor = requiredColorForIntensity(powerRank, targetMatRank);
+    passed = compareColors(color, reqColor);
+  }
+
+  const colorLower = String(color).toLowerCase();
+  const reqColor = requiredColorForIntensity(powerRank, targetMatRank);
+  const shredded = passed;
+
+  // Auto-disable the target's BA defense AE on a successful shred.
+  // The AE is found by its ongoingId flag. Disabled AEs are filtered
+  // out by the mitigation pipeline, so subsequent attacks against the
+  // target ignore that BA entirely until the GM re-enables.
+  if (shredded && targetActor && targetBaAeId) {
+    try {
+      const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+      const ae = targetActor.effects.find(e => e.flags?.[scope]?.ongoingId === targetBaAeId);
+      if (ae && !ae.disabled) {
+        await ae.update({ disabled: true });
+        console.log(`[FASERIP] Shred FEAT: disabled BA AE ${targetBaAeId} on ${targetActor.name}`);
+      }
+    } catch (e) {
+      console.warn("[FASERIP] Shred FEAT: could not disable BA AE", targetBaAeId, e);
+    }
+  }
+
+  const result = {
+    attackerMatRank, powerRank, targetMatRank,
+    attackerName, powerName,
+    preCheckFailed: false,
+    colorLower,
+    reqColor,
+    roll: roll?.total ?? null,
+    autoResult,
+    shredded,
+    actorName: actor?.name ?? "Character"
+  };
+
+  if (postChat) {
+    const cardHtml = buildShredFeatCardHtml(result);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Build a standalone Shred FEAT chat card. Mirrors buildBreakingFeatCardHtml
+ * styling but reports the shred-specific result fields.
+ */
+export function buildShredFeatCardHtml(result) {
+  const {
+    attackerMatRank, powerRank, targetMatRank,
+    attackerName, powerName,
+    preCheckFailed, colorLower, reqColor, roll, autoResult,
+    shredded, actorName
+  } = result;
+  const { bg, fg } = bannerColors(colorLower);
+  const { bg: reqBg, fg: reqFg } = bannerColors(reqColor);
+  const powerLabel = powerName || attackerName || "Power";
+
+  let resultBannerText, resultBg, resultBorder, resultFg;
+  if (preCheckFailed) {
+    resultBannerText = "PRE-CHECK FAILED";
+    resultBg = "#fff3e0"; resultBorder = "#ff9800"; resultFg = "#e65100";
+  } else if (autoResult === "impossible") {
+    resultBannerText = "IMPOSSIBLE FEAT";
+    resultBg = "#fff3e0"; resultBorder = "#ff9800"; resultFg = "#e65100";
+  } else if (shredded) {
+    resultBannerText = "ARMOR SHREDDED";
+    resultBg = "#e8f5e9"; resultBorder = "#66bb6a"; resultFg = "#2e7d32";
+  } else {
+    resultBannerText = "NO EFFECT";
+    resultBg = "#ffebee"; resultBorder = "#ef5350"; resultFg = "#c62828";
+  }
+
+  let middleBlock;
+  if (preCheckFailed) {
+    middleBlock = `
+        <div style="font-weight:bold;color:#e65100;">
+          Pre-check fail: ${attackerMatRank} material cannot dent ${targetMatRank}
+        </div>`;
+  } else if (autoResult === "auto-shred") {
+    middleBlock = `
+        <div style="font-weight:bold;color:#2e7d32;">
+          Automatic (Power rank 3+ above target material)
+        </div>`;
+  } else if (autoResult === "impossible") {
+    middleBlock = `
+        <div style="font-weight:bold;color:#c62828;">
+          Impossible (Target material 2+ above Power rank)
+        </div>`;
+  } else {
+    middleBlock = `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>Roll: <span title="d100 = ${roll}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll}</span></span>
+          <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+            ${colorLower.toUpperCase()}
+          </span>
+        </div>`;
+  }
+
+  return `
+    <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+      <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+        <strong style="color:#8b0000;">SHRED FEAT</strong>
+      </div>
+      <div style="padding:4px 10px;font-size:.95em;">
+        <strong>${actorName}</strong>${powerName ? ` — <em>${powerName}</em>` : ''}
+      </div>
+      <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+        <div>Power Rank: ${powerRank}</div>
+        ${middleBlock}
+      </div>
+      <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+        <div><strong>${powerLabel}:</strong> ${attackerMatRank} material</div>
+        <div><strong>Target Material:</strong> ${targetMatRank}</div>
+        ${!autoResult && !preCheckFailed ? `<div><strong>To shred:</strong> <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> <span style="color:#666;">(${powerRank} vs ${targetMatRank} intensity)</span></div>` : ''}
+      </div>
+      <div style="margin:6px 10px 8px;padding:8px;text-align:center;font-weight:bold;border-radius:3px;background:${resultBg};border:1px solid ${resultBorder};color:${resultFg};">
+        ${resultBannerText}
+      </div>
+    </div>`;
+}
+
+// ─── Breaking FEAT dialog (generic Str vs material) ────────────────────────
 
 export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatRank = "", actor = null }) {
   console.log("[FASERIP] openBreakingFeatDialog called:", { weaponMatRank, targetMatRank, actorName: actor?.name });

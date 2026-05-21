@@ -1,4 +1,7 @@
-// scripts/modules/effects/defense-effects.js v1.2.0 - 2026-05-15
+// scripts/modules/effects/defense-effects.js v1.3.0 - 2026-05-20
+// v1.3.0: Body Armor defense AE now carries materialStrength field
+//         (defaults to power rank). Consumed by executeShredFeat for
+//         the target-side intensity in the Shred FEAT pipeline.
 // v1.2.0: Absorption defense AE — resolveAbsorptionValues, buildAbsorptionAE, sync block.
 //         Gated on sys.absorptionType truthy. Flags: absorptionType, absorptionSpecific,
 //         convertsToHealth, canRedirect, rankValue.
@@ -63,6 +66,12 @@ function resolveBodyArmorValues(item) {
     energyRank: getClosestRankName(energy),
     armorType,
     armorNature: sys.armorNature || "natural",
+    // Material strength of the BA itself — used by Shred FEAT.
+    // Per RAW the power rank IS the BA's material strength (same
+    // convention as the Claws power "Power rank lists both the damage
+    // inflicted by the claws and the material strength"). Override via
+    // a dedicated schema field is a future addition if needed.
+    materialStrength: sys.rank || getClosestRankName(physical),
   };
 }
 
@@ -141,6 +150,7 @@ function buildBodyArmorAE(item, values) {
         energyRank: values.energyRank,
         armorType: values.armorType,
         armorNature: values.armorNature,
+        materialStrength: values.materialStrength,
         isForceField: false,
       }
     },
