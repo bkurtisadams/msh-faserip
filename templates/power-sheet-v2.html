@@ -98,6 +98,10 @@
         <input type="text" name="system.customDuration" value="{{system.customDuration}}" placeholder="e.g., 1 hour; until sunrise">
       </div>
       {{/if}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Area of Effect (areas)</label>
+        <input type="number" name="system.area" value="{{system.area}}" min="0" data-dtype="Number" placeholder="0 = single target" />
+      </div>
       <div class="ps2-flags">
         <label><input type="checkbox" name="system.countsAsTwoPowers" {{checked system.countsAsTwoPowers}} data-dtype="Boolean"> Counts as 2</label>
         <label><input type="checkbox" name="system.isBonus" {{checked system.isBonus}} data-dtype="Boolean"> Bonus Power</label>
@@ -156,7 +160,7 @@
           </div>
           <div class="ps2-field">
             <label>Damage Type</label>
-            <select name="system.damageType">
+            <select name="system.damageType" id="ps2-dmg-type">
               <option value="">-- None --</option>
               <option value="physical-blunt"      {{#if (eq system.damageType "physical-blunt")}}selected{{/if}}>Physical: Blunt</option>
               <option value="physical-edged"      {{#if (eq system.damageType "physical-edged")}}selected{{/if}}>Physical: Edged</option>
@@ -188,6 +192,11 @@
           <label title="Can reduce effect color"><input type="checkbox" name="system.canReduceEffect" {{checked system.canReduceEffect}} data-dtype="Boolean"> Pull Effect</label>
           <label title="Pierces artificial armor"><input type="checkbox" name="system.armorPiercing" {{checked system.armorPiercing}} data-dtype="Boolean"> Armor Pierce</label>
           <label title="Extra Attacks power"><input type="checkbox" name="system.extraAttacks" {{checked system.extraAttacks}} data-dtype="Boolean"> Extra Attacks</label>
+        </div>
+        <div class="ps2-flags" style="margin-top:4px;">
+          <label title="Bypass natural/organic body armor (Rotting Touch, claws house rule)"><input type="checkbox" name="system.ignoresNaturalArmor" {{checked system.ignoresNaturalArmor}} data-dtype="Boolean"> Ignore Natural BA</label>
+          <label title="Bypass artificial/suit body armor (Corrosive Touch, claws default)"><input type="checkbox" name="system.ignoresArtificialArmor" {{checked system.ignoresArtificialArmor}} data-dtype="Boolean"> Ignore Artificial BA</label>
+          <label title="Damage passes through force fields"><input type="checkbox" name="system.bypassForceField" {{checked system.bypassForceField}} data-dtype="Boolean"> Bypass FF</label>
         </div>
         <div class="ps2-material-row">
           <div class="ps2-field">
@@ -411,6 +420,17 @@
             </select>
           </div>
         </div>
+        {{#if (eq system.save.intensity "fixed-rank")}}
+        <div class="ps2-field" style="margin-top:4px;">
+          <label>Fixed Rank</label>
+          <select name="system.save.fixedRank">
+            <option value="">-- Select --</option>
+            {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
+            <option value="{{r}}" {{#if (eq ../system.save.fixedRank r)}}selected{{/if}}>{{r}}</option>
+            {{/each}}
+          </select>
+        </div>
+        {{/if}}
         <div class="ps2-flags">
           <label><input type="checkbox" name="system.save.rerollOnKarmaLoss" {{checked system.save.rerollOnKarmaLoss}} data-dtype="Boolean"> Re-roll if Karma-losing</label>
           <label><input type="checkbox" name="system.save.rerollOnLifeThreat" {{checked system.save.rerollOnLifeThreat}} data-dtype="Boolean"> Re-roll if life-threatening</label>
@@ -804,12 +824,9 @@
             <label>Max Rank</label>
             <select name="system.limitation.maxRank">
               <option value="">None</option>
-              <option value="Excellent"   {{#if (eq system.limitation.maxRank "Excellent")}}selected{{/if}}>Excellent</option>
-              <option value="Remarkable"  {{#if (eq system.limitation.maxRank "Remarkable")}}selected{{/if}}>Remarkable</option>
-              <option value="Incredible"  {{#if (eq system.limitation.maxRank "Incredible")}}selected{{/if}}>Incredible</option>
-              <option value="Amazing"     {{#if (eq system.limitation.maxRank "Amazing")}}selected{{/if}}>Amazing</option>
-              <option value="Monstrous"   {{#if (eq system.limitation.maxRank "Monstrous")}}selected{{/if}}>Monstrous</option>
-              <option value="Unearthly"   {{#if (eq system.limitation.maxRank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
+              <option value="{{r}}" {{#if (eq ../system.limitation.maxRank r)}}selected{{/if}}>{{r}}</option>
+              {{/each}}
             </select>
           </div>
           <div class="ps2-field">

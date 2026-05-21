@@ -1,4 +1,7 @@
-// power-sheet-v2-logic.js v1.5.0 - 2026-04-19
+// power-sheet-v2-logic.js v1.6.0 - 2026-05-20
+// v1.6.0: Damage type auto-tick for ignoresNaturalArmor (touch-rotting) and
+//         ignoresArtificialArmor (touch-corrosive). New armor-bypass flag
+//         checkboxes in Attack section.
 // v1.5.0: Symmetric armorPhysicalCustom pattern — orange-dot badge + reset
 //         handler + manual-edit detection, mirroring armorEnergyCustom.
 //         Rank change no longer overwrites armorPhysical when custom flag set.
@@ -164,6 +167,18 @@ export function ps2ActivateListeners(html, sheet) {
   html.find('#ps2-dmg-source').on('change', ev => {
     const isFixed = ev.currentTarget.value === 'fixed';
     html.find('input[name="system.damage"]').prop('disabled', !isFixed);
+  });
+
+  // Damage type -> auto-tick ignore-armor flags for rotting/corrosive touch
+  html.find('#ps2-dmg-type').on('change', async ev => {
+    const val = ev.currentTarget.value;
+    const updates = { "system.damageType": val };
+    if (val === "touch-rotting") {
+      updates["system.ignoresNaturalArmor"] = true;
+    } else if (val === "touch-corrosive") {
+      updates["system.ignoresArtificialArmor"] = true;
+    }
+    await sheet.item.update(updates);
   });
 
   // Rank change -> auto-fill Value from lookup
