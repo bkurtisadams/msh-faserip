@@ -1,4 +1,13 @@
-// edged-attack-action.js v3.2.1 - 2026-05-20
+// edged-attack-action.js v3.3.0 - 2026-05-21
+// v3.3.0: House rule — claws penetration FEAT vs natural BA. When
+//         (a) the source power is claws, (b) the world setting
+//         houseRules.clawsPenetrateNaturalBA is true, and (c) the
+//         primary target has natural BA, run executePenetrationFeat
+//         (claws material strength column vs target natural BA
+//         intensity) before the attack proceeds. On success, stamp
+//         choice.ignoresNaturalArmor = true for this attack so the
+//         damage pipeline skips the natural BA. Per
+//         DESIGN-material-strength.md §8 House Rule. Off by default.
 // v3.2.1: Revert v3.2.0's isClawsPower flag-stamping. Per
 //         DESIGN-material-strength.md rev 2 §6, claws use the
 //         normal damage pipeline (all armor soaks normally) and
@@ -51,6 +60,7 @@ import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { executePenetrationFeat } from "./breaking-feat.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -625,6 +635,56 @@ export class EdgedAttackAction extends AttackAction {
     }
 
     choice.shiftBreakdown = shiftBreakdown;
+
+    // House rule — claws penetration FEAT vs natural BA.
+    // Per DESIGN-material-strength.md §8: when claws power + setting on
+    // + primary target has natural BA, attempt a per-attack penetration
+    // FEAT. Comparator is the claws material strength (substance-driven,
+    // not wielder skill). On success, choice.ignoresNaturalArmor is set
+    // and flows through the existing damage pipeline. Failure or
+    // no-natural-BA-target = normal behavior (BA soaks normally).
+    const _passedItem = this.opts?.itemId
+      ? actor.items.get(this.opts.itemId)
+      : (this.opts?.item ?? null);
+    const _isClawsPower = _passedItem?.type === "power" &&
+      (/claws/i.test(_passedItem.name || "") ||
+       /claws/i.test(_passedItem.system?.type || ""));
+    const _clawsPenSettingOn = !!game.settings?.get?.("msh-faserip", "houseRules.clawsPenetrateNaturalBA");
+    if (_isClawsPower && _clawsPenSettingOn) {
+      const _primaryTarget = [...(game.user?.targets ?? [])][0]?.actor ?? null;
+      const _scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+      const _naturalBaAe = _primaryTarget?.effects?.find(e =>
+        !e.disabled &&
+        e.flags?.[_scope]?.effectCategory === "defense" &&
+        e.flags?.[_scope]?.defenseType === "bodyArmor" &&
+        (e.flags?.[_scope]?.armorNature || "natural") === "natural"
+      );
+      const _naturalMatRank = _naturalBaAe?.flags?.[_scope]?.materialStrength;
+      if (_naturalMatRank) {
+        const _sys = _passedItem.system || {};
+        let _clawMat = _sys.clawMaterialStrength || _sys.rank || "Typical";
+        // +2CS material strength bump for any limitation (RAW Claws power)
+        if (_sys.isLimited) {
+          const _idx = RANKS.indexOf(_clawMat);
+          if (_idx >= 0) _clawMat = RANKS[Math.min(_idx + 2, RANKS.length - 1)];
+        }
+        const _penResult = await executePenetrationFeat({
+          attackerMatRank: _clawMat,
+          targetMatRank: _naturalMatRank,
+          attackerName: actor.name,
+          powerName: _passedItem.name,
+          targetName: _primaryTarget.name,
+          actor,
+          postChat: true
+        });
+        if (_penResult?.penetrated) {
+          choice.ignoresNaturalArmor = true;
+          debugLog("Claws penetration FEAT passed — choice.ignoresNaturalArmor set", {
+            clawMat: _clawMat, targetMat: _naturalMatRank, colorLower: _penResult.colorLower
+          });
+        }
+      }
+    }
 
     // Execute attacks
     const targetCount = game.user.targets.size || 1;

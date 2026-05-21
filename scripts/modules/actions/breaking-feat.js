@@ -1,4 +1,14 @@
-// breaking-feat.js v1.5.0 - 2026-05-20
+// breaking-feat.js v1.6.0 - 2026-05-21
+// v1.6.0: Add executePenetrationFeat() + buildPenetrationFeatCardHtml()
+//         for the house rule "claws penetrate natural BA" path.
+//         Per DESIGN-material-strength.md §8 House Rule. Comparator is
+//         the claws material strength (NOT power rank — different from
+//         the shred FEAT), making the substance itself the
+//         differentiator. Wolverine Cl1000 vs Hulk Amazing natural BA
+//         = rankGap +6 = auto-pen. Generic Good claws vs same Hulk =
+//         pre-check fails. Only used when world setting
+//         houseRules.clawsPenetrateNaturalBA is on. Per-attack only —
+//         does not disable AEs.
 // v1.5.0: Add executeShredFeat() + buildShredFeatCardHtml() for the
 //         claws / corrosive / rotting Shred FEAT path. Per DESIGN-
 //         material-strength.md rev 2 §5: comparator is power rank
@@ -383,6 +393,158 @@ export function buildShredFeatCardHtml(result) {
         ${!autoResult && !preCheckFailed ? `<div><strong>To shred:</strong> <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> <span style="color:#666;">(${powerRank} vs ${targetMatRank} intensity)</span></div>` : ''}
       </div>
       <div style="margin:6px 10px 8px;padding:8px;text-align:center;font-weight:bold;border-radius:3px;background:${resultBg};border:1px solid ${resultBorder};color:${resultFg};">
+        ${resultBannerText}
+      </div>
+    </div>`;
+}
+
+// ─── Penetration FEAT (house rule: claws vs natural BA) ────────────────────
+
+/**
+ * Execute a Penetration FEAT — house rule mechanic that lets claws-class
+ * powers attempt to bypass natural Body Armor for a single attack. Per
+ * DESIGN-material-strength.md §8 House Rule.
+ *
+ * Differs from executeShredFeat:
+ * - Comparator is the **claws material strength**, not the power rank.
+ *   The substance of the claws is what penetrates, not the wielder's
+ *   skill. This matches the design intent: adamantium claws cut through
+ *   natural BA because they're adamantium, not because Wolverine is
+ *   unusually capable.
+ * - Per-attack only. Does NOT disable any AE. Success means the calling
+ *   action stamps ignoresNaturalArmor on the choice for one attack;
+ *   subsequent attacks must FEAT again.
+ *
+ * The caller is responsible for gating on the world setting
+ * `houseRules.clawsPenetrateNaturalBA` and for only invoking this
+ * against targets with natural BA. The function itself doesn't check.
+ *
+ * @param {Object} opts
+ * @param {string} opts.attackerMatRank - Claws material strength (after
+ *                                        +2CS limitation bump if applicable).
+ *                                        FEAT comparator.
+ * @param {string} opts.targetMatRank   - Target's natural BA material
+ *                                        strength. FEAT intensity.
+ * @param {string} [opts.attackerName]
+ * @param {string} [opts.powerName]
+ * @param {string} [opts.targetName]
+ * @param {Actor}  [opts.actor]         - Attacking actor (for speaker).
+ * @param {boolean} [opts.postChat=false]
+ * @returns {Promise<Object|null>} result with .penetrated boolean, or null on bad ranks
+ */
+export async function executePenetrationFeat({
+  attackerMatRank = "",
+  targetMatRank = "",
+  attackerName = "",
+  powerName = "",
+  targetName = "",
+  actor = null,
+  postChat = false
+}) {
+  const atkIdx = RANKS.indexOf(attackerMatRank);
+  const tgtIdx = RANKS.indexOf(targetMatRank);
+
+  if (atkIdx === -1 || tgtIdx === -1) {
+    console.warn("[FASERIP] Penetration FEAT: bad ranks", { attackerMatRank, targetMatRank });
+    return null;
+  }
+
+  const rankGap = atkIdx - tgtIdx;
+
+  let color, roll = null, autoResult = null, passed = false;
+
+  if (rankGap >= 3) {
+    autoResult = "auto-pen";
+    color = "green";
+    passed = true;
+  } else if (rankGap <= -2) {
+    autoResult = "impossible";
+    color = "white";
+    passed = false;
+  } else {
+    roll = new Roll("1d100");
+    await roll.evaluate();
+    color = game.msh.rollUniversalTable(attackerMatRank, roll.total);
+    const reqColor = requiredColorForIntensity(attackerMatRank, targetMatRank);
+    passed = compareColors(color, reqColor);
+  }
+
+  const reqColor = requiredColorForIntensity(attackerMatRank, targetMatRank);
+  const colorLower = String(color).toLowerCase();
+
+  const result = {
+    attackerMatRank, targetMatRank,
+    attackerName, powerName, targetName,
+    colorLower, reqColor,
+    roll: roll?.total ?? null,
+    autoResult,
+    penetrated: passed,
+    actorName: actor?.name ?? attackerName ?? "Character"
+  };
+
+  if (postChat) {
+    const cardHtml = buildPenetrationFeatCardHtml(result);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Build a standalone Penetration FEAT chat card. Smaller / inline-flavor
+ * relative to the shred card since this typically posts just before a
+ * regular attack card (don't want to drown the chat in headers).
+ */
+export function buildPenetrationFeatCardHtml(result) {
+  const {
+    attackerMatRank, targetMatRank,
+    powerName, targetName,
+    colorLower, reqColor, roll, autoResult,
+    penetrated, actorName
+  } = result;
+  const { bg, fg } = bannerColors(colorLower);
+  const { bg: reqBg, fg: reqFg } = bannerColors(reqColor);
+  const powerLabel = powerName || "Claws";
+
+  let resultBannerText, resultBg, resultBorder, resultFg;
+  if (autoResult === "impossible") {
+    resultBannerText = "CANNOT PENETRATE";
+    resultBg = "#fff3e0"; resultBorder = "#ff9800"; resultFg = "#e65100";
+  } else if (penetrated) {
+    resultBannerText = "CLAWS PENETRATE";
+    resultBg = "#e8f5e9"; resultBorder = "#66bb6a"; resultFg = "#2e7d32";
+  } else {
+    resultBannerText = "DEFLECTED";
+    resultBg = "#ffebee"; resultBorder = "#ef5350"; resultFg = "#c62828";
+  }
+
+  let middleBlock;
+  if (autoResult === "auto-pen") {
+    middleBlock = `<div style="font-weight:bold;color:#2e7d32;font-size:.85em;">Automatic (claws material 3+ above target armor)</div>`;
+  } else if (autoResult === "impossible") {
+    middleBlock = `<div style="font-weight:bold;color:#c62828;font-size:.85em;">Impossible (target armor 2+ above claws material)</div>`;
+  } else {
+    middleBlock = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.85em;">
+        <span>Roll: <span title="d100 = ${roll}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll}</span></span>
+        <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.85em;background:${bg};color:${fg};">${colorLower.toUpperCase()}</span>
+        <span style="color:#666;">Req: <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span></span>
+      </div>`;
+  }
+
+  return `
+    <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+      <div style="padding:4px 10px;border-bottom:1px solid #c0c0c0;font-size:.9em;">
+        <strong style="color:#8b0000;">PENETRATION FEAT</strong> — ${actorName} vs ${targetName || "target"}
+      </div>
+      <div style="padding:4px 10px;font-size:.85em;color:#555;">
+        <div><strong>${powerLabel}:</strong> ${attackerMatRank} material vs ${targetMatRank} natural BA</div>
+        ${middleBlock}
+      </div>
+      <div style="margin:4px 10px 6px;padding:5px;text-align:center;font-weight:bold;border-radius:3px;background:${resultBg};border:1px solid ${resultBorder};color:${resultFg};font-size:.85em;">
         ${resultBannerText}
       </div>
     </div>`;

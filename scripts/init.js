@@ -506,6 +506,23 @@ Hooks.once("init", async () => {
     requiresReload: false
   });
 
+  // House rule: claws penetration FEAT vs natural BA.
+  // Per DESIGN-material-strength.md §8. When enabled, claws-class powers
+  // make a per-attack material-strength FEAT against targets with natural
+  // Body Armor; on success the attack's damage bypasses the natural BA.
+  // Comparator is claws material strength (substance-driven). The
+  // standard Shred Armor action is unaffected. Default off to preserve
+  // strict RAW behavior.
+  game.settings.register("msh-faserip", "houseRules.clawsPenetrateNaturalBA", {
+    name: "House Rule — Claws Penetrate Natural BA",
+    hint: "Allow claws-class powers to roll a per-attack material-strength FEAT against natural Body Armor (e.g. Wolverine cutting Hulk). On a successful FEAT the attack bypasses natural BA. Adamantium-tier claws auto-penetrate; ordinary claws still can't beat tough hide. Off by default (strict RAW).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    requiresReload: false
+  });
+
   // Register consolidated chat cards setting
   game.settings.register("msh-faserip", "consolidatedChatCards", {
     name: "Consolidated Chat Cards",
