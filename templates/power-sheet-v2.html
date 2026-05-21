@@ -205,21 +205,21 @@
             {{#if (eq system.specialStrengthType "claw")}}
             <select name="system.clawMaterialStrength">
               <option value="">N/A</option>
-              {{#each (array "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+              {{#each (array "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
               <option value="{{r}}" {{#if (eq ../system.clawMaterialStrength r)}}selected{{/if}}>{{r}}</option>
               {{/each}}
             </select>
             {{else if (eq system.specialStrengthType "tk")}}
             <select name="system.telekinesisStrength">
               <option value="">N/A</option>
-              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
               <option value="{{r}}" {{#if (eq ../system.telekinesisStrength r)}}selected{{/if}}>{{r}}</option>
               {{/each}}
             </select>
             {{else if (eq system.specialStrengthType "ensnare")}}
             <select name="system.ensnaringStrength">
               <option value="">N/A</option>
-              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
               <option value="{{r}}" {{#if (eq ../system.ensnaringStrength r)}}selected{{/if}}>{{r}}</option>
               {{/each}}
             </select>
