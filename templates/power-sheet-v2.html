@@ -462,8 +462,13 @@
 
     <!-- ── DETECTION / SENSES ──────────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="detection">
-      <legend>Detection / Senses</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isSensePower" {{checked system.isSensePower}} data-dtype="Boolean" class="ps2-section-check" data-section="detection">
+          Detection / Senses
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isSensePower}}style="display:none;"{{/unless}}>
         <div class="ps2-grid-2col">
           <div class="ps2-field">
             <label>Enhanced Sense</label>
@@ -517,8 +522,13 @@
 
     <!-- ── ABILITY SUBSTITUTION ────────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="abilitySubstitution">
-      <legend>Ability Substitution</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isAbilitySubstitution" {{checked system.isAbilitySubstitution}} data-dtype="Boolean" class="ps2-section-check" data-section="abilitySubstitution">
+          Ability Substitution
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isAbilitySubstitution}}style="display:none;"{{/unless}}>
         <p class="ps2-hint">Power Rank replaces ability for specific actions</p>
         <div class="ps2-ability-sub-grid">
           {{#each (array "fighting" "agility" "strength" "endurance" "reason" "intuition" "psyche") as |ab|}}
@@ -533,8 +543,13 @@
 
     <!-- ── MOVEMENT ────────────────────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="movement">
-      <legend>Movement</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isMovementPower" {{checked system.isMovementPower}} data-dtype="Boolean" class="ps2-section-check" data-section="movement">
+          Movement
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isMovementPower}}style="display:none;"{{/unless}}>
         <div class="ps2-grid-2col">
           <div class="ps2-field">
             <label>Type</label>
@@ -567,8 +582,13 @@
 
     <!-- ── CONTROL / MANIPULATION ──────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="control">
-      <legend>Control / Manipulation</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isControlPower" {{checked system.isControlPower}} data-dtype="Boolean" class="ps2-section-check" data-section="control">
+          Control / Manipulation
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isControlPower}}style="display:none;"{{/unless}}>
         <div class="ps2-grid-2col">
           <div class="ps2-field">
             <label>Type</label>
@@ -610,8 +630,13 @@
 
     <!-- ── MENTAL / PSIONIC ────────────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="mental">
-      <legend>Mental / Psionic</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isMentalPower" {{checked system.isMentalPower}} data-dtype="Boolean" class="ps2-section-check" data-section="mental">
+          Mental / Psionic
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isMentalPower}}style="display:none;"{{/unless}}>
         <div class="ps2-flags ps2-mental-flags">
           <label><input type="checkbox" name="system.mental.telepathy"        {{checked system.mental.telepathy}}> Telepathy</label>
           <label><input type="checkbox" name="system.mental.mentalProbe"      {{checked system.mental.mentalProbe}}> Mental Probe</label>
@@ -656,8 +681,13 @@
 
     <!-- ── TRANSFORMATION ──────────────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="transformation">
-      <legend>Transformation</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isTransformPower" {{checked system.isTransformPower}} data-dtype="Boolean" class="ps2-section-check" data-section="transformation">
+          Transformation
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isTransformPower}}style="display:none;"{{/unless}}>
         <div class="ps2-grid-3col">
           <div class="ps2-field">
             <label>Affects</label>

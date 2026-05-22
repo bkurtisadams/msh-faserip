@@ -379,6 +379,12 @@
       "isEnergyReflection": false,
       "energyReflectionType": "",
       "energyReflectionRank": "full",
+      "isSensePower": false,
+      "isAbilitySubstitution": false,
+      "isMovementPower": false,
+      "isControlPower": false,
+      "isMentalPower": false,
+      "isTransformPower": false,
       "detection": {
         "enhancedSense": "",
         "protectedSense": "",

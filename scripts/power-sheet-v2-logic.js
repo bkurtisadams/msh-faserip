@@ -1,4 +1,14 @@
-// power-sheet-v2-logic.js v1.9.0 - 2026-05-21
+// power-sheet-v2-logic.js v1.10.0 - 2026-05-21
+// v1.10.0: Slice N — data-driven section gating. Detection, Ability
+//          Substitution, Movement, Control, Mental, and Transformation now
+//          carry .ps2-section-check toggles bound to new flags (isSensePower,
+//          isAbilitySubstitution, isMovementPower, isControlPower,
+//          isMentalPower, isTransformPower). CATEGORY_FLAG_AUTO_TICK extended
+//          so senses/movement/matterControl/energyControl/bodyControl/
+//          mentalPowers auto-tick their primary section flag on category
+//          change. No new handler needed — the generic .ps2-section-check
+//          change handler covers them. Closes the Transformation-leak class
+//          of bug (sections were JS-suggested only, with no per-section flag).
 // v1.9.0: Slice I — Extra Body Parts structured field. #ps2-add-bodypart /
 //         .ps2-remove-bodypart add/remove handlers manage the
 //         system.extraBodyParts array ([{type, count, notes}]), mirroring
@@ -83,6 +93,12 @@ const CATEGORY_AUTO_EXPAND = {
 // Only ticks flags that are currently unset. Explicit user choices always win.
 const CATEGORY_FLAG_AUTO_TICK = {
   resistances:              { isDefensePower: true, isResistance: true },
+  senses:                   { isSensePower: true },
+  movement:                 { isMovementPower: true },
+  matterControl:            { isControlPower: true },
+  energyControl:            { isControlPower: true },
+  bodyControl:              { isTransformPower: true },
+  mentalPowers:             { isMentalPower: true },
   bodyAlterationsDefensive: { isDefensePower: true },
   distanceAttacks:          { isAttackPower: true },
   bodyAlterationsOffensive: { isAttackPower: true }
