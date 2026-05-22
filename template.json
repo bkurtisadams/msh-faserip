@@ -392,10 +392,7 @@
         "infravisionRange": 0,
         "combatSense": false,
         "cosmicAwareness": false,
-        "precognition": false,
-        "postcognition": false,
         "computerLinks": false,
-        "mechanicalIntuition": false,
         "canTrack": false
       },
       "abilitySubstitution": {
@@ -457,7 +454,6 @@
         "psionicAttack": false,
         "transferral": false,
         "animateDrawings": false,
-        "pheromones": false,
         "precognition": false,
         "postcognition": false,
         "mechanicalIntuition": false,
