@@ -920,7 +920,7 @@ form.faserip-sheet .th-action-link:hover {
 form.faserip-sheet .tab-list-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%);
   color: #fff;
   font-family: 'Oswald', sans-serif;

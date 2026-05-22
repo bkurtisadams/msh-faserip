@@ -1,4 +1,10 @@
         <div class="tab" data-tab="headquarters">
+          <div class="tab-list-header">
+            <div class="th-actions">
+              <a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a>
+              <a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a>
+            </div>
+          </div>
 
           {{#if teamHQs.length}}
           <div class="team-hq-label">Team HQs</div>
@@ -37,10 +43,7 @@
                 <th class="size-col">Size</th>
                 <th class="material-col">Material</th>
                 <th class="cost-col">Cost</th>
-                <th class="th-actions">
-                  <a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a>
-                  <a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a>
-                </th>
+                <th class="th-actions"></th>
               </tr>
             </thead>
             <tbody>
