@@ -1,4 +1,6 @@
-// sheet-zoom.js v1.3.1 - 2026-05-22
+// sheet-zoom.js v1.3.2 - 2026-05-22
+// v1.3.2: Zoom badge is now a gold pill (amber fill, dark bold text, magnifier
+//         icon) at full opacity so an active non-100% zoom is unmissable.
 // v1.3.1: Fix V2 binding — sheet.element?.[0] returned the form's first control
 //         (a header button) on tag:"form" V2 sheets, so .window-content was
 //         never found and the listener never bound. Only unwrap [0] for jQuery.
@@ -22,10 +24,12 @@ function _updateBadge(titleEl, zoom) {
   if (!badge) {
     badge = document.createElement("span");
     badge.className = "faserip-zoom-badge";
-    badge.style.cssText = "margin-left:6px;font-size:10px;font-weight:normal;opacity:0.7;";
+    badge.style.cssText = "margin-left:8px;padding:1px 7px;border-radius:9px;" +
+      "background:#f0b323;color:#3a2a00;font-size:10px;font-weight:700;" +
+      "line-height:1.5;vertical-align:middle;white-space:nowrap;";
     titleEl.appendChild(badge);
   }
-  badge.textContent = `(${Math.round(zoom * 100)}%)`;
+  badge.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${Math.round(zoom * 100)}%`;
 }
 
 /**
