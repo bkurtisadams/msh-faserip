@@ -210,6 +210,15 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       .filter(item => item.type === "equipment")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
+    // per-category counts so empty equipment groups can be hidden
+    context.equipmentCounts = {
+      weapon:    context.equipment.filter(i => i.system.category === "weapon").length,
+      other:     context.equipment.filter(i => i.system.category === "other").length,
+      armor:     context.equipment.filter(i => i.system.category === "armor").length,
+      powerItem: context.equipment.filter(i => i.system.category === "power-item").length,
+      gear:      context.equipment.filter(i => ["gear", "custom", "device"].includes(i.system.category)).length
+    };
+
     // headquarters made sortable, with rent status
     context.headquarters = this.actor.items
       .filter(item => item.type === "headquarters")

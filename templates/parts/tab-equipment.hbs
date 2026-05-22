@@ -7,12 +7,12 @@
           </div>
 
           {{! ── WEAPONS ── }}
+          {{#if equipmentCounts.weapon}}
           <div class="equip-group" data-group="weapon">
-            <div class="equip-group-label">Weapons</div>
             <table class="equipment-table">
               <thead>
                 <tr>
-                  <th class="name-col">Name</th>
+                  <th class="name-col">Weapon</th>
                   <th class="material-col">Mat.</th>
                   <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col">Dmg</th>
@@ -58,14 +58,15 @@
               </tbody>
             </table>
           </div>
+          {{/if}}
 
           {{! ── ARMOR ── }}
+          {{#if equipmentCounts.other}}
           <div class="equip-group" data-group="other">
-            <div class="equip-group-label">Other Weapons</div>
             <table class="equipment-table">
               <thead>
                 <tr>
-                  <th class="name-col">Name</th>
+                  <th class="name-col">Other Weapon</th>
                   <th class="type-col">Type</th>
                   <th class="damage-col">Dmg</th>
                   <th class="range-col">Range</th>
@@ -99,13 +100,14 @@
               </tbody>
             </table>
           </div>
+          {{/if}}
 
-                    <div class="equip-group" data-group="armor">
-            <div class="equip-group-label">Armor</div>
+          {{#if equipmentCounts.armor}}
+          <div class="equip-group" data-group="armor">
             <table class="equipment-table">
               <thead>
                 <tr>
-                  <th class="name-col">Name</th>
+                  <th class="name-col">Armor</th>
                   <th class="material-col">Mat.</th>
                   <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col">Protection</th>
@@ -141,14 +143,15 @@
               </tbody>
             </table>
           </div>
+          {{/if}}
 
           {{! ── POWER ITEMS ── }}
+          {{#if equipmentCounts.powerItem}}
           <div class="equip-group" data-group="power-item">
-            <div class="equip-group-label">Power Items</div>
             <table class="equipment-table">
               <thead>
                 <tr>
-                  <th class="name-col">Name</th>
+                  <th class="name-col">Power Item</th>
                   <th class="material-col">Mat.</th>
                   <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col">Rank</th>
@@ -186,14 +189,15 @@
               </tbody>
             </table>
           </div>
+          {{/if}}
 
           {{! ── GEAR & CUSTOM ── }}
+          {{#if equipmentCounts.gear}}
           <div class="equip-group" data-group="gear">
-            <div class="equip-group-label">Gear</div>
             <table class="equipment-table">
               <thead>
                 <tr>
-                  <th class="name-col">Name</th>
+                  <th class="name-col">Gear</th>
                   <th class="material-col">Mat.</th>
                   <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col"></th>
@@ -230,6 +234,7 @@
               </tbody>
             </table>
           </div>
+          {{/if}}
 
           {{#unless equipment.length}}
           <p class="no-equipment">No equipment added yet.</p>
