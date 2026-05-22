@@ -1,4 +1,7 @@
-// sheet-zoom.js v1.3.0 - 2026-05-21
+// sheet-zoom.js v1.3.1 - 2026-05-22
+// v1.3.1: Fix V2 binding — sheet.element?.[0] returned the form's first control
+//         (a header button) on tag:"form" V2 sheets, so .window-content was
+//         never found and the listener never bound. Only unwrap [0] for jQuery.
 // v1.3.0: Idempotency guard (content.dataset.faseripZoomBound) so calling on
 //         every render — or from both the v1 adapter and the v2 _onRender —
 //         doesn't stack duplicate wheel listeners (which would multiply the
@@ -31,8 +34,11 @@ function _updateBadge(titleEl, zoom) {
 export function initSheetZoom(sheet) {
   const id = sheet.actor?.id ?? sheet.id ?? sheet.appId;
   const key = `faserip-sheet-zoom-${id}`;
-  // V1: sheet.element is jQuery, [0] extracts DOM. V2: sheet.element is already HTMLElement.
-  const el = sheet.element?.[0] ?? sheet.element;
+  // V1: sheet.element is a jQuery object → [0] extracts the DOM node.
+  // V2: sheet.element is already an HTMLElement. Do NOT index it — when the
+  // sheet uses tag:"form", element[0] returns the form's first *control*
+  // (a header button), not the root, which breaks the .window-content lookup.
+  const el = sheet.element?.jquery ? sheet.element[0] : sheet.element;
   if (!el) return;
   const content = el.querySelector?.(".window-content") ?? el.closest?.(".window-content");
   const titleEl = el.querySelector?.(".window-title");
