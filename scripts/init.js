@@ -92,7 +92,7 @@ import { rollUniversalTable } from './modules/dice/universal-table.js';
 import {
   RANKS_ORDERED, RANK_VALUES, RANK_ABBR, RANK_ALIASES,
   rankValue as _rankValue, valueToRank as _valueToRank,
-  shiftRank as _shiftRank, normalizeRank, resolveRange
+  shiftRank as _shiftRank, normalizeRank, resolveRange, powerCategoryLabel
 } from './rules/rules-reference.js';
 import { FaseripInitiative } from './faserip-initiative.js';
 import { initializeSlamHandlers } from './charge-damage.js';
@@ -1822,6 +1822,10 @@ Hooks.once("init", async () => {
 
   Handlebars.registerHelper('resolveRange', function(rangeField, rank) {
     return resolveRange(rangeField, rank);
+  });
+
+  Handlebars.registerHelper('powerCategoryLabel', function(key) {
+    return powerCategoryLabel(key);
   });
 
   Handlebars.registerHelper('some', function(array, property) {

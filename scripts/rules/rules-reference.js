@@ -2617,6 +2617,26 @@ export function resolveRange(rangeField, rank) {
   return s;
 }
 
+/** Display labels for the 10 power category keys (system.category). */
+export const POWER_CATEGORY_LABELS = {
+  resistances:              "Resistances",
+  senses:                   "Senses",
+  movement:                 "Movement",
+  matterControl:            "Matter Control",
+  energyControl:            "Energy Control",
+  bodyControl:              "Body Control",
+  distanceAttacks:          "Distance Attacks",
+  mentalPowers:             "Mental Powers",
+  bodyAlterationsOffensive: "Body Alt / Offensive",
+  bodyAlterationsDefensive: "Body Alt / Defensive"
+};
+
+/** Map a power category key to its display label; "—" if unset. */
+export function powerCategoryLabel(key) {
+  if (!key) return "—";
+  return POWER_CATEGORY_LABELS[key] || key;
+}
+
 /** Derived stats for a power type at a given rank/value.
  *  Returns [{ label, value }]; empty if type not in POWER_DERIVATIONS. */
 export function getPowerDerivations(type, rank, value) {

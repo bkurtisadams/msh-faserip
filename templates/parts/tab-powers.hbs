@@ -21,7 +21,7 @@
                 <th>Rank</th>
                 <th>Value</th>
                 <th>Range</th>
-                <th>Type</th>
+                <th>Category</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -54,7 +54,7 @@
                 <td class="power-rank">{{power.system.rank}}</td>
                 <td class="power-value">{{power.system.value}}</td>
                 <td class="power-range">{{resolveRange power.system.range power.system.rank}}</td>
-                <td class="power-type">{{power.system.type}}</td>
+                <td class="power-type">{{powerCategoryLabel power.system.category}}</td>
                 <td class="power-controls">
                   <a class="item-control item-edit" title="Edit" data-item-id="{{power._id}}">
                     <i class="fas fa-edit"></i>
