@@ -924,11 +924,11 @@ form.faserip-sheet .tab-list-header {
   background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%);
   color: #fff;
   font-family: 'Oswald', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 5px 8px;
+  padding: 3px 8px;
   margin-bottom: 2px;
 }
 

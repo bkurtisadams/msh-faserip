@@ -1,5 +1,12 @@
         <div class="tab" data-tab="powers">
-          <!-- Powers content here -->
+          <div class="tab-list-header">
+            <span>Powers</span>
+            <div class="th-actions">
+              <a class="th-action-link add-power" title="Add Power">+ add</a>
+              <a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a>
+            </div>
+          </div>
+
           <table class="powers-table">
             <colgroup>
               <col style="width: auto;" />
@@ -7,7 +14,7 @@
               <col style="width: 45px;" />
               <col style="width: 45px;" />
               <col style="width: 120px;" />
-              <col style="width: 30px;" />
+              <col style="width: 52px;" />
             </colgroup>
             <thead>
               <tr>
@@ -15,13 +22,8 @@
                 <th>Rank</th>
                 <th>Value</th>
                 <th>Range</th>
-                <th colspan="2" style="text-align: center;">
-                  Type
-                  <span class="th-actions">
-                    <a class="th-action-link add-power" title="Add Power">+ add</a>
-                    <a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a>
-                  </span>
-                </th>
+                <th>Type</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -52,7 +54,7 @@
 
                 <td class="power-rank">{{power.system.rank}}</td>
                 <td class="power-value">{{power.system.value}}</td>
-                <td class="power-range">{{power.system.range}}</td>
+                <td class="power-range">{{resolveRange power.system.range power.system.rank}}</td>
                 <td class="power-type">{{power.system.type}}</td>
                 <td class="power-controls">
                   <a class="item-control item-edit" title="Edit" data-item-id="{{power._id}}">

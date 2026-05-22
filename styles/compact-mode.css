@@ -428,7 +428,7 @@ form.faserip-sheet.compact-mode .powers-table td:nth-child(5) {
 /* Controls column */
 form.faserip-sheet.compact-mode .powers-table th:nth-child(6),
 form.faserip-sheet.compact-mode .powers-table td:nth-child(6) {
-  width: 30px !important;
+  width: 52px !important;
 }
 
 form.faserip-sheet.compact-mode .powers-table input,
