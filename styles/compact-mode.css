@@ -437,6 +437,48 @@ form.faserip-sheet.compact-mode .powers-table select {
   font-size: 11px !important;
 }
 
+/* ── Vehicles table: 9 columns; stat cols are abbreviateRank (2-3 chars) ── */
+form.faserip-sheet.compact-mode .vehicles-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+form.faserip-sheet.compact-mode .vehicles-table th,
+form.faserip-sheet.compact-mode .vehicles-table td {
+  padding: 2px 3px !important;
+  font-size: 11px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+/* Roll */
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(1),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(1) { width: 22px !important; }
+/* Name (flex) */
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(2),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(2) {
+  width: auto !important;
+  white-space: normal !important;
+  text-align: left !important;
+}
+/* Type */
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(3),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(3) { width: 44px !important; }
+/* Cost / Ctrl / Spd / Bod / Prot */
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(4),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(4),
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(5),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(5),
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(6),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(6),
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(7),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(7),
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(8),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(8) { width: 30px !important; }
+/* Actions */
+form.faserip-sheet.compact-mode .vehicles-table th:nth-child(9),
+form.faserip-sheet.compact-mode .vehicles-table td:nth-child(9) { width: 50px !important; }
+
 /* Power name: tighter icon gap */
 form.faserip-sheet.compact-mode .power-name {
   gap: 4px !important;
