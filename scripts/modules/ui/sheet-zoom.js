@@ -1,4 +1,9 @@
-// sheet-zoom.js v1.2.0 - 2026-04-18
+// sheet-zoom.js v1.3.0 - 2026-05-21
+// v1.3.0: Idempotency guard (content.dataset.faseripZoomBound) so calling on
+//         every render — or from both the v1 adapter and the v2 _onRender —
+//         doesn't stack duplicate wheel listeners (which would multiply the
+//         zoom step per tick). Added closest(".window-content") fallback and
+//         re-apply of the saved zoom on each call.
 // v1.2.0: Handle both V1 (.element is jQuery) and V2 (.element is HTMLElement)
 // v1.1.0: Show zoom % badge in window title bar
 // Ctrl+Wheel zoom for any Foundry Application sheet.
@@ -28,12 +33,23 @@ export function initSheetZoom(sheet) {
   const key = `faserip-sheet-zoom-${id}`;
   // V1: sheet.element is jQuery, [0] extracts DOM. V2: sheet.element is already HTMLElement.
   const el = sheet.element?.[0] ?? sheet.element;
-  const content = el?.querySelector(".window-content");
-  const titleEl = el?.querySelector(".window-title");
+  if (!el) return;
+  const content = el.querySelector?.(".window-content") ?? el.closest?.(".window-content");
+  const titleEl = el.querySelector?.(".window-title");
   if (!content) return;
-  let zoom = parseFloat(localStorage.getItem(key)) || 1.0;
-  content.style.zoom = zoom;
-  if (titleEl) _updateBadge(titleEl, zoom);
+
+  // Re-apply the saved zoom on every call so it survives re-renders.
+  const saved = parseFloat(localStorage.getItem(key)) || 1.0;
+  content.style.zoom = saved;
+  if (titleEl) _updateBadge(titleEl, saved);
+
+  // Bind the wheel handler once per content element. _onRender runs on every
+  // render and the v1 adapter may also reach this, so guard against stacking
+  // duplicate listeners.
+  if (content.dataset.faseripZoomBound === "1") return;
+  content.dataset.faseripZoomBound = "1";
+
+  let zoom = saved;
   content.addEventListener("wheel", (ev) => {
     if (!ev.ctrlKey) return;
     ev.preventDefault();

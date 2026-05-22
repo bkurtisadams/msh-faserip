@@ -6,6 +6,7 @@
 // Subsequent slices split parts, port listeners, and retire v1.
 
 import { FaseripActorSheet } from "./actorSheet.js";
+import { initSheetZoom } from "./modules/ui/sheet-zoom.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -182,6 +183,12 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 activateListeners shim failed", err);
     }
+
+    // Ctrl+Wheel zoom — bind against the v2 sheet directly. v1's own
+    // initSheetZoom call (in actorSheet.activateListeners) doesn't take effect
+    // on the live element through the adapter, so bind here with the real
+    // this.element. The utility guards against double-binding.
+    initSheetZoom(this);
 
     // Wire {{editor}} helper outputs (pencil-edit + save). ApplicationV2
     // doesn't auto-activate v1-style editor blocks, so we delegate to
