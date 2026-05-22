@@ -491,7 +491,6 @@
       "isMagic": false,
       "magic": {
         "energyType": "",
-        "school": "",
         "castCost": 0,
         "successAbility": "psyche",
         "chant": false,
