@@ -1,4 +1,11 @@
-// power-sheet-v2-logic.js v1.7.1 - 2026-05-20
+// power-sheet-v2-logic.js v1.8.0 - 2026-05-20
+// v1.8.0: Slice H — Resistance UX rewrite. RESISTANCE_TYPE_DEFAULTS maps
+//         resistance type -> { effect, minRank }. resistanceType change
+//         handler auto-sets resistanceEffect + resistanceMinRank from the
+//         map. resistanceEffect change handler keeps countsAsTwoPowers +
+//         resistanceIsInvulnerability in sync with the "invulnerability"
+//         option. Only sets values that are currently at defaults;
+//         explicit user choices preserved.
 // v1.7.1: Run section-visibility computation for read-only (compendium)
 //         sheets too. Previously the call from itemSheet._onRender was
 //         gated by isEditable, so compendium items leaked every section
@@ -79,6 +86,25 @@ const CATEGORY_FLAG_AUTO_TICK = {
 // Category -> sensible sub-field defaults. Same "unset only" rule.
 const CATEGORY_FIELD_DEFAULTS = {
   bodyControl: { "transformation.affects": "self" }
+};
+
+// Resistance type -> derived defaults per Players' Book pp. 71.
+// Used by the #ps2-resistance-type change handler to seed resistanceEffect
+// and resistanceMinRank. Damage-based resistances (fire/cold/electricity/
+// radiation/corrosive) reduce damage by rank #; ability-based resistances
+// (toxin/disease/emotion/mental/magical) replace the relevant FEAT ability
+// and may impose a minimum-rank rule against that ability +1CS.
+const RESISTANCE_TYPE_DEFAULTS = {
+  fire:        { effect: "damageReduction", minRank: "" },
+  cold:        { effect: "damageReduction", minRank: "" },
+  electricity: { effect: "damageReduction", minRank: "" },
+  radiation:   { effect: "damageReduction", minRank: "" },
+  corrosive:   { effect: "damageReduction", minRank: "" },
+  toxin:       { effect: "featReplace",     minRank: "endurance+1" },
+  disease:     { effect: "featReplace",     minRank: "endurance+1" },
+  emotion:     { effect: "featReplace",     minRank: "intuition+1" },
+  mental:      { effect: "featReplace",     minRank: "psyche+1" },
+  magical:     { effect: "featReplace",     minRank: "" }
 };
 
 // Sections always shown regardless of category
@@ -242,6 +268,45 @@ export function ps2ActivateListeners(html, sheet) {
       updates["system.ignoresNaturalArmor"] = true;
     } else if (val === "touch-corrosive") {
       updates["system.ignoresArtificialArmor"] = true;
+    }
+    await sheet.item.update(updates);
+  });
+
+  // Resistance type -> auto-set effect + minRank from RESISTANCE_TYPE_DEFAULTS.
+  // Per Players' Book pp. 71. Damage-based types use damageReduction; ability-
+  // based types use featReplace with a minimum-rank rule. Overrides any
+  // existing effect/minRank to keep them aligned with the chosen type.
+  html.find('#ps2-resistance-type').on('change', async ev => {
+    const val = ev.currentTarget.value;
+    const updates = { "system.resistanceType": val };
+    const defaults = RESISTANCE_TYPE_DEFAULTS[val];
+    if (defaults) {
+      // Don't override an explicit invulnerability — that's a separate choice
+      // from the type's natural effect.
+      if (sheet.item.system.resistanceEffect !== "invulnerability") {
+        updates["system.resistanceEffect"] = defaults.effect;
+      }
+      updates["system.resistanceMinRank"] = defaults.minRank;
+    }
+    await sheet.item.update(updates);
+  });
+
+  // Resistance effect -> keep countsAsTwoPowers + isInvulnerability in sync
+  // with the "invulnerability" option. Invulnerability costs 2 power slots
+  // per rulebook ("The initial choosing of Invulnerability counts as two
+  // choices").
+  html.find('#ps2-resistance-effect').on('change', async ev => {
+    const val = ev.currentTarget.value;
+    const updates = { "system.resistanceEffect": val };
+    if (val === "invulnerability") {
+      updates["system.resistanceIsInvulnerability"] = true;
+      if (!sheet.item.system.countsAsTwoPowers) {
+        updates["system.countsAsTwoPowers"] = true;
+      }
+    } else {
+      updates["system.resistanceIsInvulnerability"] = false;
+      // Don't auto-untick countsAsTwoPowers — user may have set it for
+      // another reason (e.g. Time Control also counts as two).
     }
     await sheet.item.update(updates);
   });

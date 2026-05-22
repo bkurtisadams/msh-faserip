@@ -310,37 +310,34 @@
             <div class="ps2-grid-2col">
               <div class="ps2-field">
                 <label>Against</label>
-                <select name="system.resistanceType">
+                <select name="system.resistanceType" id="ps2-resistance-type">
                   <option value="">-- Select --</option>
-                  {{#each (array "fire" "cold" "electricity" "radiation" "toxins" "corrosives" "emotion" "mental" "magic" "disease" "physical" "energy" "psionic" "astral") as |t|}}
-                    <option value="{{t}}" {{#if (eq ../system.resistanceType t)}}selected{{/if}}>{{capitalize t}}</option>
-                  {{/each}}
+                  <option value="fire"        {{#if (eq system.resistanceType "fire")}}selected{{/if}}>Fire / Heat</option>
+                  <option value="cold"        {{#if (eq system.resistanceType "cold")}}selected{{/if}}>Cold</option>
+                  <option value="electricity" {{#if (eq system.resistanceType "electricity")}}selected{{/if}}>Electricity</option>
+                  <option value="radiation"   {{#if (eq system.resistanceType "radiation")}}selected{{/if}}>Radiation</option>
+                  <option value="toxin"       {{#if (eq system.resistanceType "toxin")}}selected{{/if}}>Toxins</option>
+                  <option value="corrosive"   {{#if (eq system.resistanceType "corrosive")}}selected{{/if}}>Corrosives</option>
+                  <option value="emotion"     {{#if (eq system.resistanceType "emotion")}}selected{{/if}}>Emotion Attacks</option>
+                  <option value="mental"      {{#if (eq system.resistanceType "mental")}}selected{{/if}}>Mental Attacks</option>
+                  <option value="magical"     {{#if (eq system.resistanceType "magical")}}selected{{/if}}>Magical Attacks</option>
+                  <option value="disease"     {{#if (eq system.resistanceType "disease")}}selected{{/if}}>Disease</option>
                 </select>
               </div>
               <div class="ps2-field">
                 <label>Effect</label>
-                <select name="system.resistanceEffect">
-                  <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Reduce Dmg by Rank</option>
-                  <option value="immunity"        {{#if (eq system.resistanceEffect "immunity")}}selected{{/if}}>Ignore if Rank &ge; Atk</option>
-                  <option value="columnShift"     {{#if (eq system.resistanceEffect "columnShift")}}selected{{/if}}>+CS to resist</option>
-                  <option value="featNegate"      {{#if (eq system.resistanceEffect "featNegate")}}selected{{/if}}>FEAT to negate</option>
-                  <option value="featReplace"     {{#if (eq system.resistanceEffect "featReplace")}}selected{{/if}}>Replace ability FEAT</option>
+                <select name="system.resistanceEffect" id="ps2-resistance-effect">
+                  <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Damage Reduction (reduce by rank #, ignore below rank)</option>
+                  <option value="featReplace"     {{#if (eq system.resistanceEffect "featReplace")}}selected{{/if}}>Replace FEAT ability (toxin/disease/emotion/mental/magical)</option>
+                  <option value="invulnerability" {{#if (eq system.resistanceEffect "invulnerability")}}selected{{/if}}>Invulnerability (Class 1000)</option>
                 </select>
               </div>
             </div>
-            <div class="ps2-flags">
-              <label><input type="checkbox" name="system.resistanceIsInvulnerability" {{checked system.resistanceIsInvulnerability}} data-dtype="Boolean"> Invulnerability (CL1000)</label>
-              <label><input type="checkbox" name="system.resistanceIsConductive" {{checked system.resistanceIsConductive}} data-dtype="Boolean"> Conductive</label>
+            {{#if (eq system.resistanceType "electricity")}}
+            <div class="ps2-flags" style="margin-top:4px;">
+              <label title="Conductive resistance lets energy pass through to those the hero is touching; non-conductive stops the energy at the contact point."><input type="checkbox" name="system.resistanceIsConductive" {{checked system.resistanceIsConductive}} data-dtype="Boolean"> Conductive</label>
             </div>
-            <div class="ps2-field" style="margin-top:4px;">
-              <label>Min Rank Rule</label>
-              <select name="system.resistanceMinRank">
-                <option value="">None</option>
-                <option value="endurance+1" {{#if (eq system.resistanceMinRank "endurance+1")}}selected{{/if}}>Endurance +1CS (Toxin/Disease)</option>
-                <option value="intuition+1" {{#if (eq system.resistanceMinRank "intuition+1")}}selected{{/if}}>Intuition +1CS (Emotion)</option>
-                <option value="psyche+1"    {{#if (eq system.resistanceMinRank "psyche+1")}}selected{{/if}}>Psyche +1CS (Mental)</option>
-              </select>
-            </div>
+            {{/if}}
           </div>
         </div>
 
