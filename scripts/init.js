@@ -2512,6 +2512,54 @@ Hooks.once("ready", async () => {
     }
   }
 
+  // Migrate re-homed power flags (Slice G):
+  //   detection.precognition        -> mental.precognition
+  //   detection.postcognition       -> mental.postcognition
+  //   detection.mechanicalIntuition -> mental.mechanicalIntuition
+  //   mental.pheromones             -> bodyDefensive.pheromones
+  // Copies truthy old values forward, then prunes old keys via -=.
+  // Idempotent: once template.json no longer declares the old keys, a
+  // freshly-created item reads undefined and is skipped. Covers world
+  // Items + actor-owned items. Compendia skipped (usually locked; unlock
+  // and re-run to migrate pack contents).
+  if (game.user.isGM) {
+    try {
+      const FIELD_MOVES = [
+        ["detection", "precognition",        "mental",        "precognition"],
+        ["detection", "postcognition",       "mental",        "postcognition"],
+        ["detection", "mechanicalIntuition", "mental",        "mechanicalIntuition"],
+        ["mental",    "pheromones",          "bodyDefensive", "pheromones"]
+      ];
+      const migratePowerItem = async (item, ownerLabel) => {
+        if (item.type !== "power") return false;
+        const sys = item.system;
+        const updates = {};
+        for (const [oldGrp, oldKey, newGrp, newKey] of FIELD_MOVES) {
+          const oldVal = sys?.[oldGrp]?.[oldKey];
+          if (oldVal === undefined) continue;            // already pruned
+          if (oldVal) updates[`system.${newGrp}.${newKey}`] = true;
+          updates[`system.${oldGrp}.-=${oldKey}`] = null; // prune orphan key
+        }
+        if (!Object.keys(updates).length) return false;
+        await item.update(updates);
+        console.log(`[FASERIP] Re-homed power fields: ${ownerLabel} / ${item.name}`, updates);
+        return true;
+      };
+      let count = 0;
+      for (const item of game.items) {
+        if (await migratePowerItem(item, "World")) count++;
+      }
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (await migratePowerItem(item, actor.name)) count++;
+        }
+      }
+      if (count) console.log(`[FASERIP] Power field re-home migration: ${count} power item(s) updated`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] Power field re-home migration failed:", e);
+    }
+  }
+
   // Slam collision handlers (optional, safe)
   try {
     initializeSlamHandlers?.();

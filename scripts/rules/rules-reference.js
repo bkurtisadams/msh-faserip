@@ -1695,7 +1695,7 @@ export const MAGIC_POWERS = {
     senses: ["Combat Sense", "Enhanced Senses", "Infravision", "Protected Senses",
              "Astral Detection", "Emotion Detection", "Energy Detection", "Magic Detection",
              "Magnetic Detection", "Psionic Detection", "Tracking Ability"],
-    bodyDefensive: ["Absorption", "Body Armor", "Healing", "Pheromones", "Recovery"],
+    bodyAlterationsDefensive: ["Absorption", "Body Armor", "Healing", "Pheromones", "Recovery"],
     mental: ["Astral Projection", "Emotion Control", "Empathy", "Mental Probe",
              "Mind Control", "Postcognition", "Psi-Screen", "Psionic Attack", "Telepathy"],
     bodyControl: ["Blending", "Imitation", "Invisibility", "Shape-Shifting"],
@@ -1718,9 +1718,9 @@ export const MAGIC_POWERS = {
     movement: ["Climbing", "Digging", "Flight", "Gliding", "Leaping",
                "Lightning Speed", "Teleportation", "Swimming", "Wall-Crawling"],
     resistances: ["Cold", "Electricity", "Energy Attacks", "Fire/Heat", "Mental Attacks", "Radiation"],
-    bodyOffensive: ["Blinding Touch", "Corrosive Touch", "Energy Touch", "Health-Drain Touch",
+    bodyAlterationsOffensive: ["Blinding Touch", "Corrosive Touch", "Energy Touch", "Health-Drain Touch",
                     "Paralyzing Touch", "Rotting Touch", "Claws", "Extra Attacks", "Extra Body Parts"],
-    bodyDefensive: ["Absorption", "Damage Transfer", "Healing", "Recovery", "Regeneration", "Water Breathing"],
+    bodyAlterationsDefensive: ["Absorption", "Damage Transfer", "Healing", "Recovery", "Regeneration", "Water Breathing"],
     bodyControl: ["Animal Transformation (Self)", "Animal Transformation (Others)", "Blending",
                   "Body Transformation (Self)", "Body Transformation (Others)",
                   "Density Manipulation (Self)", "Elongation", "Growth", "Imitation",
@@ -1756,7 +1756,7 @@ export const MAGIC_POWERS = {
              "Force Field Generation (Cytorrak, Seraphim)", "Image Generation (Ikonn)",
              "Mind Control (Nightmare, Munnopor)", "Possession", "Postcognition",
              "Precognition (Aggamotto)", "Telekinesis", "Ultimate Skill"],
-    bodyDefensive: ["Body Armor (Seraphim)", "Extra Body Parts",
+    bodyAlterationsDefensive: ["Body Armor (Seraphim)", "Extra Body Parts",
                     "Immortality (Various, always exacting a high price)", "Life Support"]
   }
 };
@@ -2069,7 +2069,7 @@ export const POWERS = {
   },
 
   // ── BODY ALTERATIONS — OFFENSIVE ──
-  bodyOffensive: {
+  bodyAlterationsOffensive: {
     extraBodyParts: { desc: "Choose type: extra arms(extra attacks bonus), legs(lightning speed), prehensile tail(climbing), wings(flight+1CS), combat tail(Str+1CS dmg), extra eyes(enhanced senses), claws(+1CS material), spines(projectile+1CS)." },
     extraAttacks:   { desc: "Always Intuition +1CS. Use instead of Fighting for multiple attacks. Fail: only 1 attack that round, no other penalty." },
     energyTouch:    { desc: "Energy column damage. Bullseye=possible Stun. May reduce damage/effects. Conducts through materials (hits multiple on same surface). Bonus: Resistance to Electricity." },
@@ -2082,7 +2082,7 @@ export const POWERS = {
   },
 
   // ── BODY ALTERATIONS — DEFENSIVE ──
-  bodyDefensive: {
+  bodyAlterationsDefensive: {
     bodyArmor:      { desc: "Physical damage reduced by rank#. Energy damage reduced by rank#-20. If damage < BA, no effects apply. Natural(organic) or Artificial(suit). +1 rank if accept -1CS Agility." },
     waterBreathing: { desc: "Breathe water as air. See underwater normally. Survive depths. Next Power: Swimming or Animal Comm(sea). Both = water-only breathing." },
     absorption:     { desc: "Absorb one specific damage type. Heals + temporarily raises Health by rank#. Excess above rank: take damage but may redirect next round. Extra Health dissipates in 10 rounds." },
