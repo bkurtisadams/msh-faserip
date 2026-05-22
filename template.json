@@ -362,6 +362,7 @@
       "grantedByEquipment": false,
       "damageType": "",
       "extraAttacks": false,
+      "extraBodyParts": [],
       "specialStrengthType": "",
       "clawMaterialStrength": "",
       "telekinesisStrength": "",

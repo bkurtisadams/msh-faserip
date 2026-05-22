@@ -1,4 +1,9 @@
-// power-sheet-v2-logic.js v1.8.0 - 2026-05-20
+// power-sheet-v2-logic.js v1.9.0 - 2026-05-21
+// v1.9.0: Slice I — Extra Body Parts structured field. #ps2-add-bodypart /
+//         .ps2-remove-bodypart add/remove handlers manage the
+//         system.extraBodyParts array ([{type, count, notes}]), mirroring
+//         the bonusPowers list pattern. UI block lives in the Attack
+//         section body; schema default [] added to template.json.
 // v1.8.0: Slice H — Resistance UX rewrite. RESISTANCE_TYPE_DEFAULTS maps
 //         resistance type -> { effect, minRank }. resistanceType change
 //         handler auto-sets resistanceEffect + resistanceMinRank from the
@@ -394,6 +399,23 @@ export function ps2ActivateListeners(html, sheet) {
     const list = foundry.utils.deepClone(item.system.bonusPowers || []);
     list.splice(idx, 1);
     await item.update({ "system.bonusPowers": list });
+  });
+
+  // Extra Body Parts: add
+  html.find('#ps2-add-bodypart').on('click', async () => {
+    const item = sheet.item;
+    const list = foundry.utils.deepClone(item.system.extraBodyParts || []);
+    list.push({ type: "", count: 1, notes: "" });
+    await item.update({ "system.extraBodyParts": list });
+  });
+
+  // Extra Body Parts: remove
+  html.find('.ps2-remove-bodypart').on('click', async ev => {
+    const idx = Number(ev.currentTarget.dataset.index);
+    const item = sheet.item;
+    const list = foundry.utils.deepClone(item.system.extraBodyParts || []);
+    list.splice(idx, 1);
+    await item.update({ "system.extraBodyParts": list });
   });
 
   // SFX preview (reuse existing pattern)

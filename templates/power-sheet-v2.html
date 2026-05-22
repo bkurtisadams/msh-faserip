@@ -236,6 +236,31 @@
           </div>
           {{/if}}
         </div>
+        <!-- Extra Body Parts (Body Alt / Offensive — rulebook p.85) -->
+        <div class="ps2-bodyparts">
+          <label class="ps2-bodyparts-label">Extra Body Parts</label>
+          <div class="ps2-bodypart-list">
+            {{#each system.extraBodyParts as |ebp idx|}}
+            <div class="ps2-bodypart-row" data-index="{{idx}}">
+              <select name="system.extraBodyParts.{{idx}}.type" class="ps2-bodypart-type">
+                <option value=""               {{#unless ebp.type}}selected{{/unless}}>-- Type --</option>
+                <option value="arms"           {{#if (eq ebp.type "arms")}}selected{{/if}}>Extra Arms (&rarr; extra attacks)</option>
+                <option value="legs"           {{#if (eq ebp.type "legs")}}selected{{/if}}>Extra Legs (&rarr; Lightning Speed)</option>
+                <option value="prehensileTail" {{#if (eq ebp.type "prehensileTail")}}selected{{/if}}>Prehensile Tail (&rarr; climbing)</option>
+                <option value="wings"          {{#if (eq ebp.type "wings")}}selected{{/if}}>Wings (&rarr; Flight +1CS)</option>
+                <option value="combatTail"     {{#if (eq ebp.type "combatTail")}}selected{{/if}}>Combat Tail (&rarr; Str +1CS dmg)</option>
+                <option value="extraEyes"      {{#if (eq ebp.type "extraEyes")}}selected{{/if}}>Extra Eyes (&rarr; enhanced senses)</option>
+                <option value="claws"          {{#if (eq ebp.type "claws")}}selected{{/if}}>Claws (&rarr; +1CS material)</option>
+                <option value="spines"         {{#if (eq ebp.type "spines")}}selected{{/if}}>Spines (&rarr; projectile +1CS)</option>
+              </select>
+              <input type="number" name="system.extraBodyParts.{{idx}}.count" value="{{ebp.count}}" min="1" data-dtype="Number" class="ps2-bodypart-count" title="Count" />
+              <input type="text" name="system.extraBodyParts.{{idx}}.notes" value="{{ebp.notes}}" placeholder="Notes" class="ps2-bodypart-notes" />
+              <button type="button" class="ps2-remove-bodypart" data-index="{{idx}}" title="Remove">&times;</button>
+            </div>
+            {{/each}}
+          </div>
+          <button type="button" id="ps2-add-bodypart" class="ps2-add-btn">+ Add Body Part</button>
+        </div>
       </div>
     </fieldset>
 
