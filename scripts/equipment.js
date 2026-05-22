@@ -398,6 +398,25 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       fp.browse();
     });
 
+    // ── Portrait edit ──
+    // V2 backward-compat for data-edit="img" doesn't fire for this sheet
+    // shape (same as talent/contact/HQ). Wire the portrait click explicitly.
+    html.find('img[data-edit]').on('click', ev => {
+      ev.preventDefault();
+      const img = ev.currentTarget;
+      const field = img.dataset.edit;
+      if (!field) return;
+      const FilePickerClass = foundry.applications?.apps?.FilePicker?.implementation
+        ?? foundry.applications?.apps?.FilePicker
+        ?? globalThis.FilePicker;
+      if (!FilePickerClass) return;
+      new FilePickerClass({
+        type: "image",
+        current: img.getAttribute("src") || "",
+        callback: path => this.item.update({ [field]: path })
+      }).render(true);
+    });
+
     // Collapsible effect sections
     html.find('.effect-header').click((event) => {
       if ($(event.target).closest('.effect-control, .btn-add').length) return;
