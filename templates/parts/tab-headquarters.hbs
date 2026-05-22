@@ -1,10 +1,4 @@
         <div class="tab" data-tab="headquarters">
-          <div class="tab-list-header">
-            <div class="th-actions">
-              <a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a>
-              <a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a>
-            </div>
-          </div>
 
           {{#if teamHQs.length}}
           <div class="team-hq-label">Team HQs</div>
@@ -38,7 +32,7 @@
           <table class="headquarters-table">
             <thead>
               <tr>
-                <th class="name-col">Name</th>
+                <th class="name-col">Name<span class="th-inline-actions"><a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a><a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a></span></th>
                 <th class="location-col">Location</th>
                 <th class="size-col">Size</th>
                 <th class="material-col">Material</th>

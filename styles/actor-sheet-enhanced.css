@@ -937,6 +937,21 @@ form.faserip-sheet .tab-list-header .th-actions {
   gap: 6px;
 }
 
+/* Labeled strip: section name left, add/browse right (equip, talents, contacts) */
+form.faserip-sheet .tab-list-header.labeled {
+  justify-content: space-between;
+}
+form.faserip-sheet .tab-list-header .th-label {
+  font-weight: 600;
+}
+
+/* Inline add/browse merged into a table column header (powers, vehicles, hq, stunts) */
+form.faserip-sheet .th-inline-actions {
+  display: inline;
+  white-space: nowrap;
+  font-weight: normal;
+}
+
 /* ── Active tab: white bg, lifts into content area ──────────────────────── */
 form.faserip-sheet .sheet-tabs-navigation .item.active {
   background: #fff !important;
