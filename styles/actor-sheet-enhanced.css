@@ -679,7 +679,7 @@ form.faserip-sheet .chargen-container {
 }
 
 /* ── Buttons across the sheet: consistent treatment ─────────────────────── */
-form.faserip-sheet button[type="button"]:not(.sheet-lock-toggle):not(.recovery-btn):not(.action-btn):not(.mini-roll) {
+form.faserip-sheet button[type="button"]:not(.sheet-lock-toggle):not(.recovery-btn):not(.action-btn):not(.mini-roll):not(.header-control) {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 500;
 }

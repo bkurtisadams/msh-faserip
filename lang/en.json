@@ -1,0 +1,18 @@
+{
+  "TYPES": {
+    "Actor": {
+      "hero": "Hero",
+      "villain": "Villain",
+      "npc": "NPC",
+      "vehicle": "Vehicle"
+    },
+    "Item": {
+      "power": "Power",
+      "talent": "Talent",
+      "contact": "Contact",
+      "equipment": "Equipment",
+      "vehicle": "Vehicle",
+      "headquarters": "Headquarters"
+    }
+  }
+}

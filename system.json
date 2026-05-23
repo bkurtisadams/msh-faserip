@@ -67,6 +67,13 @@
         "styles/universal-table-tab.css",
         "styles/equipment-sheet-redesign.css"
     ],
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "lang/en.json"
+        }
+    ],
     "packs": [
         {
             "name": "powers",

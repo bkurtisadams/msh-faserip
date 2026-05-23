@@ -1,4 +1,7 @@
-/* compact-mode.css v1.3.0 - 2026-03-28 */
+/* compact-mode.css v1.4.0 - 2026-05-23 */
+/* v1.4.0: grid-auto-rows:1fr stretches the sec-grid row so column dividers reach */
+/*         full height; Health-column action buttons wrap to the column instead */
+/*         of overflowing/clipping. */
 /* v1.3.0: Full-height dividers, narrower sheet (580px), no blank space below tabs */
 /* v1.2.0: Side-by-side layout — FASERIP table left, stats+movement right */
 /* Compact character sheet mode — toggled via Settings > Compact Character Sheet */
@@ -179,6 +182,8 @@ form.faserip-sheet.compact-mode .secondary-abilities {
 form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
   grid-template-columns: 1fr 1fr 1.2fr 1fr !important;
   align-items: stretch !important;
+  align-content: stretch !important;
+  grid-auto-rows: 1fr !important;
   flex: 1 !important;
   position: relative !important;
 }
@@ -229,6 +234,20 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-body {
   flex-direction: column !important;
   justify-content: flex-start !important;
   align-items: center !important;
+}
+
+/* Health-column action buttons: fit the narrow column, wrap instead of overflow */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col.health .health-recovery-inline-btn,
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col.health .health-healing-inline-btn,
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col.health .health-wake-inline-btn,
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col.health .health-stabilize-inline-btn {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+  padding: 2px 4px !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
 }
 
 /* Movement: pin to bottom of secondary column */
