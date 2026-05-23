@@ -1,3 +1,8 @@
+// ability-feat-dialog.js v1.5.1 - 2026-05-22
+// v1.5.1: Fix Remember checkbox forcing itself back on — it was hardcoded
+//         `checked`. Now renders from a saved flag (last<Ability>SaveSettings)
+//         and persists its own state unconditionally so turning it OFF sticks,
+//         matching generic-feat-dialog's behavior.
 // ability-feat-dialog.js v1.5.0 - 2026-05-06
 // v1.5.0: Strip font/padding/color from select inline styles — moved to
 //         CSS rule .frp-dlg.frp-feat select for centralised tuning.
@@ -157,6 +162,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const savedColumnShift    = gf(`last${fullName}ColumnShift`) || 0;
   const savedIntensity      = gf(`last${fullName}Intensity`) || "None";
   const skipDiceRoll        = gf(`last${fullName}SkipDiceRoll`) || false;
+  const savedRemember       = gf(`last${fullName}SaveSettings`) !== false; // default ON; remembers an explicit OFF
   const savedFeatType       = gf(`last${fullName}FeatType`) || "standard";
   const savedWeightIntensity = gf(`last${fullName}WeightIntensity`) || "Remarkable";
   const savedMaterial       = gf(`last${fullName}Material`) || "Steel";
@@ -315,7 +321,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
         </div>
         <div class="frp-foot-checks">
-          <label><input type="checkbox" name="saveSettings" id="save-settings" checked> Remember</label>
+          <label><input type="checkbox" name="saveSettings" id="save-settings" ${savedRemember ? 'checked' : ''}> Remember</label>
           <label><input type="checkbox" name="skipDice" id="skip-dice" ${skipDiceRoll ? 'checked' : ''}> Skip dice</label>
         </div>
       </div>
@@ -359,6 +365,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             featType = html.find('[name="featType"]:checked').val();
             multiAttackCount = html.find('[name="multiAttackCount"]:checked').val() || '2';
           }
+
+          // Always persist the checkbox's own state so turning it OFF sticks
+          await actor.setFlag("msh-faserip", `last${fullName}SaveSettings`, saveSettings);
 
           // Save settings
           if (saveSettings) {
