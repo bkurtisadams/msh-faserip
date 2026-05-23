@@ -1,4 +1,6 @@
-// scripts/modules/actions/throwing-edged-action.js v3.2.0 - 2026-04-17
+// scripts/modules/actions/throwing-edged-action.js v3.2.1 - 2026-05-23
+// v3.2.1: CS Reason field now persists across reopens (lastThrowEdgedReason
+//         flag, gated by Remember), matching the other attack dialogs.
 // v3.2.0: T4 — carried-weapon damage now auto-computes via computeEdgedDamage
 //         (max(min(STR, MAT), weaponBase)), matching melee edged behavior.
 //         Ad-hoc path unchanged. Preview, resolve, and initial calc all
@@ -134,6 +136,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const savedColumnShift = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedShift")) ?? 0) : 0;
     const savedPullEnabled = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedPullEnabled")) || false) : false;
     const savedPulledDamage = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedPulledDamage")) || 0) : 0;
+    const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedReason")) || "") : "";
 
     // Build weapon options for carried select
     const weaponOptions = thrownEdged.map(i => {
@@ -171,6 +174,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
       showRange: true
@@ -514,6 +518,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastThrowEdgedRange", range);
               await actor.setFlag("msh-faserip", "lastThrowEdgedPullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastThrowEdgedPulledDamage", pulledDamage);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedReason", cs.reason);
             }
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 

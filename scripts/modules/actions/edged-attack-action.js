@@ -1,4 +1,6 @@
-// edged-attack-action.js v3.3.0 - 2026-05-21
+// edged-attack-action.js v3.3.1 - 2026-05-23
+// v3.3.1: CS Reason field now persists across reopens (lastEdgedReason flag,
+//         gated by Remember), matching the other attack dialogs.
 // v3.3.0: House rule — claws penetration FEAT vs natural BA. When
 //         (a) the source power is claws, (b) the world setting
 //         houseRules.clawsPenetrateNaturalBA is true, and (c) the
@@ -136,6 +138,7 @@ export class EdgedAttackAction extends AttackAction {
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2) : 2;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAdjacent") || false) : false;
     const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedShift") || 0) : 0;
+    const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip","lastEdgedReason")) || "") : "";
     
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
@@ -180,6 +183,7 @@ export class EdgedAttackAction extends AttackAction {
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: ability.rank
     });
 
@@ -422,6 +426,7 @@ export class EdgedAttackAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastEdgedMultiAttacks", multiAttacks);
               await actor.setFlag("msh-faserip", "lastEdgedAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastEdgedMultiAdjacent", multiAdjacent);
+              await actor.setFlag("msh-faserip", "lastEdgedReason", _csState.get().reason);
 
               if (src === "weapon") {
                 await actor.setFlag("msh-faserip", "lastEdgedItemId", itemId);

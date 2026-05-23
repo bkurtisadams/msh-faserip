@@ -1,3 +1,11 @@
+// attack-action.js v1.9.37 - 2026-05-23
+// v1.9.37: Generalized the redesigned attack card (was blunt-only) to a
+//          shared templates/chat/attack-card.hbs covering edged, shooting,
+//          throwing-edged and throwing-blunt. Result words come from each
+//          form's effects map (already form-correct); range shows real
+//          areas for ranged forms ("adjacent" for melee); the muted
+//          consequence bars and the CSS form class are driven off the new
+//          REDESIGNED_ATTACK_FORMS set. Energy/Force/Charging stay legacy.
 // attack-action.js v1.9.36 - 2026-05-22
 // v1.9.36: Blunt cards now render the Stun/Slam/Breaking consequence bars
 //          in the muted (maroon-on-light) style via opts.muted, so the
@@ -148,6 +156,13 @@ import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { SCOPE, getFlagScope } from "./flags.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+
+// Attack forms that use the redesigned shared chat card (attack-card.hbs)
+// and the muted consequence-bar style. Energy/Force/Charging stay legacy.
+const REDESIGNED_ATTACK_FORMS = new Set([
+  "blunt-attack", "edged-attack", "shooting", "throwing-edged", "throwing-blunt"
+]);
+const MELEE_ATTACK_FORMS = new Set(["blunt-attack", "edged-attack"]);
 
 
 export class AttackAction extends BaseAction {
@@ -1124,7 +1139,7 @@ export class AttackAction extends BaseAction {
 
       // Blunt cards use the quieter (maroon-on-light) consequence bars; the
       // legacy energy/edged/shooting cards keep the loud filled bars for now.
-      const mutedConsequence = String(actionType).toLowerCase() === "blunt-attack";
+      const mutedConsequence = REDESIGNED_ATTACK_FORMS.has(String(actionType).toLowerCase());
 
       // Inline Breaking FEAT for full-auto consolidated cards
       let inlineBreakingHtml = "";
@@ -1442,16 +1457,26 @@ export class AttackAction extends BaseAction {
         </div>
       `;
 
-      // ── Blunt-form card v4: header (+weapon), Target/Range line, full-width
+      // ── Redesigned attack card: header (+weapon), Target/Range line, full-width
       //    color result banner, then a Roll / <Ability> / Damage strip — roll
       //    in black, the ability-named middle cell shows the effective column
       //    (* = modified, hover lists the chain), damage hover carries the GM
-      //    armor math. Edged/shooting/thrown keep the legacy layout for now. ──
-      const isBluntCard = String(actionType).toLowerCase() === "blunt-attack";
+      //    armor math. Shared by blunt/edged/shooting/thrown via formClass. ──
+      const cardFormKey = String(actionType).toLowerCase();
+      const useRedesignedCard = REDESIGNED_ATTACK_FORMS.has(cardFormKey);
       let cardHtml = legacyCardHtml;
-      if (isBluntCard) {
+      if (useRedesignedCard) {
         const abbr = r => RANK_ABBR[r] || r;
         const shifted = !!(totalShift && totalShift !== 0);
+
+        // Form-specific bits: CSS class hook + range text. Ranged forms
+        // carry choice.range in areas (1 = adjacent); melee is adjacent.
+        const formClass = MELEE_ATTACK_FORMS.has(cardFormKey) ? cardFormKey.replace("-attack", "")
+          : cardFormKey === "shooting" ? "shooting"
+          : "thrown";
+        const _rangeAreas = Number(choice?.range || 0);
+        const cardRangeText = MELEE_ATTACK_FORMS.has(cardFormKey) ? "adjacent"
+          : (_rangeAreas >= 2 ? `${_rangeAreas} areas` : "adjacent");
 
         // Roll value (final; karma already folded in). Hover shows the math.
         const rollNum = totalKarmaUsed ? cappedTotal : roll.total;
@@ -1490,11 +1515,12 @@ export class AttackAction extends BaseAction {
 
         const cardData = {
           actionLabel: actionLabel.toUpperCase(),
+          formClass,
           weaponName: weapon?.name || "",
           indicatorHtml: bluntIndicator,
           hasTarget: !!targetActor,
           targetName,
-          rangeText: "adjacent",
+          rangeText: cardRangeText,
           badgesHtml: `${multiAttackFeatHtml}${variantBadge}${aimBadge}${talentBadge}${maDBadge}`,
           resultBg: targetBg,
           resultFg: targetFg,
@@ -1513,7 +1539,7 @@ export class AttackAction extends BaseAction {
         };
 
         cardHtml = await foundry.applications.handlebars.renderTemplate(
-          "systems/msh-faserip/templates/chat/blunt-attack-card.hbs",
+          "systems/msh-faserip/templates/chat/attack-card.hbs",
           cardData
         );
       }

@@ -1,4 +1,6 @@
-// shooting-action.js v3.7.0 - 2026-05-16
+// shooting-action.js v3.7.1 - 2026-05-23
+// v3.7.1: CS Reason field now persists across reopens (lastShootingReason
+//         flag, gated by Remember), matching the other attack dialogs.
 // v3.7.0: Aim tactic — Bullseye-effect reinterpretation per RAW Tactics.
 //         New Aim row in options box: Neutralize (Red→Yellow, disarm chat
 //         note) or Stun (Yellow Bullseye → Stun chip via attack-action.js
@@ -158,6 +160,7 @@ export class ShootingAction extends RangedAttackAction {
     const savedAttackCount = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAttackCount")) || 2) : 2;
     const savedVariantType = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingVariant")) || "") : "";
     const savedAim = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAim")) || "none") : "none";
+    const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingReason")) || "") : "";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target info ===
@@ -239,6 +242,7 @@ export class ShootingAction extends RangedAttackAction {
     const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
       showRange: true
@@ -555,6 +559,7 @@ export class ShootingAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
               await actor.setFlag("msh-faserip", "lastShootingAim", aimMode);
+              await actor.setFlag("msh-faserip", "lastShootingReason", cs.reason);
             }
 
             await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);

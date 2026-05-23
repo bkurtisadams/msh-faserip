@@ -1604,7 +1604,7 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/parts/tab-chargen.hbs",
     "systems/msh-faserip/templates/parts/encounter-editor-body.hbs",
     "systems/msh-faserip/templates/parts/rank-options.hbs",
-    "systems/msh-faserip/templates/chat/blunt-attack-card.hbs"
+    "systems/msh-faserip/templates/chat/attack-card.hbs"
   ]);
 
   game.msh.getRankValue = function(rankName) {

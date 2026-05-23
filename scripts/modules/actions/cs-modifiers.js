@@ -1,5 +1,8 @@
-// scripts/modules/actions/cs-modifiers.js v3.3.0 - 2026-05-22
+// scripts/modules/actions/cs-modifiers.js v3.4.0 - 2026-05-23
 // Manual CS input with base rank, optional range penalty, and ? reference panel.
+// v3.4.0: get() also returns the raw `reason` label so callers can persist
+//         it; the field repopulates on reopen when a dialog passes
+//         savedReason to buildCSRow.
 // v3.3.0: Optional "Reason" field under the CS input (shown only when CS != 0).
 //         Names a manual shift on the chat card via csNotes — e.g. typing
 //         "Ultimate Skill" with +4 yields the card line "Ultimate Skill: +4".
@@ -248,7 +251,7 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
       const net = cs + _rangePenalty;
       const reason = ($reasonInput.val() || '').trim();
       const csNotes = (reason && cs !== 0) ? `${reason}: ${cs > 0 ? '+' : ''}${cs}` : "";
-      return { totalShift: net, manualCS: cs, rangePenalty: _rangePenalty, csNotes };
+      return { totalShift: net, manualCS: cs, rangePenalty: _rangePenalty, csNotes, reason: (cs !== 0) ? reason : "" };
     },
     /** Update range penalty and recalc (called by shooting when range changes) */
     setRange(n) {
