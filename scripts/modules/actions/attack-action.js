@@ -1,3 +1,51 @@
+// attack-action.js v1.9.36 - 2026-05-22
+// v1.9.36: Blunt cards now render the Stun/Slam/Breaking consequence bars
+//          in the muted (maroon-on-light) style via opts.muted, so the
+//          color result banner stays the single loud element. Legacy
+//          energy/edged/shooting cards keep the loud bars for now.
+// attack-action.js v1.9.35 - 2026-05-22
+// v1.9.35: To-hit modifier lines now read "Label: value" (name-first,
+//          like the MP card) and the manual dialog shift is labeled
+//          "Manual: +N" instead of a bare number. Feeds the blunt
+//          Fighting hover and the legacy-card CS hover alike.
+// attack-action.js v1.9.34 - 2026-05-22
+// v1.9.34: Blunt card v4 fixes — widen the ability strip cell (flex 1.7)
+//          and drop the rank to 16px so full rank words stop wrapping
+//          mid-word in the narrow chat sidebar; restack the Fighting
+//          hover vertically (base, each modifier, divider, → result) to
+//          mirror the Roll20 MP to-hit tooltip.
+// attack-action.js v1.9.33 - 2026-05-22
+// v1.9.33: Blunt card v4 — back to the strip/banner layout with revisions:
+//          roll now black (was gold); middle cell labeled by ability name
+//          (e.g. FIGHTING) showing the effective column spelled out, with a
+//          "*" when modified and the modifier chain on hover; Target+Range
+//          share one line; Type row dropped; damage cell shows "—" on a miss
+//          and carries the GM armor math on hover. Shared consequence bar
+//          styling left as-is.
+// attack-action.js v1.9.32 - 2026-05-22
+// v1.9.32: Blunt card v3 — compact line layout. Drop the stat strip and
+//          color band; roll now sits in a neutral pill (black text)
+//          followed by an inline result badge. Add an always-on
+//          "Modifiers:" line ("None" when empty, "→ Eff" when shifts
+//          fire) and a dedicated Damage line (GM math / player net).
+//          Type line removed (blunt is implied by the header).
+// attack-action.js v1.9.31 - 2026-05-22
+// v1.9.31: Blunt card polish — native title= hovers (match other cards,
+//          drop oversized data-tooltip), light maroon-text header (no red
+//          bar, matches Energy Attack), and "Target: X" instead of the
+//          redundant attacker → target line (attacker is in the speaker).
+// attack-action.js v1.9.30 - 2026-05-22
+// v1.9.30: Move blunt card v2 into a Handlebars partial
+//          (templates/chat/blunt-attack-card.hbs) rendered via
+//          renderTemplate, and add audit-layer hover tooltips
+//          (data-tooltip) on the Roll, Eff-Rank, Damage, and Type
+//          values — mirroring the Roll20 MP card's to-hit / damage /
+//          subtype hovers. Behavior unchanged; presentation only.
+// attack-action.js v1.9.29 - 2026-05-22
+// v1.9.29: Blunt-form chat card v2 — full-width color-result banner, a
+//          Roll / Eff-Rank / Damage strip, only the non-zero to-hit
+//          modifiers as labeled chips, and a GM-only mitigation line.
+//          Gated to attackForm "blunt"; edged/shooting keep legacy card.
 // attack-action.js v1.9.28 - 2026-05-20
 // v1.9.28: Thread choice.ignoresNaturalArmor / choice.ignoresArtificialArmor
 //          (and fix choice.bypassForceField forwarding) through the two
@@ -1074,6 +1122,10 @@ export class AttackAction extends BaseAction {
         ? (resolveCombatMode(targetActor) === "full")
         : false;
 
+      // Blunt cards use the quieter (maroon-on-light) consequence bars; the
+      // legacy energy/edged/shooting cards keep the loud filled bars for now.
+      const mutedConsequence = String(actionType).toLowerCase() === "blunt-attack";
+
       // Inline Breaking FEAT for full-auto consolidated cards
       let inlineBreakingHtml = "";
       if (useConsolidated && !isManualMode && this.opts?.autoApply && currentBreakingFeat) {
@@ -1087,7 +1139,7 @@ export class AttackAction extends BaseAction {
             postChat: false
           });
           if (breakResult) {
-            inlineBreakingHtml = buildCollapsibleBreakingSection(breakResult);
+            inlineBreakingHtml = buildCollapsibleBreakingSection(breakResult, { muted: mutedConsequence });
             currentBreakingFeat = null;
           }
         } catch (e) {
@@ -1191,7 +1243,7 @@ export class AttackAction extends BaseAction {
             });
             
             if (inlineSlamResult) {
-              inlineSlamHtml = buildCollapsibleSlamSection(inlineSlamResult);
+              inlineSlamHtml = buildCollapsibleSlamSection(inlineSlamResult, { muted: mutedConsequence });
             }
           } catch (e) {
             console.error("[FASERIP ERROR] Inline Slam check failed:", e);
@@ -1214,7 +1266,7 @@ export class AttackAction extends BaseAction {
             });
             
             if (inlineStunResult) {
-              inlineStunHtml = buildCollapsibleStunSection(inlineStunResult);
+              inlineStunHtml = buildCollapsibleStunSection(inlineStunResult, { muted: mutedConsequence });
             }
           } catch (e) {
             console.error("[FASERIP ERROR] Inline Stun check failed:", e);
@@ -1224,59 +1276,43 @@ export class AttackAction extends BaseAction {
 
       // Build compact shift display with breakdown
       let shiftDisplay = "";
+      let toHitChips = [];
       if (totalShift !== 0) {
         const parts = [];
         const breakdown = choice.shiftBreakdown;
         
-        // Manual shift from dialog (user-entered) + situational tags
+        // Each modifier as "Label: value" (name-first, like the MP card).
+        // Situational tags from the dialog (csNotes) are already named.
         if (breakdown?.csNotes) {
-          // csNotes contains the full label from sit tags (e.g., "Range 3 -2, Blindside +2")
           parts.push(breakdown.csNotes);
         } else if (breakdown?.manual && breakdown.manual !== 0) {
-          // No notes, just show the number
-          parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
+          parts.push(`Manual: ${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
         }
-        
-        // Multi-attack penalty
+
         if (breakdown?.multiAttack && breakdown.multiAttack !== 0) {
-          const label = breakdown.multiAttack === -1 ? "multi-atk" : "multi-atk fail";
-          parts.push(`${breakdown.multiAttack} ${label}`);
+          const label = breakdown.multiAttack === -1 ? "Multi-attack" : "Multi-attack (failed)";
+          parts.push(`${label}: ${breakdown.multiAttack}`);
         }
-        
-        // Range penalty (ranged attacks)
-        if (breakdown?.range && breakdown.range !== 0) {
-          parts.push(`${breakdown.range} range`);
-        }
-        
-        // Obstacle penalty (ranged attacks)
-        if (breakdown?.obstacle && breakdown.obstacle !== 0) {
-          parts.push(`${breakdown.obstacle} obstacle`);
-        }
-        
-        // Movement penalty (ranged attacks)
-        if (breakdown?.movement && breakdown.movement !== 0) {
-          parts.push(`${breakdown.movement} movement`);
-        }
-        
-        // Adjacent targets penalty
-        if (breakdown?.adjacent && breakdown.adjacent !== 0) {
-          parts.push(`${breakdown.adjacent} adjacent`);
-        }
-        
-        // Fallback: if no breakdown but manualShift exists, show as "other"
+        if (breakdown?.range && breakdown.range !== 0) parts.push(`Range: ${breakdown.range}`);
+        if (breakdown?.obstacle && breakdown.obstacle !== 0) parts.push(`Obstacle: ${breakdown.obstacle}`);
+        if (breakdown?.movement && breakdown.movement !== 0) parts.push(`Movement: ${breakdown.movement}`);
+        if (breakdown?.adjacent && breakdown.adjacent !== 0) parts.push(`Adjacent: ${breakdown.adjacent}`);
+
+        // Fallback: no breakdown object but a manual shift exists
         if (!breakdown && manualShift !== 0) {
-          parts.push(`${manualShift > 0 ? '+' : ''}${manualShift} other`);
+          parts.push(`Other: ${manualShift > 0 ? '+' : ''}${manualShift}`);
         }
-        
-        // Show attacker effects by name
+
+        // Attacker / defender effects by name (defender sign flips — defense
+        // makes the attacker's column harder)
         for (const eff of attackerEffects) {
-          parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+          parts.push(`${eff.name}: ${eff.shift > 0 ? '+' : ''}${eff.shift}`);
         }
-        // Show defender effects by name (flip sign since they're subtracted)
         for (const eff of defenderEffects) {
-          parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+          parts.push(`${eff.name}: ${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)}`);
         }
         
+        toHitChips = parts.flatMap(p => String(p).split(',').map(s => s.trim())).filter(Boolean);
         const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
         const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
         shiftDisplay = ` (${csBox} → ${effectiveRank})`;
@@ -1302,7 +1338,7 @@ export class AttackAction extends BaseAction {
       const attackIndicator = targetCount > 1
         ? `<span style="color:#666;font-weight:normal;font-size:.85em;flex-shrink:0;white-space:nowrap;">Attack vs ${targetCount} targets</span>`
         : `<span style="color:#666;font-weight:normal;font-size:.85em;flex-shrink:0;white-space:nowrap;">Attack ${attackNumber} of ${totalAttacks}</span>`;
-      const cardHtml = `
+      const legacyCardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
           <!-- Header: Action + Attack number -->
           <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -1405,6 +1441,82 @@ export class AttackAction extends BaseAction {
           ${manualModeNotice}
         </div>
       `;
+
+      // ── Blunt-form card v4: header (+weapon), Target/Range line, full-width
+      //    color result banner, then a Roll / <Ability> / Damage strip — roll
+      //    in black, the ability-named middle cell shows the effective column
+      //    (* = modified, hover lists the chain), damage hover carries the GM
+      //    armor math. Edged/shooting/thrown keep the legacy layout for now. ──
+      const isBluntCard = String(actionType).toLowerCase() === "blunt-attack";
+      let cardHtml = legacyCardHtml;
+      if (isBluntCard) {
+        const abbr = r => RANK_ABBR[r] || r;
+        const shifted = !!(totalShift && totalShift !== 0);
+
+        // Roll value (final; karma already folded in). Hover shows the math.
+        const rollNum = totalKarmaUsed ? cappedTotal : roll.total;
+        const rollTooltip = totalKarmaUsed
+          ? `d100 = ${roll.total} + ${totalKarmaUsed} karma → ${cappedTotal}`
+          : `d100 = ${roll.total}`;
+
+        // Middle strip cell: ability name is the label, the effective column is
+        // the value (full word; * marks a modified column). Hover lists the chain.
+        const effRankValue = `${effectiveRank}${shifted ? "*" : ""}`;
+        const effRankTooltip = shifted
+          ? [`${ability.name} ${ability.rank}`, ...toHitChips, "──────────", `→ ${effectiveRank}`].join("\n")
+          : `${ability.name} ${ability.rank}\nNo modifiers`;
+
+        // Damage cell: net on hit, dash on miss. GM hover adds the armor math.
+        const dmgValue = targetIsHit ? afterArmor : "—";
+        let dmgTooltip = "";
+        if (targetIsHit) {
+          const parts = [];
+          if (game.user.isGM && armorValue > 0) {
+            const isEnergy = armorData?.isEnergyDamage;
+            const aRank = isEnergy ? armorData?.energyRank : armorData?.physicalRank;
+            const aType = armorData?.isForceField ? "Force Field" : "Body Armor";
+            parts.push(`${rawDamage} − ${armorValue} ${aType}${aRank ? ` (${abbr(aRank)})` : ""} = ${afterArmor}`);
+          }
+          if (damageNote) parts.push(damageNote); else if (sourceName) parts.push(sourceName);
+          dmgTooltip = parts.join(" · ");
+        }
+
+        let bluntIndicator = "";
+        if (targetCount > 1) {
+          bluntIndicator = `<span style="color:#666;font-weight:normal;font-size:.85em;flex-shrink:0;white-space:nowrap;">vs ${targetCount} targets</span>`;
+        } else if (totalAttacks > 1) {
+          bluntIndicator = `<span style="color:#666;font-weight:normal;font-size:.85em;flex-shrink:0;white-space:nowrap;">Attack ${attackNumber} of ${totalAttacks}</span>`;
+        }
+
+        const cardData = {
+          actionLabel: actionLabel.toUpperCase(),
+          weaponName: weapon?.name || "",
+          indicatorHtml: bluntIndicator,
+          hasTarget: !!targetActor,
+          targetName,
+          rangeText: "adjacent",
+          badgesHtml: `${multiAttackFeatHtml}${variantBadge}${aimBadge}${talentBadge}${maDBadge}`,
+          resultBg: targetBg,
+          resultFg: targetFg,
+          resultText: `${String(targetEffectColor).toUpperCase()} — ${String(targetEffectResult).toUpperCase()}`,
+          rollNum,
+          rollTooltip,
+          abilityLabelUpper: String(ability.name).toUpperCase(),
+          effRankValue,
+          effRankTooltip,
+          dmgValue,
+          dmgTooltip,
+          notesHtml: `${evasionNote}${killWarning}${disarmNote}`,
+          consequenceHtml: `${inlineSlamHtml}${inlineStunHtml}${inlineBreakingHtml}`,
+          actionsHtml: actions,
+          manualNoticeHtml: manualModeNotice
+        };
+
+        cardHtml = await foundry.applications.handlebars.renderTemplate(
+          "systems/msh-faserip/templates/chat/blunt-attack-card.hbs",
+          cardData
+        );
+      }
 
       const damageFlags = buildDamageFlags({
         actionId: actionType,

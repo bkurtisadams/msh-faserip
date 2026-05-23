@@ -1,3 +1,10 @@
+// action-utils.js v1.8.4 - 2026-05-22
+// v1.8.4: buildCollapsible{Stun,Slam,Breaking}Section gain an opts.muted
+//         flag — renders the summary bar as an outlined maroon-on-light
+//         strip instead of the loud filled band (for the blunt card).
+// action-utils.js v1.8.3 - 2026-05-22
+// v1.8.3: buildShiftDisplay — modifier lines now read "Label: value"
+//         (name-first, like the MP card) for the grenade CS hover.
 // action-utils.js v1.8.2 - 2026-05-20
 // v1.8.2: inferArmorNature helper in getBodyArmorValues — armorNature
 //         derives from source === "equipment" or grantedByEquipment ===
@@ -601,23 +608,14 @@ export function getAbilityInfo(actor, abilityName) {
 
 export function getStrengthInfo(actor) {
   const s = actor?.system?.abilities?.strength;
-  let baseRank = s?.rank || null;
-  const rawVal = s?.value;
-  let baseValue = (rawVal === 0 || (rawVal != null && rawVal !== "" && Number.isFinite(Number(rawVal)))) ? Number(rawVal) : null;
-
-  // Derive the missing half so a partial/transient read can't collapse to Typical(6)
-  if (baseRank && baseValue == null) baseValue = rankValue(baseRank);
-  else if (baseValue != null && !baseRank) baseRank = valueToRank(baseValue);
-
-  if (!baseRank && baseValue == null) {
-    console.warn(`FASERIP | getStrengthInfo: Strength unreadable for ${actor?.name ?? "actor"} (${actor?.uuid ?? "?"}) — defaulting to Typical(6)`);
-    baseRank = "Typical"; baseValue = 6;
-  }
-
+  const baseRank = s?.rank ?? "Typical";
+  const baseValue = s?.value ?? 6;
+  // Apply strength shift from Active Effects
   const cs = getAbilityShift(actor, "strength");
   if (cs !== 0) {
     const shifted = shiftRank(baseRank, cs);
-    return { rank: shifted, value: rankValue(shifted) || baseValue, baseRank, baseValue, abilityShiftCS: cs };
+    const shiftedVal = game.msh?.getRankValue?.(shifted) ?? baseValue;
+    return { rank: shifted, value: shiftedVal, baseRank, baseValue, abilityShiftCS: cs };
   }
   return { rank: baseRank, value: baseValue, baseRank, baseValue, abilityShiftCS: 0 };
 }
@@ -2983,7 +2981,7 @@ export function extractRememberSettings(html) {
  * @param {Object} result - Slam check result from CheckAction
  * @returns {string} HTML string
  */
-export function buildCollapsibleSlamSection(result) {
+export function buildCollapsibleSlamSection(result, opts = {}) {
   if (!result) return "";
   
   const { colorLower, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, targetName, defenderUuid, roll, effectiveEndRank } = result;
@@ -3070,9 +3068,13 @@ export function buildCollapsibleSlamSection(result) {
       Endurance: ${effectiveEndRank} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
     </div>`;
   
+  const muted = !!opts.muted;
+  const barBorder = muted ? "#d9b8b8" : colors.bg;
+  const barBg = muted ? "#faf3f3" : colors.bg;
+  const barFg = muted ? "#8b0000" : colors.fg;
   return `
-    <details class="faserip-check-section slam-section" style="margin:6px 10px 8px;border:1px solid ${colors.bg};border-radius:4px;overflow:hidden;">
-      <summary style="padding:6px 10px;background:${colors.bg};color:${colors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
+    <details class="faserip-check-section slam-section" style="margin:6px 10px 8px;border:1px solid ${barBorder};border-radius:4px;overflow:hidden;">
+      <summary style="padding:6px 10px;background:${barBg};color:${barFg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
         <span style="font-size:1.1em;">${colors.icon}</span>
         <span>${summaryText}</span>
         <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
@@ -3090,7 +3092,7 @@ export function buildCollapsibleSlamSection(result) {
  * @param {Object} result - Stun check result from CheckAction
  * @returns {string} HTML string
  */
-export function buildCollapsibleStunSection(result) {
+export function buildCollapsibleStunSection(result, opts = {}) {
   if (!result) return "";
   
   const { colorLower, stunDuration, targetName, roll, effectiveEndRank } = result;
@@ -3145,9 +3147,13 @@ export function buildCollapsibleStunSection(result) {
       Endurance: ${effectiveEndRank} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
     </div>`;
   
+  const muted = !!opts.muted;
+  const barBorder = muted ? "#d9b8b8" : colors.bg;
+  const barBg = muted ? "#faf3f3" : colors.bg;
+  const barFg = muted ? "#8b0000" : colors.fg;
   return `
-    <details class="faserip-check-section stun-section" style="margin:6px 10px 8px;border:1px solid ${colors.bg};border-radius:4px;overflow:hidden;">
-      <summary style="padding:6px 10px;background:${colors.bg};color:${colors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
+    <details class="faserip-check-section stun-section" style="margin:6px 10px 8px;border:1px solid ${barBorder};border-radius:4px;overflow:hidden;">
+      <summary style="padding:6px 10px;background:${barBg};color:${barFg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
         <span style="font-size:1.1em;">${colors.icon}</span>
         <span>${summaryText}</span>
         <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
@@ -3164,7 +3170,7 @@ export function buildCollapsibleStunSection(result) {
  * @param {Object} result - From executeBreakingFeat()
  * @returns {string} HTML string
  */
-export function buildCollapsibleBreakingSection(result) {
+export function buildCollapsibleBreakingSection(result, opts = {}) {
   if (!result) return "";
 
   const { weaponMatRank, targetMatRank, weaponName, wielderStr, colorLower, reqColor, roll, autoResult, weaponBreaks, actorName } = result;
@@ -3208,9 +3214,13 @@ export function buildCollapsibleBreakingSection(result) {
       Strength: ${wielderStr} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
     </div>` : "";
 
+  const muted = !!opts.muted;
+  const barBorder = muted ? "#d9b8b8" : colors.bg;
+  const barBg = muted ? "#faf3f3" : colors.bg;
+  const barFg = muted ? "#8b0000" : colors.fg;
   return `
-    <details class="faserip-check-section breaking-section" style="margin:6px 10px 8px;border:1px solid ${colors.bg};border-radius:4px;overflow:hidden;">
-      <summary style="padding:6px 10px;background:${colors.bg};color:${colors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
+    <details class="faserip-check-section breaking-section" style="margin:6px 10px 8px;border:1px solid ${barBorder};border-radius:4px;overflow:hidden;">
+      <summary style="padding:6px 10px;background:${barBg};color:${barFg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
         <span style="font-size:1.1em;">${colors.icon}</span>
         <span>${summaryText}</span>
         <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
@@ -3253,19 +3263,19 @@ export function buildShiftDisplay(totalShift, effectiveRank, breakdown = {}, att
     if (breakdown.csNotes) {
       parts.push(breakdown.csNotes);
     } else {
-      parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
+      parts.push(`Manual: ${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
     }
   }
 
   // Multi-attack penalty
   if (breakdown?.multiAttack && breakdown.multiAttack !== 0) {
-    const label = breakdown.multiAttack === -1 ? "multi-atk" : "multi-atk fail";
-    parts.push(`${breakdown.multiAttack} ${label}`);
+    const label = breakdown.multiAttack === -1 ? "Multi-attack" : "Multi-attack (failed)";
+    parts.push(`${label}: ${breakdown.multiAttack}`);
   }
 
   // Adjacent targets penalty
   if (breakdown?.adjacent && breakdown.adjacent !== 0) {
-    parts.push(`${breakdown.adjacent} adjacent`);
+    parts.push(`Adjacent: ${breakdown.adjacent}`);
   }
 
   // Fallback: no breakdown object but shift exists
@@ -3274,19 +3284,19 @@ export function buildShiftDisplay(totalShift, effectiveRank, breakdown = {}, att
     const knownKeys = new Set(["manual", "csNotes", "multiAttack", "adjacent"]);
     for (const [k, v] of Object.entries(breakdown)) {
       if (!knownKeys.has(k) && typeof v === "number" && v !== 0) {
-        parts.push(`${v > 0 ? '+' : ''}${v} ${k}`);
+        parts.push(`${k.charAt(0).toUpperCase()}${k.slice(1)}: ${v > 0 ? '+' : ''}${v}`);
       }
     }
   }
 
   // Attacker effect modifiers
   for (const eff of attackerEffects) {
-    parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+    parts.push(`${eff.name}: ${eff.shift > 0 ? '+' : ''}${eff.shift}`);
   }
 
   // Defender effect modifiers (flip sign — positive defense = harder to hit)
   for (const eff of defenderEffects) {
-    parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+    parts.push(`${eff.name}: ${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)}`);
   }
 
   const breakdownText = parts.length > 0

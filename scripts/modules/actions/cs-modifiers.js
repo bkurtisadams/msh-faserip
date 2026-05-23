@@ -1,5 +1,9 @@
-// scripts/modules/actions/cs-modifiers.js v3.2.0 - 2026-03-17
+// scripts/modules/actions/cs-modifiers.js v3.3.0 - 2026-05-22
 // Manual CS input with base rank, optional range penalty, and ? reference panel.
+// v3.3.0: Optional "Reason" field under the CS input (shown only when CS != 0).
+//         Names a manual shift on the chat card via csNotes — e.g. typing
+//         "Ultimate Skill" with +4 yields the card line "Ultimate Skill: +4".
+//         Player still enters the number; nothing is auto-detected.
 // v3.2.0: Spell out full rank names: "Good → Remarkable" (not abbreviated).
 //         Footer CSS: frp-foot-checks wrapper for right-justified checkboxes.
 // v3.1.0: Show base rank abbreviation before arrow, effective rank after.
@@ -103,7 +107,7 @@ export const CS_REFERENCE = {
 //   or:    CS [__]               Good (10) → Remarkable (30)  [?]   (when no range)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRange = false }) {
+export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRange = false, savedReason = '' }) {
   const csInputCls = savedCS > 0 ? ' pos' : savedCS < 0 ? ' neg' : '';
   const net = savedCS + rangePenalty;
   const effectiveRank = shiftRank(abilityRank, net);
@@ -145,6 +149,10 @@ export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRan
         <span class="frp-cs-rank" id="frp-cs-rank" style="${rankColor}">${effectiveLabel}</span>
         <button type="button" class="frp-cs-help" id="frp-cs-help" title="CS Reference">?</button>
       </div>
+      <div class="frp-cs-reason-row" id="frp-cs-reason-row" style="display:${savedCS !== 0 ? 'flex' : 'none'};align-items:center;gap:8px;margin-top:6px;">
+        <span class="frp-cs-label">Reason</span>
+        <input type="text" name="csReason" id="frp-cs-reason" value="${String(savedReason).replace(/"/g, '&quot;')}" placeholder="name this shift (optional)" style="flex:1;min-width:0;">
+      </div>
       <div class="frp-ref-panel" id="frp-ref-panel" style="display:none;">
         ${panelHtml}
       </div>
@@ -168,6 +176,8 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
   const $helpBtn = html.find('#frp-cs-help');
   const $refPanel = html.find('#frp-ref-panel');
   const $rangeNum = html.find('#frp-range-num');
+  const $reasonRow = html.find('#frp-cs-reason-row');
+  const $reasonInput = html.find('#frp-cs-reason');
 
   let _abilityRank = abilityRank;
 
@@ -220,10 +230,14 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
     if (cs > 0) $manualInput.addClass('pos');
     else if (cs < 0) $manualInput.addClass('neg');
 
+    // Reason row only appears once a shift is entered
+    $reasonRow.css('display', cs !== 0 ? 'flex' : 'none');
+
     if (onUpdate) onUpdate();
   };
 
   $manualInput.on('input change', recalc);
+  $reasonInput.on('input change', () => { if (onUpdate) onUpdate(); });
 
   // Initial recalc
   recalc();
@@ -232,7 +246,9 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
     get() {
       const cs = parseInt($manualInput.val()) || 0;
       const net = cs + _rangePenalty;
-      return { totalShift: net, manualCS: cs, rangePenalty: _rangePenalty, csNotes: "" };
+      const reason = ($reasonInput.val() || '').trim();
+      const csNotes = (reason && cs !== 0) ? `${reason}: ${cs > 0 ? '+' : ''}${cs}` : "";
+      return { totalShift: net, manualCS: cs, rangePenalty: _rangePenalty, csNotes };
     },
     /** Update range penalty and recalc (called by shooting when range changes) */
     setRange(n) {
