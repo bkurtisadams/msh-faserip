@@ -1,3 +1,7 @@
+// scripts/modules/actions/throwing-blunt-action.js v3.2.3 - 2026-05-23
+// v3.2.3: Thrown range now flows to the card (range added to choice) so the
+//         Target/Range line shows real areas, and the range penalty is
+//         itemized in the to-hit breakdown (shiftBreakdown.range).
 // scripts/modules/actions/throwing-blunt-action.js v3.2.2 - 2026-05-23
 // v3.2.2: CS Reason field now persists across reopens (lastThrowBluntReason
 //         flag, gated by Remember), matching the other attack dialogs.
@@ -391,8 +395,9 @@ export class ThrowingBluntAction extends RangedAttackAction {
             resolve({
               weaponId, weaponName, weaponDamage,
               totalShift: shift, shift,
+              range,
               karma: karmaToSpend, spendKarma, skipDice,
-              shiftBreakdown: { manual: cs.manualCS, csNotes },
+              shiftBreakdown: { manual: cs.manualCS, range: cs.rangePenalty, csNotes },
               pulledDamage, resultCap
             });
             dlg.close();

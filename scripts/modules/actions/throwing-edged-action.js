@@ -1,3 +1,7 @@
+// scripts/modules/actions/throwing-edged-action.js v3.2.2 - 2026-05-23
+// v3.2.2: Thrown range now flows to the card (range added to choice) so the
+//         Target/Range line shows real areas, and the range penalty is
+//         itemized in the to-hit breakdown (shiftBreakdown.range).
 // scripts/modules/actions/throwing-edged-action.js v3.2.1 - 2026-05-23
 // v3.2.1: CS Reason field now persists across reopens (lastThrowEdgedReason
 //         flag, gated by Remember), matching the other attack dialogs.
@@ -526,8 +530,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             resolve({
               weaponId, weaponName, weaponDamage,
               totalShift: shift, shift,
+              range,
               karma: karmaToSpend, spendKarma, skipDice,
-              shiftBreakdown: { manual: cs.manualCS, csNotes },
+              shiftBreakdown: { manual: cs.manualCS, range: cs.rangePenalty, csNotes },
               armorPiercing: weaponAP,
               armorPiercingCS: weaponAPCS,
               apMode: weaponAPMode,
