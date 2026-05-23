@@ -1,3 +1,6 @@
+// shooting-action.js v3.7.2 - 2026-05-23
+// v3.7.2: Range penalty now itemized in the to-hit breakdown
+//         (shiftBreakdown.range), matching the thrown forms.
 // shooting-action.js v3.7.1 - 2026-05-23
 // v3.7.1: CS Reason field now persists across reopens (lastShootingReason
 //         flag, gated by Remember), matching the other attack dialogs.
@@ -587,6 +590,7 @@ export class ShootingAction extends RangedAttackAction {
               bypassForceField: _apInfo.bypassFF,
               shiftBreakdown: {
                 manual: cs.manualCS,
+                range: cs.rangePenalty,
                 multiAttack: 0,
                 csNotes: cs.csNotes
               }

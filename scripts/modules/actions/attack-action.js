@@ -1,3 +1,16 @@
+// attack-action.js v1.9.39 - 2026-05-23
+// v1.9.39: Suppress the Stun result when the same blow reduces the target
+//          to 0 Health. Per RAW the target is knocked unconscious by the
+//          0-Health path (death save, or Four-Color knockout) — the Stun
+//          ("Unconscious 1-10 rounds") is the same outcome, so it no longer
+//          stacks a second KO timer. Slam and the red-result Kill checks
+//          are untouched. Gated on the health threshold, not the kill check
+//          (which is Four-Color-conditional).
+// attack-action.js v1.9.38 - 2026-05-23
+// v1.9.38: Energy and Force now render the redesigned attack-card.hbs too
+//          (added to REDESIGNED_ATTACK_FORMS; formClass falls through to
+//          the action key for shooting/energy/force). Charging is the only
+//          _executeSingleAttack form still on the legacy inline card.
 // attack-action.js v1.9.37 - 2026-05-23
 // v1.9.37: Generalized the redesigned attack card (was blunt-only) to a
 //          shared templates/chat/attack-card.hbs covering edged, shooting,
@@ -5,7 +18,7 @@
 //          form's effects map (already form-correct); range shows real
 //          areas for ranged forms ("adjacent" for melee); the muted
 //          consequence bars and the CSS form class are driven off the new
-//          REDESIGNED_ATTACK_FORMS set. Energy/Force/Charging stay legacy.
+//          REDESIGNED_ATTACK_FORMS set. Charging stays on the legacy card.
 // attack-action.js v1.9.36 - 2026-05-22
 // v1.9.36: Blunt cards now render the Stun/Slam/Breaking consequence bars
 //          in the muted (maroon-on-light) style via opts.muted, so the
@@ -158,9 +171,10 @@ import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModi
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // Attack forms that use the redesigned shared chat card (attack-card.hbs)
-// and the muted consequence-bar style. Energy/Force/Charging stay legacy.
+// and the muted consequence-bar style. Charging stays on the legacy card.
 const REDESIGNED_ATTACK_FORMS = new Set([
-  "blunt-attack", "edged-attack", "shooting", "throwing-edged", "throwing-blunt"
+  "blunt-attack", "edged-attack", "shooting", "throwing-edged", "throwing-blunt",
+  "energy", "force"
 ]);
 const MELEE_ATTACK_FORMS = new Set(["blunt-attack", "edged-attack"]);
 
@@ -1076,6 +1090,15 @@ export class AttackAction extends BaseAction {
         showSlam = false;
       }
 
+      // Per RAW: a blow that drops the target to 0 Health knocks them
+      // unconscious (death save, or Four-Color knockout) — the Stun result
+      // is the same "Unconscious 1-10 rounds" outcome, so don't stack it on
+      // top. Slam still applies (an unconscious body is still knocked back).
+      if (showStun && targetIsHit && targetActor) {
+        const _curHealth = Number(targetActor?.system?.attributes?.health?.value);
+        if (Number.isFinite(_curHealth) && (_curHealth - afterArmor) <= 0) showStun = false;
+      }
+
       // Build ammo variant note for chat card
       const variantLabel = {
         rubber: "Rubber Shot (blunt effects, no Slam)",
@@ -1472,8 +1495,8 @@ export class AttackAction extends BaseAction {
         // Form-specific bits: CSS class hook + range text. Ranged forms
         // carry choice.range in areas (1 = adjacent); melee is adjacent.
         const formClass = MELEE_ATTACK_FORMS.has(cardFormKey) ? cardFormKey.replace("-attack", "")
-          : cardFormKey === "shooting" ? "shooting"
-          : "thrown";
+          : cardFormKey.startsWith("throwing-") ? "thrown"
+          : cardFormKey;  // shooting, energy, force
         const _rangeAreas = Number(choice?.range || 0);
         const cardRangeText = MELEE_ATTACK_FORMS.has(cardFormKey) ? "adjacent"
           : (_rangeAreas >= 2 ? `${_rangeAreas} areas` : "adjacent");
