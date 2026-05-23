@@ -1,7 +1,8 @@
-/* compact-mode.css v1.4.0 - 2026-05-23 */
-/* v1.4.0: grid-auto-rows:1fr stretches the sec-grid row so column dividers reach */
-/*         full height; Health-column action buttons wrap to the column instead */
-/*         of overflowing/clipping. */
+/* compact-mode.css v1.4.1 - 2026-05-23 */
+/* v1.4.1: Secondary dividers render on .sec-col like the full-size sheet (the */
+/*         red header bar masks them across the header zone); secondary is a */
+/*         grid so the column cells stretch to full height; Health-column */
+/*         action buttons wrap to the column instead of overflowing. */
 /* v1.3.0: Full-height dividers, narrower sheet (580px), no blank space below tabs */
 /* v1.2.0: Side-by-side layout — FASERIP table left, stats+movement right */
 /* Compact character sheet mode — toggled via Settings > Compact Character Sheet */
@@ -164,10 +165,12 @@ form.faserip-sheet.compact-mode .primary-abilities .abilities-table td.ability-k
   border-right: 1px solid #999 !important;
 }
 
-/* Secondary container: left border, flex column so movement pins to bottom */
+/* Secondary container: grid (1fr/auto rows) gives .sec-grid a definite block */
+/* size so its 1fr row stretches full height; movement pins to the auto row.  */
 form.faserip-sheet.compact-mode .secondary-abilities {
-  display: flex !important;
-  flex-direction: column !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr auto !important;
   border-left: 2px solid var(--ink, #222) !important;
   border-top: none !important;
   border-right: none !important;
@@ -188,19 +191,21 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
   position: relative !important;
 }
 
-/* sec-col: stretch for full-height layout, flex column */
+/* sec-col: divider on the COLUMN, like the full-size sheet — the grid cell */
+/* always fills the row, so the line is always full height.                 */
 form.faserip-sheet.compact-mode .secondary-abilities .sec-col {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
+  border-right: 1px solid #999 !important;
+}
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col:last-child {
   border-right: none !important;
 }
 
-/* sec-body: divider lines between columns, below the header bar */
+/* The red ::before bar masks the column line across the header zone so it */
+/* reads as starting below the header.                                     */
 form.faserip-sheet.compact-mode .secondary-abilities .sec-col .sec-body {
-  border-right: 1px solid #999 !important;
-}
-form.faserip-sheet.compact-mode .secondary-abilities .sec-col:last-child .sec-body {
   border-right: none !important;
 }
 
