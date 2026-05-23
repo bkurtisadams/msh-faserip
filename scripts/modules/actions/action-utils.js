@@ -601,14 +601,23 @@ export function getAbilityInfo(actor, abilityName) {
 
 export function getStrengthInfo(actor) {
   const s = actor?.system?.abilities?.strength;
-  const baseRank = s?.rank ?? "Typical";
-  const baseValue = s?.value ?? 6;
-  // Apply strength shift from Active Effects
+  let baseRank = s?.rank || null;
+  const rawVal = s?.value;
+  let baseValue = (rawVal === 0 || (rawVal != null && rawVal !== "" && Number.isFinite(Number(rawVal)))) ? Number(rawVal) : null;
+
+  // Derive the missing half so a partial/transient read can't collapse to Typical(6)
+  if (baseRank && baseValue == null) baseValue = rankValue(baseRank);
+  else if (baseValue != null && !baseRank) baseRank = valueToRank(baseValue);
+
+  if (!baseRank && baseValue == null) {
+    console.warn(`FASERIP | getStrengthInfo: Strength unreadable for ${actor?.name ?? "actor"} (${actor?.uuid ?? "?"}) — defaulting to Typical(6)`);
+    baseRank = "Typical"; baseValue = 6;
+  }
+
   const cs = getAbilityShift(actor, "strength");
   if (cs !== 0) {
     const shifted = shiftRank(baseRank, cs);
-    const shiftedVal = game.msh?.getRankValue?.(shifted) ?? baseValue;
-    return { rank: shifted, value: shiftedVal, baseRank, baseValue, abilityShiftCS: cs };
+    return { rank: shifted, value: rankValue(shifted) || baseValue, baseRank, baseValue, abilityShiftCS: cs };
   }
   return { rank: baseRank, value: baseValue, baseRank, baseValue, abilityShiftCS: 0 };
 }
