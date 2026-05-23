@@ -1,3 +1,6 @@
+// blunt-attack-action.js v3.6.1 - 2026-05-23
+// v3.6.1: CS Reason field now persists across reopens (lastBluntReason flag,
+//         gated by Remember). Replaces the unused csNotes flag read.
 // blunt-attack-action.js v3.6.0 - 2026-05-16
 // v3.6.0: MA-D / MA-A zone — three-state badge between header and CS row
 //         when attacker has Martial Arts D or A. State 1 (idle/no study)
@@ -183,13 +186,14 @@ export class BluntAttackAction extends AttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
-    const savedCsNotes = (await actor.getFlag("msh-faserip", "csNotes")) || "";
+    const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastBluntReason")) || "") : "";
 
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: ability.rank
     });
 
@@ -563,6 +567,7 @@ export class BluntAttackAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
               await actor.setFlag("msh-faserip", "lastBluntShift", cs.manualCS);
+              await actor.setFlag("msh-faserip", "lastBluntReason", cs.reason);
               await actor.setFlag("msh-faserip", "cs_blunt-attack", cs.manualCS);
               await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
               await actor.setFlag("msh-faserip", "karma_blunt-attack", karma);

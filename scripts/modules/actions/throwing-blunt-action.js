@@ -1,3 +1,6 @@
+// scripts/modules/actions/throwing-blunt-action.js v3.2.2 - 2026-05-23
+// v3.2.2: CS Reason field now persists across reopens (lastThrowBluntReason
+//         flag, gated by Remember), matching the other attack dialogs.
 // scripts/modules/actions/throwing-blunt-action.js v3.2.1 - 2026-04-17
 // v3.2.1: Correct thrown-blunt damage per RAW — plain min(STR, MAT) with
 //         weapon-base floor, no bump-to-next-rank rule. Bump is melee-blunt
@@ -135,6 +138,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const savedPullEnabled = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntPullEnabled")) || false) : false;
     const savedPulledDamage = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntPulledDamage")) || 0) : 0;
     const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntResultCap")) || "none") : "none";
+    const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntReason")) || "") : "";
 
     // Build weapon options for carried select
     const weaponOptions = thrownBlunt.map(i => {
@@ -167,6 +171,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
       showRange: true
@@ -378,6 +383,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastThrowBluntPullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastThrowBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastThrowBluntResultCap", resultCap);
+              await actor.setFlag("msh-faserip", "lastThrowBluntReason", cs.reason);
             }
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
