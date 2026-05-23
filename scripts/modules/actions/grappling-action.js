@@ -1,3 +1,7 @@
+// scripts/modules/actions/grappling-action.js v3.2.1 - 2026-05-23
+// v3.2.1: CS Reason now reaches the card (was discarded — choice resolved
+//         with csNotes:"") and persists across reopens (lastGrappleReason,
+//         gated by Remember), matching the other attack dialogs.
 // scripts/modules/actions/grappling-action.js v3.2.0 - 2026-03-17
 // v3.2.0: Footer reordered: [Roll] [Cancel] ... [Remember] [Skip dice].
 // v3.1.0: Manual CS only — remove talent chips, sit-tags, auto-detection.
@@ -80,15 +84,18 @@ export class GrapplingAction extends AttackAction {
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
     const savedRemember = (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? false;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
+    const savedReason = (await actor.getFlag("msh-faserip", "lastGrappleReason")) ?? "";
 
     // Only apply saved shift if Remember was explicitly checked last time
     const optsShift = this.opts?.shift;
     const dialogShift = (optsShift !== undefined && optsShift !== null && optsShift !== 0) 
       ? optsShift 
       : (savedRemember ? savedShift : 0);
+    const dialogReason = savedRemember ? savedReason : "";
 
     const choice = await this._showGrapplingDialog(actor, strength, { 
       savedShift: dialogShift, 
+      savedReason: dialogReason,
       savedRemember, 
       savedSkipDice,
       isWeaponGrapple,
@@ -103,6 +110,7 @@ export class GrapplingAction extends AttackAction {
     await actor.setFlag("msh-faserip", "lastGrappleSkipDice", choice.skipDice);
     if (choice.remember) {
       await actor.setFlag("msh-faserip", "lastGrappleShift", choice.manualCS);
+      await actor.setFlag("msh-faserip", "lastGrappleReason", choice.reason || "");
     }
 
     // Build shift breakdown for hover text
@@ -251,7 +259,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedRemember = false, savedSkipDice = false, isWeaponGrapple = false, isPowerGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedRemember = false, savedSkipDice = false, savedReason = "", isWeaponGrapple = false, isPowerGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
     // ── Target data ──
     let prefillTargetName = this.opts?.prefill?.targetName || "";
     let prefillTargetStr  = this.opts?.prefill?.targetStrength || "";
@@ -295,6 +303,7 @@ export class GrapplingAction extends AttackAction {
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
       savedCS: savedShift,
+      savedReason,
       abilityRank: strength.rank
     });
 
@@ -448,7 +457,8 @@ export class GrapplingAction extends AttackAction {
               targetUuid:     primaryTargetActor?.uuid || prefillTargetUuid,
               shift,
               manualCS,
-              csNotes: "",
+              csNotes: csData.csNotes,
+              reason: csData.reason,
               spendKarma,
               remember: rememberSettings,
               skipDice

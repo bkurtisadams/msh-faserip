@@ -1,3 +1,6 @@
+// scripts/modules/actions/energy-action.js v3.3.2 - 2026-05-23
+// v3.3.2: CS Reason field now persists across reopens (lastEnergyReason
+//         flag, gated by Remember), matching the other attack dialogs.
 // scripts/modules/actions/energy-action.js v3.3.1 - 2026-05-20
 // v3.3.1: Revert v3.3.0's ignoresNaturalArmor / ignoresArtificialArmor
 //         setters on choiceForAttack in execute(). Per
@@ -123,6 +126,7 @@ export class EnergyAction extends RangedAttackAction {
     const savedReducedAmount = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0) : 0;
     const savedResultCap = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyResultCap") || "none") : "none";
     const savedAim = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAim") || "none") : "none";
+    const savedReason = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReason") || "") : "";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target Info ===
@@ -166,6 +170,7 @@ export class EnergyAction extends RangedAttackAction {
     })();
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: initialDisplayRank,
       rangePenalty: initialRangePenalty,
       showRange: true
@@ -463,6 +468,7 @@ export class EnergyAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
               await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
               await actor.setFlag("msh-faserip", "lastEnergyAim", aimMode);
+              await actor.setFlag("msh-faserip", "lastEnergyReason", cs.reason);
             }
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 

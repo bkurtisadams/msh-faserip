@@ -1,3 +1,7 @@
+// scripts/modules/actions/force-action.js v3.3.1 - 2026-05-23
+// v3.3.1: CS Reason now reaches the card (was discarded — only the range
+//         note was kept) and persists across reopens (lastForceReason,
+//         gated by Remember), matching the other attack dialogs.
 // scripts/modules/actions/force-action.js v3.3.0 - 2026-05-16
 // v3.3.0: Aim tactic — Bullseye-effect reinterpretation per RAW Tactics.
 //         New Aim row in options box: Neutralize only. On Force the red
@@ -119,6 +123,7 @@ export class ForceAction extends RangedAttackAction {
     const savedPullEnabled = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForcePullEnabled") || false) : false;
     const savedPulledDamage = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForcePulledDamage") || 0) : 0;
     const savedAim = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForceAim") || "none") : "none";
+    const savedReason = shouldRemember ? (await actor.getFlag("msh-faserip", "lastForceReason") || "") : "";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target Info ===
@@ -163,6 +168,7 @@ export class ForceAction extends RangedAttackAction {
     })();
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
+      savedReason,
       abilityRank: initialDisplayRank,
       rangePenalty: initialRangePenalty,
       showRange: true
@@ -450,7 +456,8 @@ export class ForceAction extends RangedAttackAction {
             const aimEnabled = $dlg('#aim-enabled').is(':checked');
             const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
 
-            const csNotes = csData.rangePenalty !== 0 ? `Range ${csData.rangePenalty}` : "";
+            const _rangeNote = csData.rangePenalty !== 0 ? `Range ${csData.rangePenalty}` : "";
+            const csNotes = [csData.csNotes, _rangeNote].filter(Boolean).join(", ");
 
             // Save settings
             if (rememberSettings) {
@@ -467,6 +474,7 @@ export class ForceAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastForcePullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastForcePulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastForceAim", aimMode);
+              await actor.setFlag("msh-faserip", "lastForceReason", csData.reason);
             }
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
