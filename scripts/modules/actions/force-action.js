@@ -1,4 +1,6 @@
-// scripts/modules/actions/force-action.js v3.3.1 - 2026-05-23
+// scripts/modules/actions/force-action.js v3.3.2 - 2026-05-23
+// v3.3.2: Range penalty itemized as "Range" in the to-hit breakdown
+//         (was baked into csNotes); manual CS no longer hidden by it.
 // v3.3.1: CS Reason now reaches the card (was discarded — only the range
 //         note was kept) and persists across reopens (lastForceReason,
 //         gated by Remember), matching the other attack dialogs.
@@ -456,8 +458,7 @@ export class ForceAction extends RangedAttackAction {
             const aimEnabled = $dlg('#aim-enabled').is(':checked');
             const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
 
-            const _rangeNote = csData.rangePenalty !== 0 ? `Range ${csData.rangePenalty}` : "";
-            const csNotes = [csData.csNotes, _rangeNote].filter(Boolean).join(", ");
+            const csNotes = csData.csNotes;
 
             // Save settings
             if (rememberSettings) {
@@ -483,6 +484,8 @@ export class ForceAction extends RangedAttackAction {
               powerName, powerDamage, powerRank, powerId, prettyRange,
               shift, karma, spendKarma, range, skipDice: skipDice, usePowerToHit,
               totalShift: shift,
+              manualCS,
+              rangePenalty: csData.rangePenalty,
               multiAdjacent,
               pulledDamage, resultCap: "none",
               aimMode,
@@ -630,7 +633,8 @@ export class ForceAction extends RangedAttackAction {
 
     // Build shift breakdown
     const shiftBreakdown = {
-      manual: choice.shift || 0,
+      manual: choice.manualCS || 0,
+      range: choice.rangePenalty || 0,
       csNotes: choice.csNotes || ""
     };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;

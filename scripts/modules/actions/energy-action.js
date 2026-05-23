@@ -1,4 +1,6 @@
-// scripts/modules/actions/energy-action.js v3.3.2 - 2026-05-23
+// scripts/modules/actions/energy-action.js v3.3.3 - 2026-05-23
+// v3.3.3: Range penalty now itemized as "Range" in the to-hit breakdown
+//         instead of being lumped into "Manual".
 // v3.3.2: CS Reason field now persists across reopens (lastEnergyReason
 //         flag, gated by Remember), matching the other attack dialogs.
 // scripts/modules/actions/energy-action.js v3.3.1 - 2026-05-20
@@ -478,6 +480,8 @@ export class EnergyAction extends RangedAttackAction {
               useAdHoc,
               shift, karma, spendKarma, range, skipDice, usePowerToHit,
               totalShift: shift,
+              manualCS: cs.manualCS,
+              rangePenalty: cs.rangePenalty,
               powerDamageType, multiAdjacent,
               reduceDamageEnabled, reducedDamage, resultCap,
               aimMode,
@@ -673,9 +677,10 @@ export class EnergyAction extends RangedAttackAction {
     // Mode already set by setupModeSelector during dialog render
     const mode = this.opts.mode;
 
-    // Build shift breakdown (range penalty baked into CS via auto sit tag)
+    // Build shift breakdown — manual CS and range penalty itemized separately
     const shiftBreakdown = {
-      manual: choice.shift || 0,
+      manual: choice.manualCS || 0,
+      range: choice.rangePenalty || 0,
       csNotes: choice.csNotes || ""
     };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;

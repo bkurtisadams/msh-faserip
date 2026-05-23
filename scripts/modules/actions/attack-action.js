@@ -1,4 +1,7 @@
-// attack-action.js v1.9.39 - 2026-05-23
+// attack-action.js v1.9.40 - 2026-05-23
+// v1.9.40: Show the to-hit breakdown when modifiers cancel to a net 0
+//          (e.g. Guns +1CS vs Range -1CS) so the Agility hover lists both
+//          instead of going blank. Effective rank gets a * when any mods apply.
 // v1.9.39: Suppress the Stun result when the same blow reduces the target
 //          to 0 Health. Per RAW the target is knocked unconscious by the
 //          0-Health path (death save, or Four-Color knockout) — the Stun
@@ -1315,7 +1318,7 @@ export class AttackAction extends BaseAction {
       // Build compact shift display with breakdown
       let shiftDisplay = "";
       let toHitChips = [];
-      if (totalShift !== 0) {
+      {
         const parts = [];
         const breakdown = choice.shiftBreakdown;
         
@@ -1351,9 +1354,13 @@ export class AttackAction extends BaseAction {
         }
         
         toHitChips = parts.flatMap(p => String(p).split(',').map(s => s.trim())).filter(Boolean);
-        const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
-        const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
-        shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+        // Show the breakdown even when components cancel to a net 0 (e.g. Guns +1
+        // vs Range -1 -> column unchanged, but both modifiers still worth showing).
+        if (totalShift !== 0 || toHitChips.length > 0) {
+          const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+          const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+          shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+        }
       }
 
       // Build compact roll display: "Roll: 57 (42 + 15 karma)" or "Roll: 42"
@@ -1491,6 +1498,8 @@ export class AttackAction extends BaseAction {
       if (useRedesignedCard) {
         const abbr = r => RANK_ABBR[r] || r;
         const shifted = !!(totalShift && totalShift !== 0);
+        // Surface the breakdown when modifiers exist even if they net to zero.
+        const hasMods = shifted || toHitChips.length > 0;
 
         // Form-specific bits: CSS class hook + range text. Ranged forms
         // carry choice.range in areas (1 = adjacent); melee is adjacent.
@@ -1509,8 +1518,8 @@ export class AttackAction extends BaseAction {
 
         // Middle strip cell: ability name is the label, the effective column is
         // the value (full word; * marks a modified column). Hover lists the chain.
-        const effRankValue = `${effectiveRank}${shifted ? "*" : ""}`;
-        const effRankTooltip = shifted
+        const effRankValue = `${effectiveRank}${hasMods ? "*" : ""}`;
+        const effRankTooltip = hasMods
           ? [`${ability.name} ${ability.rank}`, ...toHitChips, "──────────", `→ ${effectiveRank}`].join("\n")
           : `${ability.name} ${ability.rank}\nNo modifiers`;
 
