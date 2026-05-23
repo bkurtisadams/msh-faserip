@@ -1,3 +1,6 @@
+// scripts/modules/actions/throwing-edged-action.js v3.2.3 - 2026-05-23
+// v3.2.3: Range penalty is now -1CS per full area to the target (weapon rule,
+//         RAW); no free first area. Capped at the thrower's max range.
 // scripts/modules/actions/throwing-edged-action.js v3.2.2 - 2026-05-23
 // v3.2.2: Thrown range now flows to the card (range added to choice) so the
 //         Target/Range line shows real areas, and the range penalty is
@@ -321,7 +324,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
           const _getCurrentRangePenalty = () => {
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             if (rangeVal > maxThrowRange) return 0;
-            return rangeVal > 1 ? -(rangeVal - 1) : 0;
+            return rangeVal > 0 ? -rangeVal : 0;
           };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
@@ -395,7 +398,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
               _csState.setRange(0);
             } else {
-              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0;
+              const penalty = rangeVal > 0 ? -rangeVal : 0;
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
               _csState.setRange(penalty);
             }

@@ -1,3 +1,6 @@
+// action-utils.js v1.8.5 - 2026-05-23
+// v1.8.5: measureAreasBetweenTokens counts full areas to target (floor, not
+//         ceil) so a target less than one full area away reads 0 = no penalty.
 // action-utils.js v1.8.4 - 2026-05-22
 // v1.8.4: buildCollapsible{Stun,Slam,Breaking}Section gain an opts.muted
 //         flag — renders the summary bar as an outlined maroon-on-light
@@ -1281,8 +1284,8 @@ export function measureAreasBetweenTokens(src, dst) {
   const dist = measureSceneDistance(src.center, dst.center);
   const unitsPerArea = getUnitsPerArea();
   const areas = unitsPerArea === 1 ? dist : (dist / unitsPerArea);
-  // Any fraction into the next area counts as being in that area for range purposes
-  return Math.max(1, Math.ceil(areas));
+  // Count full areas traveled (floor); a target less than one area away = 0.
+  return Math.max(0, Math.floor(areas));
 }
 
 /**

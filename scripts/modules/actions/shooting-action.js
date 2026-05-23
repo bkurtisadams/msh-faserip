@@ -1,3 +1,6 @@
+// shooting-action.js v3.7.3 - 2026-05-23
+// v3.7.3: Range penalty is now -1CS per full area to the target (weapon rule,
+//         RAW); the closest area is no longer free. Same area = 0 = no penalty.
 // shooting-action.js v3.7.2 - 2026-05-23
 // v3.7.2: Range penalty now itemized in the to-hit breakdown
 //         (shiftBreakdown.range), matching the thrown forms.
@@ -416,7 +419,7 @@ export class ShootingAction extends RangedAttackAction {
             const weapon = shootingWeapons.find(i => i.id === weaponId);
             const maxRange = weapon?.system?.range || 15;
             if (rangeVal > maxRange) return 0; // out of range — handled separately
-            return rangeVal > 1 ? -(rangeVal - 1) : 0;
+            return rangeVal > 0 ? -rangeVal : 0;
           };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
@@ -481,7 +484,7 @@ export class ShootingAction extends RangedAttackAction {
               $rangePenalty.text('Heat-Seeker (no penalty)').css('color', '#1565c0');
               _csState.setRange(0);
             } else {
-              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0;
+              const penalty = rangeVal > 0 ? -rangeVal : 0;
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
               _csState.setRange(penalty);
             }
