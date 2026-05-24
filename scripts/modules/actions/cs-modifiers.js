@@ -1,5 +1,8 @@
-// scripts/modules/actions/cs-modifiers.js v3.4.0 - 2026-05-23
+// scripts/modules/actions/cs-modifiers.js v3.5.0 - 2026-05-23
 // Manual CS input with base rank, optional range penalty, and ? reference panel.
+// v3.5.0: Hide the "+ Range N" CS-row term entirely when the penalty is 0
+//         (initial build and live recalc), so 0 no longer shows "+ Range 0".
+//         Affects every ranged dialog that shares buildCSRow.
 // v3.4.0: get() also returns the raw `reason` label so callers can persist
 //         it; the field repopulates on reopen when a dialog passes
 //         savedReason to buildCSRow.
@@ -119,10 +122,12 @@ export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRan
   const rankColor = net > 0 ? 'color:#2e7d32;' : net < 0 ? 'color:#c62828;' : '';
 
   const rangeHtml = showRange
-    ? `<span class="frp-cs-plus">+</span>
-       <span class="frp-cs-range" id="frp-cs-range-val">
-         <span class="frp-range-label">Range</span>
-         <span class="frp-range-num" id="frp-range-num">${rangePenalty}</span>
+    ? `<span class="frp-cs-range-term" id="frp-cs-range-term" style="display:${rangePenalty !== 0 ? 'inline-flex' : 'none'};align-items:center;gap:4px;">
+         <span class="frp-cs-plus">+</span>
+         <span class="frp-cs-range" id="frp-cs-range-val">
+           <span class="frp-range-label">Range</span>
+           <span class="frp-range-num" id="frp-range-num">${rangePenalty}</span>
+         </span>
        </span>`
     : '';
 
@@ -179,6 +184,7 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
   const $helpBtn = html.find('#frp-cs-help');
   const $refPanel = html.find('#frp-ref-panel');
   const $rangeNum = html.find('#frp-range-num');
+  const $rangeTerm = html.find('#frp-cs-range-term');
   const $reasonRow = html.find('#frp-cs-reason-row');
   const $reasonInput = html.find('#frp-cs-reason');
 
@@ -226,6 +232,8 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
       const $rangeWrap = $rangeNum.closest('.frp-cs-range');
       $rangeWrap.removeClass('neg');
       if (_rangePenalty < 0) $rangeWrap.addClass('neg');
+      // Hide the whole "+ Range N" term when there is no penalty
+      $rangeTerm.css('display', _rangePenalty !== 0 ? 'inline-flex' : 'none');
     }
 
     // Update manual input styling
