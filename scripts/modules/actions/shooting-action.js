@@ -1,3 +1,6 @@
+// shooting-action.js v3.7.4 - 2026-05-23
+// v3.7.4: Relabel the blue distance box "Range" -> "DISTANCE" to disambiguate
+//         it from the CS-row range penalty term.
 // shooting-action.js v3.7.3 - 2026-05-23
 // v3.7.3: Range penalty is now -1CS per full area to the target (weapon rule,
 //         RAW); the closest area is no longer free. Same area = 0 = no penalty.
@@ -329,7 +332,7 @@ export class ShootingAction extends RangedAttackAction {
       <!-- Range info box (blue) — auto-filled from token distance -->
       <div class="frp-box" style="padding:3px 8px;background:#e3f2fd;border-color:#90caf9;">
         <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
-          <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
+          <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Distance</span>
           <input type="number" name="range" value="${savedRange}" min="0" readonly class="frp-pull-input" style="width:36px;">
           <span style="color:#777;">areas</span>
           <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${initialWeaponRange}</span>)</span>
