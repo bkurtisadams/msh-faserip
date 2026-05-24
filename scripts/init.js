@@ -1,4 +1,7 @@
-﻿// init.js v1.12.4 - 2026-05-14
+﻿// init.js v1.12.5 - 2026-05-23
+// v1.12.5: FASERIP status palette - CONFIG.statusEffects replaced in setup so
+//          the Token HUD shows only FASERIP conditions (core + module statuses
+//          cleared).
 // v1.12.4: syncPowerOngoingEffects now removes any existing generic
 //          "healing" ongoing when a Regen-rest or Regen-solar power is
 //          registered on an actor. Per RAW the standard End-rank/day
@@ -1425,28 +1428,6 @@ Hooks.once("init", async () => {
       Hooks.callAll("msh-faserip.timeUpdated");
     });
 
-  // Register custom status effects â€” skip any IDs already registered by core (v14 proxy enforces uniqueness)
-  const _existingStatusIds = new Set(CONFIG.statusEffects.map(e => e.id));
-  const _mshStatusEffects = [
-    { id: "grappled", name: "Grappled", img: "icons/svg/net.svg", flags: { "msh-faserip": { grappling: true } } },
-    { id: "held", name: "Held", img: "icons/svg/padlock.svg", flags: { "msh-faserip": { grappling: true } } },
-    { id: "dying", name: "Dying", img: "icons/svg/skull.svg", flags: { "msh-faserip": { isDying: true } } },
-    { id: "impaired-endurance", name: "Impaired Endurance", img: "icons/svg/blood.svg", flags: { "msh-faserip": { isImpairedEndurance: true } } },
-    { id: "dead", name: "Dead", img: "icons/svg/skull.svg", flags: { "msh-faserip": { isDead: true } } },
-    { id: "dodging", name: "Dodging", img: "icons/svg/windmill.svg", flags: { "msh-faserip": { isDodging: true } } },
-    { id: "evading", name: "Evading", img: "icons/svg/combat.svg", flags: { "msh-faserip": { isEvading: true } } },
-    { id: "blocking", name: "Blocking", img: "icons/svg/shield.svg", flags: { "msh-faserip": { isBlocking: true } } }
-  ];
-  for (const effect of _mshStatusEffects) {
-    if (_existingStatusIds.has(effect.id)) {
-      const existing = CONFIG.statusEffects.find(e => e.id === effect.id);
-      if (existing) foundry.utils.mergeObject(existing, { flags: effect.flags });
-      console.log(`[FASERIP] Status effect "${effect.id}" already registered by core â€” merging flags.`);
-    } else {
-      CONFIG.statusEffects.push(effect);
-      _existingStatusIds.add(effect.id);
-    }
-  }
 
   // Populate CONFIG.FASERIP.rankValues from canonical source + alias variants
   CONFIG.FASERIP.rankValues = Object.assign({}, RANK_VALUES);
@@ -2388,6 +2369,59 @@ Hooks.on("canvasReady", async () => {
     const actor = tokenDoc.actor;
     if (actor) _reconcileTokenEffects(actor);
   }
+});
+
+// ---------------------------------------------------------------------------
+// FASERIP status palette. Replace CONFIG.statusEffects in `setup` (after every
+// module's init, including Battlesystem) so the Token HUD shows only FASERIP
+// conditions; core fantasy statuses and module-injected ones are cleared.
+// ---------------------------------------------------------------------------
+Hooks.once("setup", () => {
+  const MSH = "msh-faserip";
+  const effects = [
+    // Combat results
+    { id: "stunned",     name: "Stunned",     img: "icons/svg/daze.svg" },
+    { id: "slammed",     name: "Slammed",     img: "icons/svg/explosion.svg" },
+    { id: "prone",       name: "Prone",       img: "icons/svg/falling.svg" },
+    { id: "unconscious", name: "Unconscious", img: "icons/svg/unconscious.svg" },
+    { id: "dying",       name: "Dying",       img: "icons/svg/blood.svg", flags: { [MSH]: { isDying: true } } },
+    { id: "dead",        name: "Dead",        img: "icons/svg/skull.svg", flags: { [MSH]: { isDead: true } } },
+    // Defensive actions
+    { id: "dodging",     name: "Dodging",     img: "icons/svg/windmill.svg", flags: { [MSH]: { isDodging: true } } },
+    { id: "evading",     name: "Evading",     img: "icons/svg/combat.svg",   flags: { [MSH]: { isEvading: true } } },
+    { id: "blocking",    name: "Blocking",    img: "icons/svg/shield.svg",   flags: { [MSH]: { isBlocking: true } } },
+    // Grappling chain
+    { id: "grappled",    name: "Grappled",    img: "icons/svg/net.svg",    flags: { [MSH]: { grappling: true } } },
+    { id: "held",        name: "Held",        img: "icons/svg/padlock.svg", flags: { [MSH]: { grappling: true } } },
+    { id: "entangled",   name: "Entangled",   img: "icons/svg/trap.svg" },
+    // Conditions
+    { id: "blinded",     name: "Blinded",     img: "icons/svg/blind.svg" },
+    { id: "poison",      name: "Poisoned",    img: "icons/svg/poison.svg" },
+    { id: "paralysis",   name: "Paralyzed",   img: "icons/svg/paralysis.svg" },
+    { id: "impaired-endurance", name: "Impaired Endurance", img: "icons/svg/downgrade.svg", flags: { [MSH]: { isImpairedEndurance: true } } },
+    { id: "regenerating", name: "Regenerating", img: "icons/svg/regen.svg" },
+    // Movement / perception (kept for CONFIG.specialStatusEffects: INVISIBLE/FLY/HOVER/BURROW)
+    { id: "invisible",   name: "Invisible",   img: "icons/svg/invisible.svg" },
+    { id: "fly",         name: "Flying",      img: "icons/svg/wing.svg" },
+    { id: "hover",       name: "Hovering",    img: "icons/svg/aura.svg" },
+    { id: "burrow",      name: "Burrowing",   img: "icons/svg/down.svg" }
+  ];
+
+  // v14 stores CONFIG.statusEffects as an id-keyed map with array back-compat;
+  // clear in place (do not reassign) so either backing shape is handled.
+  const se = CONFIG.statusEffects;
+  if (Array.isArray(se)) {
+    se.length = 0;
+    for (const e of effects) se.push(e);
+  } else {
+    for (const k of Object.keys(se)) delete se[k];
+    for (const e of effects) se[e.id] = e;
+  }
+
+  // Keep core's BLIND vision feature wired to the FASERIP "blinded" id.
+  if (CONFIG.specialStatusEffects) CONFIG.specialStatusEffects.BLIND = "blinded";
+
+  console.log(`[FASERIP] Status palette set: ${effects.length} effects (core + module statuses cleared).`);
 });
 
 Hooks.once("ready", async () => {
