@@ -1,4 +1,7 @@
-// scripts/modules/effects/defense-effects.js v1.4.1 - 2026-05-20
+// scripts/modules/effects/defense-effects.js v1.5.0 - 2026-05-23
+// v1.5.0: Absorption AE also builds from absorptionSpecific alone (no broad
+//         Type required), so a type-specific absorber (e.g. sound) can be
+//         scoped without widening it. Status id falls back to the specific.
 // v1.4.1: inferArmorNature helper — armorNature derives from source ===
 //         "equipment" or grantedByEquipment === true when not explicitly
 //         set on the power. Explicit values always win. Per
@@ -163,7 +166,7 @@ function looksLikeDefensivePower(item) {
   return sys.isBodyArmor || isBodyArmorByName(item)
       || sys.isForceField || isForceFieldByName(item)
       || (sys.isResistance && sys.resistanceType)
-      || sys.absorptionType;
+      || sys.absorptionType || sys.absorptionSpecific;
 }
 
 // ─── AE builders ─────────────────────────────────────────────────────────────
@@ -276,7 +279,7 @@ function buildAbsorptionAE(item, values) {
     img: "",
     disabled: false,
     changes: [],
-    statuses: [`absorption-${values.absorptionType}`],
+    statuses: [`absorption-${values.absorptionType || values.absorptionSpecific || "any"}`],
     flags: {
       [scope]: {
         effectCategory: "defense",
@@ -401,7 +404,7 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   const absId = defenseEffectId("absorption", item.id);
   if (removing) {
     await removeDefenseAE(actor, absId);
-  } else if (sys.absorptionType) {
+  } else if (sys.absorptionType || sys.absorptionSpecific) {
     const values = resolveAbsorptionValues(item);
     const aeData = buildAbsorptionAE(item, values);
     await registerDefenseAE(actor, absId, aeData, isInactive);

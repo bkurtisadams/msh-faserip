@@ -1,4 +1,7 @@
-﻿// init.js v1.12.5 - 2026-05-23
+﻿// init.js v1.12.6 - 2026-05-23
+// v1.12.6: Defense-power detection (resync + createToken) also recognizes
+//          absorptionSpecific, matching defense-effects.js building an
+//          absorption AE from a specific-only absorber.
 // v1.12.5: FASERIP status palette - CONFIG.statusEffects replaced in setup so
 //          the Token HUD shows only FASERIP conditions (core + module statuses
 //          cleared).
@@ -2733,7 +2736,7 @@ Hooks.once("ready", async () => {
         if (!actor?.items) continue;
         const hasDefensePower = actor.items.some(i =>
           i.type === "power" && (i.system?.isBodyArmor || i.system?.isForceField ||
-            (i.system?.isResistance && i.system?.resistanceType) || i.system?.absorptionType)
+            (i.system?.isResistance && i.system?.resistanceType) || i.system?.absorptionType || i.system?.absorptionSpecific)
         );
         if (!hasDefensePower) continue;
 
@@ -3016,7 +3019,7 @@ Hooks.on("createToken", async (tokenDoc, options, userId) => {
   const actor = tokenDoc.actor;
   if (!actor || tokenDoc.actorLink) return;
   const powers = actor.items.filter(i => i.type === "power");
-  const hasDefense = powers.some(p => p.system?.isBodyArmor || p.system?.isForceField || p.system?.isResistance || p.system?.absorptionType);
+  const hasDefense = powers.some(p => p.system?.isBodyArmor || p.system?.isForceField || p.system?.isResistance || p.system?.absorptionType || p.system?.absorptionSpecific);
   if (!hasDefense) return;
   try {
     const { syncAllDefenseEffects } = await import("./modules/effects/defense-effects.js");
