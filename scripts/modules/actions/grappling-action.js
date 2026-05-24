@@ -1,3 +1,13 @@
+// scripts/modules/actions/grappling-action.js v3.3.1 - 2026-05-24
+// v3.3.1: Drop the STR-contest third cell (grappling is a one-roll FEAT, not
+//         an opposed contest). Third cell reverts to DAMAGE (the Full-Hold
+//         damage cap; em-dash otherwise); meta label reverts to Range:adjacent.
+//         The Partial-Hold movement note keeps the Strength comparison per RAW.
+// scripts/modules/actions/grappling-action.js v3.3.0 - 2026-05-23
+// v3.3.0: Render the chat card on the shared attack-card.hbs shell. The third
+//         cell becomes a STR-vs-STR contest (raw Strength, per RAW) in place of
+//         DAMAGE; effect detail moves to the notes slot, buttons unchanged.
+//         _buildChatCard is now async (awaits renderTemplate).
 // scripts/modules/actions/grappling-action.js v3.2.1 - 2026-05-23
 // v3.2.1: CS Reason now reaches the card (was discarded — choice resolved
 //         with csNotes:"") and persists across reopens (lastGrappleReason,
@@ -235,7 +245,7 @@ export class GrapplingAction extends AttackAction {
       autoApply: !!this.opts?.autoApply,
     });
 
-    const cardHtml = this._buildChatCard({
+    const cardHtml = await this._buildChatCard({
       actor, 
       choice, 
       strength, 
@@ -488,42 +498,36 @@ export class GrapplingAction extends AttackAction {
     });
   }
 
-  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [], defenderEffects = [] }) {
+  async _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [], defenderEffects = [] }) {
     const effectLower = String(effect).toLowerCase();
-    
-    // Build CS hover breakdown
-    let shiftDisplay = "";
+
+    // Effective-rank tooltip (the CS breakdown the FEAT was read against)
+    let effRankTooltip = `Strength ${strength.rank}`;
     if (totalShift !== 0) {
       const parts = [];
-      
       if (shiftBreakdown?.manual && shiftBreakdown.manual !== 0) {
-        if (shiftBreakdown.csNotes) {
-          parts.push(shiftBreakdown.csNotes);
-        } else {
-          parts.push(`${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
-        }
+        parts.push(shiftBreakdown.csNotes || `${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
       }
-      
-      for (const eff of attackerEffects) {
-        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
-      }
-      
-      for (const eff of defenderEffects) {
-        parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
-      }
-      
+      for (const eff of attackerEffects) parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+      for (const eff of defenderEffects) parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
       const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
-      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
-      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+      effRankTooltip = `${breakdownText} → ${effectiveRank}`;
     }
 
-    // Build roll display with yellow hover box
-    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
-    const rollDisplay = totalKarmaUsed 
-      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
-      : rollBox;
+    // Roll cell
+    const rollNum = totalKarmaUsed ? cappedTotal : roll.total;
+    const rollTooltip = totalKarmaUsed
+      ? `d100 = ${roll.total} + ${totalKarmaUsed} karma = ${cappedTotal}`
+      : `d100 = ${roll.total}`;
 
-    // Effect-specific blocks
+    // Hold damage — only a Full Hold allows damage (up to the attacker's
+    // Strength, applied via the Deal Hold Damage button); the roll deals none.
+    const dmgValue = effectLower === "hold" ? strength.value : "—";
+    const dmgTooltip = effectLower === "hold"
+      ? `Up to ${strength.rank} (${strength.value}) — apply via Deal Hold Damage`
+      : "Grappling inflicts no damage on this result";
+
+    // Notes (neutral white — the banner now carries the result colour)
     const partialMovement = choice.targetStrength
       ? this._compareRanks(strength.rank, choice.targetStrength) >= 0
         ? `<div style="color:#f57f17;font-weight:bold;">Target cannot move (STR ${strength.rank} ≥ ${choice.targetStrength})</div>`
@@ -531,55 +535,51 @@ export class GrapplingAction extends AttackAction {
       : `<div style="color:#666;font-style:italic;">Movement restriction depends on relative Strength</div>`;
 
     const effectBlocks = {
-      miss: `
-        <div style="padding:6px 10px;margin:4px 10px 6px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;font-size:.9em;">
-          <div style="font-weight:bold;color:#c62828;">Miss</div>
+      miss: `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">Miss</div>
           <div>No hold established. ${actor.name} may not make other attacks this round.</div>
         </div>`,
-      partial: `
-        <div style="padding:6px 10px;margin:4px 10px 6px;background:#fff9c4;border:1px solid #fbc02d;border-radius:3px;font-size:.9em;">
-          <div style="font-weight:bold;color:#f57f17;">Partial Hold</div>
+      partial: `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">Partial Hold</div>
           <div>Target acts at -2 CS; no damage inflicted.</div>
           ${partialMovement}
         </div>`,
-      hold: `
-        <div style="padding:6px 10px;margin:4px 10px 6px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;font-size:.9em;">
-          <div style="font-weight:bold;color:#2e7d32;">Full Hold</div>
-          <div>Target fully restrained; cannot act.</div>
-          <div>You may perform one additional action.</div>
-          <div><strong>May inflict up to ${strength.rank} (${strength.value}) damage</strong> (subject to Body Armor)</div>
+      hold: `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">Full Hold</div>
+          <div>Target fully restrained; cannot act. You may perform one additional action.</div>
+          <div><strong>May inflict up to ${strength.rank} (${strength.value}) damage</strong> (subject to Body Armor).</div>
         </div>`
     };
 
-    return `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <!-- Header -->
-        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
-          <strong style="color:#8b0000;">GRAPPLING</strong>
-          <span style="color:#666;font-size:.85em;">Strength FEAT</span>
-        </div>
-        
-        <!-- Attacker → Target -->
-        <div style="padding:4px 10px;font-size:.95em;">
-          <strong>${actor.name}</strong> <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${choice.targetName}</strong>
-          ${choice.targetStrength ? `<span style="color:#666;font-size:.85em;margin-left:8px;">(STR: ${choice.targetStrength})</span>` : ''}
-        </div>
-        
-        <!-- Ability + Roll + Result -->
-        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
-          <div>Strength: ${strength.rank}${shiftDisplay}</div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span>Roll: ${rollDisplay}</span>
-            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-              ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
-            </span>
-          </div>
-        </div>
-        
-        ${effectBlocks[effectLower] || ""}
-        ${actions}
-      </div>
-    `;
+    const cardData = {
+      actionLabel: "GRAPPLING",
+      formClass: "grappling",
+      weaponName: "",
+      indicatorHtml: `<span style="color:#888;font-size:12px;">Strength FEAT</span>`,
+      hasTarget: !!choice.targetName,
+      targetName: choice.targetName || "",
+      rangeText: "adjacent",
+      badgesHtml: "",
+      resultBg: bg,
+      resultFg: fg,
+      resultText: `${String(color).toUpperCase()} — ${String(effect).toUpperCase()}`,
+      rollNum,
+      rollTooltip,
+      abilityLabelUpper: "STRENGTH",
+      effRankValue: effectiveRank,
+      effRankTooltip,
+      dmgValue,
+      dmgTooltip,
+      notesHtml: effectBlocks[effectLower] || "",
+      consequenceHtml: "",
+      actionsHtml: actions,
+      manualNoticeHtml: ""
+    };
+
+    return await foundry.applications.handlebars.renderTemplate(
+      "systems/msh-faserip/templates/chat/attack-card.hbs",
+      cardData
+    );
   }
 
   _compareRanks(a, b) {

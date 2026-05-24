@@ -1,3 +1,12 @@
+// scripts/modules/actions/escaping-action.js v3.1.1 - 2026-05-24
+// v3.1.1: Drop the STR-contest third cell (escaping is a one-roll FEAT). Third
+//         cell reverts to DAMAGE (em-dash — escapes deal no damage); meta
+//         label reverts to Range:adjacent. Remove now-unused RANK_ABBR import.
+// scripts/modules/actions/escaping-action.js v3.1.0 - 2026-05-23
+// v3.1.0: Render the chat card on the shared attack-card.hbs shell, mirroring
+//         grappling: third cell is a STR-vs-STR contest (escapee vs holder,
+//         raw Strength), effect detail in the notes slot, buttons unchanged.
+//         _buildChatCard is now async (awaits renderTemplate).
 // scripts/modules/actions/escaping-action.js v3.0.0 - 2026-03-18
 // v3.0.0: Restyle dialog to frp-dlg system — blue header, wireCSPanel, frp-fx-grid with tooltips
 // v2.3.0: Apply post-escape effects — Yellow: half move + no actions. Red: half move + -2CS.
@@ -166,7 +175,7 @@ export class EscapingAction extends AttackAction {
       autoApply: !!this.opts?.autoApply,
     });
 
-    const cardHtml = this._buildChatCard({
+    const cardHtml = await this._buildChatCard({
       actor,
       choice,
       strength,
@@ -406,74 +415,75 @@ export class EscapingAction extends AttackAction {
     });
   }
 
-  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [] }) {
+  async _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [] }) {
     const effectLower = String(effect).toLowerCase();
 
-    // CS shift display (hover tooltip style)
-    let shiftDisplay = "";
+    // Effective-rank tooltip (the CS breakdown the FEAT was read against)
+    let effRankTooltip = `Strength ${strength.rank}`;
     if (totalShift !== 0) {
       const parts = [];
       if (shiftBreakdown?.manual && shiftBreakdown.manual !== 0) {
         parts.push(shiftBreakdown.csNotes || `${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
       }
-      for (const eff of attackerEffects) {
-        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
-      }
+      for (const eff of attackerEffects) parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
       const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
-      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
-      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+      effRankTooltip = `${breakdownText} → ${effectiveRank}`;
     }
 
-    // Roll display (yellow hover box)
-    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
-    const rollDisplay = totalKarmaUsed
-      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
-      : rollBox;
+    // Roll cell
+    const rollNum = totalKarmaUsed ? cappedTotal : roll.total;
+    const rollTooltip = totalKarmaUsed
+      ? `d100 = ${roll.total} + ${totalKarmaUsed} karma = ${cappedTotal}`
+      : `d100 = ${roll.total}`;
 
-    // Effect-specific result boxes (white bg, subtle border — matches attack card)
+    // Escape attempts inflict no damage.
+    const dmgValue = "—";
+    const dmgTooltip = "Escape attempts inflict no damage";
+
     const effectBlocks = {
-      miss: `
-        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+      miss: `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#555;">Miss</div>
           <div>You remain held and may take no other actions this turn.</div>
         </div>`,
-      escape: `
-        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+      escape: `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#555;">Escape</div>
           <div>You slip free of the hold. Move up to <strong>half speed</strong> — no other actions.</div>
         </div>`,
-      reverse: `
-        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+      reverse: `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#555;">Reverse</div>
           <div>You break free. Choose one: move up to half distance · attempt Grapple on former attacker · any other action at <strong>-2CS</strong>.</div>
         </div>`
     };
 
-    return `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <!-- Header -->
-        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
-          <strong style="color:#8b0000;">ESCAPE</strong>
-          <span style="color:#666;font-size:.85em;">Strength FEAT</span>
-        </div>
-        <!-- Escaper vs Holder -->
-        <div style="padding:4px 10px;font-size:.95em;">
-          <strong>${actor.name}</strong> <span style="color:#666;">escaping from</span> <strong style="color:#d32f2f;">${choice.opponentName}</strong>
-          ${choice.opponentStr ? `<span style="color:#666;font-size:.85em;margin-left:8px;">(their STR: ${choice.opponentStr})</span>` : ''}
-        </div>
-        <!-- Strength + Roll + inline result badge -->
-        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
-          <div>Strength: ${strength.rank}${shiftDisplay}</div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
-            <span>Roll: ${rollDisplay}</span>
-            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-              ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
-            </span>
-          </div>
-        </div>
-        ${effectBlocks[effectLower] || ""}
-        ${actions}
-      </div>
-    `;
+    const cardData = {
+      actionLabel: "ESCAPE",
+      formClass: "escape",
+      weaponName: "",
+      indicatorHtml: `<span style="color:#888;font-size:12px;">Strength FEAT</span>`,
+      hasTarget: !!choice.opponentName,
+      targetName: choice.opponentName || "",
+      targetLabel: "From",
+      rangeText: "adjacent",
+      badgesHtml: "",
+      resultBg: bg,
+      resultFg: fg,
+      resultText: `${String(color).toUpperCase()} — ${String(effect).toUpperCase()}`,
+      rollNum,
+      rollTooltip,
+      abilityLabelUpper: "STRENGTH",
+      effRankValue: effectiveRank,
+      effRankTooltip,
+      dmgValue,
+      dmgTooltip,
+      notesHtml: effectBlocks[effectLower] || "",
+      consequenceHtml: "",
+      actionsHtml: actions,
+      manualNoticeHtml: ""
+    };
+
+    return await foundry.applications.handlebars.renderTemplate(
+      "systems/msh-faserip/templates/chat/attack-card.hbs",
+      cardData
+    );
   }
 }
