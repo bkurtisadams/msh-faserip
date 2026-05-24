@@ -1,3 +1,8 @@
+// generic-feat-dialog.js v1.3.0 - 2026-05-24
+// v1.3.0: Base picker can now be a directly-chosen rank, not just an ability.
+//         Adds a "Manual Rank" optgroup (Feeble…Beyond); selecting one rolls
+//         that rank vs the chosen intensity with no actor ability involved.
+//         Remember round-trips a manual rank; box relabeled ABILITY → BASE.
 // generic-feat-dialog.js v1.2.0 - 2026-05-06
 // v1.2.0: Strip font/padding/color from select inline styles — moved to
 //         CSS rule .frp-dlg.frp-feat select for centralised tuning.
@@ -79,11 +84,18 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
   // Resolve initial ability + rank state
   let abilityKey, abilityRank, abilityValue, abilityDisplayLabel;
+  let manualRank = false;  // base is a directly-picked rank, not an actor ability
   if (opts.customRank) {
     abilityKey = null;
     abilityRank = opts.customRank;
     abilityValue = game.msh?.getRankValue?.(opts.customRank) ?? 0;
     abilityDisplayLabel = "Custom";
+  } else if (RANKS.includes(savedAbility)) {
+    manualRank = true;
+    abilityKey = null;
+    abilityRank = savedAbility;
+    abilityValue = game.msh?.getRankValue?.(savedAbility) ?? 0;
+    abilityDisplayLabel = "Manual";
   } else {
     abilityKey = ABILITIES.some(a => a.key === savedAbility) ? savedAbility : "fighting";
     const ab = actor.system.abilities[abilityKey];
@@ -94,13 +106,24 @@ export async function showGenericFeatDialog(actor, opts = {}) {
   const abilityShort = RANK_ABBR[abilityRank] || abilityRank;
 
   // Build dropdown options
-  const abilityOptionsHTML = !opts.customRank ? ABILITIES.map(a => {
-    const ab = actor.system.abilities[a.key];
-    const rank = ab?.rank ?? "—";
-    const val = ab?.value ?? 0;
-    const short = RANK_ABBR[rank] || rank;
-    return `<option value="${a.key}" ${a.key === abilityKey ? 'selected' : ''}>${a.label} (${short} ${val})</option>`;
-  }).join('') : '';
+  const selectedRank = manualRank ? abilityRank : null;
+  const abilityOptionsHTML = !opts.customRank
+    ? '<optgroup label="Ability">'
+      + ABILITIES.map(a => {
+          const ab = actor.system.abilities[a.key];
+          const rank = ab?.rank ?? "—";
+          const val = ab?.value ?? 0;
+          const short = RANK_ABBR[rank] || rank;
+          return `<option value="${a.key}" ${(!manualRank && a.key === abilityKey) ? 'selected' : ''}>${a.label} (${short} ${val})</option>`;
+        }).join('')
+      + '</optgroup><optgroup label="Manual Rank">'
+      + RANKS.map(r => {
+          const short = RANK_ABBR[r] || r;
+          const val = game.msh?.getRankValue?.(r) ?? 0;
+          return `<option value="${r}" ${r === selectedRank ? 'selected' : ''}>${r} (${short} ${val})</option>`;
+        }).join('')
+      + '</optgroup>'
+    : '';
 
   const intensityOptionsHTML = ALL_RANKS_WITH_NONE.map(r =>
     `<option value="${r}">${r}</option>`
@@ -137,7 +160,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
       ${showAbilityPicker ? `
       <div class="frp-box">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">ABILITY</span>
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">BASE</span>
           <select id="generic-ability" name="ability" style="flex:1;min-width:140px;">
             ${abilityOptionsHTML}
           </select>
@@ -225,14 +248,23 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         }
       };
 
-      // Ability picker change → swap header + CS row + recompute
+      // Base picker change (ability OR manual rank) → swap header + CS row + recompute
       $abilitySelect.on('change', () => {
         if (!actor) return;
-        currentKey = $abilitySelect.val();
-        const ab = actor.system.abilities[currentKey];
-        currentRank = ab?.rank || "Typical";
-        currentValue = ab?.value || 6;
-        currentLabel = currentKey.charAt(0).toUpperCase() + currentKey.slice(1);
+        const val = $abilitySelect.val();
+        const ability = ABILITIES.find(a => a.key === val);
+        if (ability) {
+          currentKey = val;
+          const ab = actor.system.abilities[currentKey];
+          currentRank = ab?.rank || "Typical";
+          currentValue = ab?.value || 6;
+          currentLabel = ability.label;
+        } else {
+          currentKey = null;
+          currentRank = val;
+          currentValue = game.msh?.getRankValue?.(val) ?? 0;
+          currentLabel = "Manual";
+        }
         const short = RANK_ABBR[currentRank] || currentRank;
         $hStatLabel.text(currentLabel);
         $hStatRank.text(`${short} ${currentValue}`);
@@ -267,7 +299,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         const skipDice     = html.find('[name="skipDice"]').is(':checked');
 
         if (saveSettings && actor) {
-          await setF("lastGenericFeatAbility", currentKey || savedAbility);
+          await setF("lastGenericFeatAbility", currentKey || currentRank);
           await setF("lastGenericFeatLabel", labelVal);
           await setF("lastGenericFeatSkipDice", skipDice);
           await setF("lastGenericFeatRemember", true);
