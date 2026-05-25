@@ -1,4 +1,6 @@
-// action-utils.js v1.8.5 - 2026-05-23
+// action-utils.js v1.8.6 - 2026-05-25
+// v1.8.6: Slam check roll info now renders FEAT result color as a rounded
+//         Universal Table color pill and includes the slam effect beside it.
 // v1.8.5: measureAreasBetweenTokens counts full areas to target (floor, not
 //         ceil) so a target less than one full area away reads 0 = no penalty.
 // action-utils.js v1.8.4 - 2026-05-22
@@ -2975,6 +2977,29 @@ export function extractRememberSettings(html) {
   return { remember, skipDice };
 }
 
+// ── Chat-card FEAT color pills ───────────────────────────────
+
+function normalizeFeatColor(color) {
+  const value = String(color || "").trim().toLowerCase();
+  if (["white", "green", "yellow", "red"].includes(value)) return value;
+  return "white";
+}
+
+function buildChatFeatColorPill(color) {
+  const normalized = normalizeFeatColor(color);
+  return `<span class="frp-feat-pill is-${normalized}">${normalized.toUpperCase()}</span>`;
+}
+
+function formatSlamEffectLabel(slamEffect) {
+  if (slamEffect === "Grand Slam") return "GRAND SLAM";
+  if (slamEffect === "1 Area") return "1 AREA";
+  return String(slamEffect || "").toUpperCase();
+}
+
+function buildSlamEffectPill(slamEffect) {
+  return `<span class="frp-slam-effect-pill">${formatSlamEffectLabel(slamEffect)}</span>`;
+}
+
 // ============================================
 // COLLAPSIBLE CHECK SECTIONS
 // ============================================
@@ -2993,15 +3018,13 @@ export function buildCollapsibleSlamSection(result, opts = {}) {
   const effectColors = {
     "Grand Slam": { bg: "#8B0000", fg: "#fff", icon: "&#x1F4A5;" },
     "1 Area": { bg: "#DC3545", fg: "#fff", icon: "&#x1F4A2;" },
-    "Stagger": { bg: "#FFC107", fg: "#000", icon: "&#x1F635;" },
+    "Stagger": { bg: "#fef102", fg: "#222", icon: "&#x1F635;" },
     "No Slam": { bg: "#28A745", fg: "#fff", icon: "&#x1F6E1;" }
   };
   const colors = effectColors[slamEffect] || { bg: "#666", fg: "#fff", icon: "" };
   
   // Summary line (visible when collapsed)
-  const summaryText = slamEffect === "Grand Slam" 
-    ? `Slam Check - Grand Slam (${knockbackDistance} areas)` 
-    : `Slam Check - ${slamEffect}`;
+  const summaryText = "Slam Check";
   
   // Collision button for knockback effects
   const collisionButton = (slamEffect === "Grand Slam" || slamEffect === "1 Area") ? `
@@ -3016,59 +3039,21 @@ export function buildCollapsibleSlamSection(result, opts = {}) {
       </button>
     </div>` : "";
   
-  // Build detailed content
-  let detailContent = "";
-  if (slamEffect === "Grand Slam") {
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is launched away with tremendous force!</div>
-        <div style="margin-bottom:4px;"><strong>Mechanical Effects:</strong></div>
-        <div style="margin-left:8px;">
-          <div>Attacker Strength: ${attackerStrengthRank} (${attackerStrength})</div>
-          <div>Knockback Distance: ${knockbackDistance} areas</div>
-          <div>Launch Speed: ${knockbackDistance} areas/round</div>
-          <div>Direction: Attacker chooses (if damage dealt)</div>
-        </div>
-        <div style="margin-top:6px;"><strong>Collision Damage:</strong></div>
-        <div style="margin-left:8px;font-size:.85em;color:#555;">
-          <div>If target hits obstacle: charging damage applies</div>
-          <div>Buildings reduce knockback per movement rules</div>
-          <div>Target takes slam damage if hitting walls/objects</div>
-        </div>
-      </div>`;
-  } else if (slamEffect === "1 Area") {
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is knocked back 1 area!</div>
-        <div style="margin-bottom:4px;"><strong>Mechanical Effects:</strong></div>
-        <div style="margin-left:8px;font-size:.85em;">
-          <div>Knocked 1 area away from attacker</div>
-          <div>May hit obstacles during knockback</div>
-          <div>Takes damage if slammed into walls/objects</div>
-        </div>
-      </div>`;
-  } else if (slamEffect === "Stagger") {
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:6px;"><strong>${targetName}</strong> staggers from the impact!</div>
-        <div style="margin-left:8px;font-size:.85em;">
-          <div>Knocked back a step or two</div>
-          <div>No longer adjacent to attacker</div>
-          <div>Fully capable of combat next round</div>
-        </div>
-      </div>`;
-  } else {
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div><strong>${targetName}</strong> plants their feet and resists!</div>
-        <div style="margin-top:4px;font-size:.85em;color:#555;">No knockback effect - remains in current position.</div>
-      </div>`;
-  }
+  // Keep the expanded slam check compact: the result row carries the outcome.
+  const detailContent = "";
   
   // Roll info line
+  const colorPill = buildChatFeatColorPill(colorLower);
+  const effectPill = buildSlamEffectPill(slamEffect);
   const rollInfo = `
-    <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
-      Endurance: ${effectiveEndRank} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+    <div class="frp-check-roll-info" style="padding:8px;font-size:.85em;color:#555;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span>Endurance: ${effectiveEndRank}</span>
+      <span>|</span>
+      <span>Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span></span>
+      <span>|</span>
+      <span>Result:</span>
+      ${colorPill}
+      ${effectPill}
     </div>`;
   
   const muted = !!opts.muted;

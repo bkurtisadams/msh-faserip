@@ -1,4 +1,5 @@
-/* action-dialog.css v3.8.0 - 2026-05-06 */
+/* action-dialog.css v3.8.1 - 2026-05-25 */
+/* v3.8.1: Add FEAT requirement pill badges and align colors to the Universal Table. */
 /* v3.8.0: FEAT dropdown readability — 15px Barlow (uncondensed),
            4px 8px padding, explicit ink color, optgroup tier-tinting. */
 /* v3.7.0: FEAT theme refinement — darker forest green
@@ -200,6 +201,66 @@
   font-weight: 700;
   color: #444;
   background: var(--cream-dk);
+}
+
+
+.frp-dlg .frp-need-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.frp-dlg .frp-need-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  color: var(--feat-deep);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.frp-dlg .frp-feat-pill,
+.faserip-check-section .frp-feat-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1px solid #333;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+.frp-dlg .frp-feat-pill.is-white,
+.faserip-check-section .frp-feat-pill.is-white {
+  background: #ffffff;
+  border-color: #444;
+  color: #222;
+}
+.frp-dlg .frp-feat-pill.is-green,
+.frp-dlg .frp-feat-pill.is-auto,
+.faserip-check-section .frp-feat-pill.is-green,
+.faserip-check-section .frp-feat-pill.is-auto {
+  background: #00a94e;
+  border-color: #006f35;
+  color: #fff;
+}
+.frp-dlg .frp-feat-pill.is-yellow,
+.faserip-check-section .frp-feat-pill.is-yellow {
+  background: #fef102;
+  border-color: #9a8f00;
+  color: #222;
+}
+.frp-dlg .frp-feat-pill.is-red,
+.frp-dlg .frp-feat-pill.is-impossible,
+.faserip-check-section .frp-feat-pill.is-red,
+.faserip-check-section .frp-feat-pill.is-impossible {
+  background: #ee1e25;
+  border-color: #9b1118;
+  color: #fff;
 }
 
 /* ── Mode buttons in titlebar ─────────────────────────────────────────── */
@@ -1251,4 +1312,32 @@ body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .karma-calculation,
 body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-calculation {
   border: 1px solid #b8a868;
   color: #1a1a1a;
+}
+/* Compact FEAT pills inside collapsible chat checks */
+.faserip-check-section .frp-check-roll-info .frp-feat-pill {
+  min-width: 48px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.1;
+  letter-spacing: 0.25px;
+}
+
+.faserip-check-section .frp-slam-effect-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #d8d1c3;
+  background: #eeeae1;
+  color: #333;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.25px;
+  line-height: 1.1;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
 }

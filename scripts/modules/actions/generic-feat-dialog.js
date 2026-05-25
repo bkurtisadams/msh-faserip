@@ -1,4 +1,5 @@
-// generic-feat-dialog.js v1.3.0 - 2026-05-24
+// generic-feat-dialog.js v1.3.1 - 2026-05-25
+// v1.3.1: Render FEAT requirements as "Needs:" color pills using Universal Table colors.
 // v1.3.0: Base picker can now be a directly-chosen rank, not just an ability.
 //         Adds a "Manual Rank" optgroup (Feeble…Beyond); selecting one rolls
 //         that rank vs the chosen intensity with no actor ability involved.
@@ -50,10 +51,10 @@ function applyCS(rank, shift) {
 
 function colorBg(c) {
   switch ((c || '').toLowerCase()) {
-    case 'white':  return '#f5f5f0';
-    case 'green':  return '#4CAF50';
-    case 'yellow': return '#FFC107';
-    case 'red':    return '#F44336';
+    case 'white':  return '#ffffff';
+    case 'green':  return '#00a94e';
+    case 'yellow': return '#fef102';
+    case 'red':    return '#ee1e25';
     default:       return '#ddd';
   }
 }
@@ -66,6 +67,37 @@ function colorFg(c) {
     case 'red':    return '#fff';
     default:       return '#1a1a1a';
   }
+}
+
+function buildNeedPill(id, initialLabel = 'ANY COLOR') {
+  return `<span class="frp-need-line"><span class="frp-need-label">Needs:</span><span id="${id}" class="frp-feat-pill is-white">${initialLabel}</span></span>`;
+}
+
+function setNeedPill($el, requirement, { impossible = false, automatic = false } = {}) {
+  if (!$el?.length) return;
+  const classes = 'frp-feat-pill is-white is-green is-yellow is-red is-auto is-impossible';
+  $el.removeClass(classes);
+
+  if (impossible) {
+    $el.addClass('frp-feat-pill is-impossible').text('IMPOSSIBLE');
+    return;
+  }
+  if (automatic) {
+    $el.addClass('frp-feat-pill is-auto').text('AUTOMATIC');
+    return;
+  }
+
+  const key = String(requirement || '').toLowerCase();
+  const map = {
+    'white': ['is-white', 'WHITE'],
+    'green': ['is-green', 'GREEN'],
+    'yellow': ['is-yellow', 'YELLOW'],
+    'red': ['is-red', 'RED'],
+    'any color': ['is-white', 'ANY COLOR'],
+    'any': ['is-white', 'ANY COLOR']
+  };
+  const [klass, label] = map[key] || ['is-white', String(requirement || 'ANY COLOR').toUpperCase()];
+  $el.addClass(`frp-feat-pill ${klass}`).text(label);
 }
 
 export async function showGenericFeatDialog(actor, opts = {}) {
@@ -179,8 +211,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         <select id="intensity" name="intensity" style="flex:1;min-width:100px;">
           ${intensityOptionsHTML}
         </select>
-        <span style="font-family:'Oswald',sans-serif;font-size:11px;color:var(--feat-deep);letter-spacing:0.3px;text-transform:uppercase;font-weight:700;flex-shrink:0;">Need:</span>
-        <span id="required-feat-text" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;flex-shrink:0;color:#1a1a1a;">Any Color</span>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;flex-shrink:0;">${buildNeedPill('required-feat-text')}</span>
       </div>
 
       ${csRowHtml}
@@ -231,21 +262,13 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         const cs = parseInt($shift.val()) || 0;
 
         if (intensity === "None") {
-          $reqText.text("Any Color").css('color', '#1a1a1a');
+          setNeedPill($reqText, 'Any Color');
           return;
         }
 
         const effectiveRank = applyCS(currentRank, cs);
         const { requirement, impossible, automatic } = determineFeatRequirement(effectiveRank, intensity);
-
-        if (impossible) {
-          $reqText.text("IMPOSSIBLE").css('color', '#6a0000');
-        } else if (automatic) {
-          $reqText.text("AUTOMATIC").css('color', '#1b5e20');
-        } else {
-          const colors = { Green: '#1b5e20', Yellow: '#c87a00', Red: '#6a0000' };
-          $reqText.text(requirement).css('color', colors[requirement] || '#1a1a1a');
-        }
+        setNeedPill($reqText, requirement, { impossible, automatic });
       };
 
       // Base picker change (ability OR manual rank) → swap header + CS row + recompute
@@ -344,7 +367,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
                   <div>Intensity: ${intensity}</div>
                   <div>Ability rank is 3+ ranks higher than intensity</div>
                 </div>
-                <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:#4CAF50;color:#fff;">
+                <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:#00a94e;color:#fff;">
                   AUTOMATIC SUCCESS
                 </div>
               </div>`
