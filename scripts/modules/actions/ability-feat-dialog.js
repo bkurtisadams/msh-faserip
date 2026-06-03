@@ -141,6 +141,41 @@ function buildNeedPill(id, initialLabel = "ANY COLOR") {
   return `<span class="frp-need-line"><span class="frp-need-label">Needs:</span><span id="${id}" class="frp-feat-pill is-white">${initialLabel}</span></span>`;
 }
 
+function buildChatNeedPill(requirement, { impossible = false, automatic = false } = {}) {
+  let label = String(requirement || 'Any Color').toUpperCase();
+  let bg = '#f8f8f8';
+  let fg = '#333';
+  let border = '#666';
+
+  if (impossible) {
+    label = 'IMPOSSIBLE';
+    bg = '#ee1e25';
+    fg = '#fff';
+    border = '#9b1118';
+  } else if (automatic) {
+    label = 'AUTOMATIC';
+    bg = '#00a94e';
+    fg = '#fff';
+    border = '#007a38';
+  } else {
+    switch (String(requirement || '').toLowerCase()) {
+      case 'green':
+        bg = '#00a94e'; fg = '#fff'; border = '#007a38'; break;
+      case 'yellow':
+        bg = '#fef102'; fg = '#222'; border = '#b79200'; break;
+      case 'red':
+        bg = '#ee1e25'; fg = '#fff'; border = '#9b1118'; break;
+      case 'white':
+        bg = '#ffffff'; fg = '#222'; border = '#666'; break;
+      default:
+        label = 'ANY COLOR';
+        bg = '#f8f8f8'; fg = '#333'; border = '#666'; break;
+    }
+  }
+
+  return `<span style="display:inline-block;vertical-align:middle;margin-left:4px;padding:1px 8px;border-radius:8px;border:1px solid ${border};background:${bg};color:${fg};font-family:'Oswald',sans-serif;font-size:.92em;font-weight:700;letter-spacing:.03em;line-height:1.2;text-transform:uppercase;">${label}</span>`;
+}
+
 function setNeedPill($el, requirement, { impossible = false, automatic = false } = {}) {
   if (!$el?.length) return;
   const classes = 'frp-feat-pill is-white is-green is-yellow is-red is-auto is-impossible';
@@ -553,7 +588,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                   ${strengthContext}
                   ${fightingContext}
-                  ${effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Required: ${featRequirement})</div>` : ''}
+                  ${effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Req: ${buildChatNeedPill(featRequirement)})</div>` : ''}
                   <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 

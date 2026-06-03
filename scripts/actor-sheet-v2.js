@@ -286,7 +286,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
       callback: (path) => this.actor.update({ [attr]: path }),
       top: (this.position?.top ?? 0) + 40,
       left: (this.position?.left ?? 0) + 10
-    }).browse();
+    }).render(true);
   }
 
   /** Activate v1-style {{editor}} helper outputs ({.editor-content[data-edit]})

@@ -3083,56 +3083,36 @@ export function buildCollapsibleSlamSection(result, opts = {}) {
 export function buildCollapsibleStunSection(result, opts = {}) {
   if (!result) return "";
   
-  const { colorLower, stunDuration, targetName, roll, effectiveEndRank } = result;
-  
-  // Determine effect text and colors
-  let effectText = "";
+  const { colorLower, stunDuration, roll, effectiveEndRank } = result;
+
+  const colorKey = String(colorLower || '').toLowerCase();
   let colors = { bg: "#28A745", fg: "#fff", icon: "&#x1F6E1;" };
-  
-  if (colorLower === "white" && stunDuration > 0) {
-    effectText = `Stunned ${stunDuration} round${stunDuration !== 1 ? 's' : ''}`;
+  let effectLabel = "NO";
+
+  if (colorKey === "white") {
     colors = { bg: "#8B0000", fg: "#fff", icon: "&#x1F4A4;" };
-  } else if (colorLower === "green") {
-    effectText = "Stunned 1 round";
+    effectLabel = stunDuration > 0 ? `${stunDuration} ${stunDuration === 1 ? 'ROUND' : 'ROUNDS'}` : '1-10 ROUNDS';
+  } else if (colorKey === "green") {
     colors = { bg: "#DC3545", fg: "#fff", icon: "&#x1F635;" };
-  } else {
-    effectText = "No effect";
+    effectLabel = "1 ROUND";
   }
-  
-  const summaryText = `Stun Check - ${effectText}`;
-  
-  // Build detailed content
-  let detailContent = "";
-  if (colorLower === "white" && stunDuration > 0) {
-    const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is knocked out!</div>
-        <div style="margin-left:8px;">
-          <div>Duration: <strong title="Rolled 1${stunDie}">${stunDuration}</strong> round${stunDuration !== 1 ? 's' : ''}</div>
-          <div style="font-size:.85em;color:#555;margin-top:4px;">May take no actions while stunned.</div>
-        </div>
-      </div>`;
-  } else if (colorLower === "green") {
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is knocked down!</div>
-        <div style="margin-left:8px;font-size:.85em;color:#555;">
-          <div>Stunned 1 round - no actions next round.</div>
-        </div>
-      </div>`;
-  } else {
-    detailContent = `
-      <div style="padding:8px;font-size:.9em;">
-        <div><strong>${targetName}</strong> shakes it off!</div>
-        <div style="margin-top:4px;font-size:.85em;color:#555;">No stun effect.</div>
-      </div>`;
-  }
-  
-  // Roll info line
+
+  const summaryText = "Stun Check";
+
+  // Keep the expanded stun check compact: the result row carries the outcome.
+  const detailContent = "";
+
+  const colorPill = buildChatFeatColorPill(colorKey);
+  const effectPill = `<span class="frp-slam-effect-pill">${effectLabel}</span>`;
   const rollInfo = `
-    <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
-      Endurance: ${effectiveEndRank} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+    <div class="frp-check-roll-info" style="padding:8px;font-size:.85em;color:#555;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span>Endurance: ${effectiveEndRank}</span>
+      <span>|</span>
+      <span>Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span></span>
+      <span>|</span>
+      <span>Result:</span>
+      ${colorPill}
+      ${effectPill}
     </div>`;
   
   const muted = !!opts.muted;
