@@ -1341,3 +1341,44 @@ body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-cal
   text-transform: uppercase;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
 }
+
+/* ── Resource FEAT dialog (gold section identity) ───────────────────── */
+.frp-dlg.frp-res .frp-header-v3 {
+  background: linear-gradient(90deg, #e2ab14 0%, #b8860b 100%);
+  color: #3a2a00;
+  border-bottom: 2px solid #8a6508;
+  text-shadow: 0 1px 0 rgba(255,255,255,.25);
+}
+.frp-dlg.frp-res .frp-header-v3 .h-action { color: #5a1a00; }
+.frp-dlg.frp-res .frp-header-v3 .h-actor { color: #3a2a00; }
+.frp-dlg.frp-res .frp-header-v3 .h-stat-label { color: #5a4400; opacity: .85; }
+.frp-dlg.frp-res .frp-header-v3 .h-stat-rank { color: #660000; }
+
+/* Weekly-lockout status strip */
+.frp-dlg .frp-lockbar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 8px; margin-bottom: 8px; border-radius: 3px;
+  font-family: 'Barlow', Arial, sans-serif; font-size: 12px; line-height: 1.25;
+}
+.frp-dlg .frp-lockbar .ic { font-size: 14px; flex-shrink: 0; }
+.frp-dlg .frp-lockbar.locked { background: #fdf3e0; border: 1px solid #e6c378; color: #7a5b16; }
+.frp-dlg .frp-lockbar.open { background: #eef7ee; border: 1px solid #bcdcbc; color: #2f5d2f; }
+.frp-dlg .frp-lockbar .src {
+  margin-left: auto; flex-shrink: 0; opacity: .7;
+  font-family: 'Oswald', sans-serif; font-size: 10px; letter-spacing: .3px; text-transform: uppercase;
+}
+
+/* GM override row */
+.frp-dlg .frp-gm-row {
+  display: none; align-items: center; gap: 6px;
+  padding: 5px 8px; margin-bottom: 8px;
+  background: #f3eef8; border: 1px dashed #b69fd0; border-radius: 3px;
+  font-size: 12px; color: #5a3d7a;
+}
+.frp-dlg .frp-gm-row.show { display: flex; }
+.frp-dlg .frp-gm-row label { display: flex; align-items: center; gap: 6px; font-family: 'Barlow', sans-serif; font-weight: 600; cursor: pointer; }
+.frp-dlg .frp-gm-row .tag {
+  margin-left: auto; background: #5a3d7a; color: #fff;
+  font-family: 'Oswald', sans-serif; font-size: 9px; letter-spacing: .5px;
+  padding: 1px 6px; border-radius: 3px;
+}

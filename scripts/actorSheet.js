@@ -54,6 +54,8 @@ import {
   RANK_ALIASES, normalizeRank,
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
+import { showFaseripDialog } from "./modules/actions/dialog-shim.js";
+import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
 
@@ -3698,147 +3700,221 @@ html.find('.headquarters-row').each((i, row) => {
   }
 
   // Resource FEAT Roll (standard mode, no RP)
+  // Resource FEAT Roll (standard mode, no RP) — DialogV2, gold header,
+  // live required-color pill, weekly lockout (setting-gated) + GM override.
+  _resourceRanks() {
+    return ["Shift-0","Feeble","Poor","Typical","Good","Excellent",
+            "Remarkable","Incredible","Amazing","Monstrous","Unearthly"];
+  }
+
+  // Required FEAT color for an item rank vs a resource rank (house thresholds).
+  _resourceFeatRequirement(resIdx, itemIdx, loan) {
+    if (itemIdx > resIdx + (loan ? 1 : 0))
+      return { color: "Impossible", cls: "is-impossible", hint: "above your Resource rank" };
+    const diff = resIdx - itemIdx;
+    if (diff >= 3) return { color: "Automatic", cls: "is-auto", hint: "3+ ranks under \u2014 no roll" };
+    if (diff >= 1) return { color: "Green", cls: "is-green", hint: `${diff} rank${diff>1?"s":""} under Resources` };
+    if (diff === 0) return { color: "Yellow", cls: "is-yellow", hint: "equal to Resources" };
+    return { color: "Yellow", cls: "is-yellow", hint: "+1 via bank loan" };
+  }
+
+  // Weekly lockout from worldTime + per-actor flags. Setting-gated.
+  // scope "week" blocks every attempt; scope "fail" blocks lockedIdx and higher.
+  _getResourceLockStatus() {
+    if (!game.settings.get("msh-faserip", "enforceResourceLockout"))
+      return { enabled: false, locked: false };
+    const WEEK = 604800; // 7 game-days in seconds
+    let now;
+    try { now = game.msh.getCampaignDateTime().elapsedSeconds; }
+    catch { now = game.time.worldTime; }
+    const f = this.actor.getFlag("msh-faserip", "resourceFeat") || {};
+    if (Number.isFinite(f.lastAttemptWT) && now - f.lastAttemptWT < WEEK)
+      return { enabled: true, locked: true, scope: "week",
+               daysLeft: Math.ceil((f.lastAttemptWT + WEEK - now) / 86400) };
+    if (Number.isFinite(f.lastFailWT) && Number.isFinite(f.lastFailIdx) && now - f.lastFailWT < WEEK)
+      return { enabled: true, locked: true, scope: "fail", lockedIdx: f.lastFailIdx,
+               daysLeft: Math.ceil((f.lastFailWT + WEEK - now) / 86400) };
+    return { enabled: true, locked: false };
+  }
+
   _onResourceRoll() {
+    const ranks = this._resourceRanks();
     const resourceRank = this.actor.system.attributes.resources.rank;
     const resourceValue = this.actor.system.attributes.resources.value;
-  
-    const ranks = [
-      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-    ];
-  
-    const dialogContent = `
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Resource Rank:</label>
-        <input type="text" id="resource-rank" value="${resourceRank}" style="width: 100px;" readonly>
-        <span style="margin-left: 5px;">(${resourceValue})</span>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Item Cost Rank:</label>
-        <select id="item-rank" name="itemRank" style="width: 120px;">
-          ${ranks.map(r => `<option value="${r}">${r}</option>`).join("")}
-        </select>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Item Description:</label>
-        <input type="text" id="item-description" style="width: 180px;" placeholder="e.g., Apartment rent">
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label><input type="checkbox" id="bank-loan" name="bankLoan"> Using a bank loan (allows 1 rank higher purchase)</label>
-      </div>
-    `;
-  
-    new Dialog({
-      title: `Resource Roll: ${this.actor.name}`,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>',
-          label: "Roll",
-          callback: async (html) => {
-            const itemRank = html.find('#item-rank').val();
-            const itemDescription = html.find('#item-description').val() || "item";
-            const bankLoan = html.find('#bank-loan').is(':checked');
-  
-            const resourceIndex = ranks.indexOf(resourceRank);
-            const itemIndex = ranks.indexOf(itemRank);
-  
-            if (resourceIndex === -1 || itemIndex === -1) {
-              return ui.notifications.error("Invalid rank selection");
-            }
-  
-            if (itemIndex > resourceIndex + (bankLoan ? 1 : 0)) {
-              return ui.notifications.warn("Item rank is too high for your resources.");
-            }
-  
-            let featColorNeeded;
-            const rankDifference = resourceIndex - itemIndex;
-  
-            if (rankDifference >= 3) {
-              featColorNeeded = "Automatic";
-            } else if (rankDifference === 1 || rankDifference === 2) {
-              featColorNeeded = "Green";
-            } else if (rankDifference === 0 || (bankLoan && itemIndex === resourceIndex + 1)) {
-              featColorNeeded = "Yellow";
-            }
-  
-            const roll = new Roll("1d100");
-            await roll.evaluate();
-  
-            const resultColor = game.msh.rollUniversalTable(resourceRank, roll.total);
-            const resultColorLower = resultColor.toLowerCase();
-            let success = false;
-  
-            if (featColorNeeded === "Automatic") success = true;
-            else if (featColorNeeded === "Green") success = ["green", "yellow", "red"].includes(resultColorLower);
-            else if (featColorNeeded === "Yellow") success = ["yellow", "red"].includes(resultColorLower);
-            else if (featColorNeeded === "Red") success = resultColorLower === "red";
-  
-            const colorMap = {
-              white: "#f8f8f8", green: "#4CAF50", yellow: "#FFC107", red: "#F44336"
-            };
-            const textColor = (["white", "yellow"].includes(resultColorLower)) ? "#333" : "white";
-  
-            const chatContent = `
-              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px;">
-                <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                  <strong>${this.actor.name} - Resource FEAT for ${itemDescription}</strong>
-                </div>
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                  <div>Resource Rank: ${resourceRank} (${resourceValue})</div>
-                  <div>Item Rank: ${itemRank}</div>
-                  ${bankLoan ? '<div>Using Bank Loan</div>' : ''}
-                  <div>Required FEAT: ${featColorNeeded}</div>
-                  <div>Roll: ${roll.total}</div>
-                </div>
-                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
-                  background-color: ${colorMap[resultColorLower]}; color: ${textColor};">
-                  ${resultColor.toUpperCase()}
-                </div>
-                <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${success ? '#4CAF50' : '#F44336'};">
-                  ${success ? 'SUCCESS: Purchase Possible' : 'FAILURE: Cannot Afford'}
-                </div>
-                ${bankLoan && success ? `
-                  <div style="padding: 5px 10px; font-size: 0.9em; background-color: #fffde7; border: 1px solid #ffd54f; margin-top: 5px;">
-                    <strong>Bank loan approved</strong><br>
-                    You must make a ${ranks[Math.max(0, resourceIndex - 2)]} Resource FEAT each month for ${itemIndex + 1} months.
-                    <br>Failure to pay results in the bank reclaiming the item.
-                  </div>` : ''}
-              </div>
-            `;
-  
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-              content: chatContent
-            });
+    const resIdx = ranks.indexOf(resourceRank);
+    const resShort = (game.msh?.getRankAbbreviation?.(resourceRank)) || resourceRank;
+    const isGM = game.user.isGM;
+    const lock = this._getResourceLockStatus();
+    const dateTag = (() => { try { const d = game.msh.getCampaignDateTime().date; return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; } catch { return ""; } })();
 
-            const historyEntry = {
-              timestamp: new Date().toISOString(),
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: 0,
-              type: "Resource FEAT",
-              description: `${itemDescription} (${itemRank}) - ${success ? 'SUCCESS' : 'FAILED'}${bankLoan ? ' [Bank Loan]' : ''}`
-            };
-            
-            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-            currentHistory.push(historyEntry);
-            
-            if (typeof game.msh?.runAsGM === 'function') {
-              game.msh.runAsGM({
-                operation: 'update',
-                targetActorUuid: this.actor.uuid,
-                args: [{ "system.karma.history": currentHistory }]
-              });
-            } else {
-              await this.actor.update({ "system.karma.history": currentHistory });
-            }
+    const initItem = ranks[Math.max(0, resIdx - 2)] || "Typical";
+    const initIdx = ranks.indexOf(initItem);
+    const initReq = this._resourceFeatRequirement(resIdx, initIdx, false);
+
+    let lockbar = "";
+    if (lock.enabled) {
+      if (lock.locked && lock.scope === "week") {
+        lockbar = `<div class="frp-lockbar locked"><span class="ic">\u23f3</span>
+          <span><b>Locked</b> \u2014 a Resource FEAT was made this week. Next attempt in <b>${lock.daysLeft} day${lock.daysLeft>1?"s":""}</b>.</span>
+          <span class="src">${dateTag}</span></div>`;
+      } else if (lock.locked && lock.scope === "fail") {
+        lockbar = `<div class="frp-lockbar locked"><span class="ic">\u23f3</span>
+          <span><b>Locked</b> \u2014 failed a ${ranks[lock.lockedIdx]} purchase. No ${ranks[lock.lockedIdx]}-or-higher attempt for <b>${lock.daysLeft} day${lock.daysLeft>1?"s":""}</b>.</span>
+          <span class="src">${dateTag}</span></div>`;
+      } else {
+        lockbar = `<div class="frp-lockbar open"><span class="ic">\u2713</span>
+          <span><b>Available</b> this week.</span><span class="src">${dateTag}</span></div>`;
+      }
+    }
+
+    const gmrow = (isGM && lock.locked)
+      ? `<div class="frp-gm-row show"><label><input type="checkbox" id="res-ovr"> Override weekly lockout</label><span class="tag">GM</span></div>`
+      : "";
+
+    const rankOpts = ranks.map(r => `<option value="${r}" ${r===initItem?"selected":""}>${r}</option>`).join("");
+
+    const content = `
+      <div class="frp-dlg frp-res">
+        <div class="frp-header-v3">
+          <span class="h-action">Resource&nbsp;FEAT</span>
+          <span class="h-paren">\u00b7</span>
+          <span class="h-actor">${this.actor.name}</span>
+          <span class="h-spacer"></span>
+          <span class="h-stat"><span class="h-stat-label">Resources</span>
+            <span class="h-stat-rank">${resShort} ${resourceValue}</span></span>
+        </div>
+        ${lockbar}
+        ${gmrow}
+        <div class="frp-row"><span class="lbl">Resource</span>
+          <input type="text" value="${resourceRank}" readonly>
+          <span class="rankval">(${resourceValue})</span></div>
+        <div class="frp-row"><span class="lbl">Item Cost</span>
+          <select id="res-item">${rankOpts}</select></div>
+        <div class="frp-row"><span class="lbl">For</span>
+          <input type="text" id="res-desc" placeholder="e.g. surveillance van, monthly rent\u2026"></div>
+        <div class="frp-opt-row"><label><input type="checkbox" id="res-loan"> Bank loan (allows 1 rank higher)</label></div>
+        <div class="frp-need-line"><span class="frp-need-label">Required</span>
+          <span id="res-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span>
+          <span id="res-hint" class="hint">${initReq.hint}</span></div>
+        <div class="frp-foot">
+          <button id="res-roll" class="roll">\ud83c\udfb2 Roll</button>
+          <button id="res-cancel" class="cancel">Cancel</button>
+        </div>
+      </div>`;
+
+    const self = this;
+    showFaseripDialog({
+      title: `Resource Roll: ${this.actor.name}`,
+      content,
+      render: async (html, dlg) => {
+        const $item = html.find("#res-item");
+        const $loan = html.find("#res-loan");
+        const $ovr  = html.find("#res-ovr");
+        const $pill = html.find("#res-pill");
+        const $hint = html.find("#res-hint");
+        const $roll = html.find("#res-roll");
+
+        const refresh = () => {
+          const itemIdx = ranks.indexOf($item.val());
+          const loan = $loan.is(":checked");
+          const req = self._resourceFeatRequirement(resIdx, itemIdx, loan);
+          $pill.attr("class", `frp-feat-pill ${req.cls}`).text(req.color.toUpperCase());
+          $hint.text(req.hint);
+          const overridden = $ovr.length ? $ovr.is(":checked") : false;
+          const blocked = lock.locked && !overridden &&
+            (lock.scope === "week" || (lock.scope === "fail" && itemIdx >= lock.lockedIdx));
+          const impossible = req.color === "Impossible";
+          $roll.prop("disabled", impossible || blocked)
+               .html(blocked ? "\ud83d\udd12 Locked this week" : "\ud83c\udfb2 Roll");
+        };
+        $item.on("change", refresh);
+        $loan.on("change", refresh);
+        $ovr.on("change", refresh);
+        refresh();
+
+        html.find("#res-cancel").on("click", () => dlg.close());
+        $roll.on("click", async () => {
+          if ($roll.prop("disabled")) return;
+          const itemRank = $item.val();
+          const itemIdx = ranks.indexOf(itemRank);
+          const loan = $loan.is(":checked");
+          const desc = (html.find("#res-desc").val() || "item").trim();
+          const req = self._resourceFeatRequirement(resIdx, itemIdx, loan);
+          if (req.color === "Impossible") return ui.notifications.warn("Item rank is too high for your resources.");
+
+          const roll = new Roll("1d100");
+          await roll.evaluate();
+          const resultColor = game.msh.rollUniversalTable(resourceRank, roll.total);
+          const rcl = resultColor.toLowerCase();
+          let success = false;
+          if (req.color === "Automatic") success = true;
+          else if (req.color === "Green") success = ["green","yellow","red"].includes(rcl);
+          else if (req.color === "Yellow") success = ["yellow","red"].includes(rcl);
+
+          const bannerBg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[rcl] || "#ccc";
+          const bannerFg = ["white","yellow"].includes(rcl) ? "#222" : "#fff";
+          const reqPillCls = { "Automatic":"is-auto","Green":"is-green","Yellow":"is-yellow" }[req.color] || "is-green";
+          const loanNote = (loan && success)
+            ? `<div style="padding:7px 12px;font-size:12px;background:#fffde7;border-top:1px solid #ffd54f;color:#6b5d00;line-height:1.4;">
+                 <b>Bank loan approved.</b> Monthly ${ranks[Math.max(0,resIdx-2)]} Resource FEAT for ${itemIdx+1} months. Miss a payment and the bank reclaims it.</div>`
+            : "";
+
+          const card = `
+            <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;overflow:hidden;color:#333;">
+              <div style="padding:7px 12px;border-bottom:1px solid #d8d8d0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <strong style="color:#8b0000;font-size:14px;letter-spacing:.3px;">Resource FEAT</strong>
+                <span style="color:#888;font-size:12px;">${desc}</span></div>
+              <div style="padding:6px 12px;display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e2da;">
+                <span><span style="color:#888;">Resource:</span> <b>${resourceRank} (${resourceValue})</b></span>
+                <span><span style="color:#888;">Item:</span> <b>${itemRank}</b>${loan?' <span style="color:#6b5d00;">(loan)</span>':''}</span></div>
+              <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bannerBg};color:${bannerFg};">${resultColor.toUpperCase()}</div>
+              <div style="display:flex;background:#fff;text-align:center;border-bottom:1px solid #ddd;">
+                <div style="flex:1;padding:8px 4px;border-right:1px solid #ececec;">
+                  <div style="font-size:24px;font-weight:bold;color:#222;line-height:1;">${roll.total}</div>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">Roll</div></div>
+                <div style="flex:1.4;padding:8px 4px;border-right:1px solid #ececec;">
+                  <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${resourceRank}</div>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">Resources</div></div>
+                <div style="flex:1.2;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
+                  <span class="frp-feat-pill ${reqPillCls}">${req.color.toUpperCase()}</span>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed</div></div></div>
+              <div style="padding:7px 12px;text-align:center;font-weight:bold;font-size:14px;letter-spacing:.5px;color:${success?'#1b5e20':'#c62828'};">
+                ${success ? "\u2713 PURCHASE POSSIBLE" : "\u2717 CANNOT AFFORD"}</div>
+              ${loanNote}
+            </div>`;
+
+          await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card });
+
+          if (lock.enabled) {
+            let now;
+            try { now = game.msh.getCampaignDateTime().elapsedSeconds; }
+            catch { now = game.time.worldTime; }
+            const upd = { lastAttemptWT: now };
+            if (!success) { upd.lastFailWT = now; upd.lastFailIdx = itemIdx; }
+            await this.actor.setFlag("msh-faserip", "resourceFeat",
+              foundry.utils.mergeObject(this.actor.getFlag("msh-faserip","resourceFeat") || {}, upd));
           }
-        },
-        cancel: { label: "Cancel" }
-      },
-      default: "roll"
-    }).render(true);
+
+          const historyEntry = {
+            timestamp: new Date().toISOString(),
+            realDate: new Date().toLocaleDateString(),
+            gameDate: dateTag,
+            amount: 0,
+            type: "Resource FEAT",
+            description: `${desc} (${itemRank}) - ${success ? "SUCCESS" : "FAILED"}${loan ? " [Bank Loan]" : ""}`
+          };
+          const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+          currentHistory.push(historyEntry);
+          if (typeof game.msh?.runAsGM === "function") {
+            game.msh.runAsGM({ operation: "update", targetActorUuid: this.actor.uuid, args: [{ "system.karma.history": currentHistory }] });
+          } else {
+            await this.actor.update({ "system.karma.history": currentHistory });
+          }
+
+          dlg.close();
+        });
+      }
+    });
   }
 
   // Buy with Resource Points (RP mode — no roll, just spend)

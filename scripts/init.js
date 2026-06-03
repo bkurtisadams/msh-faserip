@@ -540,6 +540,16 @@ Hooks.once("init", async () => {
     requiresReload: false
   });
 
+  game.settings.register("msh-faserip", "enforceResourceLockout", {
+    name: "Enforce Resource FEAT Weekly Lockout",
+    hint: "When enabled, a character may make only one Resource FEAT per game-week; a failed purchase also locks that rank-or-higher for a week. GMs can override per roll. Clock uses game time (CTT-aware).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    requiresReload: false
+  });
+
   game.settings.register("msh-faserip", "persistedTemplates", {
     name: "Persisted Area Templates",
     hint: "Internal storage for area effect templates (smoke, gas, etc.) that auto-expire over time.",
