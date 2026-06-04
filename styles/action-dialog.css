@@ -179,7 +179,9 @@
 .frp-dlg.frp-feat .frp-cs-label {
   color: var(--feat-deep);
 }
-.frp-dlg.frp-feat select {
+.frp-dlg.frp-feat select,
+.frp-dlg.frp-res select,
+.frp-dlg.frp-pop select {
   font-family: 'Barlow', Arial, sans-serif;
   font-size: 15px;
   padding: 4px 8px;
@@ -188,7 +190,19 @@
   border: 1px solid #888;
   border-radius: 2px;
 }
-.frp-dlg.frp-feat select option {
+.frp-dlg.frp-res input[type="text"],
+.frp-dlg.frp-pop input[type="text"] {
+  font-family: 'Barlow', Arial, sans-serif;
+  font-size: 15px;
+  padding: 4px 8px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #888;
+  border-radius: 2px;
+}
+.frp-dlg.frp-feat select option,
+.frp-dlg.frp-res select option,
+.frp-dlg.frp-pop select option {
   font-family: 'Barlow', Arial, sans-serif;
   font-size: 15px;
   padding: 4px 8px;
@@ -1393,7 +1407,7 @@ body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-cal
 }
 .frp-dlg.frp-pop .frp-header-v3 .h-stat-rank { color: #ffd0e4; }
 .frp-dlg.frp-pop .frp-need-label { color: #a3115e; }
-.frp-dlg.frp-pop .frp-cs-rank { color: #a3115e; }
+.frp-dlg.frp-pop .frp-cs-rank { color: #2a2a2a; }
 .frp-dlg .frp-cs-hint {
   margin-left: auto; flex-shrink: 0;
   font-family: 'Barlow', Arial, sans-serif; font-size: 11px;

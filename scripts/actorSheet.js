@@ -3211,12 +3211,7 @@ html.find('.headquarters-row').each((i, row) => {
       const popRank = this._getPopularityRank(heroPopularity);
       const popShort = (game.msh?.getRankAbbreviation?.(popRank)) || popRank;
       const isNegInit = heroPopularity < 0;
-      const dispPill = {
-        friendly:   { c: "Green",      cls: "is-green" },
-        neutral:    { c: "Yellow",     cls: "is-yellow" },
-        unfriendly: { c: "Red",        cls: "is-red" },
-        hostile:    { c: "Impossible", cls: "is-impossible" }
-      };
+      const initReq = this._popRequiredColor("neutral", 0, isNegInit);
 
       const content = `
         <div class="frp-dlg frp-pop">
@@ -3254,13 +3249,13 @@ html.find('.headquarters-row').each((i, row) => {
           <div class="frp-cs-box"><div class="frp-cs-line">
             <span class="frp-cs-label">CS</span>
             <input type="number" id="column-shift" name="columnShift" class="frp-cs-input" value="0">
-            <span class="frp-cs-base" id="pop-cs-base">${popRank}</span>
+            <span class="frp-cs-base" id="pop-cs-base">${initReq.color}</span>
             <span class="frp-cs-arrow">&rarr;</span>
-            <span class="frp-cs-rank" id="pop-cs-rank">${popRank}</span>
+            <span class="frp-cs-rank" id="pop-cs-rank">${initReq.color}</span>
             <span class="frp-cs-hint">benefits +2 \u00b7 danger \u22123 \u00b7 value/unique \u22121 to \u22123</span>
           </div></div>
           <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
-            <span id="pop-pill" class="frp-feat-pill is-yellow">YELLOW</span>
+            <span id="pop-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span>
             <span id="pop-hint" class="hint"></span></div>
           <div class="frp-foot">
             <div class="frp-foot-btns">
@@ -3286,11 +3281,9 @@ html.find('.headquarters-row').each((i, row) => {
             const baseShort = (game.msh?.getRankAbbreviation?.(baseRank)) || baseRank;
             const neg = popVal < 0;
             const shift = parseInt($cs.val()) || 0;
-            const eff = applyColumnShiftToRank(baseRank, popVal, shift);
+            const disp = $disp.val();
 
             html.find('#pop-stat-rank').text(`${baseShort} ${popVal}`);
-            html.find('#pop-cs-base').text(baseRank);
-            html.find('#pop-cs-rank').text(eff.rank);
             $cs.removeClass('cs-pos cs-neg');
             if (shift > 0) $cs.addClass('cs-pos'); else if (shift < 0) $cs.addClass('cs-neg');
 
@@ -3298,18 +3291,22 @@ html.find('.headquarters-row').each((i, row) => {
             if (neg) { $warn.show(); html.find('#pop-warn-loss').text(Math.abs(popVal)); }
             else $warn.hide();
 
-            const disp = $disp.val();
-            const p = neg ? { c: "Yellow", cls: "is-yellow" } : (dispPill[disp] || dispPill.neutral);
-            html.find('#pop-pill').attr('class', `frp-feat-pill ${p.cls}`).text(p.c.toUpperCase());
+            const baseReq = self._popRequiredColor(disp, 0, neg);
+            const req = self._popRequiredColor(disp, shift, neg);
+            html.find('#pop-cs-base').text(baseReq.color);
+            html.find('#pop-cs-rank').text(req.color);
+            html.find('#pop-pill').attr('class', `frp-feat-pill ${req.cls}`).text(req.color.toUpperCase());
             html.find('#pop-hint').text(
-              neg ? "negative pop \u00b7 fear, not loyalty"
-                  : (disp === "hostile" ? "hostile targets won't respond" : ""));
-            html.find('#pop-roll').prop('disabled', !neg && disp === "hostile");
+              req.impossible ? "won't respond"
+                : req.automatic ? "automatic success"
+                : neg ? "negative pop \u00b7 fear, not loyalty"
+                : "");
+            html.find('#pop-roll').prop('disabled', req.impossible);
           };
 
           if ($id.length) $id.on('change', refresh);
           $disp.on('change', refresh);
-          $cs.on('input', refresh);
+          $cs.on('change keyup', refresh);
           refresh();
 
           html.find('#pop-cancel').on('click', () => dlg.close());
@@ -4071,6 +4068,19 @@ html.find('.headquarters-row').each((i, row) => {
   }
 
   // _onPopularityRoll method
+  // Popularity required FEAT color: disposition sets a base on the difficulty
+  // ladder, CS shifts it (mirrors the FEAT dialog's applyCS → requirement flow).
+  // +CS = easier (toward Automatic), -CS = harder (toward Impossible).
+  // Negative Popularity forces a Yellow base regardless of disposition.
+  _popRequiredColor(disposition, cs, negative) {
+    const LADDER = ["Automatic", "Green", "Yellow", "Red", "Impossible"];
+    const base = negative ? 2 : ({ friendly: 1, neutral: 2, unfriendly: 3, hostile: 4 }[disposition] ?? 2);
+    const idx = Math.min(4, Math.max(0, base - (parseInt(cs) || 0)));
+    const color = LADDER[idx];
+    const cls = { Automatic: "is-auto", Green: "is-green", Yellow: "is-yellow", Red: "is-red", Impossible: "is-impossible" }[color];
+    return { color, cls, automatic: color === "Automatic", impossible: color === "Impossible" };
+  }
+
   async _onPopularityRoll(html) {
     console.log("== POPULARITY ROLL START ==");
     console.log("Actor:", this.actor.name);
@@ -4108,25 +4118,17 @@ html.find('.headquarters-row').each((i, row) => {
     console.log("Label:", identityLabel);
   
     const baseRank = this._getPopularityRank(usedPopValue);
-    const shifted = applyColumnShiftToRank(baseRank, usedPopValue, columnShift);
-    const effectiveRank = shifted.rank;
-    const effectiveValue = shifted.value;
-  
-    let featColorNeeded = {
-      friendly: "Green",
-      neutral: "Yellow",
-      unfriendly: "Red",
-      hostile: "Impossible"
-    }[disposition] || "Yellow";
-  
+    const effectiveRank = baseRank;
     const isNegative = usedPopValue < 0;
-    if (isNegative) featColorNeeded = "Yellow";
-  
-    if (featColorNeeded === "Impossible") {
-      ui.notifications.warn("Hostile targets will not respond to Popularity requests.");
+
+    const req = this._popRequiredColor(disposition, columnShift, isNegative);
+    const featColorNeeded = req.color;
+
+    if (req.impossible) {
+      ui.notifications.warn("Required FEAT is Impossible \u2014 the target will not respond.");
       return;
     }
-  
+
     // ✅ Roll the dice and show 3D dice in chat
     const roll = new Roll("1d100");
     await roll.evaluate();
@@ -4137,20 +4139,21 @@ html.find('.headquarters-row').each((i, row) => {
       rollMode: game.settings.get("core", "rollMode")
     });
   
-    // ✅ Now apply roll logic
-    const resultColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+    // ✅ Now apply roll logic — roll on the base Popularity rank; CS already
+    // adjusted the required color.
+    const resultColor = game.msh.rollUniversalTable(baseRank, roll.total);
     const color = resultColor.toLowerCase();
   
-    const success =
+    const success = req.automatic ||
       (featColorNeeded === "Green" && ["green", "yellow", "red"].includes(color)) ||
       (featColorNeeded === "Yellow" && ["yellow", "red"].includes(color)) ||
       (featColorNeeded === "Red" && color === "red");
   
     const bannerBg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[color] || "#ccc";
     const bannerFg = ["white","yellow"].includes(color) ? "#222" : "#fff";
-    const needCls = { Green:"is-green", Yellow:"is-yellow", Red:"is-red" }[featColorNeeded] || "is-yellow";
+    const needCls = { Automatic:"is-auto", Green:"is-green", Yellow:"is-yellow", Red:"is-red" }[featColorNeeded] || "is-yellow";
     const idShort = identityType === "secret" ? "Secret ID" : "Hero ID";
-    const csNote = columnShift !== 0 ? `${columnShift > 0 ? "+" : ""}${columnShift}CS eff.` : "base rank";
+    const csLabel = columnShift !== 0 ? ` (${columnShift > 0 ? "+" : ""}${columnShift}CS)` : "";
     const mutNote = isMutant
       ? `<div style="padding:6px 12px;font-size:11px;color:#aa6600;border-top:1px solid #e2e2da;">Mutant penalty applies to Popularity awards/penalties (\u22121).</div>`
       : "";
@@ -4173,10 +4176,10 @@ html.find('.headquarters-row').each((i, row) => {
             <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">Roll</div></div>
           <div style="flex:1.4;padding:8px 4px;border-right:1px solid #ececec;">
             <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${effectiveRank}</div>
-            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">${csNote}</div></div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">Pop rank</div></div>
           <div style="flex:1.2;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
             <span class="frp-feat-pill ${needCls}">${featColorNeeded.toUpperCase()}</span>
-            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed</div></div></div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed${csLabel}</div></div></div>
         <div style="padding:7px 12px;text-align:center;font-weight:bold;font-size:14px;letter-spacing:.5px;color:${success ? '#1b5e20' : '#c62828'};">
           ${success ? "\u2713 SUCCESS \u00b7 REQUEST GRANTED" : "\u2717 FAILURE \u00b7 REQUEST DENIED"}</div>
         ${mutNote}
