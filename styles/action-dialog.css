@@ -1344,15 +1344,19 @@ body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-cal
 
 /* ── Resource FEAT dialog (gold section identity) ───────────────────── */
 .frp-dlg.frp-res .frp-header-v3 {
-  background: linear-gradient(90deg, #e2ab14 0%, #b8860b 100%);
-  color: #3a2a00;
-  border-bottom: 2px solid #8a6508;
+  background: linear-gradient(90deg, #ffd96b 0%, #e8b021 100%);
+  color: #3a2600;
+  border-bottom: 2px solid #b9851a;
   text-shadow: 0 1px 0 rgba(255,255,255,.25);
 }
-.frp-dlg.frp-res .frp-header-v3 .h-action { color: #5a1a00; }
-.frp-dlg.frp-res .frp-header-v3 .h-actor { color: #3a2a00; }
-.frp-dlg.frp-res .frp-header-v3 .h-stat-label { color: #5a4400; opacity: .85; }
-.frp-dlg.frp-res .frp-header-v3 .h-stat-rank { color: #660000; }
+.frp-dlg.frp-res .frp-header-v3 .h-action { color: #5a3a00; }
+.frp-dlg.frp-res .frp-header-v3 .h-actor { color: #3a2600; }
+.frp-dlg.frp-res .frp-header-v3 .h-stat-label { color: #6a4a00; opacity: .9; }
+.frp-dlg.frp-res .frp-header-v3 .h-stat-rank { color: #7a1500; }
+.frp-dlg.frp-res .rankval {
+  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 13px;
+  color: #7a1500; flex-shrink: 0;
+}
 
 /* Weekly-lockout status strip */
 .frp-dlg .frp-lockbar {
@@ -1382,3 +1386,42 @@ body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-cal
   font-family: 'Oswald', sans-serif; font-size: 9px; letter-spacing: .5px;
   padding: 1px 6px; border-radius: 3px;
 }
+/* ── Popularity FEAT dialog (magenta section identity, sheet #f48fb1) ── */
+.frp-dlg.frp-pop .frp-header-v3 {
+  background: linear-gradient(90deg, #d81b76 0%, #9c0e54 100%);
+  border-bottom: 2px solid #6a0939;
+}
+.frp-dlg.frp-pop .frp-header-v3 .h-stat-rank { color: #ffd0e4; }
+.frp-dlg.frp-pop .frp-need-label { color: #a3115e; }
+.frp-dlg.frp-pop .frp-cs-rank { color: #a3115e; }
+.frp-dlg .frp-cs-hint {
+  margin-left: auto; flex-shrink: 0;
+  font-family: 'Barlow', Arial, sans-serif; font-size: 11px;
+  color: var(--txt-s); font-style: italic;
+}
+
+/* Negative-Popularity warning strip */
+.frp-dlg .frp-warnbar {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 6px 8px; margin-bottom: 8px; border-radius: 3px;
+  font-family: 'Barlow', Arial, sans-serif; font-size: 12px; line-height: 1.35;
+  background: #fce4ec; border: 1px solid #f48fb1; color: #7a0d44;
+}
+.frp-dlg .frp-warnbar .ic { flex-shrink: 0; }
+.frp-dlg .frp-warnbar b { color: #5c0a33; }
+
+/* FEAT pills inside chat cards (resource / popularity / feat result cards).
+   The dialog-scoped rule above does not reach chat messages. */
+.chat-message .frp-feat-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 74px; padding: 2px 12px; border-radius: 999px; border: 1px solid #333;
+  font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700;
+  letter-spacing: .3px; line-height: 1.1; text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+.chat-message .frp-feat-pill.is-white { background: #fff; border-color: #444; color: #222; }
+.chat-message .frp-feat-pill.is-green,
+.chat-message .frp-feat-pill.is-auto { background: #00a94e; border-color: #006f35; color: #fff; }
+.chat-message .frp-feat-pill.is-yellow { background: #fef102; border-color: #9a8f00; color: #222; }
+.chat-message .frp-feat-pill.is-red,
+.chat-message .frp-feat-pill.is-impossible { background: #ee1e25; border-color: #9b1118; color: #fff; }

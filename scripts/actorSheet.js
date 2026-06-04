@@ -3200,75 +3200,126 @@ html.find('.headquarters-row').each((i, row) => {
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Popularity activateListeners method
+    // Popularity FEAT dialog \u2014 frp-pop shell, live CS readout + need pill,
+    // negative-popularity warn strip. Roll delegates to _onPopularityRoll.
     html.find('.popularity-header-link').click(ev => {
       const isMutant = this.actor.system.origin === "Mutant" || this.actor.system.isMutant;
       const hasSecretId = this.actor.system.identityType === "secret";
       const heroPopularity = this.actor.system.attributes.popularity.value;
       const secretIdPopularity = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value || 0) : 0;
-    
-      const dialogContent = `
-        <div style="margin-bottom: 10px;">
+
+      const popRank = this._getPopularityRank(heroPopularity);
+      const popShort = (game.msh?.getRankAbbreviation?.(popRank)) || popRank;
+      const isNegInit = heroPopularity < 0;
+      const dispPill = {
+        friendly:   { c: "Green",      cls: "is-green" },
+        neutral:    { c: "Yellow",     cls: "is-yellow" },
+        unfriendly: { c: "Red",        cls: "is-red" },
+        hostile:    { c: "Impossible", cls: "is-impossible" }
+      };
+
+      const content = `
+        <div class="frp-dlg frp-pop">
+          <div class="frp-header-v3">
+            <span class="h-action">Popularity&nbsp;FEAT</span>
+            <span class="h-paren">\u00b7</span>
+            <span class="h-actor">${this.actor.name}</span>
+            <span class="h-spacer"></span>
+            <span class="h-stat"><span class="h-stat-label">Popularity</span>
+              <span class="h-stat-rank" id="pop-stat-rank">${popShort} ${heroPopularity}</span></span>
+          </div>
+          <div class="frp-warnbar" id="pop-warn" style="${isNegInit ? "" : "display:none;"}">
+            <span class="ic">\u26a0</span>
+            <span><b>Negative Popularity.</b> Every FEAT is Yellow regardless of disposition. Using it costs <b id="pop-warn-loss">${Math.abs(heroPopularity)}</b> Karma (rank number), even on a successful, beneficial use.</span>
+          </div>
           ${hasSecretId ? `
-            <label style="display: inline-block; width: 120px;">Identity:</label>
-            <select id="identity-type" name="identityType" style="width: 120px;">
-              <option value="hero">Hero Identity (${heroPopularity})</option>
-              <option value="secret">Secret Identity (${secretIdPopularity})</option>
+          <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+            <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Identity</span>
+            <select id="identity-type" name="identityType" style="flex:1;">
+              <option value="hero">Hero ID \u2014 ${this.actor.name} (${heroPopularity})</option>
+              <option value="secret">Secret ID \u2014 ${this.actor.system.identity || "civilian"} (${secretIdPopularity})</option>
+            </select></div>` : ""}
+          <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+            <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Target</span>
+            <select id="disposition" name="disposition" style="flex:1;">
+              <option value="friendly">Friendly</option>
+              <option value="neutral" selected>Neutral</option>
+              <option value="unfriendly">Unfriendly</option>
+              <option value="hostile">Hostile</option>
             </select>
-          ` : `
-            <label style="display: inline-block; width: 120px;">Popularity:</label>
-            <input type="number" id="popularity-value" value="${heroPopularity}" style="width: 50px;" readonly>
-          `}
-          ${isMutant ? '<span style="color: #aa6600; margin-left: 5px;">Mutant (-1 modifier to all results)</span>' : ''}
-        </div>
-    
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Target Disposition:</label>
-          <select id="disposition" name="disposition" style="width: 120px;">
-            <option value="friendly">Friendly</option>
-            <option value="neutral" selected>Neutral</option>
-            <option value="unfriendly">Unfriendly</option>
-            <option value="hostile">Hostile</option>
-          </select>
-        </div>
-    
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Request Description:</label>
-          <input type="text" id="request-description" style="width: 180px;" placeholder="e.g., Information request">
-        </div>
-    
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Column Shift:</label>
-          <input type="number" id="column-shift" name="columnShift" value="0" style="width: 50px;">
-          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-        </div>
-    
-        <div style="margin-bottom: 10px;">
-          <p style="font-size: 0.9em; margin-top: 5px;">Common modifiers:</p>
-          <ul style="font-size: 0.85em; margin-top: 5px; margin-bottom: 5px; padding-left: 20px;">
-            <li>Target benefits: +2CS</li>
-            <li>Target is placed in danger: -3CS</li>
-            <li>Item value up to Good: -1CS</li>
-            <li>Item value up to Remarkable: -2CS</li>
-            <li>Item might not be returned: -2CS</li>
-            <li>Item is unique: -3CS</li>
-          </ul>
-        </div>
-      `;
-    
-      new Dialog({
+            ${isMutant ? '<span style="color:#aa6600;font-size:11px;flex-shrink:0;">Mutant \u22121</span>' : ''}</div>
+          <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+            <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Request</span>
+            <input type="text" id="request-description" style="flex:1;" placeholder="e.g. information, surrender, back off\u2026"></div>
+          <div class="frp-cs-box"><div class="frp-cs-line">
+            <span class="frp-cs-label">CS</span>
+            <input type="number" id="column-shift" name="columnShift" class="frp-cs-input" value="0">
+            <span class="frp-cs-base" id="pop-cs-base">${popRank}</span>
+            <span class="frp-cs-arrow">&rarr;</span>
+            <span class="frp-cs-rank" id="pop-cs-rank">${popRank}</span>
+            <span class="frp-cs-hint">benefits +2 \u00b7 danger \u22123 \u00b7 value/unique \u22121 to \u22123</span>
+          </div></div>
+          <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
+            <span id="pop-pill" class="frp-feat-pill is-yellow">YELLOW</span>
+            <span id="pop-hint" class="hint"></span></div>
+          <div class="frp-foot">
+            <div class="frp-foot-btns">
+              <button id="pop-roll" class="frp-btn-roll">Roll</button>
+              <button id="pop-cancel" class="frp-btn-cancel">Cancel</button>
+            </div>
+          </div>
+        </div>`;
+
+      const self = this;
+      showFaseripDialog({
         title: `Popularity Roll: ${this.actor.name}`,
-        content: dialogContent,
-        buttons: {
-          roll: {
-            icon: '<i class="fas fa-dice-d20"></i>',
-            label: "Roll",
-            callback: html => this._onPopularityRoll(html)
-          },
-          close: { icon: '<i class="fas fa-times"></i>', label: "Close" }
-        },
-        default: "roll"
-      }).render(true);
+        content,
+        render: async (html, dlg) => {
+          const $id = html.find('#identity-type');
+          const $disp = html.find('#disposition');
+          const $cs = html.find('#column-shift');
+
+          const refresh = () => {
+            const idt = $id.length ? $id.val() : "hero";
+            const popVal = idt === "secret" ? secretIdPopularity : heroPopularity;
+            const baseRank = self._getPopularityRank(popVal);
+            const baseShort = (game.msh?.getRankAbbreviation?.(baseRank)) || baseRank;
+            const neg = popVal < 0;
+            const shift = parseInt($cs.val()) || 0;
+            const eff = applyColumnShiftToRank(baseRank, popVal, shift);
+
+            html.find('#pop-stat-rank').text(`${baseShort} ${popVal}`);
+            html.find('#pop-cs-base').text(baseRank);
+            html.find('#pop-cs-rank').text(eff.rank);
+            $cs.removeClass('cs-pos cs-neg');
+            if (shift > 0) $cs.addClass('cs-pos'); else if (shift < 0) $cs.addClass('cs-neg');
+
+            const $warn = html.find('#pop-warn');
+            if (neg) { $warn.show(); html.find('#pop-warn-loss').text(Math.abs(popVal)); }
+            else $warn.hide();
+
+            const disp = $disp.val();
+            const p = neg ? { c: "Yellow", cls: "is-yellow" } : (dispPill[disp] || dispPill.neutral);
+            html.find('#pop-pill').attr('class', `frp-feat-pill ${p.cls}`).text(p.c.toUpperCase());
+            html.find('#pop-hint').text(
+              neg ? "negative pop \u00b7 fear, not loyalty"
+                  : (disp === "hostile" ? "hostile targets won't respond" : ""));
+            html.find('#pop-roll').prop('disabled', !neg && disp === "hostile");
+          };
+
+          if ($id.length) $id.on('change', refresh);
+          $disp.on('change', refresh);
+          $cs.on('input', refresh);
+          refresh();
+
+          html.find('#pop-cancel').on('click', () => dlg.close());
+          html.find('#pop-roll').on('click', async () => {
+            if (html.find('#pop-roll').prop('disabled')) return;
+            await self._onPopularityRoll(html);
+            dlg.close();
+          });
+        }
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3785,20 +3836,25 @@ html.find('.headquarters-row').each((i, row) => {
         </div>
         ${lockbar}
         ${gmrow}
-        <div class="frp-row"><span class="lbl">Resource</span>
-          <input type="text" value="${resourceRank}" readonly>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Resource</span>
+          <input type="text" value="${resourceRank}" readonly style="flex:1;">
           <span class="rankval">(${resourceValue})</span></div>
-        <div class="frp-row"><span class="lbl">Item Cost</span>
-          <select id="res-item">${rankOpts}</select></div>
-        <div class="frp-row"><span class="lbl">For</span>
-          <input type="text" id="res-desc" placeholder="e.g. surveillance van, monthly rent\u2026"></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Item Cost</span>
+          <select id="res-item" style="flex:1;">${rankOpts}</select></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">For</span>
+          <input type="text" id="res-desc" style="flex:1;" placeholder="e.g. surveillance van, monthly rent\u2026"></div>
         <div class="frp-opt-row"><label><input type="checkbox" id="res-loan"> Bank loan (allows 1 rank higher)</label></div>
-        <div class="frp-need-line"><span class="frp-need-label">Required</span>
+        <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
           <span id="res-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span>
           <span id="res-hint" class="hint">${initReq.hint}</span></div>
         <div class="frp-foot">
-          <button id="res-roll" class="roll">\ud83c\udfb2 Roll</button>
-          <button id="res-cancel" class="cancel">Cancel</button>
+          <div class="frp-foot-btns">
+            <button id="res-roll" class="frp-btn-roll">Roll</button>
+            <button id="res-cancel" class="frp-btn-cancel">Cancel</button>
+          </div>
         </div>
       </div>`;
 
@@ -3825,7 +3881,7 @@ html.find('.headquarters-row').each((i, row) => {
             (lock.scope === "week" || (lock.scope === "fail" && itemIdx >= lock.lockedIdx));
           const impossible = req.color === "Impossible";
           $roll.prop("disabled", impossible || blocked)
-               .html(blocked ? "\ud83d\udd12 Locked this week" : "\ud83c\udfb2 Roll");
+               .text(blocked ? "Locked this week" : "Roll");
         };
         $item.on("change", refresh);
         $loan.on("change", refresh);
@@ -4090,34 +4146,41 @@ html.find('.headquarters-row').each((i, row) => {
       (featColorNeeded === "Yellow" && ["yellow", "red"].includes(color)) ||
       (featColorNeeded === "Red" && color === "red");
   
-    const rankDisplay = getPopularityRankWithRange(effectiveValue, this);
-  
-    const content = `
-      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-          <strong>${this.actor.name} - ${identityLabel} Popularity Roll for ${requestDescription}</strong>
-        </div>
-        <div style="padding: 5px 10px; font-size: 0.9em;">
-          <div>${identityLabel}</div>
+    const bannerBg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[color] || "#ccc";
+    const bannerFg = ["white","yellow"].includes(color) ? "#222" : "#fff";
+    const needCls = { Green:"is-green", Yellow:"is-yellow", Red:"is-red" }[featColorNeeded] || "is-yellow";
+    const idShort = identityType === "secret" ? "Secret ID" : "Hero ID";
+    const csNote = columnShift !== 0 ? `${columnShift > 0 ? "+" : ""}${columnShift}CS eff.` : "base rank";
+    const mutNote = isMutant
+      ? `<div style="padding:6px 12px;font-size:11px;color:#aa6600;border-top:1px solid #e2e2da;">Mutant penalty applies to Popularity awards/penalties (\u22121).</div>`
+      : "";
+    const negNote = isNegative
+      ? `<div style="padding:7px 12px;font-size:12px;line-height:1.4;background:#fce4ec;border-top:1px solid #f48fb1;color:#7a0d44;"><b>\u2212${Math.abs(usedPopValue)} Karma</b> deducted (negative Popularity rank number). Logged to Karma history.</div>`
+      : "";
 
-          <div>Popularity: ${usedPopValue}${isNegative ? ' (Negative)' : ''}</div>
-          <div>Target Disposition: ${disposition.charAt(0).toUpperCase() + disposition.slice(1)}</div>
-          <div>Required FEAT: ${featColorNeeded}</div>
-          <div>Column Shift: ${columnShift >= 0 ? "+" + columnShift : columnShift}</div>
-          <div>Effective Rank: ${rankDisplay}</div>
-          <div>Roll: ${roll.total}</div>
-          ${isMutant ? '<div style="color: #aa6600;">Mutant Penalty Applied (-1 to awards/penalties)</div>' : ''}
-        </div>
-        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
-          background-color: ${color === 'white' ? '#f8f8f8' :
-            color === 'green' ? '#4CAF50' :
-            color === 'yellow' ? '#FFC107' : '#F44336'};
-          color: ${color === 'white' || color === 'yellow' ? '#333' : 'white'};">
-          ${resultColor.toUpperCase()}
-        </div>
-        <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${success ? '#4CAF50' : '#F44336'};">
-          ${success ? 'SUCCESS: Request Granted' : 'FAILURE: Request Denied'}
-        </div>
+    const content = `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;overflow:hidden;color:#333;">
+        <div style="padding:7px 12px;border-bottom:1px solid #d8d8d0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <strong style="color:#a3115e;font-size:14px;letter-spacing:.3px;">Popularity FEAT</strong>
+          <span style="color:#888;font-size:12px;">${requestDescription}</span></div>
+        <div style="padding:6px 12px;display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e2da;">
+          <span><span style="color:#888;">${idShort}:</span> <b>${usedPopValue}${isNegative ? " (neg)" : ""}</b></span>
+          <span><span style="color:#888;">Target:</span> <b>${disposition.charAt(0).toUpperCase() + disposition.slice(1)}</b></span></div>
+        <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bannerBg};color:${bannerFg};">${resultColor.toUpperCase()}</div>
+        <div style="display:flex;background:#fff;text-align:center;border-bottom:1px solid #ddd;">
+          <div style="flex:1;padding:8px 4px;border-right:1px solid #ececec;">
+            <div style="font-size:24px;font-weight:bold;color:#222;line-height:1;">${roll.total}</div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">Roll</div></div>
+          <div style="flex:1.4;padding:8px 4px;border-right:1px solid #ececec;">
+            <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${effectiveRank}</div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">${csNote}</div></div>
+          <div style="flex:1.2;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
+            <span class="frp-feat-pill ${needCls}">${featColorNeeded.toUpperCase()}</span>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed</div></div></div>
+        <div style="padding:7px 12px;text-align:center;font-weight:bold;font-size:14px;letter-spacing:.5px;color:${success ? '#1b5e20' : '#c62828'};">
+          ${success ? "\u2713 SUCCESS \u00b7 REQUEST GRANTED" : "\u2717 FAILURE \u00b7 REQUEST DENIED"}</div>
+        ${mutNote}
+        ${negNote}
       </div>
     `;
   
@@ -4150,41 +4213,27 @@ html.find('.headquarters-row').each((i, row) => {
     }
   
     if (isNegative) {
-      new Dialog({
-        title: "Negative Popularity Karma Loss",
-        content: `<p>You lose Karma due to negative popularity.</p>
-                  <div><label>Karma Loss:</label> <input type="number" id="karma-loss" value="1" min="1"></div>`,
-        buttons: {
-          confirm: {
-            label: "Confirm",
-            callback: html => {
-              const loss = parseInt(html.find('#karma-loss').val()) || 1;
-              
-              // Add karma loss to history
-              const historyEntry = {
-                timestamp: new Date().toISOString(),
-                realDate: new Date().toLocaleDateString(),
-                gameDate: "",
-                amount: -loss,
-                type: "Karma Loss",
-                description: `Lost karma from negative popularity`
-              };
-              
-              const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-              currentHistory.push(historyEntry);
-              
-              game.msh.runAsGM({
-                operation: 'update',
-                targetActorUuid: this.actor.uuid,
-                args: [{ "system.karma.history": currentHistory }]
-              });
-              
-              ui.notifications.info(`${this.actor.name} lost ${loss} Karma.`);
-            }
-          }
-        },
-        default: "confirm"
-      }).render(true);
+      const loss = Math.abs(usedPopValue);
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        realDate: new Date().toLocaleDateString(),
+        gameDate: "",
+        amount: -loss,
+        type: "Karma Loss",
+        description: `Negative Popularity use (${requestDescription})`
+      };
+      const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+      currentHistory.push(historyEntry);
+      if (typeof game.msh?.runAsGM === 'function') {
+        game.msh.runAsGM({
+          operation: 'update',
+          targetActorUuid: this.actor.uuid,
+          args: [{ "system.karma.history": currentHistory }]
+        });
+      } else {
+        await this.actor.update({ "system.karma.history": currentHistory });
+      }
+      ui.notifications.info(`${this.actor.name} lost ${loss} Karma (negative Popularity).`);
     }
   }
 
