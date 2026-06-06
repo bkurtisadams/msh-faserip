@@ -3215,12 +3215,13 @@ html.find('.headquarters-row').each((i, row) => {
       const content = `
         <div class="frp-dlg frp-pop">
           <div class="frp-header-v3">
-            <span class="h-action">Popularity&nbsp;FEAT</span>
-            <span class="h-paren">\u00b7</span>
-            <span class="h-actor">${this.actor.name}</span>
-            <span class="h-spacer"></span>
-            <span class="h-stat"><span class="h-stat-label">Popularity</span>
-              <span class="h-stat-rank" id="pop-stat-rank">${isNegInit ? "\u2212" : ""}${popShort} ${heroPopularity}</span></span>
+            <span class="h-actor" title="${this.actor.name}">${this.actor.name}</span>
+            <span class="h-paren">(</span>
+            <span class="h-stat">
+              <span class="h-stat-label">Popularity</span>
+              <span class="h-stat-rank" id="pop-stat-rank">${isNegInit ? "\u2212" : ""}${popShort} ${heroPopularity}</span>
+            </span>
+            <span class="h-paren">)</span>
           </div>
           <div class="frp-warnbar" id="pop-warn" style="${isNegInit ? "" : "display:none;"}">
             <span class="ic">\u26a0</span>
@@ -3228,44 +3229,43 @@ html.find('.headquarters-row').each((i, row) => {
           </div>
           ${hasSecretId ? `
           <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
-            <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Identity</span>
+            <span class="frp-box-label" style="margin:0;color:#a3115e;flex-shrink:0;min-width:62px;">IDENTITY</span>
             <select id="identity-type" name="identityType" style="flex:1;">
               <option value="hero">Hero ID \u2014 ${this.actor.name} (${heroPopularity})</option>
               <option value="secret">Secret ID \u2014 ${this.actor.system.identity || "civilian"} (${secretIdPopularity})</option>
             </select></div>` : ""}
           <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
-            <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Target</span>
-            <select id="disposition" name="disposition" style="flex:1;">
-              <option value="friendly">Friendly (green)</option>
-              <option value="neutral" selected>Neutral (yellow)</option>
-              <option value="unfriendly">Unfriendly (red)</option>
-              <option value="hostile">Hostile (impossible)</option>
-            </select></div>
+            <span class="frp-box-label" style="margin:0;color:#a3115e;flex-shrink:0;min-width:62px;">TARGET</span>
+            <select id="disposition" name="disposition" style="flex:0 1 auto;">
+              <option value="friendly">Friendly</option>
+              <option value="neutral" selected>Neutral</option>
+              <option value="unfriendly">Unfriendly</option>
+              <option value="hostile">Hostile</option>
+            </select>
+            <span class="frp-need-line" style="margin-left:auto;"><span class="frp-need-label">NEEDS:</span><span id="pop-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span><span id="pop-hint" class="hint" style="margin-left:6px;"></span></span>
+          </div>
           <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
-            <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Request</span>
+            <span class="frp-box-label" style="margin:0;color:#a3115e;flex-shrink:0;min-width:62px;">REQUEST</span>
             <input type="text" id="request-description" style="flex:1;" placeholder="e.g. information, surrender, back off\u2026"></div>
           <div class="frp-box" id="pop-mods" style="display:block;">
-            <span class="frp-box-label" style="display:block;margin:0 0 5px;">Circumstances \u2014 column shift</span>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="2" id="m-benefit"><span style="flex:1;">In the target's own interest</span><b>+2</b></label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-3" id="m-danger"><span style="flex:1;">Places the target in danger</span><b>\u22123</b></label>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;"><span style="flex:1;">Item value</span>
+            <span class="frp-box-label" style="display:block;margin:0 0 6px;color:#a3115e;">CIRCUMSTANCES \u2014 COLUMN SHIFT</span>
+            <label style="display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="2" id="m-benefit" style="accent-color:#a3115e;width:15px;height:15px;flex-shrink:0;"><span style="flex:1;">In the target's own interest</span><b style="color:#555;">+2</b></label>
+            <label style="display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-3" id="m-danger" style="accent-color:#a3115e;width:15px;height:15px;flex-shrink:0;"><span style="flex:1;">Places the target in danger</span><b style="color:#555;">\u22123</b></label>
+            <div style="display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0;"><span style="flex:1;">Item value</span>
               <select id="m-value"><option value="0">\u2014</option><option value="-1">up to Good \u22121</option><option value="-2">up to Remarkable \u22122</option></select></div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-2" id="m-return"><span style="flex:1;">Chance it isn't returned</span><b>\u22122</b></label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-3" id="m-unique"><span style="flex:1;">Item is unique</span><b>\u22123</b></label>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;"><span style="flex:1;">Other (GM)</span>
+            <label style="display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-2" id="m-return" style="accent-color:#a3115e;width:15px;height:15px;flex-shrink:0;"><span style="flex:1;">Chance it isn't returned</span><b style="color:#555;">\u22122</b></label>
+            <label style="display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-3" id="m-unique" style="accent-color:#a3115e;width:15px;height:15px;flex-shrink:0;"><span style="flex:1;">Item is unique</span><b style="color:#555;">\u22123</b></label>
+            <div style="display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0;"><span style="flex:1;">Other (GM)</span>
               <input type="number" id="m-other" value="0" style="width:54px;text-align:center;"></div>
             <input type="hidden" id="column-shift" name="columnShift" value="0">
+            <div class="frp-cs-line" style="border-top:1px dashed #cdbf8e;margin-top:9px;padding-top:9px;">
+              <span class="frp-cs-label">ROLL</span>
+              <span class="frp-cs-base" id="pop-base-rank">${popShort}</span>
+              <span class="frp-cs-arrow">\u2192</span>
+              <span class="frp-cs-rank" id="pop-eff-rank">${popShort}</span>
+              <span class="frp-cs-hint" id="pop-cs-readout" style="margin-left:auto;">0 CS</span>
+            </div>
           </div>
-          <div class="frp-cs-box"><div class="frp-cs-line">
-            <span class="frp-cs-label">Roll</span>
-            <span class="frp-cs-base" id="pop-base-rank">${popShort}</span>
-            <span class="frp-cs-arrow">\u2192</span>
-            <span class="frp-cs-rank" id="pop-eff-rank">${popShort}</span>
-            <span class="frp-cs-hint" id="pop-cs-readout">0 CS</span>
-          </div></div>
-          <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
-            <span id="pop-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span>
-            <span id="pop-hint" class="hint"></span></div>
           <div class="frp-foot">
             <div class="frp-foot-btns">
               <button id="pop-roll" class="frp-btn-roll">Roll</button>
