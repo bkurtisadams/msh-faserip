@@ -1,3 +1,8 @@
+// ability-feat-dialog.js v1.6.1 - 2026-06-05
+// v1.6.1: Fix double FEAT roll when detached. Detaching re-runs the render
+//         callback, which was stacking a second click/keydown handler on the
+//         same (persisted) buttons. Bindings are now namespaced off()+on() so
+//         exactly one handler survives across any number of re-renders.
 // ability-feat-dialog.js v1.6.0 - 2026-06-05
 // v1.6.0: Single chat card per FEAT. Dropped the standalone roll.toMessage()
 //         d100 card; the d100 Roll is now attached to the FEAT result card
@@ -738,13 +743,13 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       $csInput.on('change keyup', recalcCS);
 
       // ──── Roll / Cancel button wiring + Enter-to-roll ────
-      html.find('#frp-roll').on('click', async () => {
+      html.find('#frp-roll').off('click.frp').on('click.frp', async () => {
         try { await runRoll(); }
         finally { if (!isDialogDetached(dlg)) dlg.close(); }
       });
-      html.find('#frp-cancel').on('click', () => dlg.close());
+      html.find('#frp-cancel').off('click.frp').on('click.frp', () => dlg.close());
       html.find('#frp-roll').focus();
-      $dialog.on('keydown', (e) => {
+      $dialog.off('keydown.frp').on('keydown.frp', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
           e.stopPropagation();
