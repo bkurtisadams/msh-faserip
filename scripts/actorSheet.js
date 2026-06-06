@@ -4181,50 +4181,35 @@ html.find('.headquarters-row').each((i, row) => {
     ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode"));
     await ChatMessage.create(msg);
 
-    // Log Popularity FEAT to karma history
-    const featHistoryEntry = {
+    // Log the Popularity FEAT to karma history through the canonical helper so
+    // totals recompute and the open (and detached) Karma sheet refreshes.
+    const realDate = new Date().toLocaleDateString();
+    let gameDate = "";
+    try {
+      const d = game.msh.getCampaignDateTime().date;
+      gameDate = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+    } catch (_) {}
+    const karmaSheet = await import('./karma.js').then(m => new m.KarmaSheet(this.actor));
+
+    await karmaSheet._addKarmaEvent({
       timestamp: new Date().toISOString(),
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
+      realDate,
+      gameDate,
       amount: 0,
       type: "Popularity FEAT",
-      description: `${requestDescription} (${disposition}) - ${success ? 'SUCCESS' : 'FAILED'}`
-    };
-    
-    const featHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-    featHistory.push(featHistoryEntry);
-    
-    if (typeof game.msh?.runAsGM === 'function') {
-      game.msh.runAsGM({
-        operation: 'update',
-        targetActorUuid: this.actor.uuid,
-        args: [{ "system.karma.history": featHistory }]
-      });
-    } else {
-      await this.actor.update({ "system.karma.history": featHistory });
-    }
-  
+      description: `${requestDescription} (${disposition}) - ${success ? "SUCCESS" : "FAILURE"}`
+    });
+
     if (isNegative) {
       const loss = Math.abs(usedPopValue);
-      const historyEntry = {
+      await karmaSheet._addKarmaEvent({
         timestamp: new Date().toISOString(),
-        realDate: new Date().toLocaleDateString(),
-        gameDate: "",
+        realDate,
+        gameDate,
         amount: -loss,
         type: "Karma Loss",
         description: `Negative Popularity use (${requestDescription})`
-      };
-      const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-      currentHistory.push(historyEntry);
-      if (typeof game.msh?.runAsGM === 'function') {
-        game.msh.runAsGM({
-          operation: 'update',
-          targetActorUuid: this.actor.uuid,
-          args: [{ "system.karma.history": currentHistory }]
-        });
-      } else {
-        await this.actor.update({ "system.karma.history": currentHistory });
-      }
+      });
       ui.notifications.info(`${this.actor.name} lost ${loss} Karma (negative Popularity).`);
     }
   }

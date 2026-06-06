@@ -1,4 +1,4 @@
-// karma-sheet-v2.js v1.0.0
+// karma-sheet-v2.js v1.1.0
 // FASERIP KarmaSheetV2 — DocumentSheetV2 wrap around the v1 KarmaSheet.
 // Mirrors FaseripActorSheetV2: a lazy, non-rendering v1 sheet acts as a
 // data + listener adapter; v2 owns the form element, lifecycle, and a
@@ -46,6 +46,7 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
   /* -------------------------------------------- */
 
   #v1 = null;
+  #karmaHookId = null;
 
   _v1() {
     if (!this.#v1) {
@@ -108,6 +109,18 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
     return Object.assign(base, legacy);
   }
 
+  /** @override
+   *  Detached windows and cross-client karma writes don't reliably trigger the
+   *  built-in document-sheet re-render, so refresh on any karma change to this
+   *  actor ourselves. */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender?.(context, options);
+    this.#karmaHookId = Hooks.on("updateActor", (actor, changed) => {
+      if (actor?.id !== this.document?.id) return;
+      if (foundry.utils.hasProperty(changed, "system.karma")) this.render({ force: false });
+    });
+  }
+
   /** @override */
   async _onRender(context, options) {
     await super._onRender(context, options);
@@ -128,6 +141,7 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
 
   /** @override */
   async close(options) {
+    if (this.#karmaHookId) { Hooks.off("updateActor", this.#karmaHookId); this.#karmaHookId = null; }
     this.#v1 = null;
     return super.close(options);
   }
