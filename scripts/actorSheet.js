@@ -51,10 +51,10 @@ import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
-  RANK_ALIASES, normalizeRank,
+  RANK_ALIASES, normalizeRank, shiftRank,
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
-import { showFaseripDialog } from "./modules/actions/dialog-shim.js";
+import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
@@ -3203,15 +3203,14 @@ html.find('.headquarters-row').each((i, row) => {
     // Popularity FEAT dialog \u2014 frp-pop shell, live CS readout + need pill,
     // negative-popularity warn strip. Roll delegates to _onPopularityRoll.
     html.find('.popularity-header-link').click(ev => {
-      const isMutant = this.actor.system.origin === "Mutant" || this.actor.system.isMutant;
       const hasSecretId = this.actor.system.identityType === "secret";
-      const heroPopularity = this.actor.system.attributes.popularity.value;
-      const secretIdPopularity = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value || 0) : 0;
+      const heroPopularity = this.actor.system.attributes.popularity.hero?.value ?? 0;
+      const secretIdPopularity = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value ?? 0) : 0;
 
-      const popRank = this._getPopularityRank(heroPopularity);
+      const popRank = this._getPopularityRank(Math.abs(heroPopularity));
       const popShort = (game.msh?.getRankAbbreviation?.(popRank)) || popRank;
       const isNegInit = heroPopularity < 0;
-      const initReq = this._popRequiredColor("neutral", 0, isNegInit);
+      const initReq = this._popRequiredColor("neutral", isNegInit);
 
       const content = `
         <div class="frp-dlg frp-pop">
@@ -3221,11 +3220,11 @@ html.find('.headquarters-row').each((i, row) => {
             <span class="h-actor">${this.actor.name}</span>
             <span class="h-spacer"></span>
             <span class="h-stat"><span class="h-stat-label">Popularity</span>
-              <span class="h-stat-rank" id="pop-stat-rank">${popShort} ${heroPopularity}</span></span>
+              <span class="h-stat-rank" id="pop-stat-rank">${isNegInit ? "\u2212" : ""}${popShort} ${heroPopularity}</span></span>
           </div>
           <div class="frp-warnbar" id="pop-warn" style="${isNegInit ? "" : "display:none;"}">
             <span class="ic">\u26a0</span>
-            <span><b>Negative Popularity.</b> Every FEAT is Yellow regardless of disposition. Using it costs <b id="pop-warn-loss">${Math.abs(heroPopularity)}</b> Karma (rank number), even on a successful, beneficial use.</span>
+            <span><b>Negative Popularity.</b> Every FEAT is Yellow regardless of disposition, and only a request in the target's own interest helps. Using it costs <b id="pop-warn-loss">${Math.abs(heroPopularity)}</b> Karma (rank number).</span>
           </div>
           ${hasSecretId ? `
           <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
@@ -3237,22 +3236,32 @@ html.find('.headquarters-row').each((i, row) => {
           <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
             <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Target</span>
             <select id="disposition" name="disposition" style="flex:1;">
-              <option value="friendly">Friendly</option>
-              <option value="neutral" selected>Neutral</option>
-              <option value="unfriendly">Unfriendly</option>
-              <option value="hostile">Hostile</option>
-            </select>
-            ${isMutant ? '<span style="color:#aa6600;font-size:11px;flex-shrink:0;">Mutant \u22121</span>' : ''}</div>
+              <option value="friendly">Friendly (green)</option>
+              <option value="neutral" selected>Neutral (yellow)</option>
+              <option value="unfriendly">Unfriendly (red)</option>
+              <option value="hostile">Hostile (impossible)</option>
+            </select></div>
           <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
             <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Request</span>
             <input type="text" id="request-description" style="flex:1;" placeholder="e.g. information, surrender, back off\u2026"></div>
+          <div class="frp-box" id="pop-mods" style="display:block;">
+            <span class="frp-box-label" style="display:block;margin:0 0 5px;">Circumstances \u2014 column shift</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="2" id="m-benefit"><span style="flex:1;">In the target's own interest</span><b>+2</b></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-3" id="m-danger"><span style="flex:1;">Places the target in danger</span><b>\u22123</b></label>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;"><span style="flex:1;">Item value</span>
+              <select id="m-value"><option value="0">\u2014</option><option value="-1">up to Good \u22121</option><option value="-2">up to Remarkable \u22122</option></select></div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-2" id="m-return"><span style="flex:1;">Chance it isn't returned</span><b>\u22122</b></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="pop-mod-cb" data-cs="-3" id="m-unique"><span style="flex:1;">Item is unique</span><b>\u22123</b></label>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;"><span style="flex:1;">Other (GM)</span>
+              <input type="number" id="m-other" value="0" style="width:54px;text-align:center;"></div>
+            <input type="hidden" id="column-shift" name="columnShift" value="0">
+          </div>
           <div class="frp-cs-box"><div class="frp-cs-line">
-            <span class="frp-cs-label">CS</span>
-            <input type="number" id="column-shift" name="columnShift" class="frp-cs-input" value="0">
-            <span class="frp-cs-base" id="pop-cs-base">${initReq.color}</span>
-            <span class="frp-cs-arrow">&rarr;</span>
-            <span class="frp-cs-rank" id="pop-cs-rank">${initReq.color}</span>
-            <span class="frp-cs-hint">benefits +2 \u00b7 danger \u22123 \u00b7 value/unique \u22121 to \u22123</span>
+            <span class="frp-cs-label">Roll</span>
+            <span class="frp-cs-base" id="pop-base-rank">${popShort}</span>
+            <span class="frp-cs-arrow">\u2192</span>
+            <span class="frp-cs-rank" id="pop-eff-rank">${popShort}</span>
+            <span class="frp-cs-hint" id="pop-cs-readout">0 CS</span>
           </div></div>
           <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
             <span id="pop-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span>
@@ -3273,52 +3282,66 @@ html.find('.headquarters-row').each((i, row) => {
           const $id = html.find('#identity-type');
           const $disp = html.find('#disposition');
           const $cs = html.find('#column-shift');
+          const $mods = html.find('#pop-mods');
+          const $benefit = html.find('#m-benefit');
+
+          const computeCS = (neg) => {
+            // Negative Popularity: only the "in the target's interest" CS applies.
+            if (neg) return $benefit.is(':checked') ? 2 : 0;
+            let cs = 0;
+            html.find('.pop-mod-cb').each((i, el) => { if (el.checked) cs += parseInt(el.dataset.cs) || 0; });
+            cs += parseInt(html.find('#m-value').val()) || 0;
+            cs += parseInt(html.find('#m-other').val()) || 0;
+            return cs;
+          };
 
           const refresh = () => {
             const idt = $id.length ? $id.val() : "hero";
             const popVal = idt === "secret" ? secretIdPopularity : heroPopularity;
-            const baseRank = self._getPopularityRank(popVal);
-            const baseShort = (game.msh?.getRankAbbreviation?.(baseRank)) || baseRank;
             const neg = popVal < 0;
-            const shift = parseInt($cs.val()) || 0;
+            const baseRank = self._getPopularityRank(Math.abs(popVal));
+            const baseShort = (game.msh?.getRankAbbreviation?.(baseRank)) || baseRank;
             const disp = $disp.val();
 
-            html.find('#pop-stat-rank').text(`${baseShort} ${popVal}`);
-            $cs.removeClass('cs-pos cs-neg');
-            if (shift > 0) $cs.addClass('cs-pos'); else if (shift < 0) $cs.addClass('cs-neg');
+            html.find('#m-danger, #m-return, #m-unique, #m-value, #m-other').prop('disabled', neg);
+
+            const cs = computeCS(neg);
+            $cs.val(cs);
+            const effRank = shiftRank(baseRank, cs);
+            const effShort = (game.msh?.getRankAbbreviation?.(effRank)) || effRank;
+
+            html.find('#pop-stat-rank').text(`${neg ? "\u2212" : ""}${baseShort} ${popVal}`);
+            html.find('#pop-base-rank').text(baseShort);
+            html.find('#pop-eff-rank').text(effShort);
+            html.find('#pop-cs-readout').text(`${cs > 0 ? "+" : ""}${cs} CS`);
 
             const $warn = html.find('#pop-warn');
             if (neg) { $warn.show(); html.find('#pop-warn-loss').text(Math.abs(popVal)); }
             else $warn.hide();
 
-            const baseReq = self._popRequiredColor(disp, 0, neg);
-            const req = self._popRequiredColor(disp, shift, neg);
-            html.find('#pop-cs-base').text(baseReq.color);
-            html.find('#pop-cs-rank').text(req.color);
+            const req = self._popRequiredColor(disp, neg);
             html.find('#pop-pill').attr('class', `frp-feat-pill ${req.cls}`).text(req.color.toUpperCase());
             html.find('#pop-hint').text(
-              req.impossible ? "won't respond"
-                : req.automatic ? "automatic success"
-                : neg ? "negative pop \u00b7 fear, not loyalty"
+              req.impossible ? "hostile \u2014 won't respond"
+                : neg ? "fear, not loyalty"
                 : "");
             html.find('#pop-roll').prop('disabled', req.impossible);
           };
 
           if ($id.length) $id.on('change', refresh);
           $disp.on('change', refresh);
-          $cs.on('change keyup', refresh);
+          $mods.on('change keyup', 'input, select', refresh);
           refresh();
 
-          html.find('#pop-cancel').on('click', () => dlg.close());
-          html.find('#pop-roll').on('click', async () => {
+          html.find('#pop-cancel').off('click.frp').on('click.frp', () => dlg.close());
+          html.find('#pop-roll').off('click.frp').on('click.frp', async () => {
             if (html.find('#pop-roll').prop('disabled')) return;
-            await self._onPopularityRoll(html);
-            dlg.close();
+            try { await self._onPopularityRoll(html); }
+            finally { if (!isDialogDetached(dlg)) dlg.close(); }
           });
         }
       });
     });
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Ability FEAT roll buttons — delegated to ability-feat-dialog.js
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3834,10 +3857,6 @@ html.find('.headquarters-row').each((i, row) => {
         ${lockbar}
         ${gmrow}
         <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
-          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Resource</span>
-          <input type="text" value="${resourceRank}" readonly style="flex:1;">
-          <span class="rankval">(${resourceValue})</span></div>
-        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
           <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Item Cost</span>
           <select id="res-item" style="flex:1;">${rankOpts}</select></div>
         <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
@@ -3886,7 +3905,7 @@ html.find('.headquarters-row').each((i, row) => {
         refresh();
 
         html.find("#res-cancel").on("click", () => dlg.close());
-        $roll.on("click", async () => {
+        $roll.off("click.frp").on("click.frp", async () => {
           if ($roll.prop("disabled")) return;
           const itemRank = $item.val();
           const itemIdx = ranks.indexOf(itemRank);
@@ -3936,7 +3955,9 @@ html.find('.headquarters-row').each((i, row) => {
               ${loanNote}
             </div>`;
 
-          await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card });
+          const resMsg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls: [roll] };
+          ChatMessage.applyRollMode(resMsg, game.settings.get("core", "rollMode"));
+          await ChatMessage.create(resMsg);
 
           if (lock.enabled) {
             let now;
@@ -3964,7 +3985,7 @@ html.find('.headquarters-row').each((i, row) => {
             await this.actor.update({ "system.karma.history": currentHistory });
           }
 
-          dlg.close();
+          if (!isDialogDetached(dlg)) dlg.close();
         });
       }
     });
@@ -4072,91 +4093,61 @@ html.find('.headquarters-row').each((i, row) => {
   // ladder, CS shifts it (mirrors the FEAT dialog's applyCS → requirement flow).
   // +CS = easier (toward Automatic), -CS = harder (toward Impossible).
   // Negative Popularity forces a Yellow base regardless of disposition.
-  _popRequiredColor(disposition, cs, negative) {
-    const LADDER = ["Automatic", "Green", "Yellow", "Red", "Impossible"];
-    const base = negative ? 2 : ({ friendly: 1, neutral: 2, unfriendly: 3, hostile: 4 }[disposition] ?? 2);
-    const idx = Math.min(4, Math.max(0, base - (parseInt(cs) || 0)));
-    const color = LADDER[idx];
-    const cls = { Automatic: "is-auto", Green: "is-green", Yellow: "is-yellow", Red: "is-red", Impossible: "is-impossible" }[color];
-    return { color, cls, automatic: color === "Automatic", impossible: color === "Impossible" };
+  _popRequiredColor(disposition, negative) {
+    // Book-correct: disposition sets the required color outright. Column shift
+    // does NOT touch the color (it shifts the rank rolled on). Negative
+    // Popularity forces Yellow regardless of disposition; Hostile is impossible.
+    const color = negative
+      ? "Yellow"
+      : ({ friendly: "Green", neutral: "Yellow", unfriendly: "Red", hostile: "Impossible" }[disposition] ?? "Yellow");
+    const cls = { Green: "is-green", Yellow: "is-yellow", Red: "is-red", Impossible: "is-impossible" }[color];
+    return { color, cls, automatic: false, impossible: color === "Impossible" };
   }
 
   async _onPopularityRoll(html) {
-    console.log("== POPULARITY ROLL START ==");
-    console.log("Actor:", this.actor.name);
-    console.log("Raw popularity object:", this.actor.system.attributes.popularity);
-  
     const heroPopularity = this.actor.system.attributes.popularity.hero?.value ?? 0;
     const secretIdPopularity = this.actor.system.attributes.popularity.secretId?.value ?? 0;
-    const isMutant = this.actor.system.origin === "Mutant" || this.actor.system.isMutant;
-  
-    console.log("Hero Pop:", heroPopularity);
-    console.log("Secret ID Pop:", secretIdPopularity);
-    console.log("Is Mutant:", isMutant);
-  
+
     const identityType = html.find('#identity-type').val() || "hero";
     const disposition = html.find('#disposition').val() || "neutral";
     const requestDescription = html.find('#request-description').val() || "request";
     const columnShift = parseInt(html.find('#column-shift').val()) || 0;
-  
-    console.log("Selected identity:", identityType);
-    console.log("Disposition:", disposition);
-    console.log("Request:", requestDescription);
-    console.log("Column Shift:", columnShift);
-  
-    let usedPopValue, identityLabel;
-    
-    if (identityType === "secret") {
-      usedPopValue = secretIdPopularity;
-      identityLabel = `Secret ID - ${this.actor.system.identity}`;
-    } else {
-      usedPopValue = heroPopularity;
-      identityLabel = `Hero ID - ${this.actor.name}`;
-    }
-      
-    console.log("Used Popularity Value:", usedPopValue);
-    console.log("Label:", identityLabel);
-  
-    const baseRank = this._getPopularityRank(usedPopValue);
-    const effectiveRank = baseRank;
+
+    const usedPopValue = identityType === "secret" ? secretIdPopularity : heroPopularity;
     const isNegative = usedPopValue < 0;
 
-    const req = this._popRequiredColor(disposition, columnShift, isNegative);
-    const featColorNeeded = req.color;
+    // Book-correct: column shift moves the COLUMN we roll on (effective rank);
+    // disposition fixes the required color. Negative Popularity rolls on the
+    // magnitude rank and always needs Yellow.
+    const baseRank = this._getPopularityRank(Math.abs(usedPopValue));
+    const effectiveRank = shiftRank(baseRank, columnShift);
 
+    const req = this._popRequiredColor(disposition, isNegative);
+    const featColorNeeded = req.color;
     if (req.impossible) {
-      ui.notifications.warn("Required FEAT is Impossible \u2014 the target will not respond.");
+      ui.notifications.warn("Hostile target \u2014 the Popularity FEAT is Impossible.");
       return;
     }
 
-    // ✅ Roll the dice and show 3D dice in chat
     const roll = new Roll("1d100");
     await roll.evaluate();
-  
-    await roll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: `${this.actor.name} - ${identityLabel} Popularity Roll for ${requestDescription}`,
-      rollMode: game.settings.get("core", "rollMode")
-    });
-  
-    // ✅ Now apply roll logic — roll on the base Popularity rank; CS already
-    // adjusted the required color.
-    const resultColor = game.msh.rollUniversalTable(baseRank, roll.total);
+    const resultColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
     const color = resultColor.toLowerCase();
-  
-    const success = req.automatic ||
+
+    const success =
       (featColorNeeded === "Green" && ["green", "yellow", "red"].includes(color)) ||
       (featColorNeeded === "Yellow" && ["yellow", "red"].includes(color)) ||
       (featColorNeeded === "Red" && color === "red");
-  
-    const bannerBg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[color] || "#ccc";
-    const bannerFg = ["white","yellow"].includes(color) ? "#222" : "#fff";
-    const needCls = { Automatic:"is-auto", Green:"is-green", Yellow:"is-yellow", Red:"is-red" }[featColorNeeded] || "is-yellow";
+
+    const baseShort = (game.msh?.getRankAbbreviation?.(baseRank)) || baseRank;
+    const effShort = (game.msh?.getRankAbbreviation?.(effectiveRank)) || effectiveRank;
+    const bannerBg = { white: "#f8f8f8", green: "#00a94e", yellow: "#fef102", red: "#ee1e25" }[color] || "#ccc";
+    const bannerFg = ["white", "yellow"].includes(color) ? "#222" : "#fff";
+    const needCls = { Green: "is-green", Yellow: "is-yellow", Red: "is-red" }[featColorNeeded] || "is-yellow";
     const idShort = identityType === "secret" ? "Secret ID" : "Hero ID";
-    const csLabel = columnShift !== 0 ? ` (${columnShift > 0 ? "+" : ""}${columnShift}CS)` : "";
-    const mutNote = isMutant
-      ? `<div style="padding:6px 12px;font-size:11px;color:#aa6600;border-top:1px solid #e2e2da;">Mutant penalty applies to Popularity awards/penalties (\u22121).</div>`
-      : "";
+    const csLabel = columnShift !== 0 ? `${columnShift > 0 ? "+" : ""}${columnShift}CS` : "0CS";
+    const rankCell = columnShift !== 0 ? `${baseShort} \u2192 ${effShort}` : effShort;
+    const dispLabel = disposition.charAt(0).toUpperCase() + disposition.slice(1);
     const negNote = isNegative
       ? `<div style="padding:7px 12px;font-size:12px;line-height:1.4;background:#fce4ec;border-top:1px solid #f48fb1;color:#7a0d44;"><b>\u2212${Math.abs(usedPopValue)} Karma</b> deducted (negative Popularity rank number). Logged to Karma history.</div>`
       : "";
@@ -4168,29 +4159,27 @@ html.find('.headquarters-row').each((i, row) => {
           <span style="color:#888;font-size:12px;">${requestDescription}</span></div>
         <div style="padding:6px 12px;display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e2da;">
           <span><span style="color:#888;">${idShort}:</span> <b>${usedPopValue}${isNegative ? " (neg)" : ""}</b></span>
-          <span><span style="color:#888;">Target:</span> <b>${disposition.charAt(0).toUpperCase() + disposition.slice(1)}</b></span></div>
+          <span><span style="color:#888;">Target:</span> <b>${dispLabel}</b></span></div>
         <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bannerBg};color:${bannerFg};">${resultColor.toUpperCase()}</div>
         <div style="display:flex;background:#fff;text-align:center;border-bottom:1px solid #ddd;">
           <div style="flex:1;padding:8px 4px;border-right:1px solid #ececec;">
             <div style="font-size:24px;font-weight:bold;color:#222;line-height:1;">${roll.total}</div>
             <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">Roll</div></div>
-          <div style="flex:1.4;padding:8px 4px;border-right:1px solid #ececec;">
-            <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${effectiveRank}</div>
-            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">Pop rank</div></div>
+          <div style="flex:1.6;padding:8px 4px;border-right:1px solid #ececec;">
+            <div style="font-size:14px;font-weight:bold;color:#333;padding-top:3px;">${rankCell}</div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">Column (${csLabel})</div></div>
           <div style="flex:1.2;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
             <span class="frp-feat-pill ${needCls}">${featColorNeeded.toUpperCase()}</span>
-            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed${csLabel}</div></div></div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed</div></div></div>
         <div style="padding:7px 12px;text-align:center;font-weight:bold;font-size:14px;letter-spacing:.5px;color:${success ? '#1b5e20' : '#c62828'};">
           ${success ? "\u2713 SUCCESS \u00b7 REQUEST GRANTED" : "\u2717 FAILURE \u00b7 REQUEST DENIED"}</div>
-        ${mutNote}
         ${negNote}
       </div>
     `;
-  
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      content
-    });
+
+    const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content, rolls: [roll] };
+    ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode"));
+    await ChatMessage.create(msg);
 
     // Log Popularity FEAT to karma history
     const featHistoryEntry = {

@@ -37,6 +37,7 @@ export async function showFaseripDialog({ title, content, render, close } = {}) 
     // in render before it paints. Not marked as default so Enter doesn't
     // auto-resolve — the caller's render typically binds its own Enter
     // handler that triggers the Roll button.
+    classes: ["faserip-shim-dialog"],
     buttons: [{ action: "_frame", label: "" }],
     rejectClose: false,
     render: async (event, dialog) => {
@@ -48,6 +49,15 @@ export async function showFaseripDialog({ title, content, render, close } = {}) 
       const $html = $root.find('.window-content').first();
       try { await render?.($html, dialog); }
       catch (e) { console.error("FASERIP dialog render error:", e); }
+      // Keep FASERIP roll dialogs above the sheet that spawned them: clicking a
+      // sheet control raises the sheet, which would otherwise bury an already-
+      // open dialog. Re-raise the whole shim-dialog group on each render.
+      try {
+        for (const app of foundry.applications.instances.values()) {
+          if (app !== dialog && app.options?.classes?.includes("faserip-shim-dialog")) app.bringToFront?.();
+        }
+        dialog.bringToFront?.();
+      } catch (_) {}
     },
     close: () => {
       try { close?.(); }
