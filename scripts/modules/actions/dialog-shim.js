@@ -14,6 +14,19 @@
 // Used to silence "V1 Application framework is deprecated" warnings ahead of
 // Foundry v16's removal of V1.
 
+// Returns true when a DialogV2 (or any AppV2) instance is currently rendered
+// in a Foundry v14 detached browser window rather than the main workspace.
+// Detection prefers the documented window.windowId set on detach, and falls
+// back to comparing the element's owning window. Used so action dialogs can
+// keep a popped-out window alive after a roll instead of tearing it down.
+export function isDialogDetached(dialog) {
+  try {
+    if (dialog?.window?.windowId != null) return true;
+    const dv = dialog?.element?.ownerDocument?.defaultView;
+    return !!dv && dv !== window;
+  } catch (_) { return false; }
+}
+
 export async function showFaseripDialog({ title, content, render, close } = {}) {
   const { DialogV2 } = foundry.applications.api;
   return DialogV2.wait({

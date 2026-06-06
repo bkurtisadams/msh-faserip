@@ -1,3 +1,10 @@
+// ability-feat-dialog.js v1.6.0 - 2026-06-05
+// v1.6.0: Single chat card per FEAT. Dropped the standalone roll.toMessage()
+//         d100 card; the d100 Roll is now attached to the FEAT result card
+//         via rolls[] (DSN still animates) and respects the active rollMode.
+//         Also skip the post-roll dlg.close() when the dialog is rendered in
+//         a Foundry v14 detached window, so a popped-out FEAT window survives
+//         a roll instead of tearing itself (and the window) down.
 // ability-feat-dialog.js v1.5.2 - 2026-05-25
 // v1.5.2: Render FEAT requirements as "Needs:" color pills using Universal Table colors.
 // v1.5.1: Fix Remember checkbox forcing itself back on — it was hardcoded
@@ -32,7 +39,7 @@
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
 import { applyColumnShifts } from '../dice/column-shifts.js';
-import { showFaseripDialog } from "./dialog-shim.js";
+import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 
 const RANKS = [
@@ -530,14 +537,6 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const roll = new Roll("1d100");
           await roll.evaluate();
 
-          if (!skipDice) {
-            await roll.toMessage({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              flavor: `${actor.name} makes a ${fullName} FEAT roll${effectiveIntensity !== "None" ? ` vs ${effectiveIntensity} intensity` : ""}`,
-              rollMode: game.settings.get("core", "rollMode")
-            });
-          }
-
           // Karma (two-phase)
           let cappedTotal = roll.total;
           let karmaUsed = 0;
@@ -576,7 +575,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           }
 
           // Chat card
-          await ChatMessage.create({
+          const featMsg = {
             speaker: ChatMessage.getSpeaker({ actor }),
             content: `
               <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
@@ -603,7 +602,12 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                 ` : ''}
                 ${multiAttackResult}
               </div>`
-          });
+          };
+          if (!skipDice) {
+            featMsg.rolls = [roll];
+            ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode"));
+          }
+          await ChatMessage.create(featMsg);
         };  // end runRoll
 
       // Shared updateFeatRequirement for all abilities — writes to the
@@ -735,7 +739,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
 
       // ──── Roll / Cancel button wiring + Enter-to-roll ────
       html.find('#frp-roll').on('click', async () => {
-        try { await runRoll(); } finally { dlg.close(); }
+        try { await runRoll(); }
+        finally { if (!isDialogDetached(dlg)) dlg.close(); }
       });
       html.find('#frp-cancel').on('click', () => dlg.close());
       html.find('#frp-roll').focus();

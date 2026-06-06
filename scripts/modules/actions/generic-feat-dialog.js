@@ -1,3 +1,10 @@
+// generic-feat-dialog.js v1.4.0 - 2026-06-05
+// v1.4.0: Single chat card per FEAT. Dropped the standalone roll.toMessage()
+//         d100 card; the d100 Roll is now attached to the FEAT result card
+//         via rolls[] (DSN still animates) and respects the active rollMode.
+//         Also skip the post-roll dlg.close() when the dialog is rendered in
+//         a Foundry v14 detached window, so a popped-out FEAT window survives
+//         a roll instead of tearing itself (and the window) down.
 // generic-feat-dialog.js v1.3.1 - 2026-05-25
 // v1.3.1: Render FEAT requirements as "Needs:" color pills using Universal Table colors.
 // v1.3.0: Base picker can now be a directly-chosen rank, not just an ability.
@@ -19,7 +26,7 @@
 // Used by macros / GM tools, hidden from the player UI.
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
-import { showFaseripDialog } from "./dialog-shim.js";
+import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 
@@ -378,16 +385,6 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         const roll = new Roll("1d100");
         await roll.evaluate();
 
-        if (!skipDice) {
-          await roll.toMessage({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            flavor: actor
-              ? `${actor.name} makes a ${currentLabel} FEAT roll${intensity !== "None" ? ` vs ${intensity} intensity` : ""}`
-              : `Generic FEAT roll`,
-            rollMode: game.settings.get("core", "rollMode")
-          });
-        }
-
         let cappedTotal = roll.total;
         let karmaUsed = 0;
 
@@ -407,7 +404,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
           featSuccess = checkFeatSuccess(resultColor, featRequirement);
         }
 
-        await ChatMessage.create({
+        const featMsg = {
           speaker: ChatMessage.getSpeaker({ actor }),
           content: `
             <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -430,11 +427,17 @@ export async function showGenericFeatDialog(actor, opts = {}) {
                 </div>
               ` : ''}
             </div>`
-        });
+        };
+        if (!skipDice) {
+          featMsg.rolls = [roll];
+          ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode"));
+        }
+        await ChatMessage.create(featMsg);
       };
 
       html.find('#frp-roll').on('click', async () => {
-        try { await runRoll(); } finally { dlg.close(); }
+        try { await runRoll(); }
+        finally { if (!isDialogDetached(dlg)) dlg.close(); }
       });
       html.find('#frp-cancel').on('click', () => dlg.close());
       html.find('#frp-roll').focus();
