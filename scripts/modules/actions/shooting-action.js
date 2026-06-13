@@ -1,4 +1,9 @@
-// shooting-action.js v3.7.4 - 2026-05-23
+// shooting-action.js v3.7.5 - 2026-06-12
+// v3.7.5: Mercy Shot KO intensity is now per-weapon (system.mercyIntensity,
+//         falling back to system.stunIntensity, default Remarkable per RAW)
+//         and the Endurance FEAT is gated against it via requiredColorForIntensity
+//         instead of treating any non-white roll as a resist. Lets a tranq be
+//         set to Excellent (or any) Intensity.
 // v3.7.4: Relabel the blue distance box "Range" -> "DISTANCE" to disambiguate
 //         it from the CS-row range penalty term.
 // shooting-action.js v3.7.3 - 2026-05-23
@@ -912,10 +917,23 @@ export class ShootingAction extends RangedAttackAction {
       const endInfo = getAbilityInfo(targetActor, "endurance");
       const endRank = endInfo?.rank || "Typical";
 
+      // KO-drug intensity is per-weapon. Default Remarkable per the RAW Advanced
+      // Set mercy-bullet rule; a weapon may override via system.mercyIntensity
+      // (or fall back to system.stunIntensity) — e.g. an Excellent-Intensity
+      // tranquilizer. The Endurance FEAT is gated against that intensity rather
+      // than treating any non-white roll as a resist.
+      const koIntensity =
+        weapon?.system?.mercyIntensity ||
+        weapon?.system?.stunIntensity ||
+        "Remarkable";
+      const { requiredColorForIntensity } = await import("./breaking-feat.js");
+      const requiredColor = requiredColorForIntensity(endRank, koIntensity);
+
       const r = await (new Roll("1d100")).evaluate({ async: true });
       const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
       const featColorLower = String(featColor || "white").toLowerCase();
-      const resisted = featColorLower !== "white";
+      const _colorOrder = { white: 0, green: 1, yellow: 2, red: 3 };
+      const resisted = (_colorOrder[featColorLower] ?? 0) >= (_colorOrder[requiredColor] ?? 1);
 
       let line = "";
       if (resisted) {
@@ -934,7 +952,7 @@ export class ShootingAction extends RangedAttackAction {
         speaker: ChatMessage.getSpeaker({ actor }),
         content: `<div style="background:#f3e5f5;border:1px solid #8e24aa;border-radius:3px;padding:6px 8px;margin:4px 0;">
           <div style="font-weight:bold;color:#6a1b9a;margin-bottom:3px;">Mercy Shot \u2014 KO Drug</div>
-          <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs Rm Intensity: rolled ${r.total} \u2192 <b>${featColorLower.toUpperCase()}</b></div>
+          <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs ${koIntensity} Intensity \u2014 need ${requiredColor.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColorLower.toUpperCase()}</b></div>
           ${line}
         </div>`
       });
