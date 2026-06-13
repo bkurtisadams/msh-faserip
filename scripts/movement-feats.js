@@ -1,4 +1,6 @@
-// movement-feats.js v1.7.1 - 2025-01-19
+// movement-feats.js v1.8.0 - 2026-06-11
+// v1.8.0: Add Swim Speed +1 FEAT (Yellow Strength) mirroring the Run dialog —
+//         new radio option plus Strength-based resolution and +1-area result.
 // v1.7.1: Fix teleport distance table to use Air speed (areas = max teleport distance)
 // v1.7.0: Add Teleport dialog with power rank dropdown, disorientation/passenger/solid object checks
 // v1.6.0: Add Swim dialog with Swimming power dropdown, add Lightning Speed dropdown to Run dialog
@@ -1341,6 +1343,9 @@ export class MovementFeats {
             <label style="padding: 3px; background: ${savedFeatType === 'normal' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Normal swimming at current speed. No roll required.">
               <input type="radio" name="swimFeatType" value="normal" ${savedFeatType === 'normal' ? 'checked' : ''}> Normal <span style="color: #666;">(no roll)</span>
             </label>
+            <label style="padding: 3px; background: ${savedFeatType === 'speed' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Strength FEAT to move +1 area beyond max swim speed.&#10;Failure: No bonus speed.">
+              <input type="radio" name="swimFeatType" value="speed" ${savedFeatType === 'speed' ? 'checked' : ''}> Speed +1 <span style="color: #666;">(Yel Str)</span>
+            </label>
             <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Green Endurance FEAT after ${exhaustionThreshold} turns at max speed.&#10;Failure: Must rest 1-10 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
               <input type="radio" name="swimFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(Grn End)</span>
             </label>
@@ -1449,13 +1454,24 @@ export class MovementFeats {
     const enduranceAbility = this.actor.system.abilities?.endurance;
     const enduranceRank = enduranceAbility?.rank || "Typical";
     const enduranceValue = enduranceAbility?.value || 6;
-    
+    const strengthAbility = this.actor.system.abilities?.strength;
+    const strengthRank = strengthAbility?.rank || "Typical";
+    const strengthValue = strengthAbility?.value || 6;
+
+    // Speed FEAT (move +1 area beyond max) is a Yellow Strength FEAT, mirroring
+    // the Run dialog. Exhaustion/drowning checks use Endurance.
+    const isSpeedFeat = featType === 'speed';
+    const abilityRank = isSpeedFeat ? strengthRank : enduranceRank;
+    const abilityValue = isSpeedFeat ? strengthValue : enduranceValue;
+    const abilityName = isSpeedFeat ? 'Strength' : 'Endurance';
+
     const cruisingAreas = swimInfo.id === 'normal' ? 1 : Math.max(1, swimInfo.areas - 2);
     const isAboveCruising = currentSpeed > cruisingAreas;
     
     // FEAT type info
     const featTypeInfo = {
       'normal': { name: 'Normal Swimming', failure: null },
+      'speed': { name: 'Speed FEAT', failure: 'No bonus speed', requirement: 'Yellow' },
       'exhaustion': { name: 'Exhaustion Check', failure: 'Must rest 1-10 turns', requirement: 'Green' },
       'drowning': { name: 'Drowning Check', failure: 'Drowning! Lose 1 Endurance rank/turn', requirement: 'Green' }
     };
@@ -1506,8 +1522,8 @@ export class MovementFeats {
       return;
     }
     
-    // Apply column shifts
-    const effectiveRank = applyColumnShift(enduranceRank, columnShift);
+    // Apply column shifts (Strength for Speed FEAT, Endurance otherwise)
+    const effectiveRank = applyColumnShift(abilityRank, columnShift);
     
     // Roll
     const roll = new Roll("1d100");
@@ -1539,8 +1555,15 @@ export class MovementFeats {
     }
     
     const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const featSuccess = ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
+    // Speed FEAT requires Yellow; exhaustion/drowning require Green.
+    const featSuccess = isSpeedFeat
+      ? ['yellow', 'red'].includes(resultColor.toLowerCase())
+      : ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
     const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
+
+    // Effective speed for Speed FEAT reporting (actions-while-swimming halves it)
+    let speedFeatEffective = currentSpeed;
+    if (actionsWhileSwimming) speedFeatEffective = Math.ceil(speedFeatEffective / 2);
     
     // Build modifier notes
     let modifierNotes = [];
@@ -1558,10 +1581,10 @@ export class MovementFeats {
         </div>
         <div style="padding: 5px 10px; font-size: 0.9em;">
           <div>${sourceNote}</div>
-          <div>Endurance: ${enduranceRank} (${enduranceValue})</div>
+          <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
           ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
           ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
-          <div>Required: <span style="color: #2e7d32; font-weight: bold;">${featInfo.requirement}</span></div>
+          <div>Required: <span style="color: ${isSpeedFeat ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
           <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -1569,7 +1592,11 @@ export class MovementFeats {
           ${resultColor.toUpperCase()} RESULT
         </div>
         <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#4CAF50' : '#F44336'};">
-          ${featSuccess ? 'SUCCESS' : `FAILED — ${featInfo.failure}`}
+          ${isSpeedFeat
+            ? (featSuccess
+                ? `SUCCESS — Speed +1 area (${speedFeatEffective + 1} areas total)`
+                : `FAILED — No bonus speed (${speedFeatEffective} areas)`)
+            : (featSuccess ? 'SUCCESS' : `FAILED — ${featInfo.failure}`)}
         </div>
       </div>
     `;

@@ -1,4 +1,8 @@
-// equipment-action-dialog.js v1.5.0 - 2026-05-06
+// equipment-action-dialog.js v1.5.1 - 2026-06-11
+// v1.5.1: Any weapon-category item now always offers an Attack action. The gate
+//         previously required attackType/damageType/weaponType to be set, so a
+//         half-configured weapon (all blank) silently offered no attack at all.
+//         _resolveAttackType() supplies a fallback (defaults to "shooting").
 // v1.5.0: Chain Resistance FEAT after attack-mode damage when the active mode declares a
 //         resistRank. After the primary attack ActionDispatcher.roll resolves, dispatch
 //         IntensityAction with the same attackMode passed via opts. The intensity dialog
@@ -58,7 +62,11 @@ function getAvailableActions(item, actor) {
   // Primary attack is derived from top-level damageType/attackType/weaponType.
   // Attack modes (below) are ADDITIONAL named alternatives, not replacements.
   const modes = Array.isArray(sys.attackModes) ? sys.attackModes.filter(m => m?.name) : [];
-  if (cat === "weapon" && (sys.attackType || sys.damageType || sys.weaponType)) {
+  // Any weapon-category item offers an attack. Previously this required at least
+  // one of attackType/damageType/weaponType to be set, so a half-configured
+  // weapon (all three blank) silently offered NO attack. _resolveAttackType()
+  // supplies a sane fallback (defaults to "shooting") when the fields are empty.
+  if (cat === "weapon") {
     const primaryLabel = modes.length ? _primaryAttackLabel(item) : "Attack";
     actions.push({
       id: "attack",

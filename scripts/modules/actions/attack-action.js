@@ -1,4 +1,8 @@
-// attack-action.js v1.9.40 - 2026-05-23
+// attack-action.js v1.9.41 - 2026-06-11
+// v1.9.41: Firearm ammo no longer depends on the SFX subsystem. The post-attack
+//          spend block was nested inside `if (game.msh?.playCombatSFX)`; hoisted
+//          to a bare block so shots always decrement. Also seed shotsRemaining
+//          from shots when blank and never decrement `shots` (magazine capacity).
 // v1.9.40: Show the to-hit breakdown when modifiers cancel to a net 0
 //          (e.g. Guns +1CS vs Range -1CS) so the Agility hover lists both
 //          instead of going blank. Effective rank gets a * when any mods apply.
@@ -1840,8 +1844,11 @@ export class AttackAction extends BaseAction {
       }
     }
 
-    // Play combat SFX once after all cards (still plays in manual mode)
-    if (game.msh?.playCombatSFX) {
+    // Ammo accounting + optional SFX/FX after all cards (runs even in manual mode).
+    // Bare block — intentionally NOT gated on game.msh.playCombatSFX so firearm
+    // ammo always decrements regardless of whether the SFX subsystem is present
+    // or enabled. The SFX/FX calls below carry their own guards.
+    {
       const weapon =
         this?.opts?.item
         || choice?.weapon
@@ -1862,14 +1869,16 @@ export class AttackAction extends BaseAction {
       // Use the tracked actual hit status (accounts for evasion)
       const hit = anyTargetActuallyHit;
 
-        await game.msh.playCombatSFX({
-          item: weapon,
-          actionType,
-          damageType: dmgType,
-          rollResult,
-          isHit: hit,
-          sourceName
-        });
+        if (game.msh?.playCombatSFX) {
+          await game.msh.playCombatSFX({
+            item: weapon,
+            actionType,
+            damageType: dmgType,
+            rollResult,
+            isHit: hit,
+            sourceName
+          });
+        }
 
         // Play matching visual FX (no-op if disabled or Sequencer absent)
         if (game.msh?.fx?.playAttack) {
@@ -1924,11 +1933,23 @@ export class AttackAction extends BaseAction {
               return true;
             };
 
+            // shotsRemaining is the live counter; shots is magazine CAPACITY and
+            // must never be decremented. If shotsRemaining is blank (never
+            // initialized), seed it from shots before spending.
+            const tryUpdateShotsRemaining = async () => {
+              let cur = toNum(sys.shotsRemaining);
+              if (!Number.isFinite(cur)) cur = toNum(sys.shots);
+              if (!Number.isFinite(cur)) return false;
+              const next = Math.max(0, cur - rounds);
+              await weapon.update({ "system.shotsRemaining": next });
+              console.log("FASERIP | Ammo spend", { weapon: weapon.name, path: "system.shotsRemaining", cur, rounds, next });
+              return true;
+            };
+
             // First match wins (order chosen to fit your template.json)
             const updated =
               (sys.ammo && (await tryUpdate("system.ammo.current") || await tryUpdate("system.ammo.value"))) ||
-              (await tryUpdate("system.shotsRemaining")) ||
-              (await tryUpdate("system.shots")) ||
+              (await tryUpdateShotsRemaining()) ||
               (sys.uses && await tryUpdate("system.uses.value")) ||
               (await tryUpdate("system.clip")) ||
               (await tryUpdate("system.magazine"));
