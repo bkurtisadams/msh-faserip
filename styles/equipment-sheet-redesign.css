@@ -98,8 +98,9 @@
   align-items: center;
 }
 
-.equipment-sheet .frp-damage-cell input[type="number"] {
+.equipment-sheet .frp-damage-cell input {
   width: 60px;
+  flex: 0 0 60px;
   padding: 5px;
   border: 1px solid #ccc;
   background: #fff;
@@ -109,7 +110,8 @@
 }
 
 .equipment-sheet .frp-damage-cell select {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 120px;
   padding: 5px 8px;
   border: 1px solid #ccc;
   background: #fff;

@@ -152,6 +152,12 @@
             <label>Power Rank:</label>
             <input type="text" name="system.weaponPowerRank" value="{{system.weaponPowerRank}}" />
 
+            <label title="On a hit, the target makes an Endurance FEAT vs this Intensity or is stunned 1-10 rounds (stun baton, Stun Pistol/Rifle/Cannon). Ignores physical Body Armor.">Stun Intensity:</label>
+            <select name="system.stunIntensity">
+              <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
+              {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.stunIntensity}}
+            </select>
+
             <label>Flags:</label>
             <div class="frp-bool-row">
               <label><input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>No Range Penalty</label>
@@ -292,14 +298,6 @@
           </summary>
 
           <div style="padding:8px;">
-
-            <div class="form-group">
-              <label>Stun/Gas Intensity:</label>
-              <select name="system.stunIntensity">
-                <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
-                {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.stunIntensity}}
-              </select>
-            </div>
 
             <div class="form-row">
               <div class="form-group half">
