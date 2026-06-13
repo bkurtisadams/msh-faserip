@@ -1,4 +1,9 @@
-// attack-action.js v1.9.41 - 2026-06-11
+// attack-action.js v1.9.42 - 2026-06-12
+// v1.9.42: Decrement ammo for ALL firearms, not just actionType "shooting".
+//          Energy/force blasters (attackType "energy"/"force") dispatch as
+//          energy/force attacks, so the old `actionType === "shooting"` gate
+//          never fired and their shots never spent. Now detect firearms by
+//          weaponType ("shooting"/"firearm"), matching the pre-attack check.
 // v1.9.41: Firearm ammo no longer depends on the SFX subsystem. The post-attack
 //          spend block was nested inside `if (game.msh?.playCombatSFX)`; hoisted
 //          to a bare block so shots always decrement. Also seed shotsRemaining
@@ -1894,7 +1899,16 @@ export class AttackAction extends BaseAction {
 
         // --- Spend ammo for firearms (string/number tolerant; supports current template.json) ---
         try {
-          if (String(actionType).toLowerCase() === "shooting" && weapon?.system) {
+          // Firearm detection mirrors the pre-attack out-of-ammo check: a
+          // weapon is a firearm by its weaponType, regardless of the attack's
+          // damage type. Energy/force blasters have attackType "energy"/"force"
+          // (so actionType is NOT "shooting") but still expend shots.
+          const _sysW = weapon?.system || {};
+          const _isFirearm =
+            String(_sysW.weaponType || "").toLowerCase() === "firearm" ||
+            String(_sysW.weaponType || "").toLowerCase() === "shooting" ||
+            String(actionType).toLowerCase() === "shooting";
+          if (_isFirearm && weapon?.system) {
             const sys = weapon.system;
 
             // Parse first numeric in a value (works for "20", "", null, "Burst (3)", etc.)
