@@ -1,4 +1,7 @@
-// attack-action.js v1.9.44 - 2026-06-12
+// attack-action.js v1.9.45 - 2026-06-12
+// v1.9.45: Fix intensity-on-hit not firing on melee — the method-scope `weapon`
+//          is null on blunt/edged paths (they set choice.itemId, not choice.weapon).
+//          Resolve the weapon via this.opts.item first (like the ammo block).
 // v1.9.44: On-hit hook now reads the unified intensity cluster (intensityRank +
 //          intensityEffect + intensityDuration) instead of stunIntensity, applies
 //          the configured effect via shared applyIntensityEffect, FEAT gated by
@@ -1944,10 +1947,20 @@ export class AttackAction extends BaseAction {
       // damage. Skipped when a postHitCallback already delivered a post-hit
       // effect (mercy KO drug, area ripple) so the two never stack — the
       // tranq's mercy KO is unaffected.
+      //
+      // Resolve the weapon the same robust way the ammo block does: the
+      // method-scope `weapon` is null on the melee paths (blunt/edged set
+      // choice.itemId, not choice.weapon), so fall back to this.opts.item.
       // ============================================================
-      if (!postHitCallback && targetActor && targetIsHit && weapon?.system?.intensityRank) {
+      const _intensityWeapon =
+        this?.opts?.item
+        || weapon
+        || (choice?.weaponId ? this.actor.items.get(choice.weaponId) : null)
+        || (choice?.itemId ? this.actor.items.get(choice.itemId) : null)
+        || null;
+      if (!postHitCallback && targetActor && targetIsHit && _intensityWeapon?.system?.intensityRank) {
         try {
-          await this._applyIntensityOnHit({ targetActor, color: colorLower, weapon, actor });
+          await this._applyIntensityOnHit({ targetActor, color: colorLower, weapon: _intensityWeapon, actor });
         } catch (e) {
           console.error("[FASERIP ERROR] intensity-on-hit failed:", e);
         }
