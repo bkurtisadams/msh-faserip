@@ -1,3 +1,7 @@
+// equipment-action-dialog.js v1.7.0 - 2026-06-12
+// v1.7.0: Suppress the standalone "Intensity Attack" button when the item has an
+//         attack action — the intensity now rides the hit (attack-action
+//         _applyIntensityOnHit). Pure intensity items (no attack) still show it.
 // equipment-action-dialog.js v1.6.0 - 2026-06-12
 // v1.6.0: Refine skip-hub: pass straight to the attack dialog when there is
 //         exactly one ROLLABLE action, even alongside Reload (which has its own
@@ -130,8 +134,13 @@ function getAvailableActions(item, actor) {
     });
   }
 
-  // ── Intensity Attack ──
-  if (sys.intensityRank) {
+  // ── Intensity Attack (standalone) ──
+  // Suppressed when the weapon already offers an attack: in that case the
+  // intensity rides the hit (attack-action _applyIntensityOnHit) rather than
+  // being a separate FEAT button. Pure intensity items (no attack action —
+  // e.g. a gas sprayer) still show the standalone button.
+  const _hasAttackAction = actions.some(a => a.id === "attack" || a.id.startsWith("attack-mode"));
+  if (sys.intensityRank && !_hasAttackAction) {
     actions.push({
       id: "intensity",
       group: "combat",

@@ -152,12 +152,6 @@
             <label>Power Rank:</label>
             <input type="text" name="system.weaponPowerRank" value="{{system.weaponPowerRank}}" />
 
-            <label title="On a hit, the target makes an Endurance FEAT vs this Intensity or is stunned 1-10 rounds (stun baton, Stun Pistol/Rifle/Cannon). Ignores physical Body Armor.">Stun Intensity:</label>
-            <select name="system.stunIntensity">
-              <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
-              {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.stunIntensity}}
-            </select>
-
             <label>Flags:</label>
             <div class="frp-bool-row">
               <label><input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>No Range Penalty</label>
@@ -1225,7 +1219,7 @@
             <option value="" {{#if (eq system.intensityRank "")}}selected{{/if}}>None</option>
             {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.intensityRank}}
           </select>
-          <span style="font-size:0.75em;color:#888;">For FEAT vs Intensity rolls (gas, flash, etc.)</span>
+          <span style="font-size:0.75em;color:#888;">FEAT vs Intensity. On a weapon with an attack, this applies on hit (ignores physical Body Armor); on items with no attack it's a standalone Intensity Attack.</span>
         </div>
       </div>
 
@@ -1251,6 +1245,11 @@
       <div class="form-group">
         <label>Intensity Desc:</label>
         <input type="text" name="system.intensityDescription" value="{{system.intensityDescription}}" placeholder="e.g., Chemical spray causes blindness" title="Flavor text shown on chat card"/>
+      </div>
+
+      <div class="form-group">
+        <label>Intensity Duration:</label>
+        <input type="text" name="system.intensityDuration" value="{{system.intensityDuration}}" placeholder="1d10" title="How long the applied effect lasts, in rounds. Dice (e.g. 1d10) or a fixed number. Default 1d10 (RAW stun)."/>
       </div>
 
       <div class="form-group">

@@ -84,6 +84,8 @@
 .equipment-sheet .frp-grid-2col > select,
 .equipment-sheet .frp-grid-2col > input[type="text"],
 .equipment-sheet .frp-grid-2col > input[type="number"] {
+  min-width: 0;
+  width: 100%;
   padding: 5px 8px;
   border: 1px solid #ccc;
   background: #fff;
@@ -96,11 +98,12 @@
   display: flex;
   gap: 6px;
   align-items: center;
+  min-width: 0;
 }
 
 .equipment-sheet .frp-damage-cell input {
-  width: 60px;
-  flex: 0 0 60px;
+  flex: 0 0 48px;
+  width: 48px;
   padding: 5px;
   border: 1px solid #ccc;
   background: #fff;
@@ -111,7 +114,7 @@
 
 .equipment-sheet .frp-damage-cell select {
   flex: 1 1 auto;
-  min-width: 120px;
+  min-width: 0;
   padding: 5px 8px;
   border: 1px solid #ccc;
   background: #fff;

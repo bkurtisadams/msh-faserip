@@ -1,3 +1,8 @@
+// attack-action.js v1.9.44 - 2026-06-12
+// v1.9.44: On-hit hook now reads the unified intensity cluster (intensityRank +
+//          intensityEffect + intensityDuration) instead of stunIntensity, applies
+//          the configured effect via shared applyIntensityEffect, FEAT gated by
+//          required color. Renamed _applyStunOnHit -> _applyIntensityOnHit.
 // attack-action.js v1.9.43 - 2026-06-12
 // v1.9.43: Stun-on-hit hook in _executeSingleAttack. A weapon with
 //          system.stunIntensity (stun baton, Stun Pistol/Rifle/Cannon) rolls
@@ -548,27 +553,45 @@ export class AttackAction extends BaseAction {
   }
 
   /**
-   * Stun-on-hit for stun weapons (stun baton, Stun Pistol/Rifle/Cannon).
-   * On a hit, the target rolls an Endurance FEAT vs the weapon's Stun
-   * Intensity (system.stunIntensity). Failure → stunned 1-10 rounds. This
-   * is a FEAT-intensity attack and ignores Body Armor (RAW: armor does not
-   * affect intensity FEATs unless the attack must pass through it). Called
-   * from _executeSingleAttack only when no other post-hit callback applies.
+   * Intensity-on-hit for weapons carrying an on-hit Intensity effect
+   * (stun baton, Stun Pistol/Rifle/Cannon, and any weapon with an Intensity
+   * Rank + Apply effect). On a hit, the target rolls an Endurance FEAT vs
+   * system.intensityRank, gated by required color (Ability>Intensity -> green,
+   * = -> yellow, < -> red). On failure the configured effect
+   * (system.intensityEffect, default "stunned") is applied for
+   * system.intensityDuration (default 1d10). FEAT-intensity attack: ignores
+   * Body Armor (RAW). Called only when no other post-hit callback applies.
    */
-  async _applyStunOnHit({ targetActor, color, weapon, actor }) {
+  async _applyIntensityOnHit({ targetActor, color, weapon, actor }) {
     if (!targetActor) return;
     if (String(color || "white").toLowerCase() === "white") return; // miss
-    const stunRank = weapon?.system?.stunIntensity;
-    if (!stunRank) return;
+    const sys = weapon?.system || {};
+    const intensityRank = sys.intensityRank;
+    if (!intensityRank) return;
+
+    const effect = sys.intensityEffect || "stunned";
+    const desc = sys.intensityDescription || "";
 
     const { getAbilityInfo } = await import("./action-utils.js");
     const { requiredColorForIntensity } = await import("./breaking-feat.js");
     const { rollUniversalTable } = await import("../dice/universal-table.js");
-    const { applyStun } = await import("../effects/effect-engine.js");
+    const { applyIntensityEffect } = await import("../effects/effect-engine.js");
+
+    // Resolve duration (default 1d10): plain number used as-is, dice expression
+    // rolled, anything unparseable falls back to 1d10. Minimum 1 round.
+    let rounds = 1;
+    const durRaw = String(sys.intensityDuration || "1d10").trim();
+    try {
+      if (/^\d+$/.test(durRaw)) rounds = Number(durRaw);
+      else rounds = (await (new Roll(durRaw)).evaluate()).total;
+    } catch {
+      rounds = (await (new Roll("1d10")).evaluate()).total;
+    }
+    rounds = Math.max(1, rounds);
 
     const endInfo = getAbilityInfo(targetActor, "endurance");
     const endRank = endInfo?.rank || "Typical";
-    const requiredColor = requiredColorForIntensity(endRank, stunRank);
+    const requiredColor = requiredColorForIntensity(endRank, intensityRank);
 
     const r = await (new Roll("1d100")).evaluate();
     const featColor = String(
@@ -579,22 +602,24 @@ export class AttackAction extends BaseAction {
 
     let line;
     if (resisted) {
-      line = `<div style="color:#2e7d32;font-weight:bold;">${targetActor.name} shrugs off the stun.</div>`;
+      line = `<div style="color:#2e7d32;font-weight:bold;">${targetActor.name} resists.</div>`;
     } else {
-      const rounds = Math.max(1, Math.min(10, Math.floor(Math.random() * 10) + 1));
+      let applied = "";
       try {
-        await applyStun(targetActor, { rounds, originUuid: actor?.uuid });
+        applied = await applyIntensityEffect(targetActor, effect, { rounds, originUuid: actor?.uuid, desc });
       } catch (e) {
-        console.error("[FASERIP ERROR] stun-on-hit applyStun failed:", e);
+        console.error("[FASERIP ERROR] intensity-on-hit applyIntensityEffect failed:", e);
       }
-      line = `<div style="color:#d32f2f;font-weight:bold;">${targetActor.name} is stunned \u2014 no actions for ${rounds} round${rounds !== 1 ? "s" : ""}.</div>`;
+      line = `<div style="color:#d32f2f;font-weight:bold;">${targetActor.name} \u2014 ${applied || "affected"}.</div>`;
     }
 
+    const descLine = desc ? `<div style="font-style:italic;color:#555;font-size:.85em;margin-bottom:2px;">${desc}</div>` : "";
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: `<div style="background:#e3f2fd;border:1px solid #1565c0;border-radius:3px;padding:6px 8px;margin:4px 0;">
-        <div style="font-weight:bold;color:#0d47a1;margin-bottom:3px;">${weapon?.name || "Stun weapon"} \u2014 Stun</div>
-        <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs ${stunRank} Intensity \u2014 need ${requiredColor.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColor.toUpperCase()}</b></div>
+        <div style="font-weight:bold;color:#0d47a1;margin-bottom:3px;">${weapon?.name || "Weapon"} \u2014 Intensity (on hit)</div>
+        ${descLine}
+        <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${requiredColor.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColor.toUpperCase()}</b></div>
         ${line}
       </div>`
     });
@@ -1908,21 +1933,23 @@ export class AttackAction extends BaseAction {
       }
 
       // ============================================================
-      // STUN-ON-HIT: a weapon that delivers a Stunning Intensity (stun
-      // baton, Stun Pistol/Rifle/Cannon) rolls the target's Endurance
-      // FEAT vs system.stunIntensity on a hit; on failure the target is
-      // stunned 1-10 rounds. This is a FEAT-intensity attack, so per the
-      // Body Armor rules it ignores Body Armor (it does not pass through
-      // it — cf. the Sonic example) and is therefore keyed off the HIT,
-      // not penetrating damage. Skipped when a postHitCallback already
-      // delivered a post-hit effect (mercy KO drug, area ripple) so the
-      // two never stack — the tranq's mercy KO is unaffected.
+      // INTENSITY-ON-HIT: a weapon carrying an on-hit Intensity effect
+      // (stun baton, Stun Pistol/Rifle/Cannon, and any weapon with an
+      // Intensity Rank + Apply effect) rolls the target's Endurance FEAT
+      // vs system.intensityRank on a hit; on failure the configured
+      // effect (Stunned/Unconscious/Blinded/…) is applied for the listed
+      // duration. This is a FEAT-intensity attack, so per the Body Armor
+      // rules it ignores Body Armor (it does not pass through it — cf. the
+      // Sonic example) and is therefore keyed off the HIT, not penetrating
+      // damage. Skipped when a postHitCallback already delivered a post-hit
+      // effect (mercy KO drug, area ripple) so the two never stack — the
+      // tranq's mercy KO is unaffected.
       // ============================================================
-      if (!postHitCallback && targetActor && targetIsHit && weapon?.system?.stunIntensity) {
+      if (!postHitCallback && targetActor && targetIsHit && weapon?.system?.intensityRank) {
         try {
-          await this._applyStunOnHit({ targetActor, color: colorLower, weapon, actor });
+          await this._applyIntensityOnHit({ targetActor, color: colorLower, weapon, actor });
         } catch (e) {
-          console.error("[FASERIP ERROR] stun-on-hit failed:", e);
+          console.error("[FASERIP ERROR] intensity-on-hit failed:", e);
         }
       }
     }

@@ -1,3 +1,7 @@
+// scripts/modules/effects/effect-engine.js v1.14.0 - 2026-06-12
+// v1.14.0: Add exported applyIntensityEffect(target, effect, {rounds,originUuid,desc})
+//          — shared effect dispatcher used by both the Intensity action and the
+//          on-hit intensity hook in attack-action.
 // scripts/modules/effects/effect-engine.js v1.13.0 - 2026-04-19
 // v1.13.0: computeDuration now converts rounds→seconds when CTT is active
 //          with sync enabled, regardless of combat state. The previous
@@ -1329,5 +1333,102 @@ export async function restoreNullifiedPowers(effect, actor) {
       });
     }
     console.log(`[FASERIP] Nullification ended: ${actor.name} health ${currentHealth} → ${restoredHealth}/${restoredMax} (pre-existing dmg: ${preNullifyDamage}, nullified dmg: ${damageWhileNullified})`);
+  }
+}
+// ─────────────────────────────────────────────────────────────
+// applyIntensityEffect — shared effect dispatcher used by both the
+// standalone Intensity action and the on-hit intensity hook in
+// attack-action. Maps an intensityEffect name to the right applier.
+// Returns a short human-readable line describing what was applied.
+// ─────────────────────────────────────────────────────────────
+export async function applyIntensityEffect(targetActor, effectType, { rounds = 1, originUuid = null, desc = "" } = {}) {
+  const durationLabel = rounds === 999 ? "scene/escape" : `${rounds} round${rounds !== 1 ? "s" : ""}`;
+  try {
+    switch (effectType) {
+      case "blinded":
+        await applyBlinded(targetActor, { rounds, originUuid });
+        return `Blinded for ${durationLabel}`;
+      case "deafened":
+        await applyDeafened(targetActor, { rounds, originUuid });
+        return `Deafened for ${durationLabel}`;
+      case "stunned":
+        await applyStun(targetActor, { rounds, originUuid });
+        return `Stunned for ${durationLabel}`;
+      case "unconscious":
+        await applyUnconscious(targetActor, { rounds, originUuid });
+        return `Unconscious for ${durationLabel}`;
+      case "incapacitated":
+        await applyEffect(targetActor, {
+          name: "Incapacitated", img: "icons/svg/paralysis.svg", rounds, originUuid,
+          changes: [
+            { key: "system.combatMods.attackShift", mode: "add", value: "-4", priority: 20 },
+            { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 },
+            { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-2", priority: 20 },
+            { key: "system.combatMods.movementMult", mode: "multiply", value: "0.5", priority: 20 }
+          ],
+          flags: { effectType: "incapacitated", status: { isIncapacitated: true }, intensitySource: desc || "Intensity" },
+          statuses: ["incapacitated"]
+        });
+        return `Incapacitated for ${durationLabel}`;
+      case "immobilized":
+        await applyEffect(targetActor, {
+          name: "Immobilized", img: "icons/svg/frozen.svg", rounds, originUuid,
+          changes: [
+            { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 },
+            { key: "system.combatMods.canMove", mode: "override", value: "false", priority: 50 },
+            { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 },
+            { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-2", priority: 20 }
+          ],
+          flags: { effectType: "immobilized", status: { isImmobilized: true }, intensitySource: desc || "Intensity" },
+          statuses: ["immobilized"]
+        });
+        return `Immobilized for ${durationLabel}`;
+      case "paralyzed":
+        await applyParalyzed(targetActor, { rounds, originUuid });
+        return `Paralyzed for ${durationLabel}`;
+      case "nullified":
+        await applyEffect(targetActor, {
+          name: "Nullified", img: "icons/svg/cancel.svg", rounds, originUuid,
+          changes: [],
+          flags: { effectType: "nullified", status: { isNullified: true }, intensitySource: desc || "Intensity" },
+          statuses: ["nullified"]
+        });
+        return `Nullified for ${durationLabel}`;
+      case "slammed":
+        await applyEffect(targetActor, {
+          name: "Slammed", img: "icons/svg/falling.svg", rounds: 1, originUuid,
+          changes: [ { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 } ],
+          flags: { effectType: "slammed", status: { isSlammed: true }, intensitySource: desc || "Intensity" },
+          statuses: ["prone"]
+        });
+        return "Slammed (knocked down)";
+      case "grabbed":
+        await applyEffect(targetActor, {
+          name: "Grabbed", img: "icons/svg/net.svg", rounds, originUuid,
+          changes: [
+            { key: "system.combatMods.attackShift", mode: "add", value: "-2", priority: 20 },
+            { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 }
+          ],
+          flags: { effectType: "grabbed", status: { isGrabbed: true }, intensitySource: desc || "Intensity" },
+          statuses: ["restrained"]
+        });
+        return `Grabbed for ${durationLabel}`;
+      case "weakened":
+        await applyWeakened(targetActor, { rounds, originUuid });
+        return `Weakened for ${durationLabel}`;
+      case "custom":
+        await applyEffect(targetActor, {
+          name: desc || "Intensity Effect", img: "icons/svg/hazard.svg", rounds, originUuid,
+          changes: [],
+          flags: { effectType: "intensityCustom", status: { isAffected: true }, intensitySource: desc || "Intensity" },
+          statuses: ["affected"]
+        });
+        return `${desc || "Affected"} for ${durationLabel}`;
+      default:
+        return "";
+    }
+  } catch (err) {
+    console.error("[FASERIP ERROR] applyIntensityEffect failed:", err);
+    return "Effect failed (see console)";
   }
 }

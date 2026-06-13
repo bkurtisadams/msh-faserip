@@ -1,3 +1,5 @@
+// shooting-action.js v3.7.7 - 2026-06-12
+// v3.7.7: Mercy KO intensity also reads the unified system.intensityRank.
 // shooting-action.js v3.7.6 - 2026-06-12
 // v3.7.6: Drop removed Roll#evaluate({async:true}) option (use evaluate()).
 // v3.7.5: Mercy Shot KO intensity is now per-weapon (system.mercyIntensity,
@@ -919,12 +921,13 @@ export class ShootingAction extends RangedAttackAction {
       const endRank = endInfo?.rank || "Typical";
 
       // KO-drug intensity is per-weapon. Default Remarkable per the RAW Advanced
-      // Set mercy-bullet rule; a weapon may override via system.mercyIntensity
-      // (or fall back to system.stunIntensity) — e.g. an Excellent-Intensity
-      // tranquilizer. The Endurance FEAT is gated against that intensity rather
-      // than treating any non-white roll as a resist.
+      // Set mercy-bullet rule; a weapon may override via system.mercyIntensity,
+      // the unified system.intensityRank, or legacy system.stunIntensity — e.g.
+      // an Excellent-Intensity tranquilizer. The Endurance FEAT is gated against
+      // that intensity rather than treating any non-white roll as a resist.
       const koIntensity =
         weapon?.system?.mercyIntensity ||
+        weapon?.system?.intensityRank ||
         weapon?.system?.stunIntensity ||
         "Remarkable";
       const { requiredColorForIntensity } = await import("./breaking-feat.js");
