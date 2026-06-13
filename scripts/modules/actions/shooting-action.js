@@ -1,4 +1,5 @@
-// shooting-action.js v3.7.5 - 2026-06-12
+// shooting-action.js v3.7.6 - 2026-06-12
+// v3.7.6: Drop removed Roll#evaluate({async:true}) option (use evaluate()).
 // v3.7.5: Mercy Shot KO intensity is now per-weapon (system.mercyIntensity,
 //         falling back to system.stunIntensity, default Remarkable per RAW)
 //         and the Endurance FEAT is gated against it via requiredColorForIntensity
@@ -929,7 +930,7 @@ export class ShootingAction extends RangedAttackAction {
       const { requiredColorForIntensity } = await import("./breaking-feat.js");
       const requiredColor = requiredColorForIntensity(endRank, koIntensity);
 
-      const r = await (new Roll("1d100")).evaluate({ async: true });
+      const r = await (new Roll("1d100")).evaluate();
       const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
       const featColorLower = String(featColor || "white").toLowerCase();
       const _colorOrder = { white: 0, green: 1, yellow: 2, red: 3 };
@@ -1135,7 +1136,7 @@ export class ShootingAction extends RangedAttackAction {
             if (!a) continue;
             const endInfo = getAbilityInfo(a, "endurance");
             const endRank = endInfo?.rank || "Typical";
-            const r = await (new Roll("1d100")).evaluate({ async: true });
+            const r = await (new Roll("1d100")).evaluate();
             const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
             const lc = String(featColor || "white").toLowerCase();
             if (lc === "white") {

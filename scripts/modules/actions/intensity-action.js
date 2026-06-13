@@ -1,4 +1,8 @@
-// intensity-action.js v4.1.1 - 2026-05-06
+// intensity-action.js v4.1.2 - 2026-06-12
+// v4.1.2: Drop the removed Roll#evaluate({async:true}) option (use evaluate()).
+//         In v13+ it only logged a compatibility error and, when it interrupted
+//         the stun-intensity dispatch, could leave system.intensityRank stuck on
+//         a weapon (spurious "Intensity Attack" button).
 // v4.1.1: Split the Use button's label and icon (V14 DialogV2 escapes raw HTML in label,
 //         which rendered the <i class="fas fa-radiation"></i> as literal text). Use the
 //         shim's separate icon field instead.
@@ -112,15 +116,15 @@ async function resolveDuration(mode, fixedRounds, powerRank) {
   switch (mode) {
     case "1-10":
     case "1d10": {
-      const r = await (new Roll("1d10")).evaluate({ async: true });
+      const r = await (new Roll("1d10")).evaluate();
       return { rounds: r.total, label: `1d10 = ${r.total}` };
     }
     case "2d10": {
-      const r = await (new Roll("2d10")).evaluate({ async: true });
+      const r = await (new Roll("2d10")).evaluate();
       return { rounds: r.total, label: `2d10 = ${r.total}` };
     }
     case "5d10": {
-      const r = await (new Roll("5d10")).evaluate({ async: true });
+      const r = await (new Roll("5d10")).evaluate();
       return { rounds: r.total, label: `5d10 = ${r.total}` };
     }
     case "rank": {
@@ -137,7 +141,7 @@ async function resolveDuration(mode, fixedRounds, powerRank) {
       return { rounds: 999, label: "until escape" };
     }
     default: {
-      const r = await (new Roll("1d10")).evaluate({ async: true });
+      const r = await (new Roll("1d10")).evaluate();
       return { rounds: r.total, label: `1d10 = ${r.total}` };
     }
   }
@@ -229,7 +233,7 @@ export class IntensityAction extends BaseAction {
       const endInfo = getAbilityInfo(targetActor, saveAbility);
       const endRank = endInfo.rank || "Typical";
 
-      const r = await (new Roll("1d100")).evaluate({ async: true });
+      const r = await (new Roll("1d100")).evaluate();
       const total = r.total;
       const color = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, total));
       const colorLower = (color || "white").toLowerCase();
