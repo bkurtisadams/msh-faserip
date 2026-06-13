@@ -1,4 +1,9 @@
-// equipment-action-dialog.js v1.5.1 - 2026-06-11
+// equipment-action-dialog.js v1.6.0 - 2026-06-12
+// v1.6.0: Refine skip-hub: pass straight to the attack dialog when there is
+//         exactly one ROLLABLE action, even alongside Reload (which has its own
+//         .reload-weapon button on the row). Removes the double dialog for ammo
+//         weapons. Toggle/template still keep the hub; multi-mode weapons too.
+// v1.5.1 - 2026-06-11
 // v1.5.1: Any weapon-category item now always offers an Attack action. The gate
 //         previously required attackType/damageType/weaponType to be set, so a
 //         half-configured weapon (all blank) silently offered no attack at all.
@@ -469,13 +474,21 @@ export async function openEquipmentActionDialog(actor, item) {
 
   const actions = getAvailableActions(item, actor);
 
-  // Skip-hub shortcut: if there is exactly one action AND it is a rollable one
-  // (not a pure state change like toggle/reload/template), dispatch straight to
-  // its handler. The hub earns its keep only when there is genuine ambiguity or
-  // a mix of rollable actions and state-change buttons that need to stay visible.
+  // Skip-hub shortcut. Dispatch straight to the attack dialog when the item has
+  // exactly one ROLLABLE action, even if state-change actions also exist — as
+  // long as those state-change actions are reachable elsewhere. Reload has its
+  // own dedicated .reload-weapon button on the equipment row, so an ammo weapon
+  // (Attack + Reload) should still go straight to its attack dialog rather than
+  // forcing a hub click first. Toggle/template have no such affordance, so their
+  // presence keeps the hub. Multi-mode weapons (2+ rollable actions) also keep it.
   const STATE_CHANGE_IDS = new Set(["toggle", "reload", "template"]);
-  if (actions.length === 1 && !STATE_CHANGE_IDS.has(actions[0].id)) {
-    const only = actions[0];
+  const HUB_OPTIONAL_STATE_IDS = new Set(["reload"]); // reachable via .reload-weapon
+  const rollableActions = actions.filter(a => !STATE_CHANGE_IDS.has(a.id));
+  const hubRequiringStateActions = actions.filter(
+    a => STATE_CHANGE_IDS.has(a.id) && !HUB_OPTIONAL_STATE_IDS.has(a.id)
+  );
+  if (rollableActions.length === 1 && hubRequiringStateActions.length === 0) {
+    const only = rollableActions[0];
     // Key names below mirror DOMStringMap (data-foo-bar → fooBar), which is what
     // _executeAction reads from btn.dataset on the real hub buttons.
     const dataset = {
