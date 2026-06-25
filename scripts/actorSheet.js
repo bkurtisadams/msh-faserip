@@ -855,6 +855,36 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     );
   }
 
+  // V14: the inherited appv1 _onEditImage opens the legacy global FilePicker,
+  // which no longer resolves in v14 — clicking the portrait did nothing.
+  // Resolve the v14 FilePicker class (with fallbacks) and open it directly.
+  /** @override */
+  async _onEditImage(event) {
+    const target = event?.currentTarget ?? event;
+    const attr = target?.dataset?.edit;
+    if (!attr) return;
+
+    const canEdit = this.isEditable
+      || this.actor?.canUserModify?.(game.user, "update")
+      || game.user?.isGM;
+    if (!canEdit) return;
+
+    const FilePickerClass =
+         foundry.applications?.apps?.FilePicker?.implementation
+      ?? foundry.applications?.apps?.FilePicker
+      ?? globalThis.FilePicker;
+    if (!FilePickerClass) return;
+
+    const current = foundry.utils.getProperty(this.actor, attr);
+    return new FilePickerClass({
+      type: "image",
+      current,
+      callback: (path) => this.actor.update({ [attr]: path }),
+      top: (this.position?.top ?? 0) + 40,
+      left: (this.position?.left ?? 0) + 10
+    }).render(true);
+  }
+
   async close(options = {}) {
     // Unregister the in-sheet Universal Table hook when the sheet closes
     if (this._universalTableHookId) {
