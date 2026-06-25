@@ -802,7 +802,59 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       }));
     }
   }
-  
+
+  // V14-native drop chain. The inherited foundry.appv1.sheets.ActorSheet._onDrop
+  // resolves the drag payload through the legacy global TextEditor, which no
+  // longer binds in v14 — drops reached the sheet but created nothing. Resolve
+  // via foundry.applications.ux.TextEditor.implementation and create directly.
+  // Intra-sheet (same-actor) Item drags are skipped so the per-row PowerSort /
+  // TalentSort / etc. listeners keep owning sort payloads.
+  /** @override */
+  async _onDrop(event) {
+    if (!this.isEditable) return;
+
+    const TE = foundry.applications.ux.TextEditor?.implementation
+            ?? globalThis.TextEditor;
+    const data = await TE.getDragEventData(event);
+    if (!data) return;
+
+    if (Hooks.call("dropActorSheetData", this.actor, this, data) === false) return;
+
+    switch (data.type) {
+      case "Item":         return this._onDropItem(event, data);
+      case "ActiveEffect": return this._onDropActiveEffect(event, data);
+      case "Folder":       return this._onDropFolder(event, data);
+      case "Actor":        return false;
+    }
+  }
+
+  async _onDropItem(event, data) {
+    if (!this.actor.isOwner) return false;
+    const item = await Item.implementation.fromDropData(data);
+    if (!item) return false;
+    if (this.actor.uuid === item.parent?.uuid) return false;
+    return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
+  }
+
+  async _onDropActiveEffect(event, data) {
+    if (!this.actor.isOwner) return false;
+    const effect = await ActiveEffect.implementation.fromDropData(data);
+    if (!effect) return false;
+    if (effect.target === this.actor) return false;
+    return ActiveEffect.implementation.create(effect.toObject(), { parent: this.actor });
+  }
+
+  async _onDropFolder(event, data) {
+    if (!this.actor.isOwner) return [];
+    if (data.documentName !== "Item") return [];
+    const folder = await Folder.implementation.fromDropData(data);
+    if (!folder) return [];
+    return this.actor.createEmbeddedDocuments(
+      "Item",
+      folder.contents.map(i => i.toObject())
+    );
+  }
+
   async close(options = {}) {
     // Unregister the in-sheet Universal Table hook when the sheet closes
     if (this._universalTableHookId) {
