@@ -1,4 +1,7 @@
-// faserip-initiative.js v2.3.0 - 2026-03-23
+// faserip-initiative.js v2.3.1 - 2026-06-25
+// v2.3.1: Set a speaker on all initiative chat cards (side/individual/tie). Speaker-less
+//         messages left the header sender empty, collapsing the metadata column and
+//         wrapping the timestamp/delete one char per line (malformed card header).
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
@@ -629,6 +632,7 @@ export class FaseripInitiative {
         // Tie — reroll
         ChatMessage.create({
           user: game.user.id,
+          speaker: ChatMessage.getSpeaker({ alias: "Initiative" }),
           content: `<div class="faserip-initiative-tie">Initiative Tie (${pcTotal} vs ${npcTotal})! Rerolling...</div>`,
           flavor: "Initiative Tie"
         });
@@ -1082,6 +1086,7 @@ export class FaseripInitiative {
 
     await ChatMessage.create({
       user: game.user.id, content,
+      speaker: ChatMessage.getSpeaker({ alias: "Initiative" }),
       flavor: `${roundInfo} — Initiative`,
       sound: CONFIG.sounds.dice
     });
@@ -1168,6 +1173,7 @@ export class FaseripInitiative {
 
     await ChatMessage.create({
       user: game.user.id, content,
+      speaker: ChatMessage.getSpeaker({ alias: "Initiative" }),
       flavor: `${roundInfo} — Initiative`,
       sound: CONFIG.sounds.dice
     });
