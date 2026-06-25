@@ -1,0 +1,33 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="82%">
+      <stop offset="0%" stop-color="#2f4a3c"/><stop offset="100%" stop-color="#16241d"/>
+    </radialGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f1f5fb"/><stop offset="50%" stop-color="#ccd4e0"/><stop offset="100%" stop-color="#79839a"/>
+    </linearGradient>
+    <linearGradient id="grip" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5a7466"/><stop offset="100%" stop-color="#324239"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="14" y="14" width="484" height="484" rx="68" fill="url(#bg)" stroke="#6fe88a" stroke-opacity="0.5" stroke-width="4"/>
+  <g transform="rotate(-9 256 270)">
+    <rect x="150" y="232" width="196" height="50" rx="12" fill="url(#steel)" stroke="#dbe2ec" stroke-opacity="0.4" stroke-width="2"/>
+    <rect x="160" y="222" width="16" height="12" rx="3" fill="#c3cbd8"/>
+    <rect x="338" y="240" width="18" height="34" rx="4" fill="#aab3c2"/>
+    <path d="M182 278 L246 278 L228 388 L172 388 Z" fill="url(#grip)" stroke="#aeb7c6" stroke-opacity="0.4" stroke-width="2"/>
+    <g stroke="#1c2a23" stroke-width="3.5" opacity="0.7">
+      <line x1="196" y1="306" x2="232" y2="306"/><line x1="192" y1="328" x2="228" y2="328"/><line x1="188" y1="350" x2="224" y2="350"/>
+    </g>
+    <path d="M236 282 Q250 330 282 322" fill="none" stroke="#6a7686" stroke-width="9" stroke-linecap="round"/>
+    <g filter="url(#glow)">
+      <line x1="360" y1="257" x2="432" y2="257" stroke="#d6dde8" stroke-width="6" stroke-linecap="round"/>
+      <path d="M432 257 L452 257 L432 247 L432 267 Z" fill="#eef3fa"/>
+      <path d="M360 248 L372 257 L360 266 Z" fill="#6fe88a"/>
+      <path d="M352 250 L366 257 L352 264 Z" fill="#54cf70"/>
+    </g>
+  </g>
+</svg>

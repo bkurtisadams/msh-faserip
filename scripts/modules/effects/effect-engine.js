@@ -1,3 +1,7 @@
+// scripts/modules/effects/effect-engine.js v1.14.1 - 2026-06-25
+// v1.14.1: applySlam — guard existing slam-marker delete with canWriteEffectsOn +
+//          executeAsGM("deleteActiveEffects") fallback so non-owner players don't
+//          throw "lacks permission to delete ActiveEffect" on auto-triggered slams.
 // scripts/modules/effects/effect-engine.js v1.14.0 - 2026-06-12
 // v1.14.0: Add exported applyIntensityEffect(target, effect, {rounds,originUuid,desc})
 //          — shared effect dispatcher used by both the Intensity action and the
@@ -709,7 +713,21 @@ export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0 } 
   const existingMarker = actor.effects.find(e =>
     e.flags?.[SCOPE()]?.effectType === "slamMarker"
   );
-  if (existingMarker) await existingMarker.delete();
+  if (existingMarker) {
+    if (canWriteEffectsOn(actor)) {
+      await existingMarker.delete();
+    } else {
+      try {
+        const { executeAsGM } = await import("../../gm-utils.js");
+        await executeAsGM("deleteActiveEffects", {
+          targetActorUuid: actor.uuid,
+          effectIds: [existingMarker.id]
+        });
+      } catch (err) {
+        console.error("[FASERIP] Slam replace: GM delete failed", err);
+      }
+    }
+  }
 
   const knocksDown = (kind === "Grand Slam" || kind === "1 Area");
 

@@ -1,0 +1,35 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="82%">
+      <stop offset="0%" stop-color="#3a4767"/><stop offset="100%" stop-color="#1a2030"/>
+    </radialGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#9aa2b4"/><stop offset="45%" stop-color="#f1f5fb"/>
+      <stop offset="60%" stop-color="#d6dde8"/><stop offset="100%" stop-color="#79839a"/>
+    </linearGradient>
+    <linearGradient id="grip" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#454e60"/><stop offset="50%" stop-color="#828ca0"/><stop offset="100%" stop-color="#39414f"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="14" y="14" width="484" height="484" rx="68" fill="url(#bg)" stroke="#5fd8ff" stroke-opacity="0.5" stroke-width="4"/>
+  <g transform="rotate(20 256 256)">
+    <rect x="234" y="168" width="44" height="190" rx="20" fill="url(#steel)" stroke="#dbe2ec" stroke-opacity="0.4" stroke-width="2"/>
+    <rect x="231" y="300" width="50" height="150" rx="18" fill="url(#grip)" stroke="#aeb7c6" stroke-opacity="0.45" stroke-width="2"/>
+    <g stroke="#23293a" stroke-width="4" opacity="0.8">
+      <line x1="237" y1="322" x2="275" y2="322"/><line x1="237" y1="346" x2="275" y2="346"/>
+      <line x1="237" y1="370" x2="275" y2="370"/><line x1="237" y1="394" x2="275" y2="394"/>
+      <line x1="237" y1="418" x2="275" y2="418"/>
+    </g>
+    <rect x="226" y="442" width="60" height="20" rx="8" fill="#69748a" stroke="#aeb7c6" stroke-opacity="0.4" stroke-width="2"/>
+    <rect x="240" y="120" width="9" height="56" rx="4.5" fill="#cdd5e2"/>
+    <rect x="263" y="120" width="9" height="56" rx="4.5" fill="#cdd5e2"/>
+    <circle cx="244.5" cy="120" r="7.5" fill="#eef3fa"/><circle cx="267.5" cy="120" r="7.5" fill="#eef3fa"/>
+    <g filter="url(#glow)" stroke="#74dcff" stroke-width="5.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M244 120 L258 96 L246 88 L262 64 L252 92 L266 100 L267 120"/>
+    </g>
+    <circle cx="256" cy="76" r="5.5" fill="#e6faff" filter="url(#glow)"/>
+  </g>
+</svg>
