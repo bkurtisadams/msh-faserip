@@ -1,4 +1,11 @@
 /* FASERIP Character Sheet Styles */
+/* 2026-06-26: Hide number-input spin buttons on the secondary stat fields
+   (Health/Karma/Resources/Popularity) in Firefox as well as Chrome. The
+   appearance/spin-button rules below now carry !important so they win over
+   Foundry v14 core form styling, which had been re-asserting `appearance`
+   and letting Firefox re-show the steppers. Box widths are unchanged
+   (already fixed at 48px/56px); removing the spinner is what lets 4/3
+   digits fit. */
 /* Scope all selectors to prevent leaking into Foundry UI */
 .faserip-sheet {
   font-family: Arial, sans-serif;
@@ -3679,16 +3686,16 @@ form.faserip-sheet .secondary-abilities select {
   border-radius: 2px;
   box-sizing: border-box;
   text-align: center;
-  appearance: textfield;
-  -moz-appearance: textfield;
-  -webkit-appearance: none;
+  appearance: textfield !important;
+  -moz-appearance: textfield !important;
+  -webkit-appearance: none !important;
 }
 
 form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-outer-spin-button,
 form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-inner-spin-button {
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  margin: 0 !important;
 }
 
 /* Health, Karma: current value over max, stacked vertically.
