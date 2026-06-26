@@ -1,3 +1,10 @@
+/* action-dialog.css v3.9.0 - 2026-06-26 */
+/* v3.9.0: Dark-theme readability fix. Pass-4 (v3.5.0) forced dark text on
+           non-shim dialogs but set no background, so under Foundry's dark
+           theme the .window-content stayed dark => dark-text-on-dark on every
+           raw Dialog/Dialog.confirm/DialogV2 (karma, settings, mid-combat
+           confirms, stunts). Now mirror the shim: force a light #fcf8eb
+           surface + white inputs + lift inline #666/#777 hints. */
 /* action-dialog.css v3.8.1 - 2026-05-25 */
 /* v3.8.1: Add FEAT requirement pill badges and align colors to the Universal Table. */
 /* v3.8.0: FEAT dropdown readability — 15px Barlow (uncondensed),
@@ -1295,7 +1302,8 @@
 
 body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .window-content,
 body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .window-content {
-  color: #1a1a1a;
+  background: #fcf8eb;   /* v3.9.0: force a light surface so the dark text below */
+  color: #1a1a1a;        /*          stays legible under Foundry's dark theme too. */
 }
 body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .form-group > label,
 body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .form-group > label {
@@ -1315,7 +1323,17 @@ body.system-msh-faserip .dialog:not(.faserip-shim-dialog) input[type="text"],
 body.system-msh-faserip .dialog:not(.faserip-shim-dialog) input[type="number"],
 body.system-msh-faserip .dialog:not(.faserip-shim-dialog) select,
 body.system-msh-faserip .dialog:not(.faserip-shim-dialog) textarea {
-  color: #1a1a1a;
+  background: #fff;       /* v3.9.0: white field on the light surface, not Foundry's */
+  color: #1a1a1a;         /*          dark-theme input chrome. */
+  border: 1px solid #b8b8b8;
+}
+/* v3.9.0: lift inline color:#666/#777 hint paragraphs (inline needs !important)
+   so they read on the new light surface instead of vanishing. */
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .window-content p[style*="#666"],
+body.system-msh-faserip .dialog:not(.faserip-shim-dialog) .window-content p[style*="#777"],
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .window-content p[style*="#666"],
+body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .window-content p[style*="#777"] {
+  color: #5a5a5a !important;
 }
 
 /* Common per-row inline-styled blocks across karma/sheet dialogs use a
