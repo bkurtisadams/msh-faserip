@@ -1,3 +1,11 @@
+// actorSheet.js v2.2.9 - 2026-06-26
+// v2.2.9: Fix equipment dropped from a compendium being created but never
+//         shown. The equipment tab buckets by system.category and hides
+//         empty groups; items whose category was empty/unknown (common for
+//         compendium drops — PermissiveDataModel applies no default) matched
+//         no group AND didn't trip the "no equipment" message, so they
+//         silently vanished. Gear is now the catch-all bucket (any category
+//         not in weapon/other/armor/power-item), matching tab-equipment.hbs.
 // actorSheet.js v2.2.8 - 2026-04-19
 // v2.2.8: Fix "Cannot read properties of undefined (reading 'OTHER')"
 //         crash on Power Info icon click (and the _action-info chat
@@ -212,13 +220,17 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       .filter(item => item.type === "equipment")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-    // per-category counts so empty equipment groups can be hidden
+    // per-category counts so empty equipment groups can be hidden.
+    // gear is the catch-all: anything not in the four explicit groups
+    // (incl. empty/unknown/legacy categories from dropped compendium items)
+    // falls here so no equipment can be created-but-invisible.
+    const GROUPED = ["weapon", "other", "armor", "power-item"];
     context.equipmentCounts = {
       weapon:    context.equipment.filter(i => i.system.category === "weapon").length,
       other:     context.equipment.filter(i => i.system.category === "other").length,
       armor:     context.equipment.filter(i => i.system.category === "armor").length,
       powerItem: context.equipment.filter(i => i.system.category === "power-item").length,
-      gear:      context.equipment.filter(i => ["gear", "custom", "device"].includes(i.system.category)).length
+      gear:      context.equipment.filter(i => !GROUPED.includes(i.system.category)).length
     };
 
     // headquarters made sortable, with rent status
