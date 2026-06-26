@@ -1133,10 +1133,13 @@ form.faserip-sheet .movement-inline-item {
   min-width: 0;
 }
 form.faserip-sheet .movement-inline-item label.movement-label.clickable {
-  font-size: 9px;
+  /* 2026-06-26: enlarged from 9px; .movement-inline has margin-top:auto so the
+     taller labels grow upward into the empty space above, leaving the secondary
+     abilities section height unchanged. */
+  font-size: 12px;
   font-weight: bold;
-  letter-spacing: 0.5px;
-  margin-bottom: 1px;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
   cursor: pointer;
   color: #0d47a1;
   text-decoration: underline;

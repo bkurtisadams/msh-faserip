@@ -1,11 +1,11 @@
 /* FASERIP Character Sheet Styles */
-/* 2026-06-26: Hide number-input spin buttons on the secondary stat fields
-   (Health/Karma/Resources/Popularity) in Firefox as well as Chrome. The
-   appearance/spin-button rules below now carry !important so they win over
-   Foundry v14 core form styling, which had been re-asserting `appearance`
-   and letting Firefox re-show the steppers. Box widths are unchanged
-   (already fixed at 48px/56px); removing the spinner is what lets 4/3
-   digits fit. */
+/* 2026-06-26: Real fix for Firefox number-input spinners. The input rules set
+   `appearance: textfield` (correct) but then `-webkit-appearance: none`, which
+   modern Firefox treats as an ALIAS for `appearance` — so the computed value
+   became `appearance: none`, and on <input type=number> only `textfield` hides
+   the spinner in Firefox (`none` does not). Dropped the input-level
+   `-webkit-appearance: none`; Chrome stays clean via the ::-webkit-*-spin-button
+   pseudo rule. Supersedes the earlier !important attempt (not needed). */
 /* Scope all selectors to prevent leaking into Foundry UI */
 .faserip-sheet {
   font-family: Arial, sans-serif;
@@ -3686,16 +3686,15 @@ form.faserip-sheet .secondary-abilities select {
   border-radius: 2px;
   box-sizing: border-box;
   text-align: center;
-  appearance: textfield !important;
-  -moz-appearance: textfield !important;
-  -webkit-appearance: none !important;
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-outer-spin-button,
 form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-inner-spin-button {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  margin: 0 !important;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Health, Karma: current value over max, stacked vertically.
@@ -3830,7 +3829,6 @@ form.faserip-sheet .movement-panel input[type="number"] {
   width: 100%;
   appearance: textfield;
   -moz-appearance: textfield;
-  -webkit-appearance: none;
 }
 
 form.faserip-sheet .movement-panel .movement-chat-btn {
