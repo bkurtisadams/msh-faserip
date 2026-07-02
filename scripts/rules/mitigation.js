@@ -1,4 +1,9 @@
-// scripts/rules/mitigation.js v3.2.2 - 2026-07-02
+// scripts/rules/mitigation.js v3.2.3 - 2026-07-02
+// v3.2.3: Fix Force Field physical double-penalty. resolveForceFieldValues
+//         (defense-effects.js) stores physical = rank-10 in the AE flags,
+//         and applyForceFieldFromAE subtracted 10 again at apply time, so a
+//         Remarkable(30) FF protected physical at 10 instead of 20. The -10
+//         now applies exactly once, at AE build time.
 // v3.2.2: Ignore stale defense AEs during mitigation when their source
 //         power item no longer exists or no longer qualifies for that
 //         defense type. This prevents orphan invulnerability effects from
@@ -581,13 +586,12 @@ function applyBodyArmorFromAE(damage, armorData, options) {
 function applyForceFieldFromAE(damage, ffData, options) {
   const { isEnergyDamage, targetActorUuid, attackIntensity } = options;
   const fullValue = Number(ffData.fullValue) || 0;
-  let physField = Number(ffData.physical || 0);
-  let enerField = Number(ffData.energy || 0);
+  const physField = Number(ffData.physical || 0);
+  const enerField = Number(ffData.energy || 0);
 
-  // FF: full rank vs energy, rank-10 vs physical
-  if (!isEnergyDamage && physField > 0) {
-    physField = Math.max(0, physField - 10);
-  }
+  // FF: full rank vs energy, rank-10 vs physical. The -10 is applied once,
+  // in resolveForceFieldValues, before the value is written to the AE flags.
+  // Do NOT re-subtract here.
 
   const eff = isEnergyDamage ? enerField : physField;
 
