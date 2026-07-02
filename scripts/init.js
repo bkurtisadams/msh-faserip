@@ -2750,12 +2750,9 @@ Hooks.once("ready", async () => {
         );
         if (!hasDefensePower) continue;
 
-        // Check if defense AEs already exist
-        const hasDefenseAE = actor.effects.some(e =>
-          e.flags?.[scope]?.effectCategory === "defense"
-        );
-        if (hasDefenseAE) continue;
-
+        // Sync every eligible defensive actor, not only actors with zero
+        // defense AEs. Existing actors may have Body Armor or toxin resistance
+        // AEs while missing a newly edited resistance/invulnerability AE.
         await syncAllDefenseEffects(actor);
         defenseSynced++;
       }
@@ -2986,32 +2983,40 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
   if (!actor || actor.documentName !== "Actor") return;
   if (item.type !== "power") return;
 
-  // Only re-sync if relevant fields changed
-  const relevantChange = changes.system?.regenerationType !== undefined
-    || changes.system?.regenerationRate !== undefined
-    || changes.system?.rank !== undefined
-    || changes.system?.value !== undefined
-    || changes.system?.isBodyArmor !== undefined
-    || changes.system?.isForceField !== undefined
-    || changes.system?.isResistance !== undefined
-    || changes.system?.bodyArmorType !== undefined
-    || changes.system?.armorNature !== undefined
-    || changes.system?.armorPhysical !== undefined
-    || changes.system?.armorEnergy !== undefined
-    || changes.system?.armorPhysicalCustom !== undefined
-    || changes.system?.armorEnergyCustom !== undefined
-    || changes.system?.resistanceType !== undefined
-    || changes.system?.resistanceEffect !== undefined
-    || changes.system?.resistanceIsInvulnerability !== undefined
-    || changes.system?.forceFieldType !== undefined
-    || changes.system?.forceFieldPersonal !== undefined
-    || changes.system?.forceFieldCoverage !== undefined
-    || changes.system?.absorptionType !== undefined
-    || changes.system?.absorptionSpecific !== undefined
-    || changes.system?.absorptionConvertsToHealth !== undefined
-    || changes.system?.absorptionCanRedirect !== undefined
-    || changes.system?.isActive !== undefined
-    || changes.system?.activationType !== undefined;
+  // Only re-sync if relevant fields changed. Foundry may hand hook changes
+  // back either as nested data ({ system: { resistanceType: ... } }) or as
+  // flattened paths ({ "system.resistanceType": ... }), depending on the
+  // originating sheet/update call. Check both forms so passive defense AEs
+  // are created when a power type/preset is edited.
+  const hasChanged = path => Object.prototype.hasOwnProperty.call(changes, path)
+    || foundry.utils.hasProperty(changes, path);
+  const relevantChange = [
+    "system.regenerationType",
+    "system.regenerationRate",
+    "system.rank",
+    "system.value",
+    "system.isBodyArmor",
+    "system.isForceField",
+    "system.isResistance",
+    "system.bodyArmorType",
+    "system.armorNature",
+    "system.armorPhysical",
+    "system.armorEnergy",
+    "system.armorPhysicalCustom",
+    "system.armorEnergyCustom",
+    "system.resistanceType",
+    "system.resistanceEffect",
+    "system.resistanceIsInvulnerability",
+    "system.forceFieldType",
+    "system.forceFieldPersonal",
+    "system.forceFieldCoverage",
+    "system.absorptionType",
+    "system.absorptionSpecific",
+    "system.absorptionConvertsToHealth",
+    "system.absorptionCanRedirect",
+    "system.isActive",
+    "system.activationType"
+  ].some(hasChanged);
   if (!relevantChange) return;
 
   await syncPowerOngoingEffects(actor, item);

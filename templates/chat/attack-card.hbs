@@ -20,11 +20,13 @@
       <div style="font-size:16px;font-weight:bold;color:#333;line-height:1.1;padding-top:3px;">{{effRankValue}}</div>
       <div style="font-size:11px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;">{{abilityLabelUpper}}</div>
     </div>
-    {{#if thirdCellHtml}}{{{thirdCellHtml}}}{{else}}<div style="flex:1;padding:8px 4px;{{#if dmgTooltip}}cursor:help;{{/if}}"{{#if dmgTooltip}} title="{{dmgTooltip}}"{{/if}}>
-      <div style="font-size:26px;font-weight:bold;color:#c62828;line-height:1;">{{dmgValue}}</div>
-      <div style="font-size:11px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;">DAMAGE</div>
+    {{#if thirdCellHtml}}{{{thirdCellHtml}}}{{else}}<div data-faserip-damage-cell="true" style="flex:1;padding:8px 4px;{{#if dmgTooltip}}cursor:help;{{/if}}"{{#if dmgTooltip}} title="{{dmgTooltip}}"{{/if}}>
+      <div data-faserip-damage-value="true" style="font-size:26px;font-weight:bold;color:#c62828;line-height:1;">{{dmgValue}}</div>
+      <div data-faserip-damage-label="true" style="font-size:11px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;">DAMAGE</div>
     </div>{{/if}}
   </div>
+
+  <div data-faserip-mitigation-summary="true">{{{mitigationHtml}}}</div>
 
   {{{notesHtml}}}
   {{{consequenceHtml}}}

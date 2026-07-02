@@ -1912,7 +1912,7 @@ export async function applyDamageToTargets({
           ui.notifications.info(`${targetName} took ${netDamage} damage.`);
         }
       } else if (showNotification && netDamage === 0) {
-        ui.notifications.info(`${targetName}'s armor absorbed all damage.`);
+        ui.notifications.info(`${targetName}'s defenses absorbed all damage.`);
       }
 
       results.push({
@@ -1923,7 +1923,14 @@ export async function applyDamageToTargets({
         hpAfter: after,
         absorbed: (Number(damage) || 0) - netDamage,
         net: netDamage,
-        wasKillResult
+        wasKillResult,
+        mitigation: mitResult ? {
+          rawDamage: mitResult.rawDamage,
+          netDamage: mitResult.netDamage,
+          absorbed: mitResult.absorbed,
+          layers: Array.isArray(mitResult.layers) ? mitResult.layers : [],
+          ffBreach: mitResult.ffBreach || null
+        } : null
       });
     }
   } catch (outer) {

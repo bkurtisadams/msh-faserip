@@ -204,6 +204,88 @@ const REDESIGNED_ATTACK_FORMS = new Set([
 ]);
 const MELEE_ATTACK_FORMS = new Set(["blunt-attack", "edged-attack"]);
 
+function escapeChatText(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function buildMitigationChatSummary(result, context = {}) {
+  if (!result) return "";
+
+  const net = Number(result.net ?? result.mitigation?.netDamage ?? context.afterArmor ?? 0);
+  const afterArmor = Number(context.afterArmor ?? result.mitigation?.rawDamage ?? net) || 0;
+  const absorbed = Number(result.absorbed ?? Math.max(0, afterArmor - net)) || 0;
+  const layers = Array.isArray(result.mitigation?.layers) ? result.mitigation.layers : [];
+
+  if (absorbed <= 0 && net === afterArmor && layers.length === 0) return "";
+
+  const layerText = layers
+    .filter(layer => Number(layer?.absorbed || 0) > 0 || layer?.immune || layer?.overloaded || layer?.skipped)
+    .map(layer => {
+      const type = escapeChatText(layer?.type || "Defense");
+      if (layer?.immune) return `${type}: immune (${escapeChatText(layer.reason || "absorbed all damage")})`;
+      if (layer?.skipped) return `${type}: skipped (${escapeChatText(layer.reason || "not applicable")})`;
+      if (layer?.overloaded) return `${type}: absorbed ${Number(layer.absorbed || 0)} and overloaded`;
+      return `${type}: absorbed ${Number(layer?.absorbed || 0)}`;
+    })
+    .join("; ");
+
+  const math = absorbed > 0
+    ? `${afterArmor} after armor − ${absorbed} defense = ${net} taken`
+    : `${net} taken`;
+
+  return `<div style="margin:6px 10px 0;padding:6px 8px;background:#eef7ee;border:1px solid #8bc48b;border-radius:3px;font-size:.9em;color:#1b5e20;">
+    <strong>Mitigation:</strong> ${escapeChatText(math)}${layerText ? `<br><span style="color:#2e7d32;">${layerText}</span>` : ""}
+  </div>`;
+}
+
+async function updateAttackCardDamageAfterAutoApply(message, damageResults, context = {}) {
+  const result = Array.isArray(damageResults) ? damageResults[0] : damageResults;
+  if (!message || !result) return;
+
+  const net = Number(result.net ?? result.mitigation?.netDamage);
+  if (!Number.isFinite(net)) return;
+
+  const afterArmor = Number(context.afterArmor ?? result.mitigation?.rawDamage ?? net) || 0;
+  const absorbed = Number(result.absorbed ?? Math.max(0, afterArmor - net)) || 0;
+
+  // No post-armor mitigation occurred; the original attack card is already accurate.
+  if (absorbed <= 0 && net === afterArmor) return;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(message.content || "", "text/html");
+  const damageCell = doc.querySelector('[data-faserip-damage-cell="true"]');
+  const damageValue = doc.querySelector('[data-faserip-damage-value="true"]');
+  const damageLabel = doc.querySelector('[data-faserip-damage-label="true"]');
+  const mitigationSlot = doc.querySelector('[data-faserip-mitigation-summary="true"]');
+
+  // Older cards/templates may not have markers. Do not risk mangling arbitrary HTML.
+  if (!damageCell || !damageValue || !damageLabel || !mitigationSlot) return;
+
+  const hpBefore = Number(result.hpBefore);
+  const hpAfter = Number(result.hpAfter);
+  const hpText = Number.isFinite(hpBefore) && Number.isFinite(hpAfter)
+    ? ` Health: ${hpBefore} → ${hpAfter}.`
+    : "";
+
+  damageValue.textContent = String(net);
+  damageLabel.textContent = "DAMAGE TAKEN";
+  damageCell.setAttribute("title", `${afterArmor} after armor − ${absorbed} defense = ${net} taken.${hpText}`);
+  mitigationSlot.innerHTML = buildMitigationChatSummary(result, context);
+
+  const scope = game.system?.id || "msh-faserip";
+  await message.update({
+    content: doc.body.innerHTML,
+    [`flags.${scope}.netDamage`]: net,
+    [`flags.${scope}.absorbedByDefenses`]: absorbed,
+    [`flags.${scope}.hpBefore`]: Number.isFinite(hpBefore) ? hpBefore : null,
+    [`flags.${scope}.hpAfter`]: Number.isFinite(hpAfter) ? hpAfter : null
+  });
+}
+
 
 export class AttackAction extends BaseAction {
   constructor(args) {
@@ -1660,6 +1742,7 @@ export class AttackAction extends BaseAction {
           effRankTooltip,
           dmgValue,
           dmgTooltip,
+          mitigationHtml: "",
           notesHtml: `${evasionNote}${killWarning}${disarmNote}`,
           consequenceHtml: `${inlineSlamHtml}${inlineStunHtml}${inlineBreakingHtml}`,
           actionsHtml: actions,
@@ -1719,7 +1802,7 @@ export class AttackAction extends BaseAction {
           wasKillResult: showKill  // NEW: pass kill result
         });
 
-        await applyDamageToTargets({
+        const autoDamageResults = await applyDamageToTargets({
           damage: afterArmor,  // Use after-armor damage (includes pull punch cap)
           attackerUuid: actor.uuid,
           damageType: damageType,
@@ -1734,6 +1817,13 @@ export class AttackAction extends BaseAction {
           // === FIX: Pass kill result flag ===
           wasKillResult: showKill,
           forceKilling: showKill  // ensure kill save triggers on red
+        });
+
+        await updateAttackCardDamageAfterAutoApply(attackChatMsg, autoDamageResults, {
+          rawDamage,
+          afterArmor,
+          damageType,
+          targetName
         });
 
         // ── Continuing damage (corrosive, acid, etc.) ──
