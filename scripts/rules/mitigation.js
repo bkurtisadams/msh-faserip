@@ -1,4 +1,8 @@
-// scripts/rules/mitigation.js v3.2.1 - 2026-07-02
+// scripts/rules/mitigation.js v3.2.2 - 2026-07-02
+// v3.2.2: Ignore stale defense AEs during mitigation when their source
+//         power item no longer exists or no longer qualifies for that
+//         defense type. This prevents orphan invulnerability effects from
+//         applying even before the async sync cleanup runs.
 // v3.2.1: Recognize resistanceEffect=invulnerability in AE resistance
 //         flags and apply Class 1000-style reduction instead of only
 //         checking the legacy immunity string.
@@ -365,7 +369,9 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   const { ignoresNaturalArmor = false, ignoresArtificialArmor = false } = opts;
 
   const activeDefenses = actor.effects.filter(e =>
-    !e.disabled && e.flags?.[scope]?.effectCategory === "defense"
+    !e.disabled
+    && e.flags?.[scope]?.effectCategory === "defense"
+    && isDefenseAEBackedByCurrentPower(actor, e, scope)
   );
   if (activeDefenses.length === 0) {
     return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
@@ -494,6 +500,48 @@ function isResMatch(baseType, resType, fullDmgType) {
   if ((resType === "electricity" || resType === "electric") && (baseType === "electricity" || baseType === "electric")) return true;
   if (resType === "radiation" && baseType === "light") return true;
   return fullDmgType.includes(resType);
+}
+
+
+function getItemIdFromDefenseOngoingId(ongoingId = "") {
+  const parts = String(ongoingId || "").split(".");
+  return parts.length >= 3 && parts[0] === "defense" ? parts.slice(2).join(".") : "";
+}
+
+function isDefenseAEBackedByCurrentPower(actor, ae, scope) {
+  const f = ae.flags?.[scope] || {};
+  const itemId = f.powerItemId || getItemIdFromDefenseOngoingId(f.ongoingId || "");
+
+  // Very old/manual defense AEs may not know their source item. Keep them
+  // for backwards compatibility, but any AE that DOES name a power must still
+  // point at a live, qualifying power.
+  if (!itemId) return true;
+
+  const item = actor.items?.get?.(itemId);
+  if (!item || item.type !== "power") return false;
+
+  const sys = item.system || {};
+  const defenseType = f.defenseType || "";
+  const name = String(item.name || "").toLowerCase();
+  const powerType = String(sys.type || "").toLowerCase();
+
+  if (defenseType === "bodyArmor") {
+    return !!(sys.isBodyArmor || name.includes("body armor") || name.includes("body armour") || powerType.includes("body armor"));
+  }
+
+  if (defenseType === "forceField") {
+    return !!(sys.isForceField || name.includes("force field") || powerType.includes("force field"));
+  }
+
+  if (defenseType === "resistance") {
+    return !!(sys.isResistance && sys.resistanceType);
+  }
+
+  if (defenseType === "absorption") {
+    return !!(sys.absorptionType || sys.absorptionSpecific);
+  }
+
+  return false;
 }
 
 // ─── AE-based mitigation layers ──────────────────────────────────────────────

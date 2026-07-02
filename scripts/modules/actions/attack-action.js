@@ -227,36 +227,70 @@ function buildMitigationChatSummary(result, context = {}) {
     Number(layer?.absorbed || 0) > 0 || layer?.immune || layer?.overloaded || layer?.skipped
   );
 
-  const damageType = String(context.damageType || "")
+  const titleCase = value => String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\w/g, char => char.toUpperCase());
+
+  const displayLayerType = layer => {
+    const raw = String(layer?.type || "Defense").trim();
+    return titleCase(raw || "Defense");
+  };
+
+  const layerKind = layer => {
+    const label = String(layer?.type || "").toLowerCase();
+    if (label.includes("invulnerability")) return "invulnerability";
+    if (label.includes("resistance")) return "resistance";
+    if (label.includes("absorption")) return "absorption";
+    if (label.includes("force field")) return "forceField";
+    if (label.includes("body armor") || label.includes("armor")) return "armor";
+    return "defense";
+  };
+
+  const damageType = titleCase(String(context.damageType || "")
     .replace(/^energy-/, "")
     .replace(/^physical-/, "")
-    .replace(/-/g, " ");
-  const damageLabel = damageType ? ` ${escapeChatText(damageType)} damage` : " damage";
+    .replace(/-/g, " "));
+  const damageLabel = damageType ? ` ${escapeChatText(damageType.toLowerCase())} damage` : " damage";
 
   const primaryLayer = activeLayers.find(layer => layer?.immune)
     || activeLayers.find(layer => Number(layer?.absorbed || 0) > 0)
     || activeLayers[0];
-  const primaryType = escapeChatText(primaryLayer?.type || "Defense");
+  const primaryType = escapeChatText(displayLayerType(primaryLayer));
+  const primaryKind = layerKind(primaryLayer);
 
-  const visibleSummary = primaryLayer?.immune
+  const visibleSummary = primaryLayer?.immune || net <= 0
     ? `${primaryType} prevented ${absorbed || afterArmor}${damageLabel}.`
     : absorbed > 0
-      ? `${primaryType} reduced ${afterArmor}${damageLabel} to ${net}.`
+      ? primaryKind === "absorption"
+        ? `${primaryType} absorbed ${absorbed}${damageLabel}; ${net} damage taken.`
+        : `${primaryType} reduced ${afterArmor}${damageLabel} to ${net}.`
       : `Mitigation left ${net}${damageLabel} taken.`;
 
   const layerRows = activeLayers.map(layer => {
-    const type = escapeChatText(layer?.type || "Defense");
+    const type = escapeChatText(displayLayerType(layer));
     const amount = Number(layer?.absorbed || 0);
-    if (layer?.immune) {
-      return `<div><strong>${type}:</strong> immune${amount ? `, absorbed ${amount}` : ""}${layer.reason ? ` <span style="color:#4b6b4b;">(${escapeChatText(layer.reason)})</span>` : ""}</div>`;
-    }
+    const reason = layer.reason ? ` <span style="color:#4b6b4b;">(${escapeChatText(layer.reason)})</span>` : "";
+    const kind = layerKind(layer);
+
     if (layer?.skipped) {
       return `<div><strong>${type}:</strong> skipped${layer.reason ? ` <span style="color:#6b604b;">(${escapeChatText(layer.reason)})</span>` : ""}</div>`;
     }
-    if (layer?.overloaded) {
-      return `<div><strong>${type}:</strong> absorbed ${amount} and overloaded</div>`;
+
+    if (layer?.immune) {
+      return `<div><strong>${type}:</strong> prevented ${amount || afterArmor} damage${reason}</div>`;
     }
-    return `<div><strong>${type}:</strong> absorbed ${amount}</div>`;
+
+    if (layer?.overloaded) {
+      if (kind === "absorption") return `<div><strong>${type}:</strong> absorbed ${amount} and overloaded</div>`;
+      return `<div><strong>${type}:</strong> reduced damage by ${amount} and overloaded</div>`;
+    }
+
+    if (kind === "absorption") return `<div><strong>${type}:</strong> absorbed ${amount}</div>`;
+    if (kind === "armor" || kind === "forceField") return `<div><strong>${type}:</strong> blocked ${amount}</div>`;
+    if (kind === "resistance" || kind === "invulnerability") return `<div><strong>${type}:</strong> reduced damage by ${amount}</div>`;
+    return `<div><strong>${type}:</strong> reduced damage by ${amount}</div>`;
   }).join("");
 
   const mathRows = [

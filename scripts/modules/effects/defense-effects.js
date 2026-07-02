@@ -1,4 +1,9 @@
-// scripts/modules/effects/defense-effects.js v1.5.1 - 2026-07-02
+// scripts/modules/effects/defense-effects.js v1.5.3 - 2026-07-02
+// v1.5.3: Pass mshIntentional when deleting defense AEs so the global
+//         preDeleteActiveEffect guard does not block sync cleanup.
+// v1.5.2: Remove stale/orphan defense AEs by powerItemId as well as
+//         ongoingId, and prune defense AEs that point at missing or
+//         no-longer-defensive powers during bulk sync.
 // v1.5.1: Treat resistanceEffect=invulnerability as an invulnerability
 //         even if older/imported items lack resistanceIsInvulnerability.
 // v1.5.0: Absorption AE also builds from absorptionSpecific alone (no broad
@@ -59,6 +64,30 @@ function defenseEffectId(type, itemId) {
 function isDefenseEffect(ae) {
   const scope = SCOPE();
   return ae.flags?.[scope]?.effectCategory === "defense";
+}
+
+function getDefenseFlags(ae) {
+  const scope = SCOPE();
+  return ae.flags?.[scope] || {};
+}
+
+function getDefenseTypeForEffectId(effectId = "") {
+  const parts = String(effectId || "").split(".");
+  return parts.length >= 3 && parts[0] === "defense" ? parts[1] : "";
+}
+
+function getItemIdForEffectId(effectId = "") {
+  const parts = String(effectId || "").split(".");
+  return parts.length >= 3 && parts[0] === "defense" ? parts.slice(2).join(".") : "";
+}
+
+function matchesDefenseAEForItem(ae, effectId, defenseType = "", itemId = "") {
+  const f = getDefenseFlags(ae);
+  if (f.effectCategory !== "defense") return false;
+  if (defenseType && f.defenseType !== defenseType) return false;
+
+  return f.ongoingId === effectId
+      || (!!itemId && f.powerItemId === itemId);
 }
 
 // ─── Resolve protection values from a power item ─────────────────────────────
@@ -312,7 +341,10 @@ function buildAbsorptionAE(item, values) {
  */
 async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
   const scope = SCOPE();
-  const existing = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
+  const newFlags = aeData.flags?.[scope] || {};
+  const defenseType = newFlags.defenseType || getDefenseTypeForEffectId(effectId);
+  const itemId = newFlags.powerItemId || getItemIdForEffectId(effectId);
+  const existing = actor.effects.find(e => matchesDefenseAEForItem(e, effectId, defenseType, itemId));
 
   if (existing) {
     // Update in place — set disabled state from power's isActive
@@ -324,7 +356,6 @@ async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
     };
     // Merge flags
     const flagPath = `flags.${scope}`;
-    const newFlags = aeData.flags?.[scope] || {};
     for (const [k, v] of Object.entries(newFlags)) {
       updates[`${flagPath}.${k}`] = v;
     }
@@ -344,12 +375,54 @@ async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
  * Remove a defense AE by effectId.
  */
 async function removeDefenseAE(actor, effectId) {
-  const scope = SCOPE();
-  const ae = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
-  if (ae) {
-    await ae.delete();
-    console.log(`[FASERIP] Defense AE removed: ${effectId} from ${actor.name}`);
+  const defenseType = getDefenseTypeForEffectId(effectId);
+  const itemId = getItemIdForEffectId(effectId);
+  const matches = actor.effects.filter(e => matchesDefenseAEForItem(e, effectId, defenseType, itemId));
+  if (matches.length) {
+    await actor.deleteEmbeddedDocuments("ActiveEffect", matches.map(e => e.id), { mshIntentional: true });
+    console.log(`[FASERIP] Defense AE removed: ${effectId} from ${actor.name} (${matches.length})`);
   }
+}
+
+async function pruneStaleDefenseAEs(actor, powers = null) {
+  if (!actor?.effects) return 0;
+  const powerItems = powers || actor.items.filter(i => i.type === "power");
+  const powerById = new Map(powerItems.map(i => [i.id, i]));
+  const staleIds = [];
+
+  for (const ae of actor.effects) {
+    const f = getDefenseFlags(ae);
+    if (f.effectCategory !== "defense") continue;
+
+    const itemId = f.powerItemId || getItemIdForEffectId(f.ongoingId || "");
+    if (!itemId) continue;
+
+    const item = powerById.get(itemId);
+    if (!item || !looksLikeDefensivePower(item)) {
+      staleIds.push(ae.id);
+      continue;
+    }
+
+    const sys = item.system || {};
+    const defenseType = f.defenseType;
+    const stillValid = defenseType === "bodyArmor"
+      ? (sys.isBodyArmor || isBodyArmorByName(item))
+      : defenseType === "forceField"
+        ? (sys.isForceField || isForceFieldByName(item))
+        : defenseType === "resistance"
+          ? (sys.isResistance && sys.resistanceType)
+          : defenseType === "absorption"
+            ? (sys.absorptionType || sys.absorptionSpecific)
+            : false;
+
+    if (!stillValid) staleIds.push(ae.id);
+  }
+
+  if (staleIds.length) {
+    await actor.deleteEmbeddedDocuments("ActiveEffect", staleIds, { mshIntentional: true });
+    console.log(`[FASERIP] Pruned ${staleIds.length} stale defense AE(s) from ${actor.name}`);
+  }
+  return staleIds.length;
 }
 
 // ─── Public sync API ─────────────────────────────────────────────────────────
@@ -425,10 +498,9 @@ export async function syncDefenseEffects(actor, item, removing = false) {
 export async function syncAllDefenseEffects(actor) {
   if (!actor) return;
   const powers = actor.items.filter(i => i.type === "power");
+  await pruneStaleDefenseAEs(actor, powers);
   for (const item of powers) {
-    if (looksLikeDefensivePower(item)) {
-      await syncDefenseEffects(actor, item, false);
-    }
+    await syncDefenseEffects(actor, item, false);
   }
 }
 
