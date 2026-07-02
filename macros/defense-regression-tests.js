@@ -1,4 +1,11 @@
-// defense-regression-tests.js v4.0.0 - 2026-07-02
+// defense-regression-tests.js v4.1.1 - 2026-07-02
+// v4.1.1: Sleep before pendingReflect flag reads in tests 22-23. setFlag is
+//         fire-and-forget inside sync calculateMitigation, so the bank
+//         assertion raced the database write.
+// v4.1.0: Energy Reflection coverage (tests 22-26): block at Unearthly cap,
+//         over-cap remainder passes, pendingReflect banking, type filter,
+//         resistance-AE suppression (via over-cap math), deletion cleanup.
+//         Requires mitigation.js v3.3.0 + defense-effects.js v1.6.0.
 // v4.0.0: Promoted from console paste to permanent macro. Adds Body Armor,
 //         Force Field, and Absorption coverage (tests 8-20) to the seven
 //         Step #1 resistance/invulnerability tests. Test 12 guards the FF
@@ -124,6 +131,25 @@
       absorptionType,
       absorptionSpecific,
       absorptionConvertsToHealth: convertsToHealth
+    });
+  }
+
+  async function createEnergyReflectionPower(actor, {
+    rank = "Remarkable", value = 30, reflectionType = "fire"
+  } = {}) {
+    // Deliberately seeds the resistance/invulnerability fields the preset
+    // sets, so the resistance-AE suppression in defense-effects v1.6.0 is
+    // exercised: without it, the over-cap test would net 0 instead of 30.
+    return createPower(actor, "Energy Reflection", {
+      category: "energyControl",
+      type: "Energy Reflection",
+      rank, value,
+      isEnergyReflection: true,
+      energyReflectionType: reflectionType,
+      isResistance: true,
+      resistanceType: reflectionType,
+      resistanceEffect: "invulnerability",
+      resistanceIsInvulnerability: true
     });
   }
 
@@ -384,6 +410,53 @@
       { netDamage: r.netDamage, defenseEffects: listDefenseEffects(testActor) });
     assert(!r.absorptionHeal, "Deleted Absorption reports no ghost heal",
       { absorptionHeal: r.absorptionHeal });
+
+    // ── Energy Reflection (22-26) ───────────────────────────────────────────
+    // RAW: matching energy up to Unearthly (100) inflicts no damage; above
+    // 100 the hero blocks 100 and takes the remainder. Blocked amount is
+    // banked as pendingReflect (redirect FEAT is Step #3 slice 2).
+
+    const FLAG_SCOPE = globalThis.MSH_FLAG_SCOPE || SYSTEM_ID;
+    let reflection = await createEnergyReflectionPower(testActor, {
+      rank: "Remarkable", value: 30, reflectionType: "fire"
+    });
+    await forceDefenseSync(testActor);
+    console.table(listDefenseEffects(testActor));
+
+    // 22. Reflection (fire) blocks 75 fire entirely and banks it.
+    await testActor.unsetFlag(FLAG_SCOPE, "pendingReflect");
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 75, damageType: "energy-fire" });
+    await sleep(400);
+    let bank = testActor.getFlag(FLAG_SCOPE, "pendingReflect");
+    assert(r.netDamage === 0 && bank?.amount === 75, "Energy Reflection (fire) blocks 75 fire and banks 75 for redirect",
+      { netDamage: r.netDamage, bank, reflectBank: r.reflectBank, layers: r.layers });
+
+    // 23. Over the Unearthly cap: 130 fire -> block 100, take 30, bank 100.
+    // Also guards the resistance-AE suppression: a leaked invulnerability AE
+    // would zero this out.
+    await testActor.unsetFlag(FLAG_SCOPE, "pendingReflect");
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 130, damageType: "energy-fire" });
+    await sleep(400);
+    bank = testActor.getFlag(FLAG_SCOPE, "pendingReflect");
+    assert(r.netDamage === 30 && bank?.amount === 100, "Energy Reflection caps at Unearthly: 130 fire -> 30 taken, 100 banked",
+      { netDamage: r.netDamage, bank, layers: r.layers });
+
+    // 24. Non-matching energy passes untouched.
+    await testActor.unsetFlag(FLAG_SCOPE, "pendingReflect");
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 75, damageType: "energy-cold" });
+    bank = testActor.getFlag(FLAG_SCOPE, "pendingReflect");
+    assert(r.netDamage === 75 && !bank, "Fire-keyed Energy Reflection ignores cold damage (no block, no bank)",
+      { netDamage: r.netDamage, bank, layers: r.layers });
+
+    // 25-26. Deleted reflection: no block, no ghost bank.
+    await deletePowerAndSync(testActor, reflection);
+    await testActor.unsetFlag(FLAG_SCOPE, "pendingReflect");
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 75, damageType: "energy-fire" });
+    bank = testActor.getFlag(FLAG_SCOPE, "pendingReflect");
+    assert(r.netDamage === 75, "Deleted Energy Reflection no longer blocks fire damage",
+      { netDamage: r.netDamage, defenseEffects: listDefenseEffects(testActor) });
+    assert(!bank, "Deleted Energy Reflection banks no ghost reflect",
+      { bank });
 
     // ── Summary ─────────────────────────────────────────────────────────────
     const passed = results.filter(x => x.pass).length;

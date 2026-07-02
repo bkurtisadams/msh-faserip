@@ -1,4 +1,12 @@
-// scripts/modules/effects/defense-effects.js v1.5.3 - 2026-07-02
+// scripts/modules/effects/defense-effects.js v1.6.0 - 2026-07-02
+// v1.6.0: Energy Reflection defense AE (Step #3 slice 1). New defenseType
+//         "energyReflection" built when sys.isEnergyReflection. Flags:
+//         reflectionType (specific energy or broad "energy"), threshold
+//         (Unearthly 100 per RAW), rank/rankValue (reflect range). The
+//         Resistance AE is suppressed for reflection items — the preset
+//         also seeds isResistance+invulnerability for sheet coherence,
+//         and an unlimited invulnerability AE would swallow the >100
+//         remainder the hero is supposed to take.
 // v1.5.3: Pass mshIntentional when deleting defense AEs so the global
 //         preDeleteActiveEffect guard does not block sync cleanup.
 // v1.5.2: Remove stale/orphan defense AEs by powerItemId as well as
@@ -56,6 +64,7 @@ function getClosestRankName(value) {
 // Force Field: "defense.forceField.<itemId>"
 // Resistance:  "defense.resistance.<itemId>"
 // Absorption:  "defense.absorption.<itemId>"
+// Reflection:  "defense.energyReflection.<itemId>"
 
 function defenseEffectId(type, itemId) {
   return `defense.${type}.${itemId}`;
@@ -182,6 +191,25 @@ function resolveAbsorptionValues(item) {
   };
 }
 
+function resolveEnergyReflectionValues(item) {
+  const sys = item.system || {};
+  const rankValue = getRankValue(sys.rank);
+  const value = typeof sys.value === "number" ? sys.value : rankValue;
+  // Specific energy form chosen on the sheet (resistanceType dropdown),
+  // falling back to the preset's broad "energy".
+  const reflectionType = sys.energyReflectionType && sys.energyReflectionType !== "energy"
+    ? sys.energyReflectionType
+    : (sys.resistanceType || sys.energyReflectionType || "energy");
+
+  return {
+    reflectionType,
+    // RAW: attacks up to Unearthly damage or Intensity inflict no damage.
+    threshold: 100,
+    rankValue: value,
+    rank: sys.rank || getClosestRankName(value),
+  };
+}
+
 function isBodyArmorByName(item) {
   const name = String(item.name || "").toLowerCase();
   const type = String(item.system?.type || "").toLowerCase();
@@ -200,7 +228,8 @@ function looksLikeDefensivePower(item) {
   return sys.isBodyArmor || isBodyArmorByName(item)
       || sys.isForceField || isForceFieldByName(item)
       || (sys.isResistance && sys.resistanceType)
-      || sys.absorptionType || sys.absorptionSpecific;
+      || sys.absorptionType || sys.absorptionSpecific
+      || sys.isEnergyReflection;
 }
 
 // ─── AE builders ─────────────────────────────────────────────────────────────
@@ -325,6 +354,36 @@ function buildAbsorptionAE(item, values) {
         absorptionSpecific: values.absorptionSpecific,
         convertsToHealth: values.convertsToHealth,
         canRedirect: values.canRedirect,
+        rankValue: values.rankValue,
+        rank: values.rank,
+        isForceField: false,
+      }
+    },
+  };
+}
+
+function buildEnergyReflectionAE(item, values) {
+  const scope = SCOPE();
+  const typeLabel = values.reflectionType
+    ? values.reflectionType.charAt(0).toUpperCase() + values.reflectionType.slice(1)
+    : "Energy";
+  const label = `Energy Reflection: ${typeLabel} (${values.rank}: blocks \u2264${values.threshold})`;
+
+  return {
+    name: label,
+    img: "",  // no token badge - passive defense tracked in effects list only
+    disabled: false,
+    changes: [],
+    statuses: [`energy-reflection-${values.reflectionType || "energy"}`],
+    flags: {
+      [scope]: {
+        effectCategory: "defense",
+        defenseType: "energyReflection",
+        ongoingId: defenseEffectId("energyReflection", item.id),
+        powerItemId: item.id,
+        powerName: item.name,
+        reflectionType: values.reflectionType,
+        threshold: values.threshold,
         rankValue: values.rankValue,
         rank: values.rank,
         isForceField: false,
@@ -467,10 +526,13 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   }
 
   // ── Resistance ──
+  // Suppressed for Energy Reflection items: the reflection preset also seeds
+  // isResistance + invulnerability for sheet coherence, but an unlimited
+  // invulnerability AE would swallow the >100 remainder (RAW: hero takes it).
   const resId = defenseEffectId("resistance", item.id);
   if (removing) {
     await removeDefenseAE(actor, resId);
-  } else if (sys.isResistance && sys.resistanceType) {
+  } else if (sys.isResistance && sys.resistanceType && !sys.isEnergyReflection) {
     const values = resolveResistanceValues(item);
     const aeData = buildResistanceAE(item, values);
     await registerDefenseAE(actor, resId, aeData, isInactive);
@@ -488,6 +550,18 @@ export async function syncDefenseEffects(actor, item, removing = false) {
     await registerDefenseAE(actor, absId, aeData, isInactive);
   } else {
     await removeDefenseAE(actor, absId);
+  }
+
+  // ── Energy Reflection ──
+  const reflId = defenseEffectId("energyReflection", item.id);
+  if (removing) {
+    await removeDefenseAE(actor, reflId);
+  } else if (sys.isEnergyReflection) {
+    const values = resolveEnergyReflectionValues(item);
+    const aeData = buildEnergyReflectionAE(item, values);
+    await registerDefenseAE(actor, reflId, aeData, isInactive);
+  } else {
+    await removeDefenseAE(actor, reflId);
   }
 }
 

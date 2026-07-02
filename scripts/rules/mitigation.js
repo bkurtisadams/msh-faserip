@@ -1,4 +1,12 @@
-// scripts/rules/mitigation.js v3.2.3 - 2026-07-02
+// scripts/rules/mitigation.js v3.3.0 - 2026-07-02
+// v3.3.0: Energy Reflection (Step #3 slice 1: block-and-bank). New defense
+//         AE type "energyReflection" applied before all other layers on
+//         both bypass and non-bypass paths. RAW: attacks of the matching
+//         energy up to Unearthly (100) inflict no damage; above 100 the
+//         hero blocks 100 and takes the remainder. Blocked amount is
+//         banked on the target as a pendingReflect flag (expires end of
+//         the current round) and surfaced on the result as reflectBank
+//         for the attack card. Agility FEAT redirect workflow is slice 2.
 // v3.2.3: Fix Force Field physical double-penalty. resolveForceFieldValues
 //         (defense-effects.js) stores physical = rank-10 in the AE flags,
 //         and applyForceFieldFromAE subtracted 10 again at apply time, so a
@@ -102,6 +110,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     absorptionHeal: 0,
     absorptionTempHPRank: 0,
     absorptionAeIds: [],
+    // Energy Reflection: blocked amount banked for the redirect workflow.
+    //   { amount, damageType, aeId, reflectRangeRank } or null.
+    reflectBank: null,
   };
   
   // Normalize short-form damage codes (E/S/F/BA/EA/TB/TE/GP/Gb) to long form.
@@ -126,7 +137,29 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     ignoresNaturalArmor,
     ignoresArtificialArmor
   });
-  const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance || aeDefenses.hasAbsorption;
+  const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance || aeDefenses.hasAbsorption || aeDefenses.hasReflection;
+
+  // ── Energy Reflection — applies before ALL other layers ──
+  // RAW: matching energy up to Unearthly (100) inflicts no damage; above 100
+  // the hero blocks 100 and takes the remainder. Blocked amount is banked on
+  // the target (pendingReflect, expires end of current round) for the
+  // Agility FEAT redirect workflow.
+  if (aeDefenses.hasReflection) {
+    const reflLayer = applyEnergyReflectionFromAE(currentDamage, aeDefenses.reflection, {
+      dmgTypeLower, targetActor
+    });
+    if (reflLayer.absorbed > 0) {
+      currentDamage -= reflLayer.absorbed;
+      result.absorbed += reflLayer.absorbed;
+      result.layers.push(reflLayer);
+      result.reflectBank = {
+        amount: reflLayer.absorbed,
+        damageType: dmgTypeLower,
+        aeId: reflLayer.sourceAeId,
+        reflectRangeRank: aeDefenses.reflection.rank
+      };
+    }
+  }
 
   // ── Absorption — applies before BA/FF for matched damage type ──
   // Per-hit cap = rank#. Absorbed → optionally heals + temp HP. Excess flows
@@ -483,15 +516,44 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     }
   }
 
+  // Aggregate energy reflection (take highest matching rank). Match rules
+  // mirror absorption: reflectionType "energy" → any energy damage,
+  // specific string (e.g. "fire") → substring match against the damage type.
+  let reflThreshold = 0, reflRank = "", reflRankValue = 0, reflAeId = null, reflMatched = "";
+  for (const ae of activeDefenses) {
+    const f = ae.flags?.[scope];
+    if (f?.defenseType !== "energyReflection") continue;
+    const rt = String(f.reflectionType || "energy").toLowerCase().trim();
+
+    let matched = false;
+    if (rt === "energy" || rt === "") {
+      if (isEnergyDamage) matched = true;
+    } else if (dmgTypeLower.includes(rt) || baseType.includes(rt)) {
+      matched = true;
+    }
+    if (!matched) continue;
+
+    const rv = Number(f.rankValue) || 0;
+    if (rv >= reflRankValue) {
+      reflRankValue = rv;
+      reflRank = f.rank || "";
+      reflThreshold = Number(f.threshold) || 100;
+      reflAeId = ae.id;
+      reflMatched = rt;
+    }
+  }
+
   return {
     hasArmor: armorPhys > 0 || armorEner > 0,
     hasForceField: ffFull > 0,
     hasResistance: resDR > 0 || resCS > 0 || resImm,
     hasAbsorption: absRank > 0,
+    hasReflection: reflThreshold > 0,
     armor: { physical: armorPhys, energy: armorEner, physicalRank: armorPR, energyRank: armorER },
     forceField: { physical: ffPhys, energy: ffEner, fullValue: ffFull, physicalRank: ffPR, energyRank: ffER, isPersonal: ffPersonal, aeId: ffAeId },
     resistance: { damageReduction: resDR, csBonus: resCS, hasImmunity: resImm, immunityThreshold: resImmThr, type: resType },
     absorption: { rank: absRank, rankLabel: absRankLabel, convertsToHealth: absConverts, canRedirect: absRedirect, aeId: absAeId, matchedType: absMatched, specific: absSpecific },
+    reflection: { threshold: reflThreshold, rank: reflRank, rankValue: reflRankValue, aeId: reflAeId, matchedType: reflMatched },
   };
 }
 
@@ -539,11 +601,15 @@ function isDefenseAEBackedByCurrentPower(actor, ae, scope) {
   }
 
   if (defenseType === "resistance") {
-    return !!(sys.isResistance && sys.resistanceType);
+    return !!(sys.isResistance && sys.resistanceType && !sys.isEnergyReflection);
   }
 
   if (defenseType === "absorption") {
     return !!(sys.absorptionType || sys.absorptionSpecific);
+  }
+
+  if (defenseType === "energyReflection") {
+    return !!sys.isEnergyReflection;
   }
 
   return false;
@@ -631,6 +697,49 @@ function applyForceFieldFromAE(damage, ffData, options) {
   }
 
   return result;
+}
+
+function applyEnergyReflectionFromAE(damage, reflData, options) {
+  const { dmgTypeLower, targetActor } = options;
+  const threshold = Number(reflData.threshold) || 100;
+  const blocked = Math.min(damage, threshold);
+
+  const layer = {
+    type: 'Energy Reflection',
+    absorbed: blocked,
+    threshold,
+    ignoresAP: true,
+    source: "defense-ae",
+    matchedType: reflData.matchedType,
+    sourceAeId: reflData.aeId,
+  };
+
+  if (blocked <= 0) return layer;
+
+  // Bank the blocked amount for the redirect workflow. RAW: the attack may
+  // be reflected in the round it occurs, so the bank expires at the end of
+  // the CURRENT round (unlike absorption's next-round redirect). Flag-only;
+  // the chat surface and Agility FEAT land with the redirect workflow.
+  if (targetActor) {
+    try {
+      const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+      const inCombat = !!(game.combat && game.combat.round > 0);
+      const round = inCombat ? game.combat.round : null;
+      targetActor.setFlag(scope, "pendingReflect", {
+        amount: blocked,
+        damageType: dmgTypeLower,
+        bankedRound: round,
+        expiresRound: round,
+        sourceAeId: reflData.aeId,
+        reflectRangeRank: reflData.rank,
+      });
+      layer.reflectBanked = blocked;
+    } catch (e) {
+      console.warn("[FASERIP MITIGATION] Energy Reflection bank failed:", e);
+    }
+  }
+
+  return layer;
 }
 
 function applyAbsorptionFromAE(damage, absData, options) {
