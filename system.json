@@ -79,7 +79,7 @@
             "name": "powers",
             "label": "Powers",
             "system": "msh-faserip",
-            "path": "./packs/powers.db",
+            "path": "./packs/powers",
             "type": "Item"
         },
         {

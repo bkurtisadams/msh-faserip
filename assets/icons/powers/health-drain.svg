@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="health-drain power icon">
+  <defs><radialGradient id="g" cx="35%" cy="25%" r="80%"><stop offset="0" stop-color="white" stop-opacity=".26"/><stop offset=".42" stop-color="#702f70"/><stop offset="1" stop-color="#111827"/></radialGradient></defs>
+  <rect width="256" height="256" rx="34" fill="url(#g)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="rgba(255,255,255,.42)" stroke-width="8"/>
+  <path d="M203 128 C203 179 128 222 128 222 C128 222 53 179 53 128 C53 79 92 49 128 82 C164 49 203 79 203 128 Z" fill="#ffc8ff"/><path d="M128 87 V175 M96 143 H160" stroke="rgba(0,0,0,.35)" stroke-width="14" stroke-linecap="round"/>
+  <text x="128" y="142" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#111827" opacity=".82">DRN</text>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="damage-transfer power icon">
+  <defs><radialGradient id="g" cx="35%" cy="25%" r="80%"><stop offset="0" stop-color="white" stop-opacity=".26"/><stop offset=".42" stop-color="#6c5aa8"/><stop offset="1" stop-color="#111827"/></radialGradient></defs>
+  <rect width="256" height="256" rx="34" fill="url(#g)"/>
+  <circle cx="128" cy="128" r="111" fill="none" stroke="rgba(255,255,255,.42)" stroke-width="8"/>
+  <path d="M50 91 H169 L169 51 L218 111 L169 171 V131 H50 Z" fill="#e5dcff"/><path d="M206 169 H87 V209 L38 149 L87 89 V129 H206 Z" fill="#e5dcff" opacity=".65"/>
+  <text x="128" y="142" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#111827" opacity=".82">TRN</text>
+</svg>
