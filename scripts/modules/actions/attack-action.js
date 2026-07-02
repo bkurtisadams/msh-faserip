@@ -217,28 +217,61 @@ function buildMitigationChatSummary(result, context = {}) {
 
   const net = Number(result.net ?? result.mitigation?.netDamage ?? context.afterArmor ?? 0);
   const afterArmor = Number(context.afterArmor ?? result.mitigation?.rawDamage ?? net) || 0;
+  const rawDamage = Number(context.rawDamage ?? result.mitigation?.rawDamage ?? afterArmor) || 0;
   const absorbed = Number(result.absorbed ?? Math.max(0, afterArmor - net)) || 0;
   const layers = Array.isArray(result.mitigation?.layers) ? result.mitigation.layers : [];
 
   if (absorbed <= 0 && net === afterArmor && layers.length === 0) return "";
 
-  const layerText = layers
-    .filter(layer => Number(layer?.absorbed || 0) > 0 || layer?.immune || layer?.overloaded || layer?.skipped)
-    .map(layer => {
-      const type = escapeChatText(layer?.type || "Defense");
-      if (layer?.immune) return `${type}: immune (${escapeChatText(layer.reason || "absorbed all damage")})`;
-      if (layer?.skipped) return `${type}: skipped (${escapeChatText(layer.reason || "not applicable")})`;
-      if (layer?.overloaded) return `${type}: absorbed ${Number(layer.absorbed || 0)} and overloaded`;
-      return `${type}: absorbed ${Number(layer?.absorbed || 0)}`;
-    })
-    .join("; ");
+  const activeLayers = layers.filter(layer =>
+    Number(layer?.absorbed || 0) > 0 || layer?.immune || layer?.overloaded || layer?.skipped
+  );
 
-  const math = absorbed > 0
-    ? `${afterArmor} after armor − ${absorbed} defense = ${net} taken`
-    : `${net} taken`;
+  const damageType = String(context.damageType || "")
+    .replace(/^energy-/, "")
+    .replace(/^physical-/, "")
+    .replace(/-/g, " ");
+  const damageLabel = damageType ? ` ${escapeChatText(damageType)} damage` : " damage";
+
+  const primaryLayer = activeLayers.find(layer => layer?.immune)
+    || activeLayers.find(layer => Number(layer?.absorbed || 0) > 0)
+    || activeLayers[0];
+  const primaryType = escapeChatText(primaryLayer?.type || "Defense");
+
+  const visibleSummary = primaryLayer?.immune
+    ? `${primaryType} prevented ${absorbed || afterArmor}${damageLabel}.`
+    : absorbed > 0
+      ? `${primaryType} reduced ${afterArmor}${damageLabel} to ${net}.`
+      : `Mitigation left ${net}${damageLabel} taken.`;
+
+  const layerRows = activeLayers.map(layer => {
+    const type = escapeChatText(layer?.type || "Defense");
+    const amount = Number(layer?.absorbed || 0);
+    if (layer?.immune) {
+      return `<div><strong>${type}:</strong> immune${amount ? `, absorbed ${amount}` : ""}${layer.reason ? ` <span style="color:#4b6b4b;">(${escapeChatText(layer.reason)})</span>` : ""}</div>`;
+    }
+    if (layer?.skipped) {
+      return `<div><strong>${type}:</strong> skipped${layer.reason ? ` <span style="color:#6b604b;">(${escapeChatText(layer.reason)})</span>` : ""}</div>`;
+    }
+    if (layer?.overloaded) {
+      return `<div><strong>${type}:</strong> absorbed ${amount} and overloaded</div>`;
+    }
+    return `<div><strong>${type}:</strong> absorbed ${amount}</div>`;
+  }).join("");
+
+  const mathRows = [
+    `<div><strong>Raw damage:</strong> ${rawDamage}</div>`,
+    `<div><strong>After armor:</strong> ${afterArmor}</div>`,
+    layerRows,
+    `<div><strong>Final damage taken:</strong> ${net}</div>`
+  ].filter(Boolean).join("");
 
   return `<div style="margin:6px 10px 0;padding:6px 8px;background:#eef7ee;border:1px solid #8bc48b;border-radius:3px;font-size:.9em;color:#1b5e20;">
-    <strong>Mitigation:</strong> ${escapeChatText(math)}${layerText ? `<br><span style="color:#2e7d32;">${layerText}</span>` : ""}
+    <div><strong>Mitigation:</strong> ${visibleSummary}</div>
+    <details style="margin-top:4px;">
+      <summary style="cursor:pointer;color:#2e7d32;font-weight:600;">Details</summary>
+      <div style="margin-top:4px;padding-left:8px;color:#244f24;line-height:1.35;">${mathRows}</div>
+    </details>
   </div>`;
 }
 
