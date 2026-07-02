@@ -1,4 +1,6 @@
-// scripts/modules/effects/defense-effects.js v1.5.0 - 2026-05-23
+// scripts/modules/effects/defense-effects.js v1.5.1 - 2026-07-02
+// v1.5.1: Treat resistanceEffect=invulnerability as an invulnerability
+//         even if older/imported items lack resistanceIsInvulnerability.
 // v1.5.0: Absorption AE also builds from absorptionSpecific alone (no broad
 //         Type required), so a type-specific absorber (e.g. sound) can be
 //         scoped without widening it. Status id falls back to the specific.
@@ -120,12 +122,15 @@ function resolveResistanceValues(item) {
   const sys = item.system || {};
   const rankValue = getRankValue(sys.rank);
   const value = typeof sys.value === "number" ? sys.value : rankValue;
-  const isInvuln = sys.resistanceIsInvulnerability === true;
+  const resistanceEffect = sys.resistanceEffect || "damageReduction";
+  const isInvuln = sys.resistanceIsInvulnerability === true
+    || resistanceEffect === "invulnerability"
+    || resistanceEffect === "immunity";
 
   return {
     resistanceType: sys.resistanceType || "",
     resistanceSpecific: sys.resistanceSpecific || "",
-    resistanceEffect: sys.resistanceEffect || "damageReduction",
+    resistanceEffect: isInvuln ? "invulnerability" : resistanceEffect,
     resistanceValue: isInvuln ? 1000 : value,
     rankValue: value,
     rank: sys.rank || getClosestRankName(value),
@@ -528,9 +533,9 @@ export function getResistanceFromEffects(actor, damageType = "physical-blunt") {
     const value = Number(f.resistanceValue) || 0;
     const effect = f.resistanceEffect || "damageReduction";
 
-    if (f.isInvulnerability || effect === "immunity") {
+    if (f.isInvulnerability || effect === "immunity" || effect === "invulnerability") {
       hasImmunity = true;
-      immunityThreshold = Math.max(immunityThreshold, value);
+      immunityThreshold = Math.max(immunityThreshold, value || 1000);
     } else if (effect === "damageReduction") {
       damageReduction = Math.max(damageReduction, value);
     } else if (effect === "columnShift") {

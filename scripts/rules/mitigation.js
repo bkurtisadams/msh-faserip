@@ -1,4 +1,7 @@
-// scripts/rules/mitigation.js v3.2.0 - 2026-05-20
+// scripts/rules/mitigation.js v3.2.1 - 2026-07-02
+// v3.2.1: Recognize resistanceEffect=invulnerability in AE resistance
+//         flags and apply Class 1000-style reduction instead of only
+//         checking the legacy immunity string.
 // v3.2.0: Consume ignoresNaturalArmor / ignoresArtificialArmor from options.
 //         Body-armor AE aggregation now filters AEs by armorNature when an
 //         ignore flag is set. Additive: with both flags false (default) the
@@ -420,9 +423,9 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     const val = Number(f.resistanceValue) || 0;
     const eff = f.resistanceEffect || "damageReduction";
 
-    if (f.isInvulnerability || eff === "immunity") {
+    if (f.isInvulnerability || eff === "immunity" || eff === "invulnerability") {
       resImm = true;
-      resImmThr = Math.max(resImmThr, val);
+      resImmThr = Math.max(resImmThr, val || 1000);
     } else if (eff === "damageReduction") {
       resDR = Math.max(resDR, val);
     } else if (eff === "columnShift") {
@@ -642,14 +645,21 @@ function applyAbsorptionFromAE(damage, absData, options) {
 function applyResistanceFromAE(damage, resData, options) {
   const { rawDamage } = options;
 
-  // Invulnerability check
-  if (resData.hasImmunity && rawDamage < resData.immunityThreshold) {
+  // Invulnerability / immunity check. Treat it as Class 1000-style
+  // resistance: attacks up to the threshold are fully ignored; attacks above
+  // it still have the threshold absorbed instead of bypassing entirely.
+  if (resData.hasImmunity) {
+    const threshold = Number(resData.immunityThreshold) || 1000;
+    const absorbed = Math.min(damage, threshold);
+    const remainingDamage = Math.max(0, damage - absorbed);
     return {
       type: `${resData.type} Invulnerability`,
-      absorbed: damage,
-      remainingDamage: 0,
-      immune: true,
-      reason: `Attack intensity (${rawDamage}) below invulnerability (${resData.immunityThreshold})`,
+      absorbed,
+      remainingDamage,
+      immune: remainingDamage <= 0,
+      reason: remainingDamage <= 0
+        ? `Attack intensity (${rawDamage}) did not exceed invulnerability (${threshold})`
+        : `Invulnerability absorbed ${absorbed}; ${remainingDamage} exceeded threshold (${threshold})`,
       source: "defense-ae",
     };
   }

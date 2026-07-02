@@ -1,4 +1,8 @@
-// scripts/modules/actions/energy-action.js v3.3.3 - 2026-05-23
+// scripts/modules/actions/energy-action.js v3.3.4 - 2026-07-02
+// v3.3.4: Infer specific energy damage types from selected power names/types
+//         when imported/legacy powers still have blank or generic damageType.
+//         Fire Generation now resolves as energy-fire so fire resistance and
+//         invulnerability can match in mitigation.
 // v3.3.3: Range penalty now itemized as "Range" in the to-hit breakdown
 //         instead of being lumped into "Manual".
 // v3.3.2: CS Reason field now persists across reopens (lastEnergyReason
@@ -62,6 +66,38 @@ import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { isAuraMaintained } from "./nullify.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+
+
+function inferEnergyDamageType(item, fallback = "energy-generic") {
+  const sys = item?.system || {};
+  const explicit = String(sys.damageType || "").trim();
+
+  // Keep intentionally specific authored values. Treat blank/generic as a
+  // legacy-import gap and infer from canonical power naming.
+  if (explicit && explicit !== "energy-generic") return explicit;
+
+  const controlType = typeof sys.control === "object" ? sys.control?.controlType : "";
+  const text = [
+    item?.name,
+    sys.type,
+    sys.subtype,
+    sys.category,
+    controlType,
+    sys.attackType,
+    sys.sourceType,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (/corrosive|acid/.test(text)) return "corrosive";
+  if (/fire|flame|heat|torch/.test(text)) return "energy-fire";
+  if (/cold|ice|frost|freez/.test(text)) return "energy-cold";
+  if (/electric|lightning/.test(text)) return "energy-electricity";
+  if (/sound|sonic/.test(text)) return "energy-sound";
+  if (/dark\s*force|darkforce/.test(text)) return "energy-darkforce";
+  if (/radiation|radioactive|x-?ray|gamma|light|laser/.test(text)) return "energy-radiation";
+  if (/force|concuss|kinetic/.test(text)) return "energy-force";
+
+  return explicit || fallback;
+}
 export class EnergyAction extends RangedAttackAction {
   async execute() {
     const actor = this.actor;
@@ -438,7 +474,7 @@ export class EnergyAction extends RangedAttackAction {
               prettyRange = s.range === "rank"
                 ? (POWER_RANGE[powerRank] || "")
                 : String(s.calculatedRange || "");
-              powerDamageType = s.damageType || "energy-generic";
+              powerDamageType = inferEnergyDamageType(item, "energy-generic");
             }
 
             const cs = _csState.get();
@@ -517,7 +553,7 @@ export class EnergyAction extends RangedAttackAction {
                 const nameLower = item.name.toLowerCase();
                 isEnergyGeneration = nameLower.includes('energy generation') ||
                   s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
-                const dtLower = String(s.damageType || "").toLowerCase();
+                const dtLower = String(inferEnergyDamageType(item, s.damageType || "")).toLowerCase();
                 isCorrosive = /corrosive|acid/.test(nameLower) || /corrosive|acid/.test(dtLower);
                 isRotting = /rotting|rot.touch|decay/.test(nameLower) || /rotting|decay/.test(dtLower);
               }

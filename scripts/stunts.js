@@ -21,8 +21,7 @@ export class StuntRoller {
     const resolved = this._resolveStuntRank(stunt);
 
     if (stunt.timesUsed >= 10) {
-      ui.notifications.info(`${stunt.name} is mastered! Auto-success, no roll or Karma cost needed.`);
-      await this._incrementStuntUsage(stuntIndex);
+      ui.notifications.info(`${stunt.name} is mastered and does not need to be rolled.`);
       return;
     }
 
@@ -83,24 +82,25 @@ export class StuntRoller {
 
     const content = `
       <form>
-        <div class="stunt-info" style="margin-bottom:15px;padding:10px;background:#f5f5f5;border-radius:4px;">
-          <h3 style="margin-top:0;">${stunt.name}</h3>
-          ${resolved.powerName ? `<p><strong>Based on Power:</strong> ${resolved.powerName}</p>` : '<p><em>General power stunt</em></p>'}
-          <p><strong>Rank:</strong> ${resolved.rank} (${resolved.value})</p>
-          ${stunt.description ? `<p><strong>Description:</strong> ${stunt.description}</p>` : ''}
-          <p><strong>Times Attempted:</strong> ${stunt.timesUsed}</p>
-          <p><strong>Difficulty:</strong> <span style="color:${featColorHex};font-weight:bold;">${featColor} FEAT</span></p>
-          <p style="font-size:0.9em;color:#666;">${difficultyDesc}</p>
+        <div class="stunt-info" style="margin-bottom:8px;padding:8px 10px;background:#f5f5f5;border-radius:4px;line-height:1.3;">
+          <h3 style="margin:0 0 6px 0;">${stunt.name}</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:0.92em;">
+            ${resolved.powerName ? `<div style="grid-column:1 / -1;"><strong>Power:</strong> ${resolved.powerName}</div>` : '<div style="grid-column:1 / -1;"><em>General power stunt</em></div>'}
+            <div><strong>Rank:</strong> ${resolved.rank} (${resolved.value})</div>
+            <div><strong>Progress:</strong> ${stunt.timesUsed}/10</div>
+            <div><strong>Difficulty:</strong> <span style="color:${featColorHex};font-weight:bold;">${featColor}</span></div>
+            <div style="color:#666;">${difficultyDesc}</div>
+            ${stunt.description ? `<div style="grid-column:1 / -1;"><strong>Description:</strong> ${stunt.description}</div>` : ''}
+          </div>
         </div>
-        <div class="karma-section" style="margin-bottom:15px;">
-          <p><strong>Available Karma:</strong> ${availableKarma}</p>
-          <p><strong>Attempt Cost:</strong> ${baseCost} Karma</p>
-          <p style="font-size:0.9em;color:#666;">
-            Declaring Karma boost commits a minimum of 10 additional Karma (per rules),
-            spent after seeing the roll result.
-          </p>
+        <div class="karma-section" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px;font-size:0.92em;line-height:1.3;">
+          <div><strong>Available Karma:</strong> ${availableKarma}</div>
+          <div><strong>Attempt Cost:</strong> ${baseCost}</div>
+          <div style="grid-column:1 / -1;color:#666;font-size:0.9em;">
+            Karma boost: declare before the roll, then spend at least +10 after seeing the result.
+          </div>
         </div>
-        <div class="rules-reminder" style="padding:10px;background:#fff3e0;border-left:4px solid #ff9800;font-size:0.9em;">
+        <div class="rules-reminder" style="padding:7px 9px;background:#fff3e0;border-left:4px solid #ff9800;font-size:0.9em;line-height:1.25;">
           <strong>Reminder:</strong> ${masterHint}
         </div>
       </form>
@@ -110,7 +110,7 @@ export class StuntRoller {
       {
         action: "attempt",
         icon: "fas fa-dice-d20",
-        label: `Attempt (${baseCost} Karma)`,
+        label: `Attempt`,
         default: !canAffordBoost,
         callback: async () => {
           await this._makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, false);
@@ -122,7 +122,7 @@ export class StuntRoller {
       buttons.push({
         action: "attemptBoost",
         icon: "fas fa-plus-circle",
-        label: `Add Karma to Roll (${baseCost} + min 10)`,
+        label: `Boost Roll`,
         default: true,
         callback: async () => {
           await this._makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, true);
@@ -133,7 +133,7 @@ export class StuntRoller {
     buttons.push({
       action: "impossible",
       icon: "fas fa-ban",
-      label: `GM: Impossible`,
+      label: `Impossible`,
       callback: async () => {
         await ChatMessage.create({
           user: game.user.id,
@@ -149,7 +149,7 @@ export class StuntRoller {
 
     await DialogV2.wait({
       window: { title: `Power Stunt: ${stunt.name}` },
-      position: { width: 560 },
+      position: { width: 480 },
       content,
       buttons,
       rejectClose: false

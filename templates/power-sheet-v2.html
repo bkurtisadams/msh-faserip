@@ -40,6 +40,13 @@
           </select>
         </div>
         <div class="ps2-field">
+          <label>Type</label>
+          <select name="system.type" id="ps2-type" data-current="{{system.type}}">
+            <option value="">-- Select Type --</option>
+            {{#if system.type}}<option value="{{system.type}}" selected>{{system.type}}</option>{{/if}}
+          </select>
+        </div>
+        <div class="ps2-field">
           <label>Source</label>
           <select name="system.source">
             <option value="natural"   {{#if (eq system.source "natural")}}selected{{/if}}>Natural</option>
@@ -146,6 +153,7 @@
               <option value="Ch" {{#if (eq system.battleEffectsColumn "Ch")}}selected{{/if}}>Charging</option>
               <option value="Gp" {{#if (eq system.battleEffectsColumn "Gp")}}selected{{/if}}>Grappling</option>
               <option value="Gb" {{#if (eq system.battleEffectsColumn "Gb")}}selected{{/if}}>Grabbing</option>
+              <option value="Me" {{#if (eq system.battleEffectsColumn "Me")}}selected{{/if}}>Mental</option>
             </select>
           </div>
           <div class="ps2-field">
