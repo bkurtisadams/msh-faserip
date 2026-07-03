@@ -1712,6 +1712,13 @@ Hooks.once("init", async () => {
     return showGenericFeatDialog(actor, opts);
   };
 
+  // Power FEAT: roll a power's rank as a FEAT through the shared engine
+  // (powers audit Step #5). opts: { label, intensity, onResult, suppressCard }.
+  game.msh.openPowerFeat = async (actor, item, opts = {}) => {
+    const { showGenericFeatDialog } = await import('./modules/actions/generic-feat-dialog.js');
+    return showGenericFeatDialog(actor, { power: item, ...opts });
+  };
+
   // Initialize faserip initiative
   FaseripInitiative.init();
 

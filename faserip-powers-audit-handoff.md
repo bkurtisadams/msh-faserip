@@ -119,6 +119,11 @@ Karma lost from the results.
 - scripts/modules/actions/ability-feat-dialog.js v1.7.0 (slice 4a:
   resistance FEAT substitution; Endurance/Intuition/Psyche category
   radios, magical rolls higher of Psyche vs magical rank)
+- scripts/modules/actions/generic-feat-dialog.js v1.5.0 (slice 5a:
+  Power FEAT opts — power/label/intensity/onResult/suppressCard)
+- scripts/modules/actions/recovery-action.js v2.0.0 (slice 5a: migrated
+  onto the shared Power FEAT engine; 171 → 60 lines)
+- scripts/init.js (game.msh.openPowerFeat added, slice 5a)
 - scripts/actorSheet.js v2.3.0
 - scripts/power-presets.mjs (exports populatePowerTypeOptions)
 - scripts/power-sheet-v2-logic.js v1.11.2
@@ -189,6 +194,24 @@ Karma lost from the results.
      extended — AE path only.
 2. Step #5: generic Power FEAT action — highest-leverage item; turns
    dozens of Steps #7–#10 powers into one shared workflow.
+   - Slice 5a DONE (generic-feat-dialog.js v1.5.0, init.js, recovery-
+     action.js v2.0.0): the shared generic FEAT engine now takes a
+     power item and resolves a Power FEAT — opts power/label/intensity/
+     onResult/suppressCard. Result delivery is an awaited onResult
+     callback that returns an HTML effect line appended to the shared
+     card (suppressCard opt-out). RAW: with no intensity a colored
+     result succeeds, white fails (isColored). game.msh.openPowerFeat
+     is the public entry; the HUD "Generic FEAT" button and
+     openGenericFeat are unchanged (no power → original behavior).
+     Recovery migrated as the proof (171 → 60 lines): preconditions
+     stay, effect (End restore + daily flag) applied in onResult.
+     Forks locked: (A) callback, (B) shared card + effect line +
+     suppressCard escape hatch, (C) dialog-first, (D) no range.
+   - Follow-ups: migrate Healing (healing-action.js "Healing Power
+     FEAT") onto openPowerFeat next; extract a headless resolveFeat
+     core when the first auto-triggered (no-dialog) power FEAT appears
+     (fork C(b)) — this also de-dups the color/requirement math still
+     repeated between the dialog's updateFeatRequirement and runRoll.
 3. Then movement (#6) / senses (#7) / body control (#8) per the audit.
 
 ## Conventions (also in memory, restated for safety)

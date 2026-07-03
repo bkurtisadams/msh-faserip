@@ -1,3 +1,19 @@
+// generic-feat-dialog.js v1.5.0 - 2026-07-03
+// v1.5.0: Power FEAT support (powers audit Step #5, slice 5a). New opts turn
+//         the shared generic FEAT engine into the Power FEAT path:
+//           opts.power (Item)     — roll this power's rank as a FEAT; keeps
+//                                   intensity/CS/Karma; hides the ability picker.
+//           opts.label (string)   — card title (defaults to the power name).
+//           opts.intensity (rank) — preselect the INTENSITY dropdown.
+//           opts.onResult(result) — awaited after resolution; return an HTML
+//                                   string to append to the card as an effect
+//                                   line. result = { success, color, requirement,
+//                                   effectiveRank, roll, cappedTotal, karmaUsed,
+//                                   isAutomatic }. RAW: with no intensity a
+//                                   colored result (green/yellow/red) succeeds,
+//                                   white fails.
+//           opts.suppressCard     — skip the shared card entirely (caller posts
+//                                   its own).
 // generic-feat-dialog.js v1.4.1 - 2026-06-05
 // v1.4.1: Fix double FEAT roll when detached. Detaching re-runs the render
 //         callback, which was stacking a second click/keydown handler on the
@@ -113,10 +129,14 @@ function setNeedPill($el, requirement, { impossible = false, automatic = false }
 }
 
 export async function showGenericFeatDialog(actor, opts = {}) {
-  if (!actor && !opts.customRank) {
+  if (!actor && !opts.customRank && !opts.power) {
     ui.notifications.warn("Generic FEAT requires an actor or a customRank option.");
     return;
   }
+
+  // Power FEAT mode: roll the supplied power's rank as a FEAT (slice 5a).
+  const powerItem = opts.power || null;
+  const isPowerFeat = !!powerItem;
 
   const gf = (flag) => actor?.getFlag?.("msh-faserip", flag);
   const setF = (k, v) => actor?.setFlag?.("msh-faserip", k, v);
@@ -134,6 +154,11 @@ export async function showGenericFeatDialog(actor, opts = {}) {
     abilityRank = opts.customRank;
     abilityValue = game.msh?.getRankValue?.(opts.customRank) ?? 0;
     abilityDisplayLabel = "Custom";
+  } else if (isPowerFeat) {
+    abilityKey = null;
+    abilityRank = powerItem.system?.rank || "Typical";
+    abilityValue = game.msh?.getRankValue?.(abilityRank) ?? 0;
+    abilityDisplayLabel = "Power";
   } else if (RANKS.includes(savedAbility)) {
     manualRank = true;
     abilityKey = null;
@@ -169,8 +194,10 @@ export async function showGenericFeatDialog(actor, opts = {}) {
       + '</optgroup>'
     : '';
 
+  const presetIntensity = opts.intensity ?? "None";
+  const labelDefault = isPowerFeat ? (opts.label ?? powerItem.name) : savedLabel;
   const intensityOptionsHTML = ALL_RANKS_WITH_NONE.map(r =>
-    `<option value="${r}">${r}</option>`
+    `<option value="${r}" ${r === presetIntensity ? 'selected' : ''}>${r}</option>`
   ).join('');
 
   // Inline CS row — no reference panel (combat modifiers don't apply to FEATs)
@@ -185,7 +212,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
       </div>
     </div>`;
 
-  const showAbilityPicker = !opts.customRank && !!actor;
+  const showAbilityPicker = !opts.customRank && !isPowerFeat && !!actor;
   const showKarma = !opts.customRank && !!actor;
 
   const dialogContent = `
@@ -198,7 +225,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
           <span class="h-stat-rank">${abilityShort} ${abilityValue}</span>
         </span>
         <span class="h-paren">)</span>
-        <span style="margin-left:auto;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.4px;text-transform:uppercase;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;flex-shrink:0;">Generic FEAT</span>
+        <span style="margin-left:auto;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.4px;text-transform:uppercase;padding:1px 6px;background:rgba(255,255,255,0.18);border-radius:2px;flex-shrink:0;">${isPowerFeat ? 'Power FEAT' : 'Generic FEAT'}</span>
       </div>
 
       ${showAbilityPicker ? `
@@ -214,7 +241,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
       <div class="frp-box">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">LABEL</span>
-          <input type="text" name="label" placeholder="Optional &mdash; what's this FEAT for?" value="${savedLabel}" style="flex:1;min-width:0;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
+          <input type="text" name="label" placeholder="Optional &mdash; what's this FEAT for?" value="${labelDefault}" style="flex:1;min-width:0;font-family:inherit;font-size:13px;padding:2px 6px;border:1px solid #888;border-radius:2px;background:#fff;">
         </div>
       </div>
 
@@ -333,7 +360,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         const saveSettings = html.find('[name="remember"]').is(':checked');
         const skipDice     = html.find('[name="skipDice"]').is(':checked');
 
-        if (saveSettings && actor) {
+        if (saveSettings && actor && !isPowerFeat) {
           await setF("lastGenericFeatAbility", currentKey || currentRank);
           await setF("lastGenericFeatLabel", labelVal);
           await setF("lastGenericFeatSkipDice", skipDice);
@@ -359,31 +386,39 @@ export async function showGenericFeatDialog(actor, opts = {}) {
           return;
         }
 
-        const cardTitle = labelVal || "Generic FEAT";
-        const cardSubtitle = intensity !== "None"
-          ? `${currentLabel} FEAT vs ${intensity} intensity`
-          : `${currentLabel} (${currentRank})`;
+        const cardTitle = labelVal || (isPowerFeat ? "Power FEAT" : "Generic FEAT");
+        const cardSubtitle = isPowerFeat
+          ? (intensity !== "None" ? `Power FEAT vs ${intensity} intensity` : `Power rank FEAT (${currentRank})`)
+          : (intensity !== "None" ? `${currentLabel} FEAT vs ${intensity} intensity` : `${currentLabel} (${currentRank})`);
+        // RAW: with no intensity, a colored result (green/yellow/red) succeeds; white fails.
+        const isColored = c => ["green", "yellow", "red"].includes(String(c).toLowerCase());
 
         if (isAutomatic) {
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: `
-              <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
-                  <strong>${cardTitle}</strong><br>
-                  <span style="font-size:0.85em;font-weight:400;">${cardSubtitle}</span>
-                </div>
-                <div style="padding:5px 10px;font-size:0.9em;">
-                  <div>Base Rank: ${currentRank} (${currentValue})</div>
-                  ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} &rarr; ${effectiveRank}</div>` : ''}
-                  <div>Intensity: ${intensity}</div>
-                  <div>Ability rank is 3+ ranks higher than intensity</div>
-                </div>
-                <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:#00a94e;color:#fff;">
-                  AUTOMATIC SUCCESS
-                </div>
-              </div>`
-          });
+          const result = { success: true, isAutomatic: true, color: "automatic", requirement: featRequirement, effectiveRank, roll: null, cappedTotal: null, karmaUsed: 0 };
+          let effectHtml = "";
+          if (opts.onResult) { try { effectHtml = (await opts.onResult(result)) || ""; } catch (e) { console.error("Power FEAT onResult error:", e); } }
+          if (!opts.suppressCard) {
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              content: `
+                <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+                  <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
+                    <strong>${cardTitle}</strong><br>
+                    <span style="font-size:0.85em;font-weight:400;">${cardSubtitle}</span>
+                  </div>
+                  <div style="padding:5px 10px;font-size:0.9em;">
+                    <div>Base Rank: ${currentRank} (${currentValue})</div>
+                    ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} &rarr; ${effectiveRank}</div>` : ''}
+                    <div>Intensity: ${intensity}</div>
+                    <div>Ability rank is 3+ ranks higher than intensity</div>
+                  </div>
+                  <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:#00a94e;color:#fff;">
+                    AUTOMATIC SUCCESS
+                  </div>
+                  ${effectHtml}
+                </div>`
+            });
+          }
           return;
         }
 
@@ -404,10 +439,13 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
         const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
-        let featSuccess = true;
-        if (intensity !== "None") {
-          featSuccess = checkFeatSuccess(resultColor, featRequirement);
-        }
+        let featSuccess;
+        if (intensity !== "None") featSuccess = checkFeatSuccess(resultColor, featRequirement);
+        else featSuccess = isColored(resultColor);  // RAW: colored = success, white = fail
+
+        const result = { success: featSuccess, isAutomatic: false, color: resultColor, requirement: featRequirement, effectiveRank, roll: roll.total, cappedTotal, karmaUsed };
+        let effectHtml = "";
+        if (opts.onResult) { try { effectHtml = (await opts.onResult(result)) || ""; } catch (e) { console.error("Power FEAT onResult error:", e); } }
 
         const featMsg = {
           speaker: ChatMessage.getSpeaker({ actor }),
@@ -426,18 +464,19 @@ export async function showGenericFeatDialog(actor, opts = {}) {
               <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:${colorBg(resultColor)};color:${colorFg(resultColor)};">
                 ${resultColor.toUpperCase()}
               </div>
-              ${intensity !== "None" ? `
+              ${(intensity !== "None" || isPowerFeat) ? `
                 <div style="padding:5px 10px;font-size:1.05em;text-align:center;font-weight:bold;color:${featSuccess ? '#2e7d32' : '#c62828'};">
                   ${featSuccess ? 'FEAT SUCCEEDED' : 'FEAT FAILED'}
                 </div>
               ` : ''}
+              ${effectHtml}
             </div>`
         };
         if (!skipDice) {
           featMsg.rolls = [roll];
           ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode"));
         }
-        await ChatMessage.create(featMsg);
+        if (!opts.suppressCard) await ChatMessage.create(featMsg);
       };
 
       html.find('#frp-roll').off('click.frp').on('click.frp', async () => {
