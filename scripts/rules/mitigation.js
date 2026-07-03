@@ -1,3 +1,12 @@
+// scripts/rules/mitigation.js v3.4.0 - 2026-07-03
+// v3.4.0: Magical damage reduction (powers audit Step #4, slice 4b core).
+//         calculateMitigation accepts isMagic; a "featReplace" magical
+//         resistance now contributes damageReduction by rank# against
+//         magical damage (RAW: reduces magical damage by rank#), matching
+//         regardless of the attack's elemental type when isMagic is set.
+//         FEAT substitution for magical lives in ability-feat-dialog.js
+//         (slice 4a). Attack-side isMagic wiring (auto-derive + toggle)
+//         is the next commit; until then callers pass isMagic explicitly.
 // scripts/rules/mitigation.js v3.3.1 - 2026-07-02
 // v3.3.1: Reflect bank dedupe + bankId nonce. The attack pipeline can run
 //         mitigation more than once per hit (full-auto apply + manual Apply
@@ -87,7 +96,8 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     bypassForceField = false,
     attackIntensity = 0,
     ignoresNaturalArmor = false,
-    ignoresArtificialArmor = false
+    ignoresArtificialArmor = false,
+    isMagic = false
   } = options;
   
   if (debug) {
@@ -143,7 +153,8 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   // ── Try defense AEs first, fall back to item-based lookup ──
   const aeDefenses = getDefensesFromAEs(targetActor, dmgTypeLower, {
     ignoresNaturalArmor,
-    ignoresArtificialArmor
+    ignoresArtificialArmor,
+    isMagic
   });
   const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance || aeDefenses.hasAbsorption || aeDefenses.hasReflection;
 
@@ -414,7 +425,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
   if (!actor?.effects) return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
 
-  const { ignoresNaturalArmor = false, ignoresArtificialArmor = false } = opts;
+  const { ignoresNaturalArmor = false, ignoresArtificialArmor = false, isMagic = false } = opts;
 
   const activeDefenses = actor.effects.filter(e =>
     !e.disabled
@@ -471,7 +482,10 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     const f = ae.flags?.[scope];
     if (f?.defenseType !== "resistance") continue;
     const rt = (f.resistanceType || "").toLowerCase();
-    if (!isResMatch(baseType, rt, dmgTypeLower)) continue;
+    // Magical resistance matches magical damage regardless of the attack's
+    // elemental type (a magical fire bolt is both fire and magical).
+    const magicalMatch = isMagic && rt === "magical";
+    if (!isResMatch(baseType, rt, dmgTypeLower) && !magicalMatch) continue;
 
     resType = f.resistanceType;
     const val = Number(f.resistanceValue) || 0;
@@ -481,6 +495,9 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
       resImm = true;
       resImmThr = Math.max(resImmThr, val || 1000);
     } else if (eff === "damageReduction") {
+      resDR = Math.max(resDR, val);
+    } else if (eff === "featReplace" && rt === "magical") {
+      // RAW: Resistance to Magical Attacks reduces magical damage by rank#.
       resDR = Math.max(resDR, val);
     } else if (eff === "columnShift") {
       resCS += (Number(f.rankValue) || 2);

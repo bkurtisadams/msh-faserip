@@ -1,3 +1,8 @@
+// action-utils.js v1.8.9 - 2026-07-03
+// v1.8.9: Forward isMagic through applyDamageToTargets into calculateMitigation
+//         (powers audit Step #4, slice 4b core). Lets a magical resistance
+//         reduce magical damage. applyDamageNow (0 external callers) left
+//         unwired for now. Attack-side isMagic derivation is the next commit.
 // action-utils.js v1.8.8 - 2026-07-02
 // v1.8.8: Reflect prompt dedupe. Skip the offer card when mitigation flags
 //         reflectBank.suppressPrompt (duplicate pass on the same hit) and
@@ -1643,7 +1648,8 @@ export async function applyDamageToTargets({
   attackIntensity = 0,
   bypassForceField = false,
   ignoresNaturalArmor = false,
-  ignoresArtificialArmor = false
+  ignoresArtificialArmor = false,
+  isMagic = false
 } = {}) {
   const results = [];
   
@@ -1713,7 +1719,8 @@ export async function applyDamageToTargets({
             attackIntensity,
             bypassForceField,
             ignoresNaturalArmor,
-            ignoresArtificialArmor
+            ignoresArtificialArmor,
+            isMagic
           });
           mitResult = mit;
           if (mit && Number.isFinite(mit.netDamage)) {

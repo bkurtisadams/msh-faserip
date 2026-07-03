@@ -1,3 +1,9 @@
+// defense-regression-tests.js v4.2.0 - 2026-07-03
+// v4.2.0: Magical damage reduction coverage (tests 27-30, powers audit Step
+//         #4 slice 4b): featReplace magical resistance reduces magical damage
+//         by rank# regardless of elemental type when isMagic is set, ignores
+//         non-magical damage, sub-rank immunity, deletion cleanup. mitigate()
+//         helper forwards isMagic. Requires mitigation.js v3.4.0. 30 asserts.
 // defense-regression-tests.js v4.1.1 - 2026-07-02
 // v4.1.1: Sleep before pendingReflect flag reads in tests 22-23. setFlag is
 //         fire-and-forget inside sync calculateMitigation, so the bank
@@ -179,7 +185,7 @@
   }
 
   async function mitigate(calculateMitigation, actor, {
-    rawDamage, damageType, attackForm = "energy", bypassArmor = true
+    rawDamage, damageType, attackForm = "energy", bypassArmor = true, isMagic = false
   }) {
     // calculateMitigation(rawDamage, targetActor, options)
     return await calculateMitigation(rawDamage, actor, {
@@ -190,7 +196,8 @@
       ignoresArtificialArmor: false,
       armorPiercing: 0,
       armorPiercingCS: 0,
-      apMode: "value"
+      apMode: "value",
+      isMagic
     });
   }
 
@@ -457,6 +464,40 @@
       { netDamage: r.netDamage, defenseEffects: listDefenseEffects(testActor) });
     assert(!bank, "Deleted Energy Reflection banks no ghost reflect",
       { bank });
+
+    // ── Step #4 slice 4b: Magical damage reduction (tests 27-30) ────────────
+    // RAW: Resistance to Magical Attacks reduces magical damage by rank#,
+    // regardless of the attack's elemental form. featReplace effect; the
+    // reduction fires only when the attack is flagged magical (isMagic).
+    let magRes = await createResistancePower(testActor, {
+      name: "Resistance to Magical Attacks",
+      powerType: "Resistance to Magical Attacks",
+      rank: "Remarkable", value: 30,
+      resistanceType: "magical", resistanceEffect: "featReplace"
+    });
+    await forceDefenseSync(testActor);
+    console.table(listDefenseEffects(testActor));
+
+    // 27. Magical fire 75 (isMagic) reduced by 30 -> 45 despite fire typing.
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 75, damageType: "energy-fire", isMagic: true });
+    assert(r.netDamage === 45, "Magical Resistance 30 reduces 75 magical (fire) damage to 45",
+      { netDamage: r.netDamage, defenseEffects: listDefenseEffects(testActor) });
+
+    // 28. Same fire 75 but NON-magical: magical resistance must not reduce it.
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 75, damageType: "energy-fire", isMagic: false });
+    assert(r.netDamage === 75, "Magical Resistance ignores non-magical fire damage",
+      { netDamage: r.netDamage });
+
+    // 29. Sub-rank magical (25 < 30) fully absorbed.
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 25, damageType: "energy-fire", isMagic: true });
+    assert(r.netDamage === 0, "Magical damage below resistance rank (25 < 30) fully absorbed",
+      { netDamage: r.netDamage });
+
+    // 30. Deleted magical resistance no longer reduces magical damage.
+    await deletePowerAndSync(testActor, magRes);
+    r = await mitigate(calculateMitigation, testActor, { rawDamage: 75, damageType: "energy-fire", isMagic: true });
+    assert(r.netDamage === 75, "Deleted Magical Resistance no longer reduces magical damage",
+      { netDamage: r.netDamage, defenseEffects: listDefenseEffects(testActor) });
 
     // ── Summary ─────────────────────────────────────────────────────────────
     const passed = results.filter(x => x.pass).length;
