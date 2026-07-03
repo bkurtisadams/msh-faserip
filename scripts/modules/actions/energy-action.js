@@ -1,3 +1,9 @@
+// scripts/modules/actions/energy-action.js v3.3.5 - 2026-07-03
+// v3.3.5: Power damage derivation honors system.damageSource. fixed -> the
+//         fixed damage field; strength/endurance -> the actor's ability
+//         value; rank/material/blank -> power value with rank-table
+//         fallback. Previously any nonzero fixed field won regardless of
+//         the selector, so rank changes never reached the dialog damage.
 // scripts/modules/actions/energy-action.js v3.3.4 - 2026-07-02
 // v3.3.4: Infer specific energy damage types from selected power names/types
 //         when imported/legacy powers still have blank or generic damageType.
@@ -469,7 +475,22 @@ export class EnergyAction extends RangedAttackAction {
               powerId = itemId;
               const s = item.system || {};
               powerName = item.name;
-              powerDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
+              // Honor system.damageSource (the sheet's Damage Source select).
+              // Previously any nonzero fixed-damage field won regardless of
+              // the selector, so a rank-sourced power stuck at stale fixed
+              // damage after a rank change.
+              const dmgSource = String(s.damageSource || "rank");
+              const rankVal = Number(CONFIG.FASERIP?.rankValues?.[s.rank]) || 0;
+              if (dmgSource === "fixed") {
+                powerDamage = Number(s.damage) || 0;
+              } else if (dmgSource === "strength" || dmgSource === "endurance") {
+                const ab = actor.system?.abilities?.[dmgSource] || {};
+                powerDamage = Number(ab.value)
+                  || Number(CONFIG.FASERIP?.rankValues?.[ab.rank]) || 0;
+              } else {
+                // "rank" (default), "material", legacy blank
+                powerDamage = Number(s.value) || rankVal || 0;
+              }
               powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
               prettyRange = s.range === "rank"
                 ? (POWER_RANGE[powerRank] || "")
