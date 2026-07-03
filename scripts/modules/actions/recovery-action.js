@@ -1,3 +1,7 @@
+// scripts/modules/actions/recovery-action.js v2.0.1 - 2026-07-03
+// v2.0.1: Lock the intensity dropdown (Recovery has no target intensity — RAW
+//         any colored result succeeds) and add an explanatory hint, via the
+//         new lockIntensity/intensityHint opts.
 // scripts/modules/actions/recovery-action.js v2.0.0 - 2026-07-03
 // v2.0.0: Migrate onto the shared Power FEAT engine (powers audit Step #5,
 //         slice 5a). Preconditions (once-per-day gate, restore-needed) stay
@@ -45,6 +49,8 @@ export async function showRecoveryFeatDialog(actor, item) {
     power: item,
     label: "Recovery",
     intensity: "None",
+    lockIntensity: true,
+    intensityHint: "Fixed by Recovery — any colored result (Green/Yellow/Red) restores one Endurance rank; White fails.",
     onResult: async ({ success }) => {
       if (!success) {
         // Failure does not consume the daily attempt.

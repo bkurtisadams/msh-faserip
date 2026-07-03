@@ -119,9 +119,9 @@ Karma lost from the results.
 - scripts/modules/actions/ability-feat-dialog.js v1.7.0 (slice 4a:
   resistance FEAT substitution; Endurance/Intuition/Psyche category
   radios, magical rolls higher of Psyche vs magical rank)
-- scripts/modules/actions/generic-feat-dialog.js v1.5.0 (slice 5a:
+- scripts/modules/actions/generic-feat-dialog.js v1.5.1 (slice 5a:
   Power FEAT opts — power/label/intensity/onResult/suppressCard)
-- scripts/modules/actions/recovery-action.js v2.0.0 (slice 5a: migrated
+- scripts/modules/actions/recovery-action.js v2.0.1 (slice 5a: migrated
   onto the shared Power FEAT engine; 171 → 60 lines)
 - scripts/init.js (game.msh.openPowerFeat added, slice 5a)
 - scripts/actorSheet.js v2.3.0
@@ -194,8 +194,8 @@ Karma lost from the results.
      extended — AE path only.
 2. Step #5: generic Power FEAT action — highest-leverage item; turns
    dozens of Steps #7–#10 powers into one shared workflow.
-   - Slice 5a DONE (generic-feat-dialog.js v1.5.0, init.js, recovery-
-     action.js v2.0.0): the shared generic FEAT engine now takes a
+   - Slice 5a DONE (generic-feat-dialog.js v1.5.1, init.js, recovery-
+     action.js v2.0.1): the shared generic FEAT engine now takes a
      power item and resolves a Power FEAT — opts power/label/intensity/
      onResult/suppressCard. Result delivery is an awaited onResult
      callback that returns an HTML effect line appended to the shared

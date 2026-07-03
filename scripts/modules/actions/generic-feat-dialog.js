@@ -1,3 +1,10 @@
+// generic-feat-dialog.js v1.5.1 - 2026-07-03
+// v1.5.1: Power FEAT intensity guardrails (slice 5a follow-up).
+//           opts.lockIntensity  — disable the INTENSITY dropdown (value still
+//                                 shows and is read normally) so a power that
+//                                 dictates its intensity can't be mis-set.
+//           opts.intensityHint  — one-line caption under the intensity row
+//                                 explaining what the intensity means here.
 // generic-feat-dialog.js v1.5.0 - 2026-07-03
 // v1.5.0: Power FEAT support (powers audit Step #5, slice 5a). New opts turn
 //         the shared generic FEAT engine into the Power FEAT path:
@@ -196,6 +203,8 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
   const presetIntensity = opts.intensity ?? "None";
   const labelDefault = isPowerFeat ? (opts.label ?? powerItem.name) : savedLabel;
+  const lockIntensity = !!opts.lockIntensity;   // caller dictates the intensity; disable the dropdown
+  const intensityHint = opts.intensityHint || ""; // one-line explanation shown under the row
   const intensityOptionsHTML = ALL_RANKS_WITH_NONE.map(r =>
     `<option value="${r}" ${r === presetIntensity ? 'selected' : ''}>${r}</option>`
   ).join('');
@@ -247,10 +256,11 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
       <div class="frp-box" id="intensity-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
-        <select id="intensity" name="intensity" style="flex:1;min-width:100px;">
+        <select id="intensity" name="intensity" style="flex:1;min-width:100px;" ${lockIntensity ? 'disabled' : ''}>
           ${intensityOptionsHTML}
         </select>
         <span style="margin-left:auto;display:inline-flex;align-items:center;flex-shrink:0;">${buildNeedPill('required-feat-text')}</span>
+        ${intensityHint ? `<div style="flex-basis:100%;font-size:10px;color:#777;margin-top:2px;line-height:1.3;">${intensityHint}</div>` : ''}
       </div>
 
       ${csRowHtml}
