@@ -1,3 +1,10 @@
+// scripts/modules/actions/energy-action.js v3.4.2 - 2026-07-03
+// v3.4.2: Fix energy dialog ballooning to full width when a checkbox is
+//         toggled. AppV2 re-applied its default position.width ('auto') on
+//         form-input changes, which measured the long defensive-powers
+//         summary line and blew the window out. Lock position.width to 360
+//         via dlg.setPosition in render and re-assert it on the Multi/Magical
+//         toggles.
 // scripts/modules/actions/energy-action.js v3.4.1 - 2026-07-03
 // v3.4.1: Move the "Magical" override checkbox onto the existing Multi row
 //         (right-aligned) instead of adding a new option row, so the energy
@@ -402,6 +409,12 @@ export class EnergyAction extends RangedAttackAction {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
+          // Lock width through the AppV2 position API. A CSS-only width is
+          // re-applied as position.width ('auto' by default) on the next
+          // setPosition AppV2 runs (e.g. on a form-input change), which then
+          // measures the long defensive-powers summary line and balloons the
+          // dialog. Pinning position.width keeps it fixed across re-measures.
+          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
 
           // ── Wire CS panel from shared utility ──
           const _getCurrentRangePenalty = () => {
@@ -686,11 +699,13 @@ export class EnergyAction extends RangedAttackAction {
           // Multi toggle
           html.find('#multi-enabled').on('change', function() {
             html.find('#multi-lbl, #multi-hint').css('opacity', this.checked ? '' : '0.55');
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
           });
 
           // Magical override toggle
           html.find('#magical-enabled').on('change', function() {
             html.find('#magical-lbl').css('opacity', this.checked ? '' : '0.55');
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
           });
 
           // Aim tactic toggle
