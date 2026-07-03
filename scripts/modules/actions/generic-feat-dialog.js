@@ -1,3 +1,9 @@
+// generic-feat-dialog.js v1.5.2 - 2026-07-03
+// v1.5.2: Fix dialog ballooning to full width. Width was pinned only via CSS;
+//         AppV2 re-applied its default position.width ('auto') on re-measure,
+//         stretching to fit the widest line (e.g. a long intensityHint). Lock
+//         position.width via dlg.setPosition in render and re-assert on CS
+//         recalc. (Same class of bug/fix as energy-action.js v3.4.2.)
 // generic-feat-dialog.js v1.5.1 - 2026-07-03
 // v1.5.1: Power FEAT intensity guardrails (slice 5a follow-up).
 //           opts.lockIntensity  — disable the INTENSITY dropdown (value still
@@ -290,6 +296,12 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         $dialog.css('width', '380px');
         $dialog[0].style.height = 'auto';
       }
+      // Lock width through the AppV2 position API. A CSS-only width is re-applied
+      // as position.width ('auto' by default) on the next setPosition AppV2 runs
+      // (e.g. a form-input change or content re-measure), which then stretches
+      // to fit the widest line — e.g. a long intensityHint. Pinning it keeps the
+      // dialog fixed across re-measures. (Mirrors the energy-action.js fix.)
+      try { dlg?.setPosition?.({ width: 380 }); } catch (_) {}
 
       let currentRank = abilityRank;
       let currentValue = abilityValue;
@@ -355,6 +367,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         $csRank.text(applyCS(currentRank, cs));
         updateFeatRequirement();
         if ($dialog.length) $dialog[0].style.height = 'auto';
+        try { dlg?.setPosition?.({ width: 380 }); } catch (_) {}
       };
       $csInput.on('change keyup', recalcCS);
 
