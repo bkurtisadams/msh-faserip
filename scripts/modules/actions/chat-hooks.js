@@ -1,3 +1,7 @@
+// chat-hooks.js v1.7.2 - 2026-07-03
+// v1.7.2: apply-damage handler reads data-is-magic and forwards isMagic so
+//         a magical resistance reduces magical damage on the manual path
+//         (powers audit Step #4 slice 4b wiring).
 // chat-hooks.js v1.7.1 - 2026-07-02
 // v1.7.1: reflect-attack validates the button's data-bank-id against the
 //         live pendingReflect bank. Stale prompt cards (superseded by a
@@ -883,6 +887,7 @@ export function installActionChatHandlers() {
         const ignoresNaturalArmor = btn.dataset.ignoresNaturalArmor === "true";
         const ignoresArtificialArmor = btn.dataset.ignoresArtificialArmor === "true";
         const wasKillResult   = btn.dataset.isKill === "true";
+        const isMagic         = btn.dataset.isMagic === "true";
 
         // 2) Apply via rules and CAPTURE RETURNED RESULTS (one entry per target)
         const results = await applyDamageToTargets({
@@ -898,7 +903,8 @@ export function installActionChatHandlers() {
           bypassArmor,
           bypassForceField,
           ignoresNaturalArmor,
-          ignoresArtificialArmor
+          ignoresArtificialArmor,
+          isMagic
         }) ?? [];
 
         debugLog("Chat Apply results", results);

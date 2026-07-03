@@ -1,3 +1,10 @@
+// scripts/modules/actions/energy-action.js v3.4.0 - 2026-07-03
+// v3.4.0: Magical override toggle (powers audit Step #4 slice 4b wiring).
+//         Energy attack dialog gains a "Magical" checkbox; when checked it
+//         forces choice.isMagic=true (GM fiat) so a magical resistance
+//         reduces the damage. Unchecked leaves it unset, so the source
+//         power's system.isMagic auto-derive still governs. Persisted via
+//         lastEnergyMagical.
 // scripts/modules/actions/energy-action.js v3.3.5 - 2026-07-03
 // v3.3.5: Power damage derivation honors system.damageSource. fixed -> the
 //         fixed damage field; strength/endurance -> the actor's ability
@@ -166,6 +173,7 @@ export class EnergyAction extends RangedAttackAction {
     const savedUsePowerToHit = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastEnergyUsePowerToHit")) === true) : false;
     const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyShift") ?? 0) : 0;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false) : false;
+    const savedMagical = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyMagical") || false) : false;
     const savedReduceDamage = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReduceDamage") || false) : false;
     const savedReducedAmount = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0) : 0;
     const savedResultCap = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyResultCap") || "none") : "none";
@@ -322,6 +330,10 @@ export class EnergyAction extends RangedAttackAction {
         <div class="frp-opt-row${!savedMultiAdjacent ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <span style="font-size:11px;color:#777;margin-left:8px;">Adjacent targets (-4CS)</span>
+        </div>
+        <div class="frp-opt-row${!savedMagical ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label><input type="checkbox" id="magical-enabled" ${savedMagical ? 'checked' : ''}> <span class="frp-opt-label" style="color:#7b1fa2;">Magical</span></label>
+          <span style="font-size:11px;color:#777;margin-left:8px;">Force magical vs resistance</span>
         </div>
         <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
@@ -505,6 +517,7 @@ export class EnergyAction extends RangedAttackAction {
             const usePowerToHit = !!html.find('#pwr-hit-toggle').is(':checked');
             const range = Number($dlg('[name="range"]').val() || 1);
             const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
+            const magicalForced = !!$dlg('#magical-enabled').is(':checked');
             const reduceDamageEnabled = !!$dlg('#reduce-damage-enabled').is(':checked');
             const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
             const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
@@ -518,6 +531,7 @@ export class EnergyAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastEnergyShift", cs.manualCS);
               await actor.setFlag("msh-faserip", "cs_energy", cs.manualCS);
               await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
+              await actor.setFlag("msh-faserip", "lastEnergyMagical", magicalForced);
               await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
               await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
               await actor.setFlag("msh-faserip", "lastEnergyAdHocRank", powerRank);
@@ -540,6 +554,7 @@ export class EnergyAction extends RangedAttackAction {
               manualCS: cs.manualCS,
               rangePenalty: cs.rangePenalty,
               powerDamageType, multiAdjacent,
+              isMagic: magicalForced || undefined,
               reduceDamageEnabled, reducedDamage, resultCap,
               aimMode,
               csNotes

@@ -7,11 +7,13 @@ defense AE sync, chat display) — DONE, pre-dates this session.
 Step #2 (powers compendium repair/reseed) — DONE this session.
 Step #3 (Energy Reflection) — DONE this session, both slices.
 Steps #4–#10 — IN PROGRESS. Step #4 slice 4a (FEAT-replacement
-resistances, dialog side) DONE 2026-07-03. Slice 4b core (magical
-damage reduction in mitigation + regression coverage) DONE 2026-07-03;
-4b wiring (attack-side isMagic derivation + dialog toggle) NEXT. Then
-the Body Armor / Force Field / Absorption regression coverage that was
-queued before Step #3.
+resistances, dialog side) DONE 2026-07-03. Slice 4b DONE 2026-07-03:
+core (magical damage reduction in mitigation + regression) plus wiring
+(auto-derive isMagic from the source power's system.isMagic through
+AttackAction._executeSingleAttack — covers melee/ranged/energy — into
+both the auto-apply path and the manual apply-damage button, and an
+energy-dialog "Magical" override toggle). Then the Body Armor / Force
+Field / Absorption regression coverage that was queued before Step #3.
 
 ## What happened this session
 
@@ -110,10 +112,10 @@ Karma lost from the results.
 
 - scripts/rules/mitigation.js v3.4.0
 - scripts/modules/effects/defense-effects.js v1.6.0
-- scripts/modules/actions/action-utils.js v1.8.9
-- scripts/modules/actions/chat-hooks.js v1.7.1
-- scripts/modules/actions/attack-action.js v1.9.46
-- scripts/modules/actions/energy-action.js v3.3.5
+- scripts/modules/actions/action-utils.js v1.8.10
+- scripts/modules/actions/attack-action.js v1.9.47
+- scripts/modules/actions/chat-hooks.js v1.7.2
+- scripts/modules/actions/energy-action.js v3.4.0
 - scripts/modules/actions/ability-feat-dialog.js v1.7.0 (slice 4a:
   resistance FEAT substitution; Endurance/Intuition/Psyche category
   radios, magical rolls higher of Psyche vs magical rank)
@@ -158,22 +160,33 @@ Karma lost from the results.
    Attacks (Psyche + magical damage reduction).
    - Slice 4a DONE (ability-feat-dialog.js v1.7.0): dialog-side FEAT
      substitution via owned featReplace resistance powers.
-   - Slice 4b core DONE (mitigation.js v3.4.0, action-utils.js v1.8.9,
+   - Slice 4b core DONE (mitigation.js v3.4.0, action-utils.js v1.8.10,
      defense-regression-tests.js v4.2.0): calculateMitigation takes
      isMagic; featReplace magical resistance reduces magical damage by
      rank#, matching regardless of elemental type when isMagic. 30
      asserts pass. Representation is an explicit isMagic option (NOT a
      damageType-string token — avoids rippling through every .includes).
-   - Slice 4b wiring NEXT: derive isMagic at attack-build sites from the
-     source power's system.isMagic (auto), plus a dialog toggle override
-     (energy attack dialog first). applyDamageToTargets already forwards
-     isMagic; only the callers that build power attacks need to pass it.
-     Loose ends for wiring: applyDamageNow (0 external callers) is
-     unwired; the manual "Apply Damage" chat-card path does not yet
-     carry isMagic (would need isMagic stamped on the card's damage
-     flags); mitigation's item-fallback resistance path
-     (getResistanceModifiers, non-AE) is not extended — AE path only,
-     matching how absorption/reflection were done.
+   - Slice 4b wiring DONE (attack-action.js v1.9.47, action-utils.js
+     v1.8.10, chat-hooks.js v1.7.2, energy-action.js v3.4.0):
+     AttackAction._executeSingleAttack derives isMagic once from the
+     resolved source item's system.isMagic (choice.isMagic overrides),
+     covering melee/ranged/energy (RangedAttackAction and EnergyAction
+     both extend AttackAction, no override). Threaded to the auto-apply
+     applyDamageToTargets call and to buildActionsBox, which emits
+     data-is-magic on the apply-damage button; chat-hooks reads it on the
+     manual path. Energy dialog has a "Magical" override checkbox
+     (forces on only; unchecked leaves auto-derive intact; persisted as
+     lastEnergyMagical).
+     Loose ends: the per-attack override toggle is on the ENERGY dialog
+     only — blunt/edged/shooting/mental attacks still auto-derive from
+     the source item but have no per-attack override UI. Direct
+     applyDamageToTargets callers that are not power attacks
+     (shooting/charging/grenade/equipment/gm-utils/charge-damage) and
+     mental-power-action's buildActionsBox do NOT pass isMagic (default
+     false) — a magic arrow / magically-sourced mental attack would not
+     reduce; wire per-need. applyDamageNow (0 external callers) unwired.
+     mitigation item-fallback path (getResistanceModifiers, non-AE) not
+     extended — AE path only.
 2. Step #5: generic Power FEAT action — highest-leverage item; turns
    dozens of Steps #7–#10 powers into one shared workflow.
 3. Then movement (#6) / senses (#7) / body control (#8) per the audit.

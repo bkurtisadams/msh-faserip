@@ -1,3 +1,9 @@
+// attack-action.js v1.9.47 - 2026-07-03
+// v1.9.47: Magical damage wiring (powers audit Step #4, slice 4b). Derive
+//          isMagic in _executeSingleAttack from the source power's
+//          system.isMagic (choice.isMagic overrides for GM fiat), and pass
+//          it to the auto-apply path and the manual apply-damage button so a
+//          magical resistance reduces magical damage.
 // attack-action.js v1.9.46 - 2026-07-02
 // v1.9.46: Mitigation chat summary — Energy Reflection layer wording.
 //          layerKind recognizes reflection; summary and layer rows read
@@ -814,6 +820,17 @@ export class AttackAction extends BaseAction {
       ?? (choice?.weaponId ? this.actor.items.get(choice.weaponId) : null)
       ?? null;
 
+    // Magical damage tagging (powers audit Step #4 slice 4b). Auto-derive
+    // from the source power's isMagic flag; an explicit boolean choice.isMagic
+    // (dialog/GM override) wins. Threads to the auto-apply path and the manual
+    // apply-damage button so a magical resistance reduces magical damage.
+    const _magicSrc = weapon
+      ?? this.opts?.item
+      ?? (choice?.itemId ? this.actor.items.get(choice.itemId) : null);
+    const isMagic = (typeof choice?.isMagic === "boolean")
+      ? choice.isMagic
+      : !!(_magicSrc?.system?.isMagic);
+
     if (weapon?.system) {
       const sys = weapon.system;
       const isFirearm =
@@ -1475,6 +1492,7 @@ export class AttackAction extends BaseAction {
             autoApply: !!this.opts?.autoApply,
             autoSave: false,  // prevent chat button duplicates
             sourceItemUuid: choice?.weapon?.uuid || "",
+            isMagic,
           })
         : "";
 
@@ -1891,6 +1909,7 @@ export class AttackAction extends BaseAction {
           ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
           ignoresArtificialArmor: !!choice?.ignoresArtificialArmor,
           targets: [target],
+          isMagic,
           // === FIX: Pass kill result flag ===
           wasKillResult: showKill,
           forceKilling: showKill  // ensure kill save triggers on red

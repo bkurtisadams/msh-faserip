@@ -1,3 +1,8 @@
+// action-utils.js v1.8.10 - 2026-07-03
+// v1.8.10: buildActionsBox emits data-is-magic on the apply-damage button so
+//          the manual path recovers the magical tag (powers audit Step #4
+//          slice 4b wiring). Pairs with attack-action.js v1.9.47 (sets it)
+//          and chat-hooks.js (reads it).
 // action-utils.js v1.8.9 - 2026-07-03
 // v1.8.9: Forward isMagic through applyDamageToTargets into calculateMitigation
 //         (powers audit Step #4, slice 4b core). Lets a magical resistance
@@ -967,7 +972,8 @@ export function buildActionsBox({
   bypassForceField = false,
   ignoresNaturalArmor = false,
   ignoresArtificialArmor = false,
-  sourceItemUuid = ""  // UUID of source power/weapon; lets manual-apply path fire follow-ups (continuing damage, etc.)
+  sourceItemUuid = "",  // UUID of source power/weapon; lets manual-apply path fire follow-ups (continuing damage, etc.)
+  isMagic = false       // magical attack → magical resistance reduces the damage (slice 4b)
 }) {
 
   // Small helper to render a chip
@@ -1013,6 +1019,7 @@ export function buildActionsBox({
         data-bypass-force-field="${bypassForceField ? 'true' : 'false'}"
         data-ignores-natural-armor="${ignoresNaturalArmor ? 'true' : 'false'}"
         data-ignores-artificial-armor="${ignoresArtificialArmor ? 'true' : 'false'}"
+        data-is-magic="${isMagic ? 'true' : 'false'}"
         data-source-item-uuid="${sourceItemUuid || ''}"`
       )
     );
