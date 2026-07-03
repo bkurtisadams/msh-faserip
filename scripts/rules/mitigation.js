@@ -1,3 +1,11 @@
+// scripts/rules/mitigation.js v3.3.1 - 2026-07-02
+// v3.3.1: Reflect bank dedupe + bankId nonce. The attack pipeline can run
+//         mitigation more than once per hit (full-auto apply + manual Apply
+//         Damage click); a matching bank (same AE, same amount, <5s old) is
+//         now reused with suppressPrompt so only one offer card posts. Each
+//         bank carries a bankId consumed by the reflect-attack handler so
+//         stale prompt cards report superseded instead of a confusing
+//         no-pending warning.
 // scripts/rules/mitigation.js v3.3.0 - 2026-07-02
 // v3.3.0: Energy Reflection (Step #3 slice 1: block-and-bank). New defense
 //         AE type "energyReflection" applied before all other layers on
@@ -156,7 +164,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
         amount: reflLayer.absorbed,
         damageType: dmgTypeLower,
         aeId: reflLayer.sourceAeId,
-        reflectRangeRank: aeDefenses.reflection.rank
+        reflectRangeRank: aeDefenses.reflection.rank,
+        bankId: reflLayer.bankId || null,
+        suppressPrompt: reflLayer.suppressPrompt === true
       };
     }
   }
@@ -720,20 +730,41 @@ function applyEnergyReflectionFromAE(damage, reflData, options) {
   // be reflected in the round it occurs, so the bank expires at the end of
   // the CURRENT round (unlike absorption's next-round redirect). Flag-only;
   // the chat surface and Agility FEAT land with the redirect workflow.
+  //
+  // Dedupe: the attack pipeline can run mitigation more than once for the
+  // same hit (full-auto apply + a manual Apply Damage click). If an existing
+  // bank matches this AE + amount within a 5s window, reuse it and suppress
+  // the duplicate prompt instead of re-banking.
   if (targetActor) {
     try {
       const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-      const inCombat = !!(game.combat && game.combat.round > 0);
-      const round = inCombat ? game.combat.round : null;
-      targetActor.setFlag(scope, "pendingReflect", {
-        amount: blocked,
-        damageType: dmgTypeLower,
-        bankedRound: round,
-        expiresRound: round,
-        sourceAeId: reflData.aeId,
-        reflectRangeRank: reflData.rank,
-      });
-      layer.reflectBanked = blocked;
+      const existing = targetActor.getFlag(scope, "pendingReflect");
+      const now = Date.now();
+      if (existing
+          && existing.sourceAeId === reflData.aeId
+          && Number(existing.amount) === blocked
+          && Number.isFinite(existing.bankedAt)
+          && (now - existing.bankedAt) < 5000) {
+        layer.reflectBanked = blocked;
+        layer.bankId = existing.bankId;
+        layer.suppressPrompt = true;
+      } else {
+        const inCombat = !!(game.combat && game.combat.round > 0);
+        const round = inCombat ? game.combat.round : null;
+        const bankId = foundry.utils?.randomID?.() || `${now}-${Math.floor(Math.random() * 1e6)}`;
+        targetActor.setFlag(scope, "pendingReflect", {
+          bankId,
+          amount: blocked,
+          damageType: dmgTypeLower,
+          bankedRound: round,
+          expiresRound: round,
+          bankedAt: now,
+          sourceAeId: reflData.aeId,
+          reflectRangeRank: reflData.rank,
+        });
+        layer.reflectBanked = blocked;
+        layer.bankId = bankId;
+      }
     } catch (e) {
       console.warn("[FASERIP MITIGATION] Energy Reflection bank failed:", e);
     }

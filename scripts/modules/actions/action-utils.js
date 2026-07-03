@@ -1,3 +1,7 @@
+// action-utils.js v1.8.8 - 2026-07-02
+// v1.8.8: Reflect prompt dedupe. Skip the offer card when mitigation flags
+//         reflectBank.suppressPrompt (duplicate pass on the same hit) and
+//         stamp data-bank-id on the reflect button for stale-card detection.
 // action-utils.js v1.8.7 - 2026-07-02
 // v1.8.7: Energy Reflection prompt (Step #3 slice 2). When mitigation banks
 //         a pendingReflect on the target, applyDamageToTargets posts the
@@ -1535,7 +1539,8 @@ async function postReflectPrompt(targetActor, reflectBank, { attackerUuid = null
         <div style="margin-top:6px;">
           <button type="button" data-action="reflect-attack"
             data-reflector-uuid="${targetActor.uuid}"
-            data-attacker-uuid="${attackerUuid || ""}">
+            data-attacker-uuid="${attackerUuid || ""}"
+            data-bank-id="${reflectBank.bankId || ""}">
             \u{1F501} Reflect (Agility FEAT)
           </button>
         </div>
@@ -1728,7 +1733,7 @@ export async function applyDamageToTargets({
       }
 
       // ── Energy Reflection prompt ──
-      if (mitResult?.reflectBank) {
+      if (mitResult?.reflectBank && !mitResult.reflectBank.suppressPrompt) {
         await postReflectPrompt(targetActor, mitResult.reflectBank, { attackerUuid });
       }
 

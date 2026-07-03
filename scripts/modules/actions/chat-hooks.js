@@ -1,3 +1,8 @@
+// chat-hooks.js v1.7.1 - 2026-07-02
+// v1.7.1: reflect-attack validates the button's data-bank-id against the
+//         live pendingReflect bank. Stale prompt cards (superseded by a
+//         newer bank or already consumed) now report that plainly instead
+//         of the generic no-pending warning.
 // chat-hooks.js v1.7.0 - 2026-07-02
 // v1.7.0: Energy Reflection redirect handler (Step #3 slice 2). reflect-attack
 //         button consumes the pendingReflect flag (validating the same-round
@@ -767,6 +772,7 @@ export function installActionChatHandlers() {
         const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
         const reflectorUuid = btn.dataset.reflectorUuid || "";
         const attackerUuid = btn.dataset.attackerUuid || "";
+        const cardBankId = btn.dataset.bankId || "";
 
         let reflector = reflectorUuid ? await fromUuid(reflectorUuid) : null;
         if (reflector?.actor) reflector = reflector.actor; // token-document uuid
@@ -780,6 +786,10 @@ export function installActionChatHandlers() {
         const bank = reflector.getFlag(scope, "pendingReflect");
         if (!bank || !(Number(bank.amount) > 0)) {
           ui.notifications.warn("No pending reflection — already used or expired.");
+          return;
+        }
+        if (cardBankId && bank.bankId && cardBankId !== bank.bankId) {
+          ui.notifications.warn("This reflection offer is stale — it was superseded by a newer blocked attack or already used.");
           return;
         }
         if (game.combat && bank.expiresRound != null && game.combat.round > bank.expiresRound) {
