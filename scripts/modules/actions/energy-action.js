@@ -1,4 +1,8 @@
-// scripts/modules/actions/energy-action.js v3.4.0 - 2026-07-03
+// scripts/modules/actions/energy-action.js v3.4.1 - 2026-07-03
+// v3.4.1: Move the "Magical" override checkbox onto the existing Multi row
+//         (right-aligned) instead of adding a new option row, so the energy
+//         dialog keeps its original size. Multi/Magical dim independently via
+//         inline opacity (no shared .inactive class).
 // v3.4.0: Magical override toggle (powers audit Step #4 slice 4b wiring).
 //         Energy attack dialog gains a "Magical" checkbox; when checked it
 //         forces choice.isMagic=true (GM fiat) so a magical resistance
@@ -327,13 +331,10 @@ export class EnergyAction extends RangedAttackAction {
           </span>
           <span class="effect-note" style="font-size:10px;color:#888;margin-left:auto;">Effect &ne; reduced</span>
         </div>
-        <div class="frp-opt-row${!savedMultiAdjacent ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label><input type="checkbox" id="multi-enabled" ${savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
-          <span style="font-size:11px;color:#777;margin-left:8px;">Adjacent targets (-4CS)</span>
-        </div>
-        <div class="frp-opt-row${!savedMagical ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label><input type="checkbox" id="magical-enabled" ${savedMagical ? 'checked' : ''}> <span class="frp-opt-label" style="color:#7b1fa2;">Magical</span></label>
-          <span style="font-size:11px;color:#777;margin-left:8px;">Force magical vs resistance</span>
+        <div class="frp-opt-row" style="border-bottom:1px solid #e8e0d0;">
+          <label id="multi-lbl" style="${!savedMultiAdjacent ? 'opacity:0.55;' : ''}"><input type="checkbox" id="multi-enabled" ${savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
+          <span id="multi-hint" style="font-size:11px;color:#777;margin-left:8px;${!savedMultiAdjacent ? 'opacity:0.55;' : ''}">Adjacent targets (-4CS)</span>
+          <label id="magical-lbl" style="margin-left:auto;${!savedMagical ? 'opacity:0.55;' : ''}" title="Force this attack to count as magical vs a Resistance to Magical Attacks"><input type="checkbox" id="magical-enabled" ${savedMagical ? 'checked' : ''}> <span class="frp-opt-label" style="color:#7b1fa2;">Magical</span></label>
         </div>
         <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
@@ -684,7 +685,12 @@ export class EnergyAction extends RangedAttackAction {
 
           // Multi toggle
           html.find('#multi-enabled').on('change', function() {
-            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
+            html.find('#multi-lbl, #multi-hint').css('opacity', this.checked ? '' : '0.55');
+          });
+
+          // Magical override toggle
+          html.find('#magical-enabled').on('change', function() {
+            html.find('#magical-lbl').css('opacity', this.checked ? '' : '0.55');
           });
 
           // Aim tactic toggle

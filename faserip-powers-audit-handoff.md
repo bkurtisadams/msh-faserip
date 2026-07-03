@@ -115,7 +115,7 @@ Karma lost from the results.
 - scripts/modules/actions/action-utils.js v1.8.10
 - scripts/modules/actions/attack-action.js v1.9.47
 - scripts/modules/actions/chat-hooks.js v1.7.2
-- scripts/modules/actions/energy-action.js v3.4.0
+- scripts/modules/actions/energy-action.js v3.4.1
 - scripts/modules/actions/ability-feat-dialog.js v1.7.0 (slice 4a:
   resistance FEAT substitution; Endurance/Intuition/Psyche category
   radios, magical rolls higher of Psyche vs magical rank)
@@ -167,7 +167,7 @@ Karma lost from the results.
      asserts pass. Representation is an explicit isMagic option (NOT a
      damageType-string token — avoids rippling through every .includes).
    - Slice 4b wiring DONE (attack-action.js v1.9.47, action-utils.js
-     v1.8.10, chat-hooks.js v1.7.2, energy-action.js v3.4.0):
+     v1.8.10, chat-hooks.js v1.7.2, energy-action.js v3.4.1):
      AttackAction._executeSingleAttack derives isMagic once from the
      resolved source item's system.isMagic (choice.isMagic overrides),
      covering melee/ranged/energy (RangedAttackAction and EnergyAction
