@@ -1,3 +1,10 @@
+// chat-hooks.js v1.7.0 - 2026-07-02
+// v1.7.0: Energy Reflection redirect handler (Step #3 slice 2). reflect-attack
+//         button consumes the pendingReflect flag (validating the same-round
+//         window), rolls a direct Agility FEAT via rollUniversalTable (no
+//         Karma hooks per RAW), and on green+ routes the banked damage to the
+//         user's target (falling back to the original attacker's token)
+//         through applyDamageToTargets so the new target defends normally.
 // chat-hooks.js v1.6.0 - 2026-04-30
 // v1.6.0: Deal Hold Damage and Escape Attempt dialogs wrapped in frp-dlg + frp-header-v3.
 //         Hold Damage now resolves attackerUuid → name for the header banner;
@@ -749,6 +756,104 @@ export function installActionChatHandlers() {
     });
 
     // 5) Apply Damage button
+    // ── Energy Reflection: Agility FEAT redirect ──
+    html.on("click", '[data-action="reflect-attack"]', async (ev) => {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+
+      try {
+        const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+        const reflectorUuid = btn.dataset.reflectorUuid || "";
+        const attackerUuid = btn.dataset.attackerUuid || "";
+
+        let reflector = reflectorUuid ? await fromUuid(reflectorUuid) : null;
+        if (reflector?.actor) reflector = reflector.actor; // token-document uuid
+        if (!reflector) { ui.notifications.warn("Reflecting actor not found."); return; }
+        if (!game.user.isGM && !reflector.isOwner) {
+          ui.notifications.warn(`You do not own ${reflector.name}.`);
+          btn.disabled = false;
+          return;
+        }
+
+        const bank = reflector.getFlag(scope, "pendingReflect");
+        if (!bank || !(Number(bank.amount) > 0)) {
+          ui.notifications.warn("No pending reflection — already used or expired.");
+          return;
+        }
+        if (game.combat && bank.expiresRound != null && game.combat.round > bank.expiresRound) {
+          await reflector.unsetFlag(scope, "pendingReflect");
+          ui.notifications.warn("The reflection window has passed — the attack must be reflected in the round it occurs.");
+          return;
+        }
+
+        // Target: current user target(s) first, else the original attacker's token.
+        let targets = Array.from(game.user?.targets ?? []);
+        if (!targets.length && attackerUuid) {
+          const attacker = await fromUuid(attackerUuid);
+          if (attacker?.actor) targets = [attacker];               // token document
+          else if (attacker?.getActiveTokens) {
+            const tok = attacker.getActiveTokens(true)[0];
+            if (tok) targets = [tok];
+          }
+        }
+        if (!targets.length) {
+          ui.notifications.warn("Target a token to reflect at, then click Reflect again.");
+          btn.disabled = false;
+          return;
+        }
+
+        // Agility FEAT — direct roll, no Karma hooks. RAW: no Karma is lost
+        // from the results of a reflected attack.
+        const agilityRank = reflector.system?.abilities?.agility?.rank || "Typical";
+        const roll = new Roll("1d100");
+        await roll.evaluate();
+        const color = rollUniversalTable(agilityRank, roll.total);
+        const hit = color !== "white";
+
+        const targetName = targets[0]?.name ?? targets[0]?.document?.name ?? "target";
+        const typeLabel = String(bank.damageType || "energy").replace(/^energy-/, "").replace(/-/g, " ");
+        const colorStyles = {
+          white: "background:#f5f5f5;color:#333;border:1px solid #bbb",
+          green: "background:#2e7d32;color:#fff",
+          yellow: "background:#f9a825;color:#333",
+          red: "background:#c62828;color:#fff"
+        };
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: reflector }),
+          rolls: [roll],
+          content: `<div class="msh-card" style="background:#e8f0fe;border:1px solid #4a6fd8;padding:8px;border-radius:3px;">
+            <strong>${reflector.name}</strong> reflects <b>${bank.amount}</b> ${typeLabel} damage at <strong>${targetName}</strong>!
+            <div style="margin-top:4px;">Agility FEAT (${agilityRank}): rolled <b>${roll.total}</b>
+              <span style="display:inline-block;padding:1px 8px;border-radius:8px;${colorStyles[color] || colorStyles.white}">${color.toUpperCase()}</span>
+              — ${hit ? "the reflection hits!" : "the reflection misses."}
+            </div>
+            <div style="font-size:0.85em;color:#555;margin-top:4px;">No Karma is lost from the results of a reflected attack.</div>
+          </div>`
+        });
+
+        if (hit) {
+          await applyDamageToTargets({
+            damage: Number(bank.amount) || 0,
+            damageType: bank.damageType || "energy",
+            attackForm: "energy",
+            targets,
+            attackerUuid: reflector.uuid,
+            showNotification: true
+          });
+        }
+
+        // One reflect attempt per banked attack, hit or miss.
+        await reflector.unsetFlag(scope, "pendingReflect");
+      } catch (err) {
+        console.error("[FASERIP] reflect-attack handler failed:", err);
+        ui.notifications.error("Reflection failed — see console.");
+        btn.disabled = false;
+      }
+    });
+
     html.on("click", '[data-action="apply-damage"]', async (ev) => {
       ev.preventDefault();
       const btn = ev.currentTarget;

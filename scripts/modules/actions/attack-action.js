@@ -1,3 +1,7 @@
+// attack-action.js v1.9.46 - 2026-07-02
+// v1.9.46: Mitigation chat summary — Energy Reflection layer wording.
+//          layerKind recognizes reflection; summary and layer rows read
+//          "blocked N — may reflect" instead of the generic reduced-to text.
 // attack-action.js v1.9.45 - 2026-06-12
 // v1.9.45: Fix intensity-on-hit not firing on melee — the method-scope `weapon`
 //          is null on blunt/edged paths (they set choice.itemId, not choice.weapon).
@@ -240,6 +244,7 @@ function buildMitigationChatSummary(result, context = {}) {
 
   const layerKind = layer => {
     const label = String(layer?.type || "").toLowerCase();
+    if (label.includes("reflection")) return "reflection";
     if (label.includes("invulnerability")) return "invulnerability";
     if (label.includes("resistance")) return "resistance";
     if (label.includes("absorption")) return "absorption";
@@ -261,11 +266,15 @@ function buildMitigationChatSummary(result, context = {}) {
   const primaryKind = layerKind(primaryLayer);
 
   const visibleSummary = primaryLayer?.immune || net <= 0
-    ? `${primaryType} prevented ${absorbed || afterArmor}${damageLabel}.`
+    ? primaryKind === "reflection"
+      ? `${primaryType} blocked ${absorbed || afterArmor}${damageLabel} — may reflect.`
+      : `${primaryType} prevented ${absorbed || afterArmor}${damageLabel}.`
     : absorbed > 0
       ? primaryKind === "absorption"
         ? `${primaryType} absorbed ${absorbed}${damageLabel}; ${net} damage taken.`
-        : `${primaryType} reduced ${afterArmor}${damageLabel} to ${net}.`
+        : primaryKind === "reflection"
+          ? `${primaryType} blocked ${absorbed}${damageLabel}; ${net} damage taken — may reflect.`
+          : `${primaryType} reduced ${afterArmor}${damageLabel} to ${net}.`
       : `Mitigation left ${net}${damageLabel} taken.`;
 
   const layerRows = activeLayers.map(layer => {
@@ -287,6 +296,7 @@ function buildMitigationChatSummary(result, context = {}) {
       return `<div><strong>${type}:</strong> reduced damage by ${amount} and overloaded</div>`;
     }
 
+    if (kind === "reflection") return `<div><strong>${type}:</strong> blocked ${amount} — may reflect</div>`;
     if (kind === "absorption") return `<div><strong>${type}:</strong> absorbed ${amount}</div>`;
     if (kind === "armor" || kind === "forceField") return `<div><strong>${type}:</strong> blocked ${amount}</div>`;
     if (kind === "resistance" || kind === "invulnerability") return `<div><strong>${type}:</strong> reduced damage by ${amount}</div>`;

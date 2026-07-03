@@ -1,3 +1,8 @@
+// action-utils.js v1.8.7 - 2026-07-02
+// v1.8.7: Energy Reflection prompt (Step #3 slice 2). When mitigation banks
+//         a pendingReflect on the target, applyDamageToTargets posts the
+//         redirect offer card with a reflect-attack button. Agility FEAT +
+//         damage routing live in chat-hooks.js.
 // action-utils.js v1.8.6 - 2026-05-25
 // v1.8.6: Slam check roll info now renders FEAT result color as a rounded
 //         Universal Table color pill and includes the slam effect beside it.
@@ -1508,6 +1513,39 @@ export const getTargetingContext = buildTargetingHTML;
  *   - apMode: Armor piercing mode ("value" or "cs")
  * @returns {Array} - Array of results for each target
  */
+// ─── Energy Reflection Prompt ────────────────────────────────────────────────
+// Called when mitigation banked a pendingReflect on the target. Posts the
+// redirect offer; the Agility FEAT + damage routing live in the chat-hooks
+// reflect-attack handler. RAW: reflect in the round it occurs, at the
+// attacker or another target within Power rank range; no Karma is lost from
+// the results of a reflected attack.
+async function postReflectPrompt(targetActor, reflectBank, { attackerUuid = null } = {}) {
+  try {
+    const { amount, damageType, reflectRangeRank } = reflectBank;
+    const typeLabel = String(damageType || "energy").replace(/^energy-/, "").replace(/-/g, " ");
+    const inCombat = !!(game.combat && game.combat.round > 0);
+    const expiryText = inCombat ? `this round (round ${game.combat.round})` : "on its next action";
+    const rangeText = reflectRangeRank ? ` within ${reflectRangeRank} range` : "";
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+      content: `<div class="msh-card" style="background:#e8f0fe;border:1px solid #4a6fd8;padding:8px;border-radius:3px;">
+        <strong>${targetActor.name}</strong> blocked <b>${amount}</b> ${typeLabel} damage with Energy Reflection!
+        <div style="font-size:0.9em;color:#555;margin-top:4px;">May reflect it ${expiryText} at the attacker or another target${rangeText}. Agility FEAT to hit; no Karma is lost from the results.</div>
+        <div style="margin-top:6px;">
+          <button type="button" data-action="reflect-attack"
+            data-reflector-uuid="${targetActor.uuid}"
+            data-attacker-uuid="${attackerUuid || ""}">
+            \u{1F501} Reflect (Agility FEAT)
+          </button>
+        </div>
+      </div>`
+    });
+  } catch (e) {
+    console.warn("[FASERIP] postReflectPrompt failed:", e);
+  }
+}
+
 // ─── Force Field Breach Handler ──────────────────────────────────────────────
 // Called when mitigation detects FF overload. Disables the FF AE and posts
 // appropriate consequences: personal FF shuts off (excess dmg already in netDamage),
@@ -1687,6 +1725,11 @@ export async function applyDamageToTargets({
       // ── Force Field breach consequences ──
       if (ffBreachData) {
         await handleFFBreach(targetActor, ffBreachData);
+      }
+
+      // ── Energy Reflection prompt ──
+      if (mitResult?.reflectBank) {
+        await postReflectPrompt(targetActor, mitResult.reflectBank, { attackerUuid });
       }
 
       // Get health values
