@@ -1,3 +1,12 @@
+// ability-feat-dialog.js v1.7.0 - 2026-07-03
+// v1.7.0: Resistance FEAT substitution (powers audit Step #4, slice 4a).
+//         Endurance/Intuition/Psyche FEATs gain TYPE radios for owned
+//         "featReplace" resistance powers (Toxin/Disease, Emotion,
+//         Mental/Magical). Selecting a category rolls the resistance rank
+//         instead of the ability; Standard rolls the ability as normal.
+//         Magical rolls the higher of Psyche vs the magical resistance
+//         rank (RAW: the resistance may be lower than Psyche). Damage
+//         reduction for Magical is separate (slice 4b, mitigation.js).
 // ability-feat-dialog.js v1.6.1 - 2026-06-05
 // v1.6.1: Fix double FEAT roll when detached. Detaching re-runs the render
 //         callback, which was stacking a second click/keydown handler on the
@@ -45,7 +54,7 @@
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
 import { applyColumnShifts } from '../dice/column-shifts.js';
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { RANK_ABBR, rankValue } from "../../rules/rules-reference.js";
 
 const RANKS = [
   "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -248,6 +257,31 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const savedThickness      = gf(`last${fullName}Thickness`) || "2-12";
   const savedMultiAttackCount = gf(`last${fullName}MultiAttackCount`) || "2";
 
+  // ── Resistance FEAT substitution (powers audit Step #4, slice 4a) ──
+  // Owned "featReplace" resistance powers let the matching FEAT roll the
+  // resistance rank instead of the ability. Radios appear only for powers
+  // the actor actually owns; Standard is always available.
+  const RESIST_FEAT_MAP = {
+    endurance: [["toxin", "Toxin"], ["disease", "Disease"]],
+    intuition: [["emotion", "Emotion"]],
+    psyche:    [["mental", "Mental"], ["magical", "Magical"]]
+  };
+  const subOptions = [];
+  for (const [rtype, label] of (RESIST_FEAT_MAP[key] || [])) {
+    const power = actor.items.find(i => i.type === "power"
+      && i.system?.resistanceEffect === "featReplace"
+      && String(i.system?.resistanceType || "").toLowerCase() === rtype
+      && i.system?.rank);
+    if (!power) continue;
+    const resistRank = power.system.rank;
+    const rollRank = (rtype === "magical" && rankValue(abilityRank) >= rankValue(resistRank))
+      ? abilityRank : resistRank;
+    subOptions.push({ value: rtype, label, rank: rollRank, resistRank, powerName: power.name });
+  }
+  const hasSubs = subOptions.length > 0;
+  const initialFeatType = subOptions.some(o => o.value === savedFeatType) ? savedFeatType : "standard";
+  const resolveRollRank = (ft) => (subOptions.find(o => o.value === ft)?.rank) || abilityRank;
+
   // Build dropdown HTML
   const materialOptionsHTML = Object.entries(MATERIALS_BY_RANK).map(([rank, mats]) => {
     const options = mats.map(m => `<option value="${m}" ${m === savedMaterial ? 'selected' : ''}>${m}</option>`).join('');
@@ -265,7 +299,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const abilityShort = RANK_ABBR[abilityRank] || abilityRank;
   const initShift = Number(savedColumnShift) || 0;
   const csInputCls = initShift > 0 ? ' pos' : initShift < 0 ? ' neg' : '';
-  const initEffective = applyCS(abilityRank, initShift);
+  const initEffective = applyCS(resolveRollRank(initialFeatType), initShift);
 
   // Inline CS row — no reference panel (combat modifiers don't apply to FEATs)
   const csRowHtml = `
@@ -292,6 +326,13 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
         <label><input type="radio" name="featType" value="multiattack" ${savedFeatType === 'multiattack' ? 'checked' : ''}> Multi-Attack</label>`;
     }
+    if (hasSubs) {
+      const std = `<label><input type="radio" name="featType" value="standard" ${initialFeatType === 'standard' ? 'checked' : ''}> Standard</label>`;
+      const subs = subOptions.map(o =>
+        `<label><input type="radio" name="featType" value="${o.value}" ${initialFeatType === o.value ? 'checked' : ''}> ${o.label}</label>`
+      ).join('');
+      return std + subs;
+    }
     return '';
   };
 
@@ -310,7 +351,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
 
       <input type="hidden" name="abilityRank" value="${abilityRank}">
 
-      ${(isStrength || isFighting) ? `
+      ${(isStrength || isFighting || hasSubs) ? `
       <!-- FEAT Type — compact horizontal radios -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row" style="gap:10px;">
@@ -441,6 +482,10 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             multiAttackCount = html.find('[name="multiAttackCount"]:checked').val() || '2';
           }
 
+          if (hasSubs) {
+            featType = html.find('[name="featType"]:checked').val() || 'standard';
+          }
+
           // Always persist the checkbox's own state so turning it OFF sticks
           await actor.setFlag("msh-faserip", `last${fullName}SaveSettings`, saveSettings);
 
@@ -459,10 +504,28 @@ export async function showAbilityFeatDialog(actor, abilityName) {
               await actor.setFlag("msh-faserip", `last${fullName}FeatType`, featType);
               await actor.setFlag("msh-faserip", `last${fullName}MultiAttackCount`, multiAttackCount);
             }
+            if (hasSubs) {
+              await actor.setFlag("msh-faserip", `last${fullName}FeatType`, featType);
+            }
+          }
+
+          // Resistance substitution: roll the resistance rank when a
+          // category is chosen (Step #4 slice 4a).
+          const subOpt = (hasSubs && featType !== 'standard')
+            ? subOptions.find(o => o.value === featType) : null;
+          const baseRankName  = subOpt ? subOpt.rank : abilityRank;
+          const baseRankValue = subOpt ? rankValue(subOpt.rank) : abilityValue;
+          let resistContext = '';
+          if (subOpt) {
+            resistContext = `<div>Resistance: ${subOpt.powerName} (substitutes for ${fullName})</div>`;
+            if (subOpt.value === 'magical' && subOpt.rank === abilityRank
+                && rankValue(subOpt.resistRank) < abilityValue) {
+              resistContext += `<div>Magical resist ${subOpt.resistRank} &lt; ${fullName} — rolled the higher.</div>`;
+            }
           }
 
           // Apply column shifts
-          const effectiveRank = applyCS(abilityRank, columnShift);
+          const effectiveRank = applyCS(baseRankName, columnShift);
 
           // Fighting multi-attack: override intensity from attack count
           let multiAttackIntensity = '';
@@ -521,7 +584,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                     <strong>${actor.name} - ${fullName} FEAT Roll vs ${effectiveIntensity}</strong>
                   </div>
                   <div style="padding: 5px 10px; font-size: 0.9em;">
-                    <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                    <div>Base Rank: ${baseRankName} (${baseRankValue})</div>
+                    ${resistContext}
                     ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                     ${strengthContext}
                     ${fightingContext}
@@ -588,7 +652,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   <strong>${actor.name} - ${fullName} FEAT Roll${effectiveIntensity !== "None" ? ` vs ${effectiveIntensity}` : ""}</strong>
                 </div>
                 <div style="padding: 5px 10px; font-size: 0.9em;">
-                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                  <div>Base Rank: ${baseRankName} (${baseRankValue})</div>
+                  ${resistContext}
                   ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                   ${strengthContext}
                   ${fightingContext}
@@ -630,7 +695,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           return;
         }
 
-        const effectiveRank = applyCS(abilityRank, cs);
+        const ft = html.find('[name="featType"]:checked').val() || 'standard';
+        const effectiveRank = applyCS(resolveRollRank(ft), cs);
         const { requirement, impossible, automatic } = determineFeatRequirement(effectiveRank, intensity);
         reqText.each((_, el) => setNeedPill($(el), requirement, { impossible, automatic }));
       };
@@ -736,11 +802,12 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         $csInput.removeClass('pos neg');
         if (cs > 0) $csInput.addClass('pos');
         else if (cs < 0) $csInput.addClass('neg');
-        $csRank.text(applyCS(abilityRank, cs));
+        $csRank.text(applyCS(resolveRollRank(html.find('[name="featType"]:checked').val() || 'standard'), cs));
         updateFeatRequirement();
         if ($dialog.length) $dialog[0].style.height = 'auto';
       };
       $csInput.on('change keyup', recalcCS);
+      if (hasSubs) html.find('[name="featType"]').on('change', recalcCS);
 
       // ──── Roll / Cancel button wiring + Enter-to-roll ────
       html.find('#frp-roll').off('click.frp').on('click.frp', async () => {
