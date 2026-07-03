@@ -1,3 +1,10 @@
+// actorSheet.js v2.3.0 - 2026-07-03
+// v2.3.0: Bind sheet drop natively. Core 14.364 appv1 DragDrop stopped
+//         delivering sheet-level drop events (row-level native listeners
+//         still fire), so compendium drags reached the sheet but _onDrop
+//         never ran. activateListeners now binds dragover/drop directly on
+//         the form; _onDrop carries a same-event guard so nothing double
+//         fires if a core-delivered drop ever returns.
 // actorSheet.js v2.2.9 - 2026-06-26
 // v2.2.9: Fix equipment dropped from a compendium being created but never
 //         shown. The equipment tab buckets by system.category and hides
@@ -825,6 +832,11 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   async _onDrop(event) {
     if (!this.isEditable) return;
 
+    // Same-event guard: the native binding in activateListeners and any
+    // surviving core DragDrop delivery share the event instance.
+    if (event.__mshDropHandled) return;
+    event.__mshDropHandled = true;
+
     const TE = foundry.applications.ux.TextEditor?.implementation
             ?? globalThis.TextEditor;
     const data = await TE.getDragEventData(event);
@@ -994,6 +1006,16 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // V14 (core 14.364): appv1 DragDrop no longer delivers sheet-level
+    // drops. Bind natively on the form; _onDrop dedupes via its
+    // same-event guard if core delivery ever resumes.
+    const dropEl = this.element?.[0] ?? this.element;
+    if (dropEl && !dropEl.__mshDropBound) {
+      dropEl.__mshDropBound = true;
+      dropEl.addEventListener("dragover", ev => ev.preventDefault());
+      dropEl.addEventListener("drop", ev => this._onDrop(ev));
+    }
 
     // Apply compact mode class from actor flag
     const compact = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
