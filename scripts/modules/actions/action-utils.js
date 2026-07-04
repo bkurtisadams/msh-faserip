@@ -1,3 +1,6 @@
+// action-utils.js v1.8.11 - 2026-07-04
+// v1.8.11: Add shared derivePowerDamage() (honors system.damageSource) — single
+//          source of truth for energy/force/throwing power-damage derivation.
 // action-utils.js v1.8.10 - 2026-07-03
 // v1.8.10: buildActionsBox emits data-is-magic on the apply-damage button so
 //          the manual path recovers the magical tag (powers audit Step #4
@@ -119,6 +122,29 @@ function resolveCombatModeSafe(actor) {
 
 
 // Given a Token or Actor, return the correct Actor document for Active Effects
+// Derive a power's damage from its system fields, honoring system.damageSource.
+// Single source of truth for energy/force/throwing attacks (previously each
+// action file rolled its own; energy got the damageSource fix, force didn't —
+// which is why a rank-sourced power with a 0/blank fixed-damage field, e.g. a
+// fresh Air Control from the rebuilt pack, dealt 0 damage).
+//   "rank" (default) / "material" / blank -> power value (rank-value fallback)
+//   "fixed"                               -> the fixed damage field
+//   "strength" / "endurance"              -> the actor's ability value
+export function derivePowerDamage(system, actor) {
+  const s = system || {};
+  const dmgSource = String(s.damageSource || "rank");
+  const rankVal = Number(CONFIG.FASERIP?.rankValues?.[s.rank])
+    || Number(game.msh?.getRankValue?.(s.rank)) || 0;
+  if (dmgSource === "fixed") return Number(s.damage) || 0;
+  if (dmgSource === "strength" || dmgSource === "endurance") {
+    const ab = actor?.system?.abilities?.[dmgSource] || {};
+    return Number(ab.value)
+      || Number(CONFIG.FASERIP?.rankValues?.[ab.rank])
+      || Number(game.msh?.getRankValue?.(ab.rank)) || 0;
+  }
+  return Number(s.value) || rankVal || 0;
+}
+
 export function actorForEffects(target) {
   if (!target) return null;
   // TokenDocument or Token

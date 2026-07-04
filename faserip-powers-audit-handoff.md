@@ -140,6 +140,17 @@ Karma lost from the results.
 
 ## Known issues / loose ends
 
+- Power-damage derivation CONSOLIDATED 2026-07-04 (action-utils.js v1.8.11):
+  one shared derivePowerDamage(system, actor) honoring system.damageSource is
+  now the single source of truth. Fixes Air Control (matterControl -> force-
+  action) dealing 0 damage: force-action v3.3.3 read s.damage first via ?? so
+  a rank-sourced power with a 0/blank fixed field dealt 0 (old copies only
+  worked because 40 had been typed into the fixed field). energy-action v3.4.3,
+  throwing-blunt v3.2.5, throwing-edged v3.2.4 all now import the shared helper
+  (kills the drift that let energy get the fix but not force/throwing). The
+  separate thrown-WEAPON path (computeThrownBluntDamage: max(weaponBase,
+  min(STR,MAT))) is unchanged.
+
 - Pack QA pass 2026-07-03 (packs source now available): ROUTING CLEAN —
   each exclusive routing flag (hasRecoveryPower, isHealingPower,
   isDamageTransfer, isHealthDrain, isParalyzingTouch, isBlindingTouch)

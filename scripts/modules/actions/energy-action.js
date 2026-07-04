@@ -1,3 +1,7 @@
+// scripts/modules/actions/energy-action.js v3.4.3 - 2026-07-04
+// v3.4.3: Use the shared action-utils derivePowerDamage() instead of the local
+//         inlined damageSource block (single source of truth; force/throwing
+//         now share it).
 // scripts/modules/actions/energy-action.js v3.4.2 - 2026-07-03
 // v3.4.2: Fix energy dialog ballooning to full width when a checkbox is
 //         toggled. AppV2 re-applied its default position.width ('auto') on
@@ -82,7 +86,8 @@ import {
   RANKS,
   setupModeSelector,
   applyCapabilitiesToDialog,
-  shiftRank
+  shiftRank,
+  derivePowerDamage
 } from "./action-utils.js";
 
 import { RANK_ABBR, POWER_RANGE } from "../../rules/rules-reference.js";
@@ -501,22 +506,7 @@ export class EnergyAction extends RangedAttackAction {
               powerId = itemId;
               const s = item.system || {};
               powerName = item.name;
-              // Honor system.damageSource (the sheet's Damage Source select).
-              // Previously any nonzero fixed-damage field won regardless of
-              // the selector, so a rank-sourced power stuck at stale fixed
-              // damage after a rank change.
-              const dmgSource = String(s.damageSource || "rank");
-              const rankVal = Number(CONFIG.FASERIP?.rankValues?.[s.rank]) || 0;
-              if (dmgSource === "fixed") {
-                powerDamage = Number(s.damage) || 0;
-              } else if (dmgSource === "strength" || dmgSource === "endurance") {
-                const ab = actor.system?.abilities?.[dmgSource] || {};
-                powerDamage = Number(ab.value)
-                  || Number(CONFIG.FASERIP?.rankValues?.[ab.rank]) || 0;
-              } else {
-                // "rank" (default), "material", legacy blank
-                powerDamage = Number(s.value) || rankVal || 0;
-              }
+              powerDamage = derivePowerDamage(s, actor);   // shared, honors system.damageSource
               powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
               prettyRange = s.range === "rank"
                 ? (POWER_RANGE[powerRank] || "")

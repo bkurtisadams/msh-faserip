@@ -1,4 +1,6 @@
-// scripts/modules/actions/throwing-edged-action.js v3.2.3 - 2026-05-23
+// scripts/modules/actions/throwing-edged-action.js v3.2.4 - 2026-07-04
+// v3.2.4: Use shared action-utils derivePowerDamage() (honors damageSource;
+//         replaces the local ||-chain that ignored the Damage Source select).
 // v3.2.3: Range penalty is now -1CS per full area to the target (weapon rule,
 //         RAW); no free first area. Capped at the thrower's max range.
 // scripts/modules/actions/throwing-edged-action.js v3.2.2 - 2026-05-23
@@ -34,7 +36,8 @@ import {
   getTargetData,
   getBodyArmorValues,
   computeEdgedDamage,
-  debugLog
+  debugLog,
+  derivePowerDamage
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
@@ -57,7 +60,7 @@ function computeThrowingEdgedDamage(actor, item) {
   if (!item) return 0;
   if (item.type === "power") {
     const s = item.system || {};
-    return Number(s.damage || s.value || game.msh.getRankValue(s.rank) || 0);
+    return derivePowerDamage(s, actor);
   }
   return computeThrownEdgedDamage(actor, item);
 }
