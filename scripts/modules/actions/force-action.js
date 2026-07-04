@@ -1,3 +1,10 @@
+// scripts/modules/actions/force-action.js v3.3.3 - 2026-07-04
+// v3.3.3: Honor system.damageSource when deriving force-power damage (was
+//         reading s.damage first via ??, so a rank-sourced power with a
+//         0/blank fixed-damage field dealt 0 — e.g. a fresh Air Control from
+//         the rebuilt pack). Adds derivePowerDamage(), used at all 3 sites
+//         (source dropdown label, attack derivation, live #dmg-val preview).
+//         Matches energy-action.js v3.3.5.
 // scripts/modules/actions/force-action.js v3.3.2 - 2026-05-23
 // v3.3.2: Range penalty itemized as "Range" in the to-hit breakdown
 //         (was baked into csNotes); manual CS no longer hidden by it.
@@ -49,6 +56,22 @@ import { RANK_ABBR, POWER_RANGE } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+
+// Derive a force power's damage honoring system.damageSource (mirrors the
+// energy-action.js v3.3.5 fix). Previously force-action read s.damage first
+// via ?? , so a rank-sourced power with a 0/blank fixed-damage field dealt 0
+// (e.g. a fresh Air Control from the rebuilt pack) instead of its rank value.
+function derivePowerDamage(s, actor) {
+  const dmgSource = String(s.damageSource || "rank");
+  const rankVal = Number(CONFIG.FASERIP?.rankValues?.[s.rank]) || 0;
+  if (dmgSource === "fixed") return Number(s.damage) || 0;
+  if (dmgSource === "strength" || dmgSource === "endurance") {
+    const ab = actor?.system?.abilities?.[dmgSource] || {};
+    return Number(ab.value) || Number(CONFIG.FASERIP?.rankValues?.[ab.rank]) || 0;
+  }
+  return Number(s.value) || rankVal || 0;   // "rank" (default), "material", legacy blank
+}
+
 export class ForceAction extends RangedAttackAction {
   async execute() {
     const actor = this.actor;
@@ -180,7 +203,7 @@ export class ForceAction extends RangedAttackAction {
     const powerSrcOptions = [];
     for (const item of forceItems) {
       const s = item.system || {};
-      const dmg = Number(s.damage ?? s.value ?? 0);
+      const dmg = derivePowerDamage(s, actor);
       const rank = s.rank ?? s.powerRank ?? "Remarkable";
       const rankAbbr = RANK_ABBR[rank] || rank;
       const sel = (!savedAdHoc && item.id === savedItemId) ? 'selected'
@@ -425,7 +448,7 @@ export class ForceAction extends RangedAttackAction {
               powerId = itemId;
               const s = item.system || {};
               powerName = item.name;
-              powerDamage = Number(s.damage ?? s.value ?? 0);
+              powerDamage = derivePowerDamage(s, actor);
               powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
               prettyRange = s.range === "rank"
                 ? (POWER_RANGE[powerRank] || "")
@@ -516,7 +539,7 @@ export class ForceAction extends RangedAttackAction {
               const item = forceItems.find(i => i.id === itemId);
               if (item) {
                 const s = item.system || {};
-                currentDamage = Number(s.damage ?? s.value ?? 0);
+                currentDamage = derivePowerDamage(s, actor);
                 currentRank = String(s.rank ?? s.powerRank ?? "Remarkable");
               }
             }
