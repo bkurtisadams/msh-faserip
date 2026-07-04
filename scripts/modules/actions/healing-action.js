@@ -1,4 +1,4 @@
-// scripts/modules/actions/healing-action.js v2.0.0 - 2026-07-03
+// scripts/modules/actions/healing-action.js v2.0.1 - 2026-07-03
 // Two-mode dialog for the Healing power. Restores lost Health/End to others
 // (not self). Power rank = max Health per target per day (the daily cap only).
 // RAW (rulebook): BOTH modes make an ENDURANCE FEAT (the healer's Endurance),
@@ -8,6 +8,10 @@
 //   End-rank mode: 1 rank/day per target; Endurance FEAT; the TARGET's rank is
 //                restored regardless of the FEAT; on FAILURE the HEALER loses
 //                one Endurance rank (below Feeble -> healer perishes, RAW).
+// v2.0.1: Lock dialog width (was ballooning to full width on the long End-mode
+//         panel line, same AppV2 position.width 'auto' bug as the other
+//         dialogs) and fix the window-title arrow (&rarr; -> → ; titles are
+//         plain text, not HTML).
 // v2.0.0: Route both rolls through the shared headless resolver
 //         (rules/feat-core.js, powers audit Step #5 fork C(b)) and FIX RAW:
 //         End-rank mode now rolls Endurance (was Power rank) and heals the
@@ -197,10 +201,19 @@ export async function showHealingDialog(healer, item) {
     </div>`;
 
   await showFaseripDialog({
-    title: `Healing — ${healer.name} &rarr; ${target.name}`,
+    title: `Healing — ${healer.name} → ${target.name}`,
     content: dialogContent,
     render: async (html, dlg) => {
       const $dialog = html.closest('.dialog');
+
+      // Fix width so the long End-mode explanation can't force the dialog wide
+      // (AppV2 re-applies position.width 'auto' on re-measure). Same fix as the
+      // energy / generic-feat dialogs.
+      if ($dialog.length) {
+        $dialog.css('width', '400px');
+        $dialog[0].style.height = 'auto';
+      }
+      try { dlg?.setPosition?.({ width: 400 }); } catch (_) {}
 
       // Mode toggle
       html.find('input[name="heal-mode"]').on('change', (ev) => {

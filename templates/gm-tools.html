@@ -290,6 +290,17 @@
         </select>
       </div>
 
+      {{#each abilityRanks}}
+      <div class="gm-state-label">
+        <strong>{{label}}</strong>
+        {{#if ../hasSelected}}<span class="gm-state-cur">{{rank}} / {{value}}</span>{{/if}}
+      </div>
+      <div class="gm-state-controls">
+        <button type="button" class="gm-test-btn grt-btn" data-k="{{key}}" data-op="reduce" data-tooltip="Reduce one rank (remembers original)">▼</button>
+        <button type="button" class="gm-test-btn grt-btn" data-k="{{key}}" data-op="restore" data-tooltip="Restore one rank toward original">▲</button>
+      </div>
+      {{/each}}
+
       <div class="gm-state-label">
         <strong>Karma</strong>
         {{#if hasSelected}}<span class="gm-state-cur">{{karmaCur}}</span>{{/if}}

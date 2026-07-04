@@ -1,3 +1,10 @@
+// gm-tools.js v1.4.1 - 2026-07-03
+// v1.4.1: Move the ability-rank test controls into the template (State tab,
+//         six non-Endurance ability rows via _snapshotState.abilityRanks);
+//         drop the activateListeners DOM injection. De-dup Endurance: the
+//         native End ▼/▲ is now Health-aware (lose/restoreOneEnduranceRank),
+//         so there's one Endurance control that sets originalEndurance.
+// v1.4.0 - 2026-07-03: (superseded) injected Ability Ranks panel.
 // gm-tools.js v1.3.0 - 2026-04-29
 // GM Tools dialog: backups, effects, action runner, token finder, state quick-set.
 // v1.3.0: Tokens tab — list every token across scope (current/all), filter,
@@ -24,6 +31,7 @@ import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { ACTIONS as ACTION_LIST } from "../helpers/action-constants.js";
 import { safeActorDeleteEffects } from "./gm-utils.js";
 import { RANKS_ORDERED, rankValue, shiftRank } from "./rules/rules-reference.js";
+import { loseOneEnduranceRank, restoreOneEnduranceRank } from "./modules/effects/ongoing-engine.js";
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
@@ -147,6 +155,9 @@ export class GMToolsApp extends Application {
     html.find(".gm-karma-set").click(ev => this._onSetKarma(ev));
     html.find(".gm-karma-adj").click(ev => this._onAdjustKarma(ev));
     html.find(".gm-time-adv").click(ev => this._onAdvanceTime(ev));
+
+    // Ability-rank test controls (State tab)
+    html.find(".grt-btn").click(ev => this._onRankTestBtn(ev));
 
     // Re-render when actors / tokens / scenes / time change
     Hooks.on("createActor", this._onActorChange);
@@ -1097,17 +1108,26 @@ export class GMToolsApp extends Application {
   // ── State tab ──
 
   _snapshotState(actor) {
-    if (!actor) return { healthCur: 0, healthMax: 0, enduranceRank: "", enduranceVal: 0, karmaCur: 0 };
+    if (!actor) return { healthCur: 0, healthMax: 0, enduranceRank: "", enduranceVal: 0, karmaCur: 0, abilityRanks: [] };
     const sys = actor.system ?? {};
     const h = sys.derived?.attributes?.health ?? {};
     const k = sys.derived?.attributes?.karma ?? {};
     const e = sys.abilities?.endurance ?? {};
+    const ABIL = [
+      ["fighting", "Fighting"], ["agility", "Agility"], ["strength", "Strength"],
+      ["reason", "Reason"], ["intuition", "Intuition"], ["psyche", "Psyche"]
+    ];
+    const abilityRanks = ABIL.map(([key, label]) => {
+      const a = sys.abilities?.[key] ?? {};
+      return { key, label, rank: a.rank ?? "—", value: a.value ?? 0 };
+    });
     return {
       healthCur: h.value ?? 0,
       healthMax: h.max ?? 0,
       enduranceRank: e.rank ?? "",
       enduranceVal: e.value ?? 0,
-      karmaCur: k.value ?? 0
+      karmaCur: k.value ?? 0,
+      abilityRanks
     };
   }
 
@@ -1139,12 +1159,57 @@ export class GMToolsApp extends Application {
     const actor = this._selectedActor();
     if (!actor) return ui.notifications.warn("Select a token first");
     const delta = Number(ev.currentTarget.dataset.delta) || 0;
-    const cur = actor.system.abilities?.endurance?.rank ?? "Good";
-    const next = shiftRank(cur, delta);
-    await actor.update({
-      "system.abilities.endurance.rank": next,
-      "system.abilities.endurance.value": rankValue(next)
-    });
+    // Health-aware: ▼ loses a rank (recalcs Health, sets originalEndurance so
+    // Recovery/Healing see the loss); ▲ restores toward the original. The
+    // set-rank dropdown remains for raw/forced sets.
+    if (delta < 0) await loseOneEnduranceRank(actor, { source: "GM test" });
+    else if (delta > 0) await restoreOneEnduranceRank(actor, { source: "GM test" });
+  }
+
+  // ── Ability-rank test controls (State tab) ──────────────────────────
+  // Reduce/restore an ability rank on the selected actor for testing powers
+  // that key off lost ranks. Endurance uses the Health-aware ongoing-engine
+  // path (via _onShiftEndurance, and the guard below for safety); the other
+  // six step via RANKS_ORDERED and remember the original under a gmRankTest
+  // flag so Restore climbs back to the right cap. Markup + rank display live
+  // in templates/gm-tools.html (fed by _snapshotState.abilityRanks).
+  async _rankReduce(actor, key) {
+    if (key === "endurance") return loseOneEnduranceRank(actor, { source: "GM test" });
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system.id;
+    const cur = actor.system?.abilities?.[key]?.rank;
+    const idx = RANKS_ORDERED.indexOf(cur);
+    if (idx <= 0) return ui.notifications.info(`${actor.name} ${key} already at the floor.`);
+    const orig = foundry.utils.deepClone(actor.getFlag(scope, "gmRankTest") || {});
+    if (!(key in orig)) orig[key] = cur;
+    await actor.setFlag(scope, "gmRankTest", orig);
+    const nr = RANKS_ORDERED[idx - 1];
+    await actor.update({ [`system.abilities.${key}.rank`]: nr, [`system.abilities.${key}.value`]: rankValue(nr) });
+  }
+
+  async _rankRestore(actor, key) {
+    if (key === "endurance") return restoreOneEnduranceRank(actor, { source: "GM test" });
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system.id;
+    const orig = foundry.utils.deepClone(actor.getFlag(scope, "gmRankTest") || {});
+    const cap = orig[key];
+    if (!cap) return ui.notifications.info(`${actor.name} ${key} was not reduced by this tool.`);
+    const cur = actor.system?.abilities?.[key]?.rank;
+    const ci = RANKS_ORDERED.indexOf(cur), capi = RANKS_ORDERED.indexOf(cap);
+    const nr = (ci >= 0 && ci < capi) ? RANKS_ORDERED[ci + 1] : cap;
+    await actor.update({ [`system.abilities.${key}.rank`]: nr, [`system.abilities.${key}.value`]: rankValue(nr) });
+    if (nr === cap) { delete orig[key]; await actor.setFlag(scope, "gmRankTest", orig); }
+  }
+
+  async _onRankTestBtn(ev) {
+    ev.preventDefault();
+    const actor = this._selectedActor();
+    if (!actor) return ui.notifications.warn("Select a token first");
+    const { k, op } = ev.currentTarget.dataset;
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      if (op === "reduce") await this._rankReduce(actor, k);
+      else await this._rankRestore(actor, k);
+    } finally { btn.disabled = false; }
   }
 
   async _onSetEndurance(ev) {

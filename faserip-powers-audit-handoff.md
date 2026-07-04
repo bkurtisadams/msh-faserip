@@ -125,7 +125,7 @@ Karma lost from the results.
   onto the shared Power FEAT engine; 171 → 60 lines)
 - scripts/init.js (game.msh.openPowerFeat added, slice 5a)
 - scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
-- scripts/modules/actions/healing-action.js v2.0.0 (migrated onto
+- scripts/modules/actions/healing-action.js v2.0.1 (migrated onto
   feat-core; End-mode RAW fixes)
 - scripts/actorSheet.js v2.3.0
 - scripts/power-presets.mjs (exports populatePowerTypeOptions)
@@ -136,6 +136,34 @@ Karma lost from the results.
 - Foundry core 14.364, system version 2.0.0
 
 ## Known issues / loose ends
+
+- Pack QA pass 2026-07-03 (packs source now available): ROUTING CLEAN —
+  each exclusive routing flag (hasRecoveryPower, isHealingPower,
+  isDamageTransfer, isHealthDrain, isParalyzingTouch, isBlindingTouch)
+  is on exactly the right power; Healing/Regeneration split correct
+  (Healing isHealingPower + empty regenerationType; Regeneration/Solar
+  have regenerationType, isHealingPower false). All 122 have rank/_key/
+  _id, no dup ids. Descriptions: no empty/truncated shells. Cosmetic
+  OCR artifacts remain: standalone page-number lines in Astral
+  Projection ("84"), Light Manipulation ("75"), Plant Control ("85"),
+  Postcognition ("85"); OCR typos e.g. Mind Control "the hem" -> "hero";
+  Elongation has a stray range-table fragment. Not yet stripped (source
+  edit + pack rebuild required).
+- Healing compendium entry: correct for routing; carries benign
+  leftovers damageSource "rank" (inert, non-attack) and activationType
+  "passive" (category default; Recovery is same and rolls fine).
+- GM testing: State tab of GM Tools (gm-tools.js v1.4.1 +
+  templates/gm-tools.html) has reduce/restore ▼/▲ for the six non-
+  Endurance ability ranks on the SELECTED actor (rows fed by
+  _snapshotState.abilityRanks; RANKS_ORDERED step + gmRankTest flag so
+  Restore climbs back to the original). Endurance is NOT duplicated: the
+  native Endurance ▼/▲ is now Health-aware (lose/restoreOneEnduranceRank,
+  sets originalEndurance) — one Endurance control that Recovery/Healing
+  see. Set-rank dropdown still forces any rank raw. Markup is in the
+  template (no DOM injection). Standalone macro macros/gm-rank-tester.js
+  still available for use without opening GM Tools (it covers all 7).
+  NOTE: the native Endurance ▲ now caps at originalEndurance (restore
+  semantics); use the Set-rank dropdown to push End above its original.
 
 - Compendium descriptions are still raw OCR text: hard line-wrap
   newlines, occasional stray page numbers (e.g. an embedded "86" in
@@ -210,7 +238,7 @@ Karma lost from the results.
      stay, effect (End restore + daily flag) applied in onResult.
      Forks locked: (A) callback, (B) shared card + effect line +
      suppressCard escape hatch, (C) dialog-first, (D) no range.
-   - Slice 5b DONE (feat-core.js v1.0.0, healing-action.js v2.0.0):
+   - Slice 5b DONE (feat-core.js v1.0.0, healing-action.js v2.0.1):
      extracted the headless resolveFeat core (fork C(b)) — rolls d100,
      posts the roll, resolves color on the Universal Table, reports
      success (requiredColor null => any color wins / white fails), NO
