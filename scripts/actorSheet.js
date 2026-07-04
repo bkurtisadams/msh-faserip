@@ -1,4 +1,7 @@
-// actorSheet.js v2.3.1 - 2026-07-03
+// actorSheet.js v2.3.2 - 2026-07-04
+// v2.3.2: Re-bind the native sheet drop listener on every render (was a
+//         once-only __mshDropBound guard that didn't survive re-renders, so
+//         compendium drops worked once then stopped).
 // v2.3.1: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
 // v2.3.0: Bind sheet drop natively. Core 14.364 appv1 DragDrop stopped
 //         delivering sheet-level drop events (row-level native listeners
@@ -1012,10 +1015,20 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     // drops. Bind natively on the form; _onDrop dedupes via its
     // same-event guard if core delivery ever resumes.
     const dropEl = this.element?.[0] ?? this.element;
-    if (dropEl && !dropEl.__mshDropBound) {
-      dropEl.__mshDropBound = true;
-      dropEl.addEventListener("dragover", ev => ev.preventDefault());
-      dropEl.addEventListener("drop", ev => this._onDrop(ev));
+    if (dropEl) {
+      // Re-bind every render (remove prior handler, then add) so the CURRENT
+      // element always has exactly one live drop listener. The previous
+      // once-only __mshDropBound guard did not survive appv1-on-14.364
+      // re-renders: the drop worked once, then the re-rendered element had
+      // no live listener.
+      if (this._mshDropHandler) {
+        dropEl.removeEventListener("dragover", this._mshDragoverHandler);
+        dropEl.removeEventListener("drop", this._mshDropHandler);
+      }
+      this._mshDragoverHandler = ev => ev.preventDefault();
+      this._mshDropHandler = ev => this._onDrop(ev);
+      dropEl.addEventListener("dragover", this._mshDragoverHandler);
+      dropEl.addEventListener("drop", this._mshDropHandler);
     }
 
     // Apply compact mode class from actor flag
