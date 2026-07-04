@@ -1,3 +1,7 @@
+// power-router.js v1.9.0 - 2026-07-03
+// v1.9.0: Senses early-route (audit Step #7) — senses-category / isSensePower
+//         powers dispatch to sense-action.js (detection Power FEATs + passive
+//         info cards) before the non-attack bail.
 // power-router.js v1.8.0 - 2026-05-15
 // v1.8.0: Blinding Touch early-route — dedicated dialog (was previously in
 //         ENERGY_TYPES list, misrouted to EnergyAction as energy damage).
@@ -210,6 +214,13 @@ export async function rollPower(actor, item) {
   if (nameLower === "blinding touch" || item.system?.isBlindingTouch === true) {
     const { showBlindingTouchDialog } = await import("./blinding-touch-action.js");
     return showBlindingTouchDialog(actor, item);
+  }
+
+  // Senses: detection Power FEATs + passive info cards (audit Step #7).
+  // Routed before the non-attack bail so sense powers get a real workflow.
+  if (catLower === "senses" || item.system?.isSensePower === true) {
+    const { showSenseFeat } = await import("./sense-action.js");
+    return showSenseFeat(actor, item);
   }
 
   // Normalize legacy values

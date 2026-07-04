@@ -124,6 +124,8 @@ Karma lost from the results.
 - scripts/modules/actions/recovery-action.js v2.0.1 (slice 5a: migrated
   onto the shared Power FEAT engine; 171 → 60 lines)
 - scripts/init.js (game.msh.openPowerFeat added, slice 5a)
+- scripts/modules/actions/sense-action.js v1.0.0 (Step #7 slice 7a)
+- scripts/modules/actions/power-router.js v1.9.0 (senses early-route)
 - scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
 - scripts/modules/actions/healing-action.js v2.0.1 (migrated onto
   feat-core; End-mode RAW fixes)
@@ -262,7 +264,22 @@ Karma lost from the results.
      risk low). feat-core is currently roll-only (no CS/intensity/Karma-
      boost); extend when a caller needs those. This also de-dups the
      color/requirement math still repeated in the dialog.
-3. Then movement (#6) / senses (#7) / body control (#8) per the audit.
+3. Step #7 senses (audit group; first use of the openPowerFeat "wire
+   powers as data" model).
+   - Slice 7a DONE (sense-action.js v1.0.0, power-router.js v1.9.0):
+     senses now route to showSenseFeat instead of the non-attack bail.
+     Data-driven SENSE_CONFIG (one entry per sense). 8 detection senses
+     resolve through showGenericFeatDialog({power,...}) with a per-sense
+     intensity rule + color->outcome mapping: Magic/Psionic Detection are
+     color-graded (W/G/Y/R give different info); Emotion Detection is
+     vs the single target's Intuition (needsTarget); Energy/Astral/
+     Mutant/Cosmic/Tracking are simple colored=success. 6 passive senses
+     (Protected/Enhanced/Infravision/Magnetic/Computer Links + Combat
+     Sense for now) post an info card. All 14 pack senses covered.
+   - Slice 7b NEXT: Combat Sense as a FEAT-substitution (reuse the 4a
+     ability-feat-dialog substitution — Combat Sense rank in place of
+     Int(surprise)/Fight(block)/Agi(dodge)/Str(escape)).
+   Then movement (#6) / body control (#8) per the audit.
 
 ## Conventions (also in memory, restated for safety)
 
