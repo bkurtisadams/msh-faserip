@@ -1,3 +1,10 @@
+// ability-feat-dialog.js v1.8.0 - 2026-07-03
+// v1.8.0: Combat Sense FEAT-substitution (audit Step #7 slice 7b). Extends the
+//         slice-4a substitution to a sense power: on Intuition/Fighting/
+//         Agility/Strength FEATs, an owned Combat Sense adds a category radio
+//         (labelled with the RAW context — surprise/block/dodge/escape) that
+//         rolls the higher of the ability vs Combat Sense rank. Card
+//         substitution line generalized (was "Resistance:"-prefixed).
 // ability-feat-dialog.js v1.7.0 - 2026-07-03
 // v1.7.0: Resistance FEAT substitution (powers audit Step #4, slice 4a).
 //         Endurance/Intuition/Psyche FEATs gain TYPE radios for owned
@@ -278,6 +285,20 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       ? abilityRank : resistRank;
     subOptions.push({ value: rtype, label, rank: rollRank, resistRank, powerName: power.name });
   }
+  // Combat Sense: substitutes for Int(surprise)/Fight(block)/Agi(dodge)/
+  // Str(escape) (audit Step #7 slice 7b). A sense power, matched by name. RAW
+  // "use instead of"; rolls the higher of the ability vs Combat Sense rank.
+  const COMBAT_SENSE_CONTEXT = { intuition: "surprise", fighting: "block", agility: "dodge", strength: "escape" };
+  if (COMBAT_SENSE_CONTEXT[key]) {
+    const cs = actor.items.find(i => i.type === "power"
+      && i.name?.toLowerCase() === "combat sense"
+      && i.system?.rank);
+    if (cs) {
+      const csRank = cs.system.rank;
+      const rollRank = rankValue(abilityRank) >= rankValue(csRank) ? abilityRank : csRank;
+      subOptions.push({ value: "combatSense", label: `Combat Sense (${COMBAT_SENSE_CONTEXT[key]})`, rank: rollRank, resistRank: csRank, powerName: cs.name });
+    }
+  }
   const hasSubs = subOptions.length > 0;
   const initialFeatType = subOptions.some(o => o.value === savedFeatType) ? savedFeatType : "standard";
   const resolveRollRank = (ft) => (subOptions.find(o => o.value === ft)?.rank) || abilityRank;
@@ -517,10 +538,11 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const baseRankValue = subOpt ? rankValue(subOpt.rank) : abilityValue;
           let resistContext = '';
           if (subOpt) {
-            resistContext = `<div>Resistance: ${subOpt.powerName} (substitutes for ${fullName})</div>`;
-            if (subOpt.value === 'magical' && subOpt.rank === abilityRank
+            resistContext = `<div>${subOpt.powerName} substitutes for ${fullName}</div>`;
+            if ((subOpt.value === 'magical' || subOpt.value === 'combatSense')
+                && subOpt.rank === abilityRank
                 && rankValue(subOpt.resistRank) < abilityValue) {
-              resistContext += `<div>Magical resist ${subOpt.resistRank} &lt; ${fullName} — rolled the higher.</div>`;
+              resistContext += `<div>${subOpt.powerName} (${subOpt.resistRank}) &lt; ${fullName} — rolled the higher.</div>`;
             }
           }
 

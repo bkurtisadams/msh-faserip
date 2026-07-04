@@ -116,15 +116,15 @@ Karma lost from the results.
 - scripts/modules/actions/attack-action.js v1.9.47
 - scripts/modules/actions/chat-hooks.js v1.7.2
 - scripts/modules/actions/energy-action.js v3.4.2
-- scripts/modules/actions/ability-feat-dialog.js v1.7.0 (slice 4a:
-  resistance FEAT substitution; Endurance/Intuition/Psyche category
+- scripts/modules/actions/ability-feat-dialog.js v1.8.0 (slice 4a+7b:
+  resistance + Combat Sense FEAT substitution; category
   radios, magical rolls higher of Psyche vs magical rank)
 - scripts/modules/actions/generic-feat-dialog.js v1.5.2 (slice 5a:
   Power FEAT opts — power/label/intensity/onResult/suppressCard)
 - scripts/modules/actions/recovery-action.js v2.0.1 (slice 5a: migrated
   onto the shared Power FEAT engine; 171 → 60 lines)
 - scripts/init.js (game.msh.openPowerFeat added, slice 5a)
-- scripts/modules/actions/sense-action.js v1.0.0 (Step #7 slice 7a)
+- scripts/modules/actions/sense-action.js v1.0.1 (Step #7 slice 7a+7b)
 - scripts/modules/actions/power-router.js v1.9.0 (senses early-route)
 - scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
 - scripts/modules/actions/healing-action.js v2.0.1 (migrated onto
@@ -279,6 +279,14 @@ Karma lost from the results.
    - Slice 7b NEXT: Combat Sense as a FEAT-substitution (reuse the 4a
      ability-feat-dialog substitution — Combat Sense rank in place of
      Int(surprise)/Fight(block)/Agi(dodge)/Str(escape)).
+   - Slice 7b DONE (ability-feat-dialog.js v1.8.0, sense-action.js
+     v1.0.1): Combat Sense FEAT-substitution — extends the 4a machinery
+     so an owned Combat Sense adds a radio on Int/Fight/Agi/Str FEATs
+     (labelled surprise/block/dodge/escape) that rolls the higher of the
+     ability vs Combat Sense rank. Card substitution line generalized
+     (dropped the "Resistance:" prefix; higher-of note now covers magical
+     + combatSense). Combat Sense passive card text updated. RAW "use
+     instead of" read as higher-of (parallels the magical 4a choice).
    Then movement (#6) / body control (#8) per the audit.
 
 ## Conventions (also in memory, restated for safety)

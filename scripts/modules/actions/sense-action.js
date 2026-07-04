@@ -1,4 +1,4 @@
-// scripts/modules/actions/sense-action.js v1.0.0 - 2026-07-03
+// scripts/modules/actions/sense-action.js v1.0.1 - 2026-07-03
 // Senses group (powers audit Step #7, slice 7a). Data-driven: each sense is a
 // SENSE_CONFIG entry, and detection senses resolve through the shared Power
 // FEAT engine (generic-feat-dialog with a power item) with a per-sense
@@ -84,7 +84,7 @@ const SENSE_CONFIG = {
   "infravision":        { kind: "passive", text: (r) => `See in the dark within a 5-area range. In darkness above ${r}, sight is limited to 2 ft.` },
   "magnetic detection": { kind: "passive", text: (r) => `Detects Earth's magnetic field and aberrations at ${r}. The character is hard to get lost.` },
   "computer links":     { kind: "passive", text: (r) => `Communicate with and retrieve from computers at ${r}. Breaking in: contest ${r} vs the computer's Reason.` },
-  "combat sense":       { kind: "passive", text: (r) => `Used in place of Intuition (surprise), Fighting (block), Agility (dodge), or Strength (escape). (Automatic substitution is slice 7b.)` }
+  "combat sense":       { kind: "passive", text: (r) => `Used in place of Intuition (surprise), Fighting (block), Agility (dodge), or Strength (escape) — select the "Combat Sense" option on that ability's FEAT to roll the higher of the two.` }
 };
 
 function postPassiveCard(actor, item, cfg) {
