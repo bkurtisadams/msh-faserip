@@ -2767,6 +2767,20 @@ Hooks.once("ready", async () => {
     } catch (e) {
       console.warn("[FASERIP WARN] Defense auto-sync failed:", e);
     }
+
+    // -- Body-control power auto-sync (Growth/Shrinking/Density/Plasticity) --
+    try {
+      const { syncAllBodyControlEffects } = await import("./modules/effects/body-control-effects.js");
+      const BC_NAMES = new Set(["growth", "shrinking", "plasticity",
+        "density manipulation self", "density manipulation", "density manipulation (self)"]);
+      for (const actor of Effects.getAllTokenActors()) {
+        if (!actor?.items) continue;
+        if (!actor.items.some(i => i.type === "power" && BC_NAMES.has(String(i.name || "").toLowerCase()))) continue;
+        await syncAllBodyControlEffects(actor);
+      }
+    } catch (e) {
+      console.warn("[FASERIP WARN] Body-control auto-sync failed:", e);
+    }
   }
 
   // Migration: strip legacy canAct/canMove/movementMult changes from existing Dying AEs.
@@ -2904,6 +2918,14 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     await syncDefenseEffects(actor, item, removing);
   } catch (e) {
     console.error("[FASERIP ERROR] Failed to sync defense effects:", e);
+  }
+
+  // -- Body-control state sync (Growth/Shrinking/Density/Plasticity) --
+  try {
+    const { syncBodyControlEffects } = await import("./modules/effects/body-control-effects.js");
+    await syncBodyControlEffects(actor, item, removing);
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to sync body-control effects:", e);
   }
 
   const regenType = removing ? "" : (item.system?.regenerationType || "");

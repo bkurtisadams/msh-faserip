@@ -337,7 +337,24 @@ Karma lost from the results.
    Body control (#8) is the heavier remaining group (stateful self-
    transformations — Growth/Shrinking combat mods, Density damage mods,
    Invisibility/Blending/Phasing states; Active-Effect territory).
-   Deserves a dedicated multi-slice run, not a single config pass.
+   - Slice 8a-i DONE (body-control-effects.js v1.0.0 NEW + init.js hooks):
+     auto-builds state AEs from body-control powers, mirroring defense-
+     effects.js; toggled by the power's isActive (sheet bolt); synced
+     from the per-item create/update/delete handler + world-load bulk,
+     alongside syncDefenseEffects. Growth -> combatMods.defenseShift
+     −tier (easier to hit); Shrinking -> +tier (harder); Density Self ->
+     bodyArmor AE (physical+energy = rank; read by defense-effects
+     getBodyArmorFromEffects, no mitigation change) + −1CS Fight/Agi when
+     rank value > Endurance; Plasticity -> bodyArmor AE (physical = rank).
+     combatMods changes use the effect-engine string-mode convention
+     ({mode:"add",priority:20}). DECISIONS: size tier from the power's
+     RANK (Fe-Gd/Rm-Am/Mn+ = 1/2/3); Excellent defaults to tier 1 (flag
+     if Kurt wants tier 2). Density mass defaults to full rank (max BA).
+     OUT OF SCOPE (8a-ii / choice UI): Growth Strength-as-rank, Shrinking
+     attacking-vs-larger (target-relative), Density Shift-0 immunity
+     (lowest mass), Phasing/Invisibility/Blending (need immunity + hard-
+     to-target channels confirmed). Power ITEM sheet template still wanted
+     for the activation-time choices (Density level, material, animal).
 
 ## Conventions (also in memory, restated for safety)
 
