@@ -146,12 +146,30 @@ Karma lost from the results.
   is on exactly the right power; Healing/Regeneration split correct
   (Healing isHealingPower + empty regenerationType; Regeneration/Solar
   have regenerationType, isHealingPower false). All 122 have rank/_key/
-  _id, no dup ids. Descriptions: no empty/truncated shells. Cosmetic
-  OCR artifacts remain: standalone page-number lines in Astral
-  Projection ("84"), Light Manipulation ("75"), Plant Control ("85"),
-  Postcognition ("85"); OCR typos e.g. Mind Control "the hem" -> "hero";
-  Elongation has a stray range-table fragment. Not yet stripped (source
-  edit + pack rebuild required).
+  _id, no dup ids.
+  CLEANUP DONE 2026-07-03 (source JSONs edited; PACK REBUILD REQUIRED —
+  node tools/build-powers-pack.mjs): removed OCR page-number lines from
+  Astral Projection (84), Light Manipulation (75), Plant Control (85);
+  fixed Mind Control "The hem" -> "The hero"; and FIXED A FRAGMENT-MERGE
+  BUG — Postcognition had the entire Plant Control description wrongly
+  appended (truncated back to its correct ending "...find the gun at the
+  robbery)."). A full-pack scan for other merges came back clean (only
+  false positive: Resistance to Mental legitimately cross-references
+  Resistance to Emotion). Elongation description also rewritten from
+  Kurt's clean rulebook text: flowing intro + a readable rank->areas
+  table (was OCR-mangled run-together columns). 6 source JSONs edited
+  total this cleanup.
+- Pack DESCRIPTION REFLOW DONE 2026-07-04 (all 122): removed the OCR
+  hard line-wraps (~39-char book-column breaks that rendered as a skinny
+  1/3-width column) — descriptions now flow to fill the field. Bullet
+  lists preserved (34 powers) with continuations rejoined; hyphenated
+  word-splits mended (pos-sible->possible, stif-fening->stiffening,
+  advance-ment->advancement, vulnerable-to->vulnerable to) while real
+  compounds kept their hyphen (non-telepathic, extra-dimensional, etc.).
+  Text-integrity verified (alnum char counts match originals — nothing
+  lost). Delivered as faserip-powers-source-reflowed.zip (unzip into the
+  system root -> packs/_source/powers/, then rebuild). Description text
+  only — no mechanics/flags/ids touched.
 - Healing compendium entry: correct for routing; carries benign
   leftovers damageSource "rank" (inert, non-attack) and activationType
   "passive" (category default; Recovery is same and rolls fine).
