@@ -1,4 +1,5 @@
-// ability-feat-dialog.js v1.8.0 - 2026-07-03
+// ability-feat-dialog.js v1.8.1 - 2026-07-03
+// v1.8.1: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
 // v1.8.0: Combat Sense FEAT-substitution (audit Step #7 slice 7b). Extends the
 //         slice-4a substitution to a sense power: on Intuition/Fighting/
 //         Agility/Strength FEATs, an owned Combat Sense adds a category radio
@@ -697,7 +698,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           };
           if (!skipDice) {
             featMsg.rolls = [roll];
-            ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode"));
+            ChatMessage.applyMode(featMsg, game.settings.get("core", "rollMode"));
           }
           await ChatMessage.create(featMsg);
         };  // end runRoll

@@ -116,10 +116,10 @@ Karma lost from the results.
 - scripts/modules/actions/attack-action.js v1.9.47
 - scripts/modules/actions/chat-hooks.js v1.7.2
 - scripts/modules/actions/energy-action.js v3.4.2
-- scripts/modules/actions/ability-feat-dialog.js v1.8.0 (slice 4a+7b:
+- scripts/modules/actions/ability-feat-dialog.js v1.8.1 (slice 4a+7b:
   resistance + Combat Sense FEAT substitution; category
   radios, magical rolls higher of Psyche vs magical rank)
-- scripts/modules/actions/generic-feat-dialog.js v1.5.2 (slice 5a:
+- scripts/modules/actions/generic-feat-dialog.js v1.5.3 (slice 5a:
   Power FEAT opts — power/label/intensity/onResult/suppressCard)
 - scripts/modules/actions/recovery-action.js v2.0.1 (slice 5a: migrated
   onto the shared Power FEAT engine; 171 → 60 lines)
@@ -130,7 +130,7 @@ Karma lost from the results.
 - scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
 - scripts/modules/actions/healing-action.js v2.0.2 (migrated onto
   feat-core; End-mode RAW fixes)
-- scripts/actorSheet.js v2.3.0
+- scripts/actorSheet.js v2.3.1
 - scripts/power-presets.mjs (exports populatePowerTypeOptions)
 - scripts/power-sheet-v2-logic.js v1.11.2
 - macros/defense-regression-tests.js v4.2.0

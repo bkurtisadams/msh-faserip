@@ -1,4 +1,5 @@
-// generic-feat-dialog.js v1.5.2 - 2026-07-03
+// generic-feat-dialog.js v1.5.3 - 2026-07-03
+// v1.5.3: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
 // v1.5.2: Fix dialog ballooning to full width. Width was pinned only via CSS;
 //         AppV2 re-applied its default position.width ('auto') on re-measure,
 //         stretching to fit the widest line (e.g. a long intensityHint). Lock
@@ -497,7 +498,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         };
         if (!skipDice) {
           featMsg.rolls = [roll];
-          ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode"));
+          ChatMessage.applyMode(featMsg, game.settings.get("core", "rollMode"));
         }
         if (!opts.suppressCard) await ChatMessage.create(featMsg);
       };

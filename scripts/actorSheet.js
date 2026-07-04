@@ -1,4 +1,5 @@
-// actorSheet.js v2.3.0 - 2026-07-03
+// actorSheet.js v2.3.1 - 2026-07-03
+// v2.3.1: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
 // v2.3.0: Bind sheet drop natively. Core 14.364 appv1 DragDrop stopped
 //         delivering sheet-level drop events (row-level native listeners
 //         still fire), so compendium drags reached the sheet but _onDrop
@@ -4072,7 +4073,7 @@ html.find('.headquarters-row').each((i, row) => {
             </div>`;
 
           const resMsg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls: [roll] };
-          ChatMessage.applyRollMode(resMsg, game.settings.get("core", "rollMode"));
+          ChatMessage.applyMode(resMsg, game.settings.get("core", "rollMode"));
           await ChatMessage.create(resMsg);
 
           if (lock.enabled) {
@@ -4294,7 +4295,7 @@ html.find('.headquarters-row').each((i, row) => {
     `;
 
     const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content, rolls: [roll] };
-    ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode"));
+    ChatMessage.applyMode(msg, game.settings.get("core", "rollMode"));
     await ChatMessage.create(msg);
 
     // Log the Popularity FEAT to karma history through the canonical helper so
