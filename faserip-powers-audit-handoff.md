@@ -127,7 +127,7 @@ Karma lost from the results.
 - scripts/modules/actions/sense-action.js v1.0.1 (Step #7 slice 7a+7b)
 - scripts/modules/actions/power-router.js v1.9.0 (senses early-route)
 - scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
-- scripts/modules/actions/healing-action.js v2.0.1 (migrated onto
+- scripts/modules/actions/healing-action.js v2.0.2 (migrated onto
   feat-core; End-mode RAW fixes)
 - scripts/actorSheet.js v2.3.0
 - scripts/power-presets.mjs (exports populatePowerTypeOptions)
@@ -240,7 +240,7 @@ Karma lost from the results.
      stay, effect (End restore + daily flag) applied in onResult.
      Forks locked: (A) callback, (B) shared card + effect line +
      suppressCard escape hatch, (C) dialog-first, (D) no range.
-   - Slice 5b DONE (feat-core.js v1.0.0, healing-action.js v2.0.1):
+   - Slice 5b DONE (feat-core.js v1.0.0, healing-action.js v2.0.2):
      extracted the headless resolveFeat core (fork C(b)) — rolls d100,
      posts the roll, resolves color on the Universal Table, reports
      success (requiredColor null => any color wins / white fails), NO
@@ -250,13 +250,19 @@ Karma lost from the results.
          old End-mode code rolled the Power rank — that was wrong. Power
          rank is only the Health daily cap.
        • End-mode: the TARGET's Endurance is restored REGARDLESS of the
-         FEAT; on FAILURE the HEALER loses one Endurance rank (below
-         Feeble => healer perishes). Old code gated the target heal on
-         success — wrong.
-       • Added the "no Karma => may not Heal" gate on Health mode
-         (interpreted narrowly: gates Health, whose failure costs Karma;
-         End mode risks Endurance, not Karma — flag if Kurt reads "may
-         not Heal" as blocking all modes).
+         FEAT; on FAILURE the HEALER loses one Endurance rank. Old code
+         gated the target heal on success — wrong. CONFIRMED by Kurt.
+         DEATH THRESHOLD (Kurt ruling, healing-action v2.0.2): healer
+         perishes only when Endurance would drop BELOW Shift-0 (already
+         at Shift-0 and forced to lose again) — SURVIVES at Shift-0.
+         Was firing on reaching Shift-0 (loseOneEnduranceRank
+         belowFeeble); now keys off atFloor. (ongoing-engine's
+         belowFeeble flag + its "below Feeble = dies" comment are now
+         stale/unused — left untouched.)
+       • Added the "no Karma => may not Heal" gate on Health mode —
+         CONFIRMED by Kurt: gates Health only (whose failure costs
+         Karma); End mode risks Endurance, not Karma, so it is NOT
+         Karma-gated.
      Healing keeps its own two-mode/target/cap dialog; only the FEAT
      roll delegates to feat-core.
    - Remaining follow-up: refactor the generic FEAT dialog's runRoll

@@ -1,3 +1,9 @@
+// scripts/modules/actions/healing-action.js v2.0.2 - 2026-07-03
+// v2.0.2: End-mode death threshold fix (Kurt ruling): the healer perishes only
+//         when Endurance drops BELOW Shift-0 (i.e. already at Shift-0 and the
+//         failed FEAT forces another loss) — surviving AT Shift-0. Was firing
+//         on reaching Shift-0 (belowFeeble); now keys off loseOneEnduranceRank
+//         atFloor. Panel/card wording updated.
 // scripts/modules/actions/healing-action.js v2.0.1 - 2026-07-03
 // Two-mode dialog for the Healing power. Restores lost Health/End to others
 // (not self). Power rank = max Health per target per day (the daily cap only).
@@ -7,7 +13,7 @@
 //                amount healed. A character without Karma may not Heal.
 //   End-rank mode: 1 rank/day per target; Endurance FEAT; the TARGET's rank is
 //                restored regardless of the FEAT; on FAILURE the HEALER loses
-//                one Endurance rank (below Feeble -> healer perishes, RAW).
+//                one Endurance rank (below Shift-0 -> healer perishes, RAW).
 // v2.0.1: Lock dialog width (was ballooning to full width on the long End-mode
 //         panel line, same AppV2 position.width 'auto' bug as the other
 //         dialogs) and fix the window-title arrow (&rarr; -> → ; titles are
@@ -189,7 +195,7 @@ export async function showHealingDialog(healer, item) {
             : ""}
           <div style="margin-top:6px;color:#666;font-size:0.85em;">
             Endurance FEAT (${healerEndShort} ${healerEndValue}). Healer uses 1/day.<br>
-            Target's Endurance is restored regardless; on a failed FEAT the healer loses 1 Endurance rank (below Feeble &rarr; healer perishes, RAW).
+            Target's Endurance is restored regardless; on a failed FEAT the healer loses 1 Endurance rank (below Shift-0 &rarr; healer perishes, RAW).
           </div>
         </div>
       </div>
@@ -322,8 +328,11 @@ export async function showHealingDialog(healer, item) {
         let lost = null, dieWarning = "";
         if (!success) {
           lost = await loseOneEnduranceRank(healer, { source: `Failed Healing on ${target.name}` });
-          if (lost?.belowFeeble) {
-            dieWarning = `<div style="margin-top:6px;padding:6px;background:#c62828;color:#fff;text-align:center;font-weight:bold;">${healer.name}'s Endurance dropped below Feeble &mdash; the healer perishes (RAW). GM resolves.</div>`;
+          if (lost?.atFloor) {
+            // Already at Shift-0: the failed FEAT would take Endurance BELOW
+            // Shift-0 — the healer perishes. (RAW ruling: survive AT Shift-0,
+            // die only below it. Dropping Feeble -> Shift-0 is survivable.)
+            dieWarning = `<div style="margin-top:6px;padding:6px;background:#c62828;color:#fff;text-align:center;font-weight:bold;">${healer.name}'s Endurance is at Shift-0 — the loss would take it below; the healer perishes (RAW). GM resolves.</div>`;
           }
         }
 
@@ -349,7 +358,7 @@ export async function showHealingDialog(healer, item) {
               ${!success ? `<div style="padding:5px 10px;font-size:0.95em;text-align:center;color:#c62828;">
                 ${lost?.lost
                   ? `${healer.name} lost 1 Endurance rank: <strong>${lost.oldRank}</strong> &rarr; <strong>${lost.newRank}</strong>`
-                  : `${healer.name} could not lose Endurance (already at floor).`}
+                  : `${healer.name} is at Shift-0 Endurance and cannot absorb the loss.`}
               </div>` : ""}
               ${dieWarning}
             </div>`
