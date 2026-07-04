@@ -124,6 +124,9 @@ Karma lost from the results.
 - scripts/modules/actions/recovery-action.js v2.0.1 (slice 5a: migrated
   onto the shared Power FEAT engine; 171 → 60 lines)
 - scripts/init.js (game.msh.openPowerFeat added, slice 5a)
+- scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
+- scripts/modules/actions/healing-action.js v2.0.0 (migrated onto
+  feat-core; End-mode RAW fixes)
 - scripts/actorSheet.js v2.3.0
 - scripts/power-presets.mjs (exports populatePowerTypeOptions)
 - scripts/power-sheet-v2-logic.js v1.11.2
@@ -207,11 +210,30 @@ Karma lost from the results.
      stay, effect (End restore + daily flag) applied in onResult.
      Forks locked: (A) callback, (B) shared card + effect line +
      suppressCard escape hatch, (C) dialog-first, (D) no range.
-   - Follow-ups: migrate Healing (healing-action.js "Healing Power
-     FEAT") onto openPowerFeat next; extract a headless resolveFeat
-     core when the first auto-triggered (no-dialog) power FEAT appears
-     (fork C(b)) — this also de-dups the color/requirement math still
-     repeated between the dialog's updateFeatRequirement and runRoll.
+   - Slice 5b DONE (feat-core.js v1.0.0, healing-action.js v2.0.0):
+     extracted the headless resolveFeat core (fork C(b)) — rolls d100,
+     posts the roll, resolves color on the Universal Table, reports
+     success (requiredColor null => any color wins / white fails), NO
+     card (caller owns output). Healing migrated onto it and its RAW
+     was FIXED to match the rulebook writeup Kurt provided:
+       • BOTH modes now make an Endurance FEAT (healer's Endurance). The
+         old End-mode code rolled the Power rank — that was wrong. Power
+         rank is only the Health daily cap.
+       • End-mode: the TARGET's Endurance is restored REGARDLESS of the
+         FEAT; on FAILURE the HEALER loses one Endurance rank (below
+         Feeble => healer perishes). Old code gated the target heal on
+         success — wrong.
+       • Added the "no Karma => may not Heal" gate on Health mode
+         (interpreted narrowly: gates Health, whose failure costs Karma;
+         End mode risks Endurance, not Karma — flag if Kurt reads "may
+         not Heal" as blocking all modes).
+     Healing keeps its own two-mode/target/cap dialog; only the FEAT
+     roll delegates to feat-core.
+   - Remaining follow-up: refactor the generic FEAT dialog's runRoll
+     onto feat-core too (deferred — it's the just-changed 5a code, keep
+     risk low). feat-core is currently roll-only (no CS/intensity/Karma-
+     boost); extend when a caller needs those. This also de-dups the
+     color/requirement math still repeated in the dialog.
 3. Then movement (#6) / senses (#7) / body control (#8) per the audit.
 
 ## Conventions (also in memory, restated for safety)

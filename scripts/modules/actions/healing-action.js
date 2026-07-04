@@ -1,15 +1,24 @@
-// scripts/modules/actions/healing-action.js v1.0.0 - 2026-05-15
-// Two-mode dialog for the Healing power.
-// RAW: Restore lost Health/End to others (not self).
-//   Health: max rank# per target per day. End FEAT required.
-//           Fail → healer loses Karma equal to attempted amount.
-//   End ranks: 1/day for healer. Power-rank FEAT.
-//           Fail → healer loses 1 End rank. Below Feeble = healer dies.
+// scripts/modules/actions/healing-action.js v2.0.0 - 2026-07-03
+// Two-mode dialog for the Healing power. Restores lost Health/End to others
+// (not self). Power rank = max Health per target per day (the daily cap only).
+// RAW (rulebook): BOTH modes make an ENDURANCE FEAT (the healer's Endurance),
+// not a Power-rank FEAT.
+//   Health mode: heal up to cap; Endurance FEAT; fail -> healer loses Karma =
+//                amount healed. A character without Karma may not Heal.
+//   End-rank mode: 1 rank/day per target; Endurance FEAT; the TARGET's rank is
+//                restored regardless of the FEAT; on FAILURE the HEALER loses
+//                one Endurance rank (below Feeble -> healer perishes, RAW).
+// v2.0.0: Route both rolls through the shared headless resolver
+//         (rules/feat-core.js, powers audit Step #5 fork C(b)) and FIX RAW:
+//         End-rank mode now rolls Endurance (was Power rank) and heals the
+//         target regardless of success; add the no-Karma gate on Health mode.
+// v1.0.0: Initial two-mode dialog. (End-rank FEAT base + gating were wrong.)
 // Target selection via game.user.targets (must be exactly one, not self).
 
 import { showFaseripDialog } from "./dialog-shim.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
-import { deductKarma } from "../dice/dice-roller.js";
+import { deductKarma, getAvailableKarma } from "../dice/dice-roller.js";
+import { resolveFeat } from "../../rules/feat-core.js";
 import {
   restoreOneEnduranceRank,
   loseOneEnduranceRank,
@@ -101,19 +110,23 @@ export async function showHealingDialog(healer, item) {
   const endLastUsed = healer.getFlag(scope, "healingEndLastUsedDate");
   const endModeAvailable = !endLastUsed || endLastUsed !== today;
 
-  // Healer endurance for the Health-mode FEAT
+  // Healer endurance for the FEAT (RAW: both modes use the healer's Endurance).
   const healerEndRank = healer.system?.abilities?.endurance?.rank || "Typical";
   const healerEndValue = healer.system?.abilities?.endurance?.value || 0;
   const healerEndShort = RANK_ABBR[healerEndRank] || healerEndRank;
 
+  // RAW: "A character without Karma may not Heal" — gate Health mode (whose
+  // failure costs Karma). End-rank mode risks Endurance, not Karma.
+  const healerHasKarma = getAvailableKarma(healer) > 0;
+
+  const healthDisabled = healthMaxThisRoll <= 0 || !healerHasKarma;
+  const endDisabled = !tEndImpaired || !endModeAvailable;
+
   // ── Both modes blocked? ──────────────────────────────────────────────
-  if (healthMaxThisRoll <= 0 && !tEndImpaired) {
-    ui.notifications.info(`${target.name} has no Health or Endurance to restore.`);
+  if (healthDisabled && endDisabled) {
+    ui.notifications.info(`${healer.name} cannot Heal ${target.name} right now (no eligible Health or Endurance restoration).`);
     return;
   }
-
-  const healthDisabled = healthMaxThisRoll <= 0;
-  const endDisabled = !tEndImpaired || !endModeAvailable;
 
   const defaultMode = !healthDisabled ? "health" : "end";
 
@@ -157,7 +170,7 @@ export async function showHealingDialog(healer, item) {
           </div>
           <div style="margin-top:6px;color:#666;font-size:0.85em;">
             Endurance FEAT (${healer.name}: ${healerEndShort} ${healerEndValue}).
-            Fail &rarr; healer loses Karma equal to attempted amount.
+            Fail &rarr; healer loses Karma equal to the amount healed.${!healerHasKarma ? ' <span style="color:#c62828;">No Karma &mdash; may not Heal (RAW).</span>' : ''}
           </div>
         </div>
       </div>
@@ -171,8 +184,8 @@ export async function showHealingDialog(healer, item) {
             ? `<div style="color:#c62828;">${healer.name} has already used End-rank healing today.</div>`
             : ""}
           <div style="margin-top:6px;color:#666;font-size:0.85em;">
-            Power-rank FEAT (${powerRank} ${powerValue}). Healer uses 1/day.<br>
-            Fail &rarr; healer loses 1 Endurance rank. Below Feeble &rarr; healer dies (RAW).
+            Endurance FEAT (${healerEndShort} ${healerEndValue}). Healer uses 1/day.<br>
+            Target's Endurance is restored regardless; on a failed FEAT the healer loses 1 Endurance rank (below Feeble &rarr; healer perishes, RAW).
           </div>
         </div>
       </div>
@@ -201,16 +214,17 @@ export async function showHealingDialog(healer, item) {
           ui.notifications.warn(`Invalid heal amount: ${amount} (max ${healthMaxThisRoll}).`);
           return;
         }
-        // Endurance FEAT for the healer
-        const roll = new Roll("1d100");
-        await roll.evaluate();
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: healer }),
-          flavor: `${healer.name} makes an Endurance FEAT to heal ${target.name} (${amount} HP)`,
-          rollMode: game.settings.get("core", "rollMode")
+        // RAW: without Karma the healer may not Heal.
+        if (getAvailableKarma(healer) <= 0) {
+          ui.notifications.warn(`${healer.name} has no Karma — may not Heal (RAW).`);
+          return;
+        }
+        // Endurance FEAT for the healer (shared headless resolver).
+        const { color: resultColor, success, roll } = await resolveFeat({
+          actor: healer,
+          rank: healerEndRank,
+          flavor: `${healer.name} makes an Endurance FEAT to heal ${target.name} (${amount} HP)`
         });
-        const resultColor = game.msh.rollUniversalTable(healerEndRank, roll.total);
-        const success = ["green", "yellow", "red"].includes(String(resultColor).toLowerCase());
 
         if (success) {
           const tHpNow = Number(target.system?.attributes?.health?.value ?? 0);
@@ -275,72 +289,58 @@ export async function showHealingDialog(healer, item) {
           ui.notifications.warn(`${healer.name} already used End-rank healing today.`);
           return;
         }
-        // Power-rank FEAT
-        const roll = new Roll("1d100");
-        await roll.evaluate();
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: healer }),
-          flavor: `${healer.name} makes a Healing Power FEAT to restore ${target.name}'s Endurance`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
-        const resultColor = game.msh.rollUniversalTable(powerRank, roll.total);
-        const success = ["green", "yellow", "red"].includes(String(resultColor).toLowerCase());
 
-        // Mark daily-used REGARDLESS — End-rank mode is 1/day attempt per RAW
+        // RAW: End-rank healing uses an ENDURANCE FEAT (the healer's Endurance),
+        // not the Power rank.
+        const { color: resultColor, success, roll } = await resolveFeat({
+          actor: healer,
+          rank: healerEndRank,
+          flavor: `${healer.name} makes an Endurance FEAT to restore ${target.name}'s Endurance`
+        });
+
+        // 1/day attempt regardless of outcome.
         await healer.setFlag(scope, "healingEndLastUsedDate", today);
 
-        if (success) {
-          const restored = await restoreOneEnduranceRank(target, { source: `Healing by ${healer.name}` });
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor: healer }),
-            content: `
-              <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
-                  <strong>Healing FEAT &mdash; Endurance Rank</strong><br>
-                  <span style="font-size:0.85em;font-weight:400;">${healer.name} &rarr; ${target.name}</span>
-                </div>
-                <div style="padding:5px 10px;font-size:0.9em;">
-                  <div>Power FEAT (${powerRank} ${powerValue}). Roll: ${roll.total}</div>
-                </div>
-                <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:${colorBg(resultColor)};color:${colorFg(resultColor)};">
-                  ${String(resultColor).toUpperCase()} &mdash; SUCCESS
-                </div>
-                <div style="padding:5px 10px;font-size:0.95em;text-align:center;">
-                  ${restored?.restored
-                    ? `${target.name} restored: <strong>${restored.oldRank}</strong> &rarr; <strong>${restored.newRank}</strong>`
-                    : "No rank restored (already at cap)."}
-                </div>
-              </div>`
-          });
-        } else {
-          // Failure: healer loses 1 End rank
-          const lost = await loseOneEnduranceRank(healer, { source: `Failed Healing on ${target.name}` });
-          const dieWarning = lost?.belowFeeble
-            ? `<div style="margin-top:6px;padding:6px;background:#c62828;color:#fff;text-align:center;font-weight:bold;">${healer.name}'s Endurance dropped to Shift-0 &mdash; below Feeble. Healer dies (RAW). GM resolves.</div>`
-            : "";
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor: healer }),
-            content: `
-              <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
-                  <strong>Healing FEAT &mdash; Endurance Rank</strong><br>
-                  <span style="font-size:0.85em;font-weight:400;">${healer.name} &rarr; ${target.name}</span>
-                </div>
-                <div style="padding:5px 10px;font-size:0.9em;">
-                  <div>Power FEAT (${powerRank} ${powerValue}). Roll: ${roll.total}</div>
-                </div>
-                <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:${colorBg(resultColor)};color:${colorFg(resultColor)};">
-                  ${String(resultColor).toUpperCase()} &mdash; FAILURE
-                </div>
-                <div style="padding:5px 10px;font-size:0.95em;text-align:center;color:#c62828;">
-                  ${lost?.lost
-                    ? `${healer.name} lost 1 Endurance rank: <strong>${lost.oldRank}</strong> &rarr; <strong>${lost.newRank}</strong>`
-                    : `${healer.name} could not lose Endurance (already at floor).`}
-                </div>
-                ${dieWarning}
-              </div>`
-          });
+        // RAW: the target's Endurance is restored regardless of the FEAT.
+        const restored = await restoreOneEnduranceRank(target, { source: `Healing by ${healer.name}` });
+
+        // RAW: on a FAILED FEAT the HEALER loses one Endurance rank (below
+        // Feeble -> healer perishes). Success costs the healer nothing.
+        let lost = null, dieWarning = "";
+        if (!success) {
+          lost = await loseOneEnduranceRank(healer, { source: `Failed Healing on ${target.name}` });
+          if (lost?.belowFeeble) {
+            dieWarning = `<div style="margin-top:6px;padding:6px;background:#c62828;color:#fff;text-align:center;font-weight:bold;">${healer.name}'s Endurance dropped below Feeble &mdash; the healer perishes (RAW). GM resolves.</div>`;
+          }
         }
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: healer }),
+          content: `
+            <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+              <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
+                <strong>Healing FEAT &mdash; Endurance Rank</strong><br>
+                <span style="font-size:0.85em;font-weight:400;">${healer.name} &rarr; ${target.name}</span>
+              </div>
+              <div style="padding:5px 10px;font-size:0.9em;">
+                <div>Endurance FEAT (${healerEndShort} ${healerEndValue}). Roll: ${roll.total}</div>
+              </div>
+              <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background-color:${colorBg(resultColor)};color:${colorFg(resultColor)};">
+                ${String(resultColor).toUpperCase()} &mdash; ${success ? "SUCCESS" : "FAILURE"}
+              </div>
+              <div style="padding:5px 10px;font-size:0.95em;text-align:center;">
+                ${restored?.restored
+                  ? `${target.name} Endurance restored: <strong>${restored.oldRank}</strong> &rarr; <strong>${restored.newRank}</strong>`
+                  : `${target.name}: no rank restored (already at cap).`}
+              </div>
+              ${!success ? `<div style="padding:5px 10px;font-size:0.95em;text-align:center;color:#c62828;">
+                ${lost?.lost
+                  ? `${healer.name} lost 1 Endurance rank: <strong>${lost.oldRank}</strong> &rarr; <strong>${lost.newRank}</strong>`
+                  : `${healer.name} could not lose Endurance (already at floor).`}
+              </div>` : ""}
+              ${dieWarning}
+            </div>`
+        });
       };
 
       const runRoll = async () => {
