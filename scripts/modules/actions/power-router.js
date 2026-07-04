@@ -1,3 +1,7 @@
+// power-router.js v1.10.0 - 2026-07-03
+// v1.10.0: Movement early-route (audit Step #6) — movement-category /
+//          isMovementPower powers dispatch to movement-action.js (Teleport /
+//          Dimensional Travel Power FEATs + passive info cards).
 // power-router.js v1.9.0 - 2026-07-03
 // v1.9.0: Senses early-route (audit Step #7) — senses-category / isSensePower
 //         powers dispatch to sense-action.js (detection Power FEATs + passive
@@ -221,6 +225,13 @@ export async function rollPower(actor, item) {
   if (catLower === "senses" || item.system?.isSensePower === true) {
     const { showSenseFeat } = await import("./sense-action.js");
     return showSenseFeat(actor, item);
+  }
+
+  // Movement: Teleportation / Dimensional Travel Power FEATs + passive info
+  // cards (audit Step #6). Routed before the non-attack bail.
+  if (catLower === "movement" || item.system?.isMovementPower === true) {
+    const { showMovementFeat } = await import("./movement-action.js");
+    return showMovementFeat(actor, item);
   }
 
   // Normalize legacy values

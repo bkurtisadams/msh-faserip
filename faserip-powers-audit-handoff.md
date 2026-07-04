@@ -125,7 +125,8 @@ Karma lost from the results.
   onto the shared Power FEAT engine; 171 → 60 lines)
 - scripts/init.js (game.msh.openPowerFeat added, slice 5a)
 - scripts/modules/actions/sense-action.js v1.0.1 (Step #7 slice 7a+7b)
-- scripts/modules/actions/power-router.js v1.9.0 (senses early-route)
+- scripts/modules/actions/movement-action.js v1.0.0 (Step #6 slice 6a)
+- scripts/modules/actions/power-router.js v1.10.0 (senses + movement early-routes)
 - scripts/rules/feat-core.js v1.0.0 (headless resolveFeat, fork C(b))
 - scripts/modules/actions/healing-action.js v2.0.2 (migrated onto
   feat-core; End-mode RAW fixes)
@@ -293,7 +294,21 @@ Karma lost from the results.
      (dropped the "Resistance:" prefix; higher-of note now covers magical
      + combatSense). Combat Sense passive card text updated. RAW "use
      instead of" read as higher-of (parallels the magical 4a choice).
-   Then movement (#6) / body control (#8) per the audit.
+   Movement (#6) slice 6a DONE (movement-action.js v1.0.0,
+   power-router.js v1.10.0): movement powers route to showMovementFeat
+   instead of the non-attack bail. Data-driven MOVEMENT_CONFIG: 2 Power
+   FEATs — Teleportation (colored=clean, white=disoriented) and
+   Dimensional Travel (graded: green=break through, yellow=return home,
+   red=specific location) — resolve through showGenericFeatDialog; 9
+   passive movement powers (Flight/Gliding/Leaping/Wall-Crawling/
+   Lightning Speed/Levitation/Swimming/Climbing/Digging) post info
+   cards. All 11 pack movement powers covered. Out of scope (noted):
+   actual token movement / speed-in-areas is a separate movement-system
+   concern, not this FEAT-audit pass.
+   Body control (#8) is the heavier remaining group (stateful self-
+   transformations — Growth/Shrinking combat mods, Density damage mods,
+   Invisibility/Blending/Phasing states; Active-Effect territory).
+   Deserves a dedicated multi-slice run, not a single config pass.
 
 ## Conventions (also in memory, restated for safety)
 
