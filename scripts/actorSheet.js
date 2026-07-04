@@ -1,4 +1,8 @@
-// actorSheet.js v2.3.2 - 2026-07-04
+// actorSheet.js v2.3.3 - 2026-07-04
+// v2.3.3: Stop recomputing displayed Health (FASE) and Karma (RIP) from CS
+//         shifts — a column shift is a FEAT-roll modifier, not a rank change,
+//         so it must not move Health/Karma. Shifted ability rows keep the
+//         effective-rank display with a clearer tooltip; totals stay on base.
 // v2.3.2: Re-bind the native sheet drop listener on every render (was a
 //         once-only __mshDropBound guard that didn't survive re-renders, so
 //         compendium drops worked once then stopped).
@@ -599,7 +603,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
         row.find('.ability-key').css('cssText', 'background: #1565c0 !important; color: white !important;');
 
         const sourceName = this._findAbilityShiftSource(ability);
-        const tooltip = `Boosted +${cs}CS by ${sourceName}: ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue})`;
+        const tooltip = `${sourceName}: +${cs}CS on ${ability} FEATs. Rolls as ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue}). Column shift only — actual rank and Health/Karma are unchanged.`;
 
         // Set the rank dropdown to show the effective rank
         const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
@@ -627,7 +631,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
         row.find('.ability-key').css('cssText', 'background: #ef6c00 !important; color: white !important;');
 
         const sourceName = this._findAbilityShiftSource(ability);
-        const tooltip = `Penalized ${cs}CS by ${sourceName}: ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue})`;
+        const tooltip = `${sourceName}: ${cs}CS on ${ability} FEATs. Rolls as ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue}). Column shift only — actual rank and Health/Karma are unchanged.`;
 
         const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
         // CRITICAL: Remove name FIRST to prevent submitOnChange from saving the visual value
@@ -649,100 +653,14 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       }
     }
 
-    // ── Adjust Health / Karma display if any FASE or RIP abilities are shifted ──
-    const faseShift = (Number(mods.fighting) || 0) + (Number(mods.agility) || 0) +
-                      (Number(mods.strength) || 0) + (Number(mods.endurance) || 0);
-    if (faseShift !== 0) {
-      // Compute boosted health max from effective FASE values
-      const effectiveHealth = ["fighting","agility","strength","endurance"].reduce((sum, ab) => {
-        const base = this.actor.system.abilities?.[ab];
-        const cs = Number(mods[ab]) || 0;
-        if (cs === 0) return sum + parseInt(base?.value || 0);
-        const idx = RANKS.indexOf(base?.rank);
-        if (idx < 0) return sum + parseInt(base?.value || 0);
-        const newIdx = Math.min(Math.max(idx + cs, 0), RANKS.length - 1);
-        return sum + (rankValues[RANKS[newIdx]] || 0);
-      }, 0);
-
-      const baseHealth = parseInt(this.actor.system.abilities?.fighting?.value || 0) +
-                          parseInt(this.actor.system.abilities?.agility?.value || 0) +
-                          parseInt(this.actor.system.abilities?.strength?.value || 0) +
-                          parseInt(this.actor.system.abilities?.endurance?.value || 0);
-      const healthDelta = effectiveHealth - baseHealth;
-
-      const healthSection = html.find('.sec-col.health');
-      const healthMaxInput = healthSection.find('input[name="system.attributes.health.max"]');
-      const healthValInput = healthSection.find('input[name="system.attributes.health.value"]');
-      const boostStyle = "background: #e3f2fd !important; border-color: #1565c0 !important; color: #1565c0 !important; font-weight: bold !important;";
-
-      if (healthDelta > 0) {
-        healthMaxInput.val(effectiveHealth);
-        healthMaxInput.removeAttr('name');
-        healthMaxInput.prop('readonly', true);
-        healthMaxInput.css('cssText', boostStyle);
-        healthMaxInput.attr('title', `Base: ${baseHealth}, Boosted: +${healthDelta}`);
-
-        const currentStored = parseInt(this.actor.system.attributes?.health?.value || 0);
-        const boostedCurrent = Math.min(effectiveHealth, currentStored + healthDelta);
-        healthValInput.val(boostedCurrent);
-        healthValInput.removeAttr('name');
-        healthValInput.prop('readonly', true);
-        healthValInput.css('cssText', boostStyle);
-        healthValInput.attr('title', `Base: ${currentStored}, Boosted: +${healthDelta}`);
-
-        healthSection.find('.sec-head').css('cssText', 'background: #1565c0 !important; color: white !important;');
-      } else if (healthDelta < 0) {
-        const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
-        healthMaxInput.val(effectiveHealth);
-        healthMaxInput.removeAttr('name');
-        healthMaxInput.prop('readonly', true);
-        healthMaxInput.css('cssText', penaltyStyle);
-        healthMaxInput.attr('title', `Base: ${baseHealth}, Penalty: ${healthDelta}`);
-
-        const currentStored = parseInt(this.actor.system.attributes?.health?.value || 0);
-        const penalizedCurrent = Math.max(0, Math.min(effectiveHealth, currentStored + healthDelta));
-        healthValInput.val(penalizedCurrent);
-        healthValInput.removeAttr('name');
-        healthValInput.prop('readonly', true);
-        healthValInput.css('cssText', penaltyStyle);
-        healthValInput.attr('title', `Base: ${currentStored}, Penalty: ${healthDelta}`);
-
-        healthSection.find('.sec-head').css('cssText', 'background: #ef6c00 !important; color: white !important;');
-      }
-    }
-
-    const ripShift = (Number(mods.reason) || 0) + (Number(mods.intuition) || 0) +
-                     (Number(mods.psyche) || 0);
-    if (ripShift !== 0) {
-      const effectiveKarma = ["reason","intuition","psyche"].reduce((sum, ab) => {
-        const base = this.actor.system.abilities?.[ab];
-        const cs = Number(mods[ab]) || 0;
-        if (cs === 0) return sum + parseInt(base?.value || 0);
-        const idx = RANKS.indexOf(base?.rank);
-        if (idx < 0) return sum + parseInt(base?.value || 0);
-        const newIdx = Math.min(Math.max(idx + cs, 0), RANKS.length - 1);
-        return sum + (rankValues[RANKS[newIdx]] || 0);
-      }, 0);
-
-      const baseKarma = parseInt(this.actor.system.abilities?.reason?.value || 0) +
-                         parseInt(this.actor.system.abilities?.intuition?.value || 0) +
-                         parseInt(this.actor.system.abilities?.psyche?.value || 0);
-      const karmaDelta = effectiveKarma - baseKarma;
-
-      const karmaSection = html.find('.sec-col.karma');
-      const karmaMaxInput = karmaSection.find('input[data-field="karma-max"]');
-      const boostStyle = "background: #e3f2fd !important; border-color: #1565c0 !important; color: #1565c0 !important; font-weight: bold !important;";
-      const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
-
-      if (karmaDelta !== 0) {
-        const style = karmaDelta > 0 ? boostStyle : penaltyStyle;
-        karmaMaxInput.val(effectiveKarma);
-        karmaMaxInput.removeAttr('name');
-        karmaMaxInput.prop('readonly', true);
-        karmaMaxInput.css('cssText', style);
-        karmaMaxInput.attr('title', `Base: ${baseKarma}, ${karmaDelta > 0 ? "Boosted" : "Penalty"}: ${karmaDelta > 0 ? "+" : ""}${karmaDelta}`);
-      }
-    }
+    // ── Health/Karma are NOT recomputed from CS shifts (RAW) ──
+    // A column shift (grapple, Impaired, Weakened, equipment, Density high
+    // mass, etc.) is a FEAT-roll modifier, not a rank/value change, so it must
+    // never move Health (F+A+S+E) or Karma (R+I+P). The shifted ability rows
+    // above still show the effective rank with an explanatory tooltip; the
+    // Health/Karma totals stay on the base values. Real Endurance-rank loss
+    // (dying/Recovery) still lowers Health via prepareBaseData + the
+    // isImpaired/dyingEffect styling handled separately above.
   }
 
   /**
