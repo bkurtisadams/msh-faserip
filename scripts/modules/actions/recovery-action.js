@@ -1,9 +1,11 @@
-// scripts/modules/actions/recovery-action.js v2.1.0 - 2026-07-05
-// v2.1.0: A successful Recovery now clears a dying state. onResult success
-//         calls RestSystem.stabilizeDying (via game.msh.rest) when the actor
-//         carries the dying AE — restore runs first so regained Health keeps
-//         them conscious. Previously restoreOneEnduranceRank bumped the rank but
-//         left the dying AE ticking. (Kurt ruling.)
+// scripts/modules/actions/recovery-action.js v2.2.0 - 2026-07-05
+// v2.2.0: RAW conformance (Kurt ruling). Revert the v2.1.0 dying-clear -- RAW
+//         Recovery only regains lost Endurance ranks and says nothing about the
+//         Kill/dying state (a separate axis, resolved by per-turn Endurance
+//         FEATs). Also make a failed FEAT consume the daily attempt (RAW: one
+//         Power rank FEAT per day), matching the "retry tomorrow" card text.
+// v2.1.0: (reverted in v2.2.0 as non-RAW) A successful Recovery cleared a dying
+//         state via RestSystem.stabilizeDying.
 // scripts/modules/actions/recovery-action.js v2.0.1 - 2026-07-03
 // v2.0.1: Lock the intensity dropdown (Recovery has no target intensity — RAW
 //         any colored result succeeds) and add an explanatory hint, via the
@@ -58,17 +60,12 @@ export async function showRecoveryFeatDialog(actor, item) {
     lockIntensity: true,
     intensityHint: "Fixed by Recovery — any colored result (Green/Yellow/Red) restores one Endurance rank; White fails.",
     onResult: async ({ success }) => {
+      // RAW: one Power rank FEAT per day. Either outcome consumes the attempt.
+      await actor.setFlag(scope, "recoveryLastUsedDate", today);
       if (!success) {
-        // Failure does not consume the daily attempt.
         return `<div style="padding:5px 10px;font-size:0.85em;text-align:center;color:#666;">No Endurance restored. May retry tomorrow.</div>`;
       }
-      await actor.setFlag(scope, "recoveryLastUsedDate", today);
       const restored = await restoreOneEnduranceRank(actor, { source: "Recovery" });
-      // A successful Recovery halts the death spiral: if the actor was dying,
-      // stabilize (removes the dying AE + death-save unconscious via the canonical
-      // routine). Restore ran first, so any Health regained keeps them conscious.
-      const wasDying = actor.effects.some(e => e.getFlag(scope, "isDying") || e.statuses?.has?.("dying"));
-      if (wasDying) await game.msh?.rest?.stabilizeDying?.(actor);
       return restored?.restored
         ? `<div style="padding:5px 10px;font-size:0.95em;text-align:center;">Endurance restored: <strong>${restored.oldRank}</strong> &rarr; <strong>${restored.newRank}</strong></div>`
         : `<div style="padding:5px 10px;font-size:0.95em;text-align:center;">No rank to restore (already at cap).</div>`;
