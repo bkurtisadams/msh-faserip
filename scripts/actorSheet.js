@@ -1,3 +1,8 @@
+// actorSheet.js v2.3.6 - 2026-07-05
+// v2.3.6: Fix two sheet-roll card crashes on core 14+ (resistance roll,
+//         ability roll). applyMode() was fed the legacy core.rollMode value
+//         (a roll mode, not a message mode) and threw on .handler; now reads
+//         core.messageMode, with an applyRollMode/rollMode fallback for v13.
 // actorSheet.js v2.3.5 - 2026-07-04
 // v2.3.5: De-dupe compendium drops by payload fingerprint and stop row-level
 //         external-drop delegation from bubbling into the form-level drop
@@ -4053,7 +4058,8 @@ html.find('.headquarters-row').each((i, row) => {
             </div>`;
 
           const resMsg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls: [roll] };
-          ChatMessage.applyMode(resMsg, game.settings.get("core", "rollMode"));
+          try { ChatMessage.applyMode(resMsg, game.settings.get("core", "messageMode")); }
+          catch { try { ChatMessage.applyRollMode(resMsg, game.settings.get("core", "rollMode")); } catch {} }
           await ChatMessage.create(resMsg);
 
           if (lock.enabled) {
@@ -4275,7 +4281,8 @@ html.find('.headquarters-row').each((i, row) => {
     `;
 
     const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content, rolls: [roll] };
-    ChatMessage.applyMode(msg, game.settings.get("core", "rollMode"));
+    try { ChatMessage.applyMode(msg, game.settings.get("core", "messageMode")); }
+    catch { try { ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode")); } catch {} }
     await ChatMessage.create(msg);
 
     // Log the Popularity FEAT to karma history through the canonical helper so

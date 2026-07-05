@@ -1,3 +1,9 @@
+// generic-feat-dialog.js v1.5.4 - 2026-07-05
+// v1.5.4: Fix FEAT card crash on core 14+. applyMode() was fed the legacy
+//         core.rollMode value (a roll mode, not a message mode), so it read
+//         .handler off an undefined mode entry and threw — killing Recovery and
+//         every other generic-dialog FEAT. Now reads core.messageMode and calls
+//         applyMode, with a core.rollMode + applyRollMode fallback for v13.
 // generic-feat-dialog.js v1.5.3 - 2026-07-03
 // v1.5.3: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
 // v1.5.2: Fix dialog ballooning to full width. Width was pinned only via CSS;
@@ -498,7 +504,8 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         };
         if (!skipDice) {
           featMsg.rolls = [roll];
-          ChatMessage.applyMode(featMsg, game.settings.get("core", "rollMode"));
+          try { ChatMessage.applyMode(featMsg, game.settings.get("core", "messageMode")); }
+          catch { try { ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode")); } catch {} }
         }
         if (!opts.suppressCard) await ChatMessage.create(featMsg);
       };

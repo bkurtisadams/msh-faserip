@@ -1,3 +1,7 @@
+// ability-feat-dialog.js v1.8.2 - 2026-07-05
+// v1.8.2: Fix ability-FEAT card crash on core 14+. Same applyMode() fix as
+//         generic-feat-dialog v1.5.4 — read core.messageMode (not the legacy
+//         rollMode) and fall back to applyRollMode for v13.
 // ability-feat-dialog.js v1.8.1 - 2026-07-03
 // v1.8.1: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
 // v1.8.0: Combat Sense FEAT-substitution (audit Step #7 slice 7b). Extends the
@@ -698,7 +702,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           };
           if (!skipDice) {
             featMsg.rolls = [roll];
-            ChatMessage.applyMode(featMsg, game.settings.get("core", "rollMode"));
+            try { ChatMessage.applyMode(featMsg, game.settings.get("core", "messageMode")); }
+            catch { try { ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode")); } catch {} }
           }
           await ChatMessage.create(featMsg);
         };  // end runRoll
