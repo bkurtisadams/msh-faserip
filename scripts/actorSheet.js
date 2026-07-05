@@ -1,3 +1,10 @@
+// actorSheet.js v2.3.4 - 2026-07-05
+// v2.3.4: Compendium/Item drops onto a sort-row (power / talent / contact /
+//         equipment / vehicle / HQ) now delegate to _onDrop. Each row handler
+//         owned only its own *Sort payload and bailed on external drops,
+//         relying on a bubble to the form handler that core 14.364 appv1
+//         DragDrop swallowed; _onDrop's __mshDropHandled guard blocks any
+//         double-create when the event does also reach the form handler.
 // actorSheet.js v2.3.3 - 2026-07-04
 // v2.3.3: Stop recomputing displayed Health (FASE) and Karma (RIP) from CS
 //         shifts — a column shift is a FEAT-roll modifier, not a rank change,
@@ -1456,7 +1463,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "TalentSort") return;
+          if (sourceData.type !== "TalentSort") return this._onDrop(ev);
     
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1534,7 +1541,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "ContactSort") return;
+          if (sourceData.type !== "ContactSort") return this._onDrop(ev);
     
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1611,7 +1618,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "EquipmentSort") return;
+          if (sourceData.type !== "EquipmentSort") return this._onDrop(ev);
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1688,7 +1695,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "VehicleSort") return;
+          if (sourceData.type !== "VehicleSort") return this._onDrop(ev);
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1852,7 +1859,11 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
           console.log("Drop data", sourceData);
           
-          if (sourceData.type !== "PowerSort") return;
+          // Not a reorder — an external Item/compendium drop landed on a
+          // power row. Bubbling to the form-level _onDrop is unreliable under
+          // core 14.364 appv1 DragDrop, so delegate explicitly (_onDrop's
+          // __mshDropHandled guard prevents a double-create if it also bubbles).
+          if (sourceData.type !== "PowerSort") return this._onDrop(ev);
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -3131,7 +3142,7 @@ html.find('.headquarters-row').each((i, row) => {
 
     try {
       const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "HeadquartersSort") return;
+      if (sourceData.type !== "HeadquartersSort") return this._onDrop(ev);
 
       const sourceId = sourceData.itemId;
       const targetId = row.dataset.itemId;
