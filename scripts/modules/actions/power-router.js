@@ -1,3 +1,8 @@
+// power-router.js v1.11.0 - 2026-07-05
+// v1.11.0: Body-control early-route (audit Step #8, slice 8b) — bodyControl-
+//          category / isTransformPower powers dispatch to body-control-action.js
+//          (Shape-Shifting / Imitation / Animal Transformation Power FEATs +
+//          passive state info cards) before the non-attack bail.
 // power-router.js v1.10.0 - 2026-07-03
 // v1.10.0: Movement early-route (audit Step #6) — movement-category /
 //          isMovementPower powers dispatch to movement-action.js (Teleport /
@@ -232,6 +237,15 @@ export async function rollPower(actor, item) {
   if (catLower === "movement" || item.system?.isMovementPower === true) {
     const { showMovementFeat } = await import("./movement-action.js");
     return showMovementFeat(actor, item);
+  }
+
+  // Body Control: self-transformation powers post an activation card — a Power
+  // FEAT for Shape-Shifting / Imitation / Animal Transformation, an info card
+  // for the continuous states (audit Step #8, slice 8b). Routed before the
+  // non-attack bail. Passive state AEs are handled in body-control-effects.js.
+  if (catLower === "bodycontrol" || item.system?.isTransformPower === true) {
+    const { showBodyControlFeat } = await import("./body-control-action.js");
+    return showBodyControlFeat(actor, item);
   }
 
   // Normalize legacy values

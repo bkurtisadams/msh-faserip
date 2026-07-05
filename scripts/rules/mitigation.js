@@ -1,3 +1,8 @@
+// scripts/rules/mitigation.js v3.5.0 - 2026-07-04
+// v3.5.0: Phasing intangibility (audit Step #8, 8a-ii) — a target with an
+//         active body-control phasing effect takes 0 from any non-mental
+//         damage (RAW: immune to everything but psychic). Mental attacks
+//         route via mental-action, so psychic is unaffected.
 // scripts/rules/mitigation.js v3.4.0 - 2026-07-03
 // v3.4.0: Magical damage reduction (powers audit Step #4, slice 4b core).
 //         calculateMitigation accepts isMagic; a "featReplace" magical
@@ -146,6 +151,22 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     "gp": "grappling", "gb": "grabbing",
   };
   if (_shortToLong[dmgTypeLower]) dmgTypeLower = _shortToLong[dmgTypeLower];
+
+  // Phasing: intangible — immune to all damage except mental/psychic (RAW).
+  // Mental attacks resolve through mental-action, not this function, so a
+  // blanket immunity here already excludes psychic; the type guard is belt-and-
+  // braces for any mental damage that does reach mitigation.
+  {
+    const _scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+    const _isMental = dmgTypeLower.includes("mental") || dmgTypeLower.includes("psych");
+    if (!_isMental && targetActor.effects?.find(e => !e.disabled && e.flags?.[_scope]?.bodyControlType === "phasing")) {
+      result.netDamage = 0;
+      result.layers.push({ type: "phasing", immune: true, absorbed: rawDamage,
+        reason: "Phasing: intangible — immune to non-psychic damage" });
+      return result;
+    }
+  }
+
   const isEnergyDamage = dmgTypeLower.includes("energy");
   
   let currentDamage = rawDamage;

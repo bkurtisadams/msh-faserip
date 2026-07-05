@@ -1,3 +1,8 @@
+// scripts/modules/effects/body-control-effects.js v1.1.1 - 2026-07-04
+// v1.1.1: 8a-ii state AEs — Phasing (intangible flag; mitigation zeroes non-
+//         psychic damage), Invisibility + Blending (invisible status badge;
+//         sensing left to GM per Kurt, no auto sense-gate). Density Shift-0
+//         immunity still deferred to the mass-choice UI.
 // scripts/modules/effects/body-control-effects.js v1.0.0 - 2026-07-04
 // Auto-build state Active Effects from body-control powers (audit Step #8,
 // slice 8a-i), mirroring defense-effects.js. Toggled by the power's isActive
@@ -90,6 +95,18 @@ function buildBodyArmorAE(item, ongoingId, physical, energy, rank) {
 
 const ADD = (key, value) => ({ key, mode: "add", value: String(value), priority: 20 });
 
+// Status/flag-based state AE (no changes) — for intangibility/concealment states.
+function buildStateAE(item, ongoingId, label, { statuses = [], flags = {} } = {}) {
+  const scope = SCOPE();
+  return {
+    name: label,
+    img: item.img || "",
+    changes: [],
+    statuses,
+    flags: { [scope]: { effectCategory: "bodyControl", ongoingId, powerItemId: item.id, powerName: item.name, ...flags } }
+  };
+}
+
 /**
  * Sync body-control state AEs for a single power item.
  * Called from the item create/update/delete hooks (alongside syncDefenseEffects).
@@ -146,6 +163,39 @@ export async function syncBodyControlEffects(actor, item, removing = false) {
     const id = bcId("plasticity-ba", item.id);
     if (!removing && isKind(item, "plasticity")) {
       await registerBcAE(actor, id, buildBodyArmorAE(item, id, val, 0, rank), inactive);
+    } else await removeBcAE(actor, id);
+  }
+
+  // ── Phasing: intangible — immune to all damage but psychic (RAW, Kurt).
+  // mitigation reads flags.bodyControlType === "phasing" and zeroes non-mental
+  // damage (mental attacks route through mental-action, not mitigation). ──
+  {
+    const id = bcId("phasing", item.id);
+    if (!removing && isKind(item, "phasing")) {
+      await registerBcAE(actor, id, buildStateAE(item, id,
+        "Phasing (intangible — immune to non-psychic damage)",
+        { flags: { bodyControlType: "phasing" } }), inactive);
+    } else await removeBcAE(actor, id);
+  }
+
+  // ── Invisibility: applies the invisible status (status-only badge, per
+  // Kurt). RAW sensing an invisible target (Monstrous Intuition FEAT) is left
+  // to GM adjudication — deliberately NOT auto-gated in the attack flow. ──
+  {
+    const id = bcId("invisibility", item.id);
+    if (!removing && isKind(item, "invisibility")) {
+      await registerBcAE(actor, id, buildStateAE(item, id, "Invisibility",
+        { statuses: ["invisible"], flags: { bodyControlType: "invisibility" } }), inactive);
+    } else await removeBcAE(actor, id);
+  }
+
+  // ── Blending: hidden until you move or act (GM untoggles). Same invisible
+  // status badge as Invisibility. ──
+  {
+    const id = bcId("blending", item.id);
+    if (!removing && isKind(item, "blending")) {
+      await registerBcAE(actor, id, buildStateAE(item, id, "Blending (hidden until you move or act)",
+        { statuses: ["invisible"], flags: { bodyControlType: "blending" } }), inactive);
     } else await removeBcAE(actor, id);
   }
 }

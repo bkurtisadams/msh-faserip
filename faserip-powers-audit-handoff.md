@@ -350,7 +350,17 @@ Karma lost from the results.
      ({mode:"add",priority:20}). DECISIONS: size tier from the power's
      RANK (Fe-Gd/Rm-Am/Mn+ = 1/2/3); Excellent defaults to tier 1 (flag
      if Kurt wants tier 2). Density mass defaults to full rank (max BA).
-     OUT OF SCOPE (8a-ii / choice UI): Growth Strength-as-rank, Shrinking
+     Slice 8a-ii DONE (body-control-effects.js v1.1.1 + mitigation.js v3.5.0):
+   Phasing -> flags.bodyControlType 'phasing'; mitigation zeroes any NON-mental
+   damage for a phased target (RAW immune to everything but psychic; mental
+   routes via mental-action so it's unaffected). Invisibility + Blending ->
+   the 'invisible' status badge only (STATUS-ONLY per Kurt). The attack
+   sense-gate (Monstrous Intuition FEAT to strike an unseen target) was
+   CONSIDERED and CANCELLED: RAW is conditional (only attackers who can't
+   sense you are penalized), which a hard gate can't capture, so sensing is
+   left to GM adjudication. Density Shift-0 immunity stays deferred (mass-
+   choice UI).
+   OUT OF SCOPE (choice UI): Growth Strength-as-rank, Shrinking
      attacking-vs-larger (target-relative), Density Shift-0 immunity
      (lowest mass), Phasing/Invisibility/Blending (need immunity + hard-
      to-target channels confirmed). Power ITEM sheet template still wanted
