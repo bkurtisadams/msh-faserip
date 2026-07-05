@@ -1,3 +1,7 @@
+// actorSheet.js v2.3.5 - 2026-07-04
+// v2.3.5: De-dupe compendium drops by payload fingerprint and stop row-level
+//         external-drop delegation from bubbling into the form-level drop
+//         handler. Fixes one power drag creating duplicate sheet powers.
 // actorSheet.js v2.3.4 - 2026-07-05
 // v2.3.4: Compendium/Item drops onto a sort-row (power / talent / contact /
 //         equipment / vehicle / HQ) now delegate to _onDrop. Each row handler
@@ -88,6 +92,24 @@ import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-sh
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
+
+const MSH_DROP_DEDUPE_MS = 750;
+
+function buildDropFingerprint(actor, data) {
+  if (!data) return "";
+  const droppedData = data.data ?? data.itemData ?? {};
+  return [
+    actor?.uuid ?? actor?.id ?? "",
+    data.type ?? "",
+    data.uuid ?? "",
+    data.pack ?? "",
+    data.id ?? data._id ?? "",
+    data.documentName ?? "",
+    droppedData.uuid ?? "",
+    droppedData._id ?? droppedData.id ?? "",
+    droppedData.name ?? data.name ?? ""
+  ].join("|");
+}
 
 function getPopularityRankWithRange(value, context) {
   const rank = context._getPopularityRank(value);
@@ -751,6 +773,21 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     }
   }
 
+  _isDuplicateDropData(data) {
+    const fingerprint = buildDropFingerprint(this.actor, data);
+    if (!fingerprint) return false;
+
+    const now = Date.now();
+    const previous = this._mshLastDrop;
+    if (previous?.fingerprint === fingerprint && (now - previous.time) < MSH_DROP_DEDUPE_MS) {
+      console.warn("[FASERIP] Ignored duplicate actor-sheet drop", data);
+      return true;
+    }
+
+    this._mshLastDrop = { fingerprint, time: now };
+    return false;
+  }
+
   // V14-native drop chain. The inherited foundry.appv1.sheets.ActorSheet._onDrop
   // resolves the drag payload through the legacy global TextEditor, which no
   // longer binds in v14 — drops reached the sheet but created nothing. Resolve
@@ -770,6 +807,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
             ?? globalThis.TextEditor;
     const data = await TE.getDragEventData(event);
     if (!data) return;
+    if (this._isDuplicateDropData(data)) return false;
 
     if (Hooks.call("dropActorSheetData", this.actor, this, data) === false) return;
 
@@ -1463,7 +1501,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "TalentSort") return this._onDrop(ev);
+          if (sourceData.type !== "TalentSort") { ev.stopPropagation(); return this._onDrop(ev); }
     
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1541,7 +1579,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "ContactSort") return this._onDrop(ev);
+          if (sourceData.type !== "ContactSort") { ev.stopPropagation(); return this._onDrop(ev); }
     
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1618,7 +1656,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "EquipmentSort") return this._onDrop(ev);
+          if (sourceData.type !== "EquipmentSort") { ev.stopPropagation(); return this._onDrop(ev); }
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1695,7 +1733,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "VehicleSort") return this._onDrop(ev);
+          if (sourceData.type !== "VehicleSort") { ev.stopPropagation(); return this._onDrop(ev); }
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -1863,7 +1901,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           // power row. Bubbling to the form-level _onDrop is unreliable under
           // core 14.364 appv1 DragDrop, so delegate explicitly (_onDrop's
           // __mshDropHandled guard prevents a double-create if it also bubbles).
-          if (sourceData.type !== "PowerSort") return this._onDrop(ev);
+          if (sourceData.type !== "PowerSort") { ev.stopPropagation(); return this._onDrop(ev); }
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -3142,7 +3180,7 @@ html.find('.headquarters-row').each((i, row) => {
 
     try {
       const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "HeadquartersSort") return this._onDrop(ev);
+      if (sourceData.type !== "HeadquartersSort") { ev.stopPropagation(); return this._onDrop(ev); }
 
       const sourceId = sourceData.itemId;
       const targetId = row.dataset.itemId;

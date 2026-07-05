@@ -1,3 +1,8 @@
+// power-router.js v1.12.0 - 2026-07-05
+// v1.12.0: Body-defense early-route (audit: bodyAlterationsDefensive passive
+//          leftovers) — bodyAlterationsDefensive-category powers without a
+//          dedicated dialog dispatch to body-defense-action.js (info cards) before
+//          the non-attack bail. Recovery / Healing / Damage Transfer route earlier.
 // power-router.js v1.11.0 - 2026-07-05
 // v1.11.0: Body-control early-route (audit Step #8, slice 8b) — bodyControl-
 //          category / isTransformPower powers dispatch to body-control-action.js
@@ -246,6 +251,16 @@ export async function rollPower(actor, item) {
   if (catLower === "bodycontrol" || item.system?.isTransformPower === true) {
     const { showBodyControlFeat } = await import("./body-control-action.js");
     return showBodyControlFeat(actor, item);
+  }
+
+  // Body Alterations (Defensive): the passive defensive powers with no dedicated
+  // dialog (Water Breathing, Life Support, Pheromones, Immortality, plus Body
+  // Armor / Absorption / Regeneration / Solar Regeneration) post an info card
+  // instead of the non-attack bail. Recovery / Healing / Damage Transfer are
+  // routed to their own dialogs earlier, so they never reach here.
+  if (catLower === "bodyalterationsdefensive") {
+    const { showBodyDefenseFeat } = await import("./body-defense-action.js");
+    return showBodyDefenseFeat(actor, item);
   }
 
   // Normalize legacy values
