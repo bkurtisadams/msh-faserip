@@ -1,3 +1,8 @@
+// action-utils.js v1.8.12 - 2026-07-05
+// v1.8.12: Mode pill legibility — inactive pills are white with dark text and
+//          a mode-colored border (was grey-on-grey #e0e0e0/#999); disabled
+//          pills desaturate instead of opacity:.5. Click-handler inactive
+//          reset mirrors the same style via each pill's data-bg.
 // action-utils.js v1.8.11 - 2026-07-04
 // v1.8.11: Add shared derivePowerDamage() (honors system.damageSource) — single
 //          source of truth for energy/force/throwing power-damage derivation.
@@ -445,8 +450,8 @@ export function buildModeSelector({ mode, disabled = false, disabledReason = "" 
     const c = colors[val];
     const baseStyle = "display:inline-flex;align-items:center;padding:4px 10px;border:2px solid;border-radius:4px;margin-left:4px;cursor:pointer;font-size:12px;";
     const activeStyle = `background:${c.bg};color:${c.text};font-weight:600;border-color:${c.border};`;
-    const inactiveStyle = `background:#e0e0e0;color:#999;border-color:#bbb;`;
-    const disStyle = isDisabled ? "pointer-events:none;opacity:.5;" : "";
+    const inactiveStyle = `background:#fff;color:#222;border-color:${c.bg};`;
+    const disStyle = isDisabled ? "pointer-events:none;filter:saturate(.45);opacity:.85;" : "";
     const tip = isDisabled ? (disabledReason || `Locked by global setting: ${globalMode}`) : "";
     return `<label class="faserip-mode" data-mode="${val}" data-bg="${c.bg}" data-border="${c.border}" data-text="${c.text}" 
                    style="${baseStyle}${active ? activeStyle : inactiveStyle}${disStyle}" 
@@ -515,13 +520,14 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
 
     const c = colors[mode];
     
-    // Reset all labels to inactive
+    // Reset all labels to inactive (white pill, dark text, mode-colored border)
     $labels.each(function() {
-      $(this).css({
-        "background": "#e0e0e0",
-        "color": "#999",
+      const $l = $(this);
+      $l.css({
+        "background": "#fff",
+        "color": "#222",
         "font-weight": "400",
-        "border-color": "#bbb"
+        "border-color": String($l.data("bg") || "#bbb")
       });
     });
     

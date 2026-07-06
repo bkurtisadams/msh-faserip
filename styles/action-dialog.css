@@ -1,3 +1,9 @@
+/* action-dialog.css v3.10.0 - 2026-07-05 */
+/* v3.10.0: Header banner outlined white — .frp-header-v3 drops the red
+           gradient for #fff + 1px var(--mred) outline (frp-feat variant:
+           green outline); text flipped for light bg (h-actor ink, h-target
+           mred-lit, ranks/arrow gold). frp-cs-help pinned to a true 18px
+           circle (min/max width+height) against core button height. */
 /* action-dialog.css v3.9.0 - 2026-06-26 */
 /* v3.9.0: Dark-theme readability fix. Pass-4 (v3.5.0) forced dark text on
            non-shim dialogs but set no background, so under Foundry's dark
@@ -108,8 +114,9 @@
   gap: 4px;
   padding: 5px 8px;
   margin: -6px -6px 4px;
-  background: linear-gradient(90deg, var(--mred) 0%, var(--mred-dk) 100%);
-  color: #fff;
+  background: #fff;
+  border: 1px solid var(--mred);
+  color: var(--ink);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -124,7 +131,7 @@
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: 15px;
-  color: #fff;
+  color: var(--ink);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -154,7 +161,7 @@
   font-family: 'Oswald', sans-serif;
   font-size: 13px;
   font-weight: 700;
-  color: var(--gold-lit);
+  color: var(--gold);
 }
 .frp-dlg .frp-header-v3 .h-verb {
   font-family: 'Barlow Condensed', sans-serif;
@@ -163,7 +170,7 @@
   flex-shrink: 0;
 }
 .frp-dlg .frp-header-v3 .h-arrow {
-  color: var(--gold-lit);
+  color: var(--gold);
   font-weight: 700;
   font-size: 14px;
   flex-shrink: 0;
@@ -172,7 +179,7 @@
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: 15px;
-  color: #ffcdd2;
+  color: var(--mred-lit);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -181,7 +188,8 @@
 
 /* ── FEAT-themed dialog (green accent) ───────────────────────────────── */
 .frp-dlg.frp-feat .frp-header-v3 {
-  background: linear-gradient(90deg, var(--feat) 0%, var(--feat-dk) 100%);
+  background: #fff;
+  border-color: var(--feat);
 }
 .frp-dlg.frp-feat .frp-cs-label {
   color: var(--feat-deep);
@@ -618,6 +626,8 @@
 .frp-dlg .frp-cs-help {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 50%;
+  min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px;
+  box-sizing: border-box;
   border: 1px solid #c0b8a0; background: #f5f3ee; color: #999;
   font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 700;
   cursor: pointer; user-select: none; padding: 0; line-height: 1;
