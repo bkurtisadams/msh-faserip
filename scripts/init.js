@@ -1,4 +1,5 @@
-﻿// init.js v1.12.6 - 2026-05-23
+﻿// init.js v1.12.7 - 2026-07-07
+// v1.12.7: Preload tab-hardware.hbs (Hardware tab, Slice 1).
 // v1.12.6: Defense-power detection (resync + createToken) also recognizes
 //          absorptionSpecific, matching defense-effects.js building an
 //          absorption AE from a specific-only absorber.
@@ -1589,6 +1590,7 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/parts/tab-talents.hbs",
     "systems/msh-faserip/templates/parts/tab-contacts.hbs",
     "systems/msh-faserip/templates/parts/tab-equipment.hbs",
+    "systems/msh-faserip/templates/parts/tab-hardware.hbs",
     "systems/msh-faserip/templates/parts/tab-headquarters.hbs",
     "systems/msh-faserip/templates/parts/tab-vehicles.hbs",
     "systems/msh-faserip/templates/parts/tab-stunts.hbs",

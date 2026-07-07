@@ -3,7 +3,7 @@
     "name": "msh-faserip",
     "title": "Marvel Super Heroes (FASERIP)",
     "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v14.",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "compatibility": {
         "minimum": "14",
         "verified": "14.360"
@@ -65,6 +65,7 @@
         "styles/vehicle-sheet.css",
         "styles/compact-mode.css",
         "styles/universal-table-tab.css",
+        "styles/hardware-tab.css",
         "styles/equipment-sheet-redesign.css"
     ],
     "languages": [

@@ -1,0 +1,125 @@
+{{!-- tab-hardware.hbs — v1.0.0: Slice 1 — Hardware tab shell. Inventor strip (Reason/Resources), invention project list over equipment items with system.hardware.enabled, per-project effective-cost calculator (applicable ranks, RAW CS modifiers, custom shift, Beyond-1980s-tech), derivation trace, build-time readout with assistant/round-the-clock reductions. FEAT rolls arrive in Slice 2. --}}
+<div class="tab" data-tab="hardware">
+  <div class="tab-list-header labeled">
+    <span class="th-label">Hardware</span>
+    <div class="th-actions">
+      <a class="th-action-link hw-add-invention" title="Start a new invention">+ new invention</a>
+    </div>
+  </div>
+
+  <div class="hw-inventor-strip">
+    <span class="hw-inv-stat"><label>Reason</label> {{hwInventor.reasonRank}} ({{hwInventor.reasonValue}})</span>
+    <span class="hw-inv-stat"><label>Resources</label> {{hwInventor.resourcesRank}} ({{hwInventor.resourcesValue}})</span>
+    <span class="hw-inv-note">A hero may attempt a device whose effective cost exceeds his Reason — the success roll reads one color worse.</span>
+  </div>
+
+  {{#if hardwareProjects.length}}
+  {{#each hardwareProjects as |p|}}
+  <div class="hw-project" data-item-id="{{p._id}}">
+    <div class="hw-project-header">
+      <img src="{{p.img}}" class="hw-icon" width="24" height="24" />
+      <input type="text" class="hw-name" value="{{p.name}}" placeholder="Invention name" />
+      <select class="hw-field hw-status" data-hw-path="status">
+        <option value="design"   {{#if (eq p.system.hardware.status "design")}}selected{{/if}}>Design</option>
+        <option value="building" {{#if (eq p.system.hardware.status "building")}}selected{{/if}}>Building</option>
+        <option value="testing"  {{#if (eq p.system.hardware.status "testing")}}selected{{/if}}>Testing</option>
+        <option value="complete" {{#if (eq p.system.hardware.status "complete")}}selected{{/if}}>Complete</option>
+        <option value="failed"   {{#if (eq p.system.hardware.status "failed")}}selected{{/if}}>Failed</option>
+      </select>
+      <span class="hw-badge hw-badge-cost" title="Effective Cost">{{p.hw.cost}}</span>
+      <span class="hw-badge hw-badge-days" title="Build time (adjusted / base)">{{p.hw.adjDays}}d / {{p.hw.days}}d</span>
+      <span class="hw-header-actions">
+        <a class="hw-open" title="Open item sheet"><i class="fas fa-edit"></i></a>
+        <a class="hw-delete" title="Delete invention"><i class="fas fa-trash"></i></a>
+      </span>
+    </div>
+
+    <details class="hw-project-body">
+      <summary>Effective-cost calculator</summary>
+
+      <div class="hw-row">
+        <label>Item class</label>
+        <select class="hw-field" data-hw-path="itemClass">
+          <option value="weapon"    {{#if (eq p.system.hardware.itemClass "weapon")}}selected{{/if}}>Weapon</option>
+          <option value="vehicle"   {{#if (eq p.system.hardware.itemClass "vehicle")}}selected{{/if}}>Vehicle</option>
+          <option value="powersuit" {{#if (eq p.system.hardware.itemClass "powersuit")}}selected{{/if}}>Power Suit</option>
+          <option value="robot"     {{#if (eq p.system.hardware.itemClass "robot")}}selected{{/if}}>Robot / Construct</option>
+          <option value="other"     {{#if (eq p.system.hardware.itemClass "other")}}selected{{/if}}>Other Device</option>
+        </select>
+        <span class="hw-class-hint">
+          {{#if (eq p.system.hardware.itemClass "weapon")}}Applicable ranks: Damage (or Intensity), Range, Material Strength. Thrown weapons ignore the Range rank.{{/if}}
+          {{#if (eq p.system.hardware.itemClass "vehicle")}}Applicable ranks: Control, Speed, Body, Protection.{{/if}}
+          {{#if (eq p.system.hardware.itemClass "powersuit")}}Applicable ranks: modified abilities, plus Material Strength or Body Armor (whichever is higher). Shift-style suits: use +1CS custom per ability shift instead of set ranks.{{/if}}
+          {{#if (eq p.system.hardware.itemClass "robot")}}Applicable ranks: all listed abilities and Power ranks. Omit abilities the robot lacks.{{/if}}
+          {{#if (eq p.system.hardware.itemClass "other")}}Applicable ranks: Material Strength and any Power ranks involved.{{/if}}
+        </span>
+      </div>
+
+      <div class="hw-ranks">
+        <div class="hw-ranks-head">
+          <label>Applicable ranks</label>
+          <a class="hw-rank-add" title="Add applicable rank">+ add rank</a>
+        </div>
+        {{#each p.system.hardware.applicableRanks as |r idx|}}
+        <div class="hw-rank-row" data-idx="{{idx}}">
+          <input type="text" class="hw-rank-label" value="{{r.label}}" placeholder="e.g. Damage, Speed, Material Strength" />
+          <select class="hw-rank-rank">
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=@root.hwRankChoices selected=r.rank}}
+          </select>
+          <a class="hw-rank-remove" title="Remove"><i class="fas fa-times"></i></a>
+        </div>
+        {{/each}}
+      </div>
+
+      <div class="hw-mods">
+        <label class="hw-mods-title">Cost modifiers</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.beyondTech" {{#if p.system.hardware.modifiers.beyondTech}}checked{{/if}} /> Not reproducible by 1980s tech (adds Monstrous applicable rank)</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.invisible" {{#if p.system.hardware.modifiers.invisible}}checked{{/if}} /> Cannot normally be seen (+2CS)</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.pocketSized" {{#if p.system.hardware.modifiers.pocketSized}}checked{{/if}} /> Pocket-sized (+1CS)</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.portable" {{#if p.system.hardware.modifiers.portable}}checked{{/if}} /> Portable (+1CS)</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.multiArea" {{#if p.system.hardware.modifiers.multiArea}}checked{{/if}} /> Occupies more than one area (+1CS)</label>
+        {{#if (eq p.system.hardware.itemClass "weapon")}}
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.meleeTouch" {{#if p.system.hardware.modifiers.meleeTouch}}checked{{/if}} /> Damage on touch only — melee (-1CS)</label>
+        {{/if}}
+        {{#if (eq p.system.hardware.itemClass "vehicle")}}
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.noProtection" {{#if p.system.hardware.modifiers.noProtection}}checked{{/if}} /> Offers no Protection (-1CS)</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.gev" {{#if p.system.hardware.modifiers.gev}}checked{{/if}} /> GEV (+1CS)</label>
+        {{/if}}
+        {{#if (eq p.system.hardware.itemClass "robot")}}
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.humanoid" {{#if p.system.hardware.modifiers.humanoid}}checked{{/if}} /> Humanoid form (-1CS)</label>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.imitatesIndividual" {{#if p.system.hardware.modifiers.imitatesIndividual}}checked{{/if}} /> Imitates a specific individual (+1CS)</label>
+        {{/if}}
+        <span class="hw-inline-field">
+          <label>Custom CS</label>
+          <input type="number" step="1" class="hw-field hw-num" data-hw-path="customCS" value="{{p.system.hardware.customCS}}" />
+        </span>
+        <span class="hw-inline-field">
+          <label>Special requirements</label>
+          <input type="number" min="0" step="1" class="hw-field hw-num" data-hw-path="specialReqCount" value="{{p.system.hardware.specialReqCount}}" title="RM+ cost may have one; MN+ always has at least one. -1CS each on the success roll (max -3CS). Set by the Judge." />
+        </span>
+      </div>
+
+      <div class="hw-derivation">
+        {{#each p.hw.steps}}<div class="hw-step">{{this}}</div>{{/each}}
+      </div>
+
+      <div class="hw-time">
+        <label class="hw-mods-title">Build time</label>
+        <span class="hw-inline-field">
+          <label>Assistant</label>
+          <select class="hw-field" data-hw-path="time.assistant">
+            <option value="none"      {{#if (eq p.system.hardware.time.assistant "none")}}selected{{/if}}>None</option>
+            <option value="aid"       {{#if (eq p.system.hardware.time.assistant "aid")}}selected{{/if}}>Lab assistant (time ÷2)</option>
+            <option value="brilliant" {{#if (eq p.system.hardware.time.assistant "brilliant")}}selected{{/if}}>Assistant, Reason within one rank (time ÷4)</option>
+          </select>
+        </span>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="time.roundTheClock" {{#if p.system.hardware.time.roundTheClock}}checked{{/if}} /> Working straight through (time ÷2, -1CS on success roll)</label>
+        <span class="hw-time-readout">{{p.hw.adjDays}} days ({{p.hw.days}} base) · Resource FEAT vs {{p.hw.cost}}</span>
+      </div>
+    </details>
+  </div>
+  {{/each}}
+  {{else}}
+  <div class="hw-empty">No inventions yet. Use <b>+ new invention</b> to start one — completed devices remain normal equipment items and appear on the Equipment tab.</div>
+  {{/if}}
+</div>

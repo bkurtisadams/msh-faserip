@@ -346,6 +346,35 @@
       "armorNature": "natural",
       "bodyArmorType": "both",
       "protectionValue": 0,
+      "hardware": {
+        "enabled": false,
+        "status": "design",
+        "itemClass": "other",
+        "applicableRanks": [],
+        "modifiers": {
+          "invisible": false,
+          "pocketSized": false,
+          "portable": false,
+          "multiArea": false,
+          "meleeTouch": false,
+          "noProtection": false,
+          "gev": false,
+          "humanoid": false,
+          "imitatesIndividual": false,
+          "beyondTech": false
+        },
+        "customCS": 0,
+        "specialReqCount": 0,
+        "effectiveCost": "",
+        "derivation": "",
+        "time": {
+          "daysRequired": 0,
+          "daysElapsed": 0,
+          "assistant": "none",
+          "roundTheClock": false
+        },
+        "notes": ""
+      },
       "forceFieldPersonal": false,
       "forceFieldCoverage": 0,
       "resistanceType": "",

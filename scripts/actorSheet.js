@@ -1,4 +1,10 @@
-// actorSheet.js v2.3.6 - 2026-07-05
+// actorSheet.js v2.4.0 - 2026-07-07
+// v2.4.0: Hardware tab Slice 1. getData supplies hardwareProjects (equipment
+//         items with system.hardware.enabled, decorated with computed
+//         effective cost / derivation / build days via hardware-rules.mjs),
+//         hwInventor strip data, hwRankChoices. Listeners: new-invention
+//         creation, applicable-rank row add/edit/remove, modifier + time
+//         fields with recompute-on-change (_hwUpdate), rename, open, delete.
 // v2.3.6: Fix two sheet-roll card crashes on core 14+ (resistance roll,
 //         ability roll). applyMode() was fed the legacy core.rollMode value
 //         (a roll mode, not a message mode) and threw on .handler; now reads
@@ -94,6 +100,7 @@ import {
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
+import { computeEffectiveCost, buildDays, adjustedDays, defaultHardware } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
@@ -281,6 +288,35 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       powerItem: context.equipment.filter(i => i.system.category === "power-item").length,
       gear:      context.equipment.filter(i => !GROUPED.includes(i.system.category)).length
     };
+
+    // Hardware tab (Slice 1): invention projects are equipment items flagged
+    // with system.hardware.enabled. Effective cost / derivation / build days
+    // are recomputed for display so the readout is always canonical.
+    context.hardwareProjects = context.equipment
+      .filter(i => i.system.hardware?.enabled)
+      .map(i => {
+        const hw = i.system.hardware;
+        const ec = computeEffectiveCost(hw);
+        const days = ec.valid ? buildDays(ec.costRank) : 0;
+        const adj = adjustedDays(days, hw.time ?? {});
+        return {
+          _id: i.id, name: i.name, img: i.img, system: i.system,
+          hw: {
+            cost: ec.valid ? ec.costRank : "\u2014",
+            days,
+            adjDays: Number.isInteger(adj) ? adj : adj.toFixed(1),
+            steps: ec.steps
+          }
+        };
+      });
+    context.hwInventor = {
+      reasonRank: actorData.system.abilities?.reason?.rank ?? "",
+      reasonValue: actorData.system.abilities?.reason?.value ?? 0,
+      resourcesRank: actorData.system.attributes?.resources?.rank ?? "",
+      resourcesValue: actorData.system.attributes?.resources?.value ?? 0
+    };
+    // Feeble..Class 5000 — Shift-0/Beyond are not meaningful effective costs.
+    context.hwRankChoices = _RANKS.slice(1, 17);
 
     // headquarters made sortable, with rent status
     context.headquarters = this.actor.items
@@ -976,6 +1012,23 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   }
 
   // In actorSheet.js, add to the activateListeners function
+  /**
+   * Hardware tab: apply changes (keys relative to system.hardware), recompute
+   * effective cost / derivation / base build days, and persist in one update.
+   */
+  async _hwUpdate(item, changes) {
+    const hw = foundry.utils.mergeObject(
+      foundry.utils.deepClone(item.system.hardware ?? {}),
+      foundry.utils.expandObject(changes)
+    );
+    const ec = computeEffectiveCost(hw);
+    hw.effectiveCost = ec.valid ? ec.costRank : "";
+    hw.derivation = ec.steps.join("\n");
+    hw.time = hw.time ?? {};
+    hw.time.daysRequired = ec.valid ? buildDays(ec.costRank) : 0;
+    await item.update({ "system.hardware": hw });
+  }
+
   activateListeners(html) {
     super.activateListeners(html);
 
@@ -2588,6 +2641,76 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       } else {
         ui.notifications.warn("Equipment compendium not found.");
       }
+    });
+
+    // ── Hardware tab (Slice 1) ──────────────────────────────────────────
+    html.find('.hw-add-invention').click(async () => {
+      const hw = defaultHardware();
+      const ec = computeEffectiveCost(hw);
+      hw.effectiveCost = ec.costRank;
+      hw.derivation = ec.steps.join("\n");
+      hw.time.daysRequired = buildDays(ec.costRank);
+      await this.actor.createEmbeddedDocuments("Item", [{
+        name: "New Invention", type: "equipment",
+        system: { category: "gear", materialStrength: "Typical", price: "Poor",
+                  description: "", notes: "", hardware: hw }
+      }]);
+    });
+
+    const hwItem = ev => this.actor.items.get($(ev.currentTarget).closest('.hw-project').data('itemId'));
+
+    html.find('.hw-project .hw-open').click(ev => hwItem(ev)?.sheet.render(true));
+
+    html.find('.hw-project .hw-delete').click(async ev => {
+      const item = hwItem(ev); if (!item) return;
+      const ok = await Dialog.confirm({
+        title: "Delete Invention",
+        content: `<p>Delete <b>${item.name}</b>? This removes the equipment item entirely.</p>`
+      });
+      if (ok) await item.delete();
+    });
+
+    html.find('.hw-project .hw-name').change(ev => {
+      const item = hwItem(ev); if (!item) return;
+      item.update({ name: ev.currentTarget.value || "New Invention" });
+    });
+
+    // Generic hardware field: data-hw-path is relative to system.hardware.
+    html.find('.hw-project .hw-field').change(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const el = ev.currentTarget;
+      const path = el.dataset.hwPath;
+      if (!path) return;
+      let value;
+      if (el.type === "checkbox") value = el.checked;
+      else if (el.type === "number") value = Number(el.value) || 0;
+      else value = el.value;
+      this._hwUpdate(item, { [path]: value });
+    });
+
+    html.find('.hw-project .hw-rank-add').click(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const ranks = foundry.utils.deepClone(item.system.hardware?.applicableRanks ?? []);
+      ranks.push({ label: "", rank: "Typical" });
+      this._hwUpdate(item, { applicableRanks: ranks });
+    });
+
+    html.find('.hw-project .hw-rank-remove').click(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const idx = Number($(ev.currentTarget).closest('.hw-rank-row').data('idx'));
+      const ranks = foundry.utils.deepClone(item.system.hardware?.applicableRanks ?? []);
+      ranks.splice(idx, 1);
+      this._hwUpdate(item, { applicableRanks: ranks });
+    });
+
+    html.find('.hw-project .hw-rank-label, .hw-project .hw-rank-rank').change(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const row = $(ev.currentTarget).closest('.hw-rank-row');
+      const idx = Number(row.data('idx'));
+      const ranks = foundry.utils.deepClone(item.system.hardware?.applicableRanks ?? []);
+      if (!ranks[idx]) return;
+      ranks[idx] = { label: row.find('.hw-rank-label').val(), rank: row.find('.hw-rank-rank').val() };
+      this._hwUpdate(item, { applicableRanks: ranks });
     });
 
     // Equipment info button
