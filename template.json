@@ -373,6 +373,21 @@
           "assistant": "none",
           "roundTheClock": false
         },
+        "resourceFeat": {
+          "made": false,
+          "funding": "solo",
+          "gameDate": ""
+        },
+        "successFeat": {
+          "rolled": false,
+          "color": "",
+          "talentsCS": 0,
+          "rebuild": false,
+          "gameDate": "",
+          "fineTuneDays": 0,
+          "failTurns": 0
+        },
+        "startedGameDate": "",
         "notes": ""
       },
       "forceFieldPersonal": false,

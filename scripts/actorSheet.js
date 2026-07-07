@@ -1,4 +1,14 @@
-// actorSheet.js v2.4.0 - 2026-07-07
+// actorSheet.js v2.5.0 - 2026-07-07
+// v2.5.0: Hardware tab Slice 2. Resource FEAT dialog per invention (solo /
+//         combined / Contacts funding via fundingResourceRank, reuses the
+//         shared weekly resource lockout flags and requirement thresholds,
+//         house-style chat card, sets status building on success). Build-day
+//         tracker (+1d/+5d/complete against adjusted days). Success Reason
+//         FEAT dialog (CS from successFeatCS, Karma declared before the
+//         roll and deducted via karma history, color degradation when cost
+//         exceeds shifted Reason, white/green/yellow/red outcomes with 1d10
+//         fail-turns / fine-tune days, status transitions). Testing-state
+//         fine-tune / rebuild handlers.
 // v2.4.0: Hardware tab Slice 1. getData supplies hardwareProjects (equipment
 //         items with system.hardware.enabled, decorated with computed
 //         effective cost / derivation / build days via hardware-rules.mjs),
@@ -100,7 +110,8 @@ import {
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
-import { computeEffectiveCost, buildDays, adjustedDays, defaultHardware } from "./rules/hardware-rules.mjs";
+import { computeEffectiveCost, buildDays, adjustedDays, defaultHardware,
+         successFeatCS, costExceedsReason, fundingResourceRank } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
@@ -299,13 +310,27 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
         const ec = computeEffectiveCost(hw);
         const days = ec.valid ? buildDays(ec.costRank) : 0;
         const adj = adjustedDays(days, hw.time ?? {});
+        const sf = hw.successFeat ?? {};
+        const cs = successFeatCS({
+          assistant: hw.time?.assistant === "brilliant",
+          talents: sf.talentsCS, rushed: !!hw.time?.roundTheClock,
+          specialReqs: hw.specialReqCount, rebuild: !!sf.rebuild
+        });
+        const reasonRank = actorData.system.abilities?.reason?.rank ?? "Typical";
+        const shiftedReason = shiftRank(reasonRank, cs);
+        const elapsed = Number(hw.time?.daysElapsed) || 0;
         return {
           _id: i.id, name: i.name, img: i.img, system: i.system,
           hw: {
             cost: ec.valid ? ec.costRank : "\u2014",
             days,
             adjDays: Number.isInteger(adj) ? adj : adj.toFixed(1),
-            steps: ec.steps
+            steps: ec.steps,
+            successCS: cs, successCSPos: cs >= 0,
+            shiftedReason,
+            degrade: ec.valid && costExceedsReason(ec.costRank, shiftedReason),
+            progressPct: adj > 0 ? Math.min(100, Math.round(elapsed / adj * 100)) : 0,
+            timeDone: ec.valid && adj > 0 && elapsed >= adj - 1e-9
           }
         };
       });
@@ -1027,6 +1052,366 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     hw.time = hw.time ?? {};
     hw.time.daysRequired = ec.valid ? buildDays(ec.costRank) : 0;
     await item.update({ "system.hardware": hw });
+  }
+
+  /** Campaign-date tag, "M/D/YYYY" or "". */
+  _hwDateTag() {
+    try { const d = game.msh.getCampaignDateTime().date;
+          return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; }
+    catch { return ""; }
+  }
+
+  /** Append a karma-history entry (system convention: negative = spend). */
+  async _hwLogHistory(amount, type, description) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      realDate: new Date().toLocaleDateString(),
+      gameDate: this._hwDateTag(),
+      amount, type, description
+    };
+    const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+    history.push(entry);
+    if (typeof game.msh?.runAsGM === "function") {
+      game.msh.runAsGM({ operation: "update", targetActorUuid: this.actor.uuid,
+                         args: [{ "system.karma.history": history }] });
+    } else {
+      await this.actor.update({ "system.karma.history": history });
+    }
+  }
+
+  /** Hardware Slice 2: Resource FEAT vs effective cost. RAW p.68 — solo,
+   *  combined (two heroes within one rank), or Contacts funding. Failure
+   *  locks further attempts for one week (shared resource-FEAT ledger). */
+  _hwResourceFeat(item) {
+    const hw = item.system.hardware ?? {};
+    const ec = computeEffectiveCost(hw);
+    if (!ec.valid) return ui.notifications.warn("Set at least one applicable rank first.");
+    const cost = ec.costRank;
+    const ranks = this._resourceRanks();
+    const costIdx = _RANKS.indexOf(cost);
+    const baseRank = this.actor.system.attributes.resources.rank;
+    const lock = this._getResourceLockStatus();
+    const isGM = game.user.isGM;
+    const dateTag = this._hwDateTag();
+
+    const contactOpts = ranks.slice(1).map(r => `<option value="${r}">${r}</option>`).join("");
+    let lockbar = "";
+    if (lock.enabled && lock.locked) {
+      const why = lock.scope === "week"
+        ? "a Resource FEAT was made this week"
+        : `failed a ${ranks[lock.lockedIdx] ?? "high-rank"} attempt`;
+      lockbar = `<div class="frp-lockbar locked"><span class="ic">\u23f3</span>
+        <span><b>Locked</b> \u2014 ${why}. Next attempt in <b>${lock.daysLeft} day${lock.daysLeft>1?"s":""}</b>.</span>
+        <span class="src">${dateTag}</span></div>`;
+    }
+    const gmrow = (isGM && lock.locked)
+      ? `<div class="frp-gm-row show"><label><input type="checkbox" id="hwres-ovr"> Override weekly lockout</label><span class="tag">GM</span></div>`
+      : "";
+
+    const content = `
+      <div class="frp-dlg frp-res">
+        <div class="frp-header-v3">
+          <span class="h-action">Invention&nbsp;Resource&nbsp;FEAT</span>
+          <span class="h-paren">\u00b7</span>
+          <span class="h-actor">${item.name}</span>
+          <span class="h-spacer"></span>
+          <span class="h-stat"><span class="h-stat-label">Cost</span>
+            <span class="h-stat-rank">${cost}</span></span>
+        </div>
+        ${lockbar}
+        ${gmrow}
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Funding</span>
+          <select id="hwres-funding" style="flex:1;">
+            <option value="solo">Solo \u2014 my Resources (${baseRank})</option>
+            <option value="combined">Combined \u2014 second hero, Resources within one rank (counts as ${fundingResourceRank(baseRank, "combined")})</option>
+            <option value="contacts">Contacts \u2014 backing organization</option>
+          </select></div>
+        <div class="frp-box" id="hwres-contact-row" style="display:none;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Contact</span>
+          <select id="hwres-contact" style="flex:1;">${contactOpts}</select></div>
+        <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
+          <span id="hwres-pill" class="frp-feat-pill is-green">\u2014</span>
+          <span id="hwres-hint" class="hint"></span></div>
+        <div class="frp-foot">
+          <div class="frp-foot-btns">
+            <button id="hwres-roll" class="frp-btn-roll">Roll</button>
+            <button id="hwres-cancel" class="frp-btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    const self = this;
+    showFaseripDialog({
+      title: `Invention Resource FEAT: ${item.name}`,
+      content,
+      render: async (html, dlg) => {
+        const $funding = html.find("#hwres-funding");
+        const $contactRow = html.find("#hwres-contact-row");
+        const $contact = html.find("#hwres-contact");
+        const $ovr = html.find("#hwres-ovr");
+        const $pill = html.find("#hwres-pill");
+        const $hint = html.find("#hwres-hint");
+        const $roll = html.find("#hwres-roll");
+
+        const effRank = () => fundingResourceRank(baseRank, $funding.val(), $contact.val());
+        const refresh = () => {
+          $contactRow.css("display", $funding.val() === "contacts" ? "flex" : "none");
+          const req = self._resourceFeatRequirement(_RANKS.indexOf(effRank()), costIdx, false);
+          const cls = { "Automatic":"is-auto","Green":"is-green","Yellow":"is-yellow","Impossible":"is-impossible" }[req.color] || "is-green";
+          $pill.attr("class", `frp-feat-pill ${cls}`).text(req.color.toUpperCase());
+          $hint.text(req.hint);
+          const overridden = $ovr.length ? $ovr.is(":checked") : false;
+          const blocked = lock.locked && !overridden &&
+            (lock.scope === "week" || (lock.scope === "fail" && costIdx >= lock.lockedIdx));
+          $roll.prop("disabled", req.color === "Impossible" || blocked)
+               .text(blocked ? "Locked this week" : "Roll");
+        };
+        $funding.on("change", refresh);
+        $contact.on("change", refresh);
+        $ovr.on("change", refresh);
+        refresh();
+
+        html.find("#hwres-cancel").on("click", () => dlg.close());
+        $roll.off("click.hw").on("click.hw", async () => {
+          if ($roll.prop("disabled")) return;
+          const funding = $funding.val();
+          const rollRank = effRank();
+          const req = self._resourceFeatRequirement(_RANKS.indexOf(rollRank), costIdx, false);
+          if (req.color === "Impossible") return;
+
+          const roll = new Roll("1d100");
+          await roll.evaluate();
+          const resultColor = game.msh.rollUniversalTable(rollRank, roll.total);
+          const rcl = resultColor.toLowerCase();
+          let success = false;
+          if (req.color === "Automatic") success = true;
+          else if (req.color === "Green") success = ["green","yellow","red"].includes(rcl);
+          else if (req.color === "Yellow") success = ["yellow","red"].includes(rcl);
+
+          const fundLabel = { solo: "Solo", combined: "Combined FEAT", contacts: `Contacts (${rollRank})` }[funding];
+          const bannerBg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[rcl] || "#ccc";
+          const bannerFg = ["white","yellow"].includes(rcl) ? "#222" : "#fff";
+          const contactNote = (funding === "contacts")
+            ? `<div style="padding:7px 12px;font-size:12px;background:#fffde7;border-top:1px solid #ffd54f;color:#6b5d00;line-height:1.4;"><b>Contacts funding.</b> Persuading them may take Popularity FEATs, and the backers may attach their own restrictions or requirements (Judge).</div>`
+            : "";
+          const failNote = !success
+            ? `<div style="padding:7px 12px;font-size:12px;background:#fdecea;border-top:1px solid #f5c6c2;color:#7a1f1a;line-height:1.4;">Cost is not prohibitive \u2014 the money just is not there right now. No further Resource FEAT before <b>next week</b>.</div>`
+            : "";
+
+          const card = `
+            <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;overflow:hidden;color:#333;">
+              <div style="padding:7px 12px;border-bottom:1px solid #d8d8d0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <strong style="color:#8b0000;font-size:14px;letter-spacing:.3px;">Invention Resource FEAT</strong>
+                <span style="color:#888;font-size:12px;">${item.name}</span></div>
+              <div style="padding:6px 12px;display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e2da;">
+                <span><span style="color:#888;">Funding:</span> <b>${fundLabel}</b></span>
+                <span><span style="color:#888;">Effective Cost:</span> <b>${cost}</b></span></div>
+              <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bannerBg};color:${bannerFg};">${resultColor.toUpperCase()}</div>
+              <div style="display:flex;background:#fff;text-align:center;border-bottom:1px solid #ddd;">
+                <div style="flex:1;padding:8px 4px;border-right:1px solid #ececec;">
+                  <div style="font-size:24px;font-weight:bold;color:#222;line-height:1;">${roll.total}</div>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">Roll</div></div>
+                <div style="flex:1.4;padding:8px 4px;border-right:1px solid #ececec;">
+                  <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${rollRank}</div>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">Resources</div></div>
+                <div style="flex:1.2;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
+                  <span class="frp-feat-pill ${ { "Automatic":"is-auto","Green":"is-green","Yellow":"is-yellow" }[req.color] || "is-green" }">${req.color.toUpperCase()}</span>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;text-transform:uppercase;">needed</div></div></div>
+              <div style="padding:7px 12px;text-align:center;font-weight:bold;font-size:14px;letter-spacing:.5px;color:${success?"#1b5e20":"#c62828"};">
+                ${success ? "\u2713 PROJECT FUNDED \u2014 WORK BEGINS" : "\u2717 CANNOT FUND"}</div>
+              ${contactNote}${failNote}
+            </div>`;
+
+          const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls: [roll] };
+          try { ChatMessage.applyMode(msg, game.settings.get("core", "messageMode")); }
+          catch { try { ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode")); } catch {} }
+          await ChatMessage.create(msg);
+
+          if (lock.enabled) {
+            let now;
+            try { now = game.msh.getCampaignDateTime().elapsedSeconds; }
+            catch { now = game.time.worldTime; }
+            const upd = { lastAttemptWT: now };
+            if (!success) { upd.lastFailWT = now; upd.lastFailIdx = costIdx; }
+            await this.actor.setFlag("msh-faserip", "resourceFeat",
+              foundry.utils.mergeObject(this.actor.getFlag("msh-faserip","resourceFeat") || {}, upd));
+          }
+
+          await this._hwLogHistory(0, "Resource FEAT",
+            `Invention: ${item.name} (${cost}) [${fundLabel}] - ${success ? "SUCCESS" : "FAILED"}`);
+
+          if (success) {
+            await this._hwUpdate(item, {
+              "status": "building",
+              "resourceFeat.made": true,
+              "resourceFeat.funding": funding,
+              "resourceFeat.gameDate": dateTag,
+              "startedGameDate": dateTag,
+              "time.daysElapsed": 0
+            });
+          }
+          if (!isDialogDetached(dlg)) dlg.close();
+        });
+      }
+    });
+  }
+
+  /** Hardware Slice 2: invention success Reason FEAT. Karma is declared
+   *  before the roll (RAW). If effective cost exceeds the shifted Reason,
+   *  the rolled color reads one worse. */
+  _hwSuccessFeat(item) {
+    const hw = item.system.hardware ?? {};
+    const ec = computeEffectiveCost(hw);
+    if (!ec.valid) return ui.notifications.warn("Set at least one applicable rank first.");
+    const cost = ec.costRank;
+    const days = buildDays(cost);
+    const adj = adjustedDays(days, hw.time ?? {});
+    const elapsed = Number(hw.time?.daysElapsed) || 0;
+    const timeDone = adj > 0 && elapsed >= adj - 1e-9;
+    const isGM = game.user.isGM;
+    if (!timeDone && !isGM)
+      return ui.notifications.warn(`Build time not complete: ${elapsed} of ${adj} adjusted days.`);
+
+    const sf = hw.successFeat ?? {};
+    const csParts = [];
+    if (hw.time?.assistant === "brilliant") csParts.push("+1CS assistant (Reason within one rank)");
+    const talents = Math.min(Math.max(Number(sf.talentsCS) || 0, 0), 3);
+    if (talents) csParts.push(`+${talents}CS applicable talents`);
+    if (hw.time?.roundTheClock) csParts.push("-1CS rushed (working straight through)");
+    const reqs = Math.min(Math.max(Number(hw.specialReqCount) || 0, 0), 3);
+    if (reqs) csParts.push(`-${reqs}CS special requirements`);
+    if (sf.rebuild) csParts.push("+1CS rebuilding from salvage / failed experiment");
+    const cs = successFeatCS({
+      assistant: hw.time?.assistant === "brilliant",
+      talents: sf.talentsCS, rushed: !!hw.time?.roundTheClock,
+      specialReqs: hw.specialReqCount, rebuild: !!sf.rebuild
+    });
+    const reasonRank = this.actor.system.abilities?.reason?.rank ?? "Typical";
+    const shifted = shiftRank(reasonRank, cs);
+    const degrade = costExceedsReason(cost, shifted);
+    const availableKarma = this.actor.availableKarma ?? 0;
+    const dateTag = this._hwDateTag();
+
+    const timeWarn = !timeDone
+      ? `<div class="frp-lockbar locked"><span class="ic">\u23f3</span><span><b>Time incomplete</b> \u2014 ${elapsed} of ${adj} adjusted days logged.</span><span class="tag">GM override</span></div>`
+      : "";
+    const degradeWarn = degrade
+      ? `<div class="frp-lockbar locked"><span class="ic">\u26a0</span><span><b>Cost ${cost} exceeds shifted Reason ${shifted}</b> \u2014 the result reads one color worse.</span></div>`
+      : "";
+
+    const content = `
+      <div class="frp-dlg frp-res">
+        <div class="frp-header-v3">
+          <span class="h-action">Invention&nbsp;Success&nbsp;FEAT</span>
+          <span class="h-paren">\u00b7</span>
+          <span class="h-actor">${item.name}</span>
+          <span class="h-spacer"></span>
+          <span class="h-stat"><span class="h-stat-label">Reason</span>
+            <span class="h-stat-rank">${reasonRank} \u2192 ${shifted}</span></span>
+        </div>
+        ${timeWarn}${degradeWarn}
+        <div class="frp-box"><span class="frp-box-label">Column shifts (${cs >= 0 ? "+" : ""}${cs}CS)</span>
+          <div style="font-size:11px;line-height:1.5;">${csParts.length ? csParts.join("<br>") : "None"}</div></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;">Karma (declare before roll)</span>
+          <input type="number" id="hwsuc-karma" min="0" max="${availableKarma}" step="1" value="0" style="width:70px;">
+          <span class="hint">available: ${availableKarma}</span></div>
+        <div class="frp-foot">
+          <div class="frp-foot-btns">
+            <button id="hwsuc-roll" class="frp-btn-roll">Roll</button>
+            <button id="hwsuc-cancel" class="frp-btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    showFaseripDialog({
+      title: `Invention Success FEAT: ${item.name}`,
+      content,
+      render: async (html, dlg) => {
+        html.find("#hwsuc-cancel").on("click", () => dlg.close());
+        html.find("#hwsuc-roll").off("click.hw").on("click.hw", async () => {
+          let karma = Math.min(Math.max(Number(html.find("#hwsuc-karma").val()) || 0, 0), availableKarma);
+
+          const roll = new Roll("1d100");
+          await roll.evaluate();
+          const total = Math.min(roll.total + karma, 100);
+          const rolledColor = game.msh.rollUniversalTable(shifted, total).toLowerCase();
+          const finalColor = degrade
+            ? ({ red: "yellow", yellow: "green", green: "white", white: "white" }[rolledColor] ?? rolledColor)
+            : rolledColor;
+
+          const rolls = [roll];
+          let extra = 0;
+          if (finalColor === "green" || finalColor === "yellow") {
+            const d10 = new Roll("1d10");
+            await d10.evaluate();
+            extra = d10.total;
+            rolls.push(d10);
+          }
+
+          const OUTCOME = {
+            white:  { txt: "You missed something, but a double check shows what it is. <b>Start again</b> \u2014 same time, no new Resource FEAT, +1 special requirement.", status: "building" },
+            green:  { txt: `It flies, Wilbur, but not for long. The device <b>fails after ${extra} turns</b>. Repairs are done as for a White result.`, status: "testing" },
+            yellow: { txt: `<b>Working prototype.</b> Operates at -1CS on all abilities until fine-tuned \u2014 <b>${extra} additional days</b>.`, status: "testing" },
+            red:    { txt: "<b>Success!</b> The device does exactly what it was designed for.", status: "complete" }
+          }[finalColor];
+
+          const bannerBg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[finalColor] || "#ccc";
+          const bannerFg = ["white","yellow"].includes(finalColor) ? "#222" : "#fff";
+          const banner = degrade && rolledColor !== finalColor
+            ? `ROLLED ${rolledColor.toUpperCase()} \u2192 READS ${finalColor.toUpperCase()}`
+            : finalColor.toUpperCase();
+          const karmaLine = karma
+            ? `<span><span style="color:#888;">Karma:</span> <b>+${karma}</b> (declared)</span>`
+            : "";
+
+          const card = `
+            <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;overflow:hidden;color:#333;">
+              <div style="padding:7px 12px;border-bottom:1px solid #d8d8d0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <strong style="color:#8b0000;font-size:14px;letter-spacing:.3px;">Invention Success FEAT</strong>
+                <span style="color:#888;font-size:12px;">${item.name}</span></div>
+              <div style="padding:6px 12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:13px;border-bottom:1px solid #e2e2da;">
+                <span><span style="color:#888;">Reason:</span> <b>${reasonRank} \u2192 ${shifted}</b> (${cs >= 0 ? "+" : ""}${cs}CS)</span>
+                <span><span style="color:#888;">Cost:</span> <b>${cost}</b></span>${karmaLine}</div>
+              <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bannerBg};color:${bannerFg};">${banner}</div>
+              <div style="display:flex;background:#fff;text-align:center;border-bottom:1px solid #ddd;">
+                <div style="flex:1;padding:8px 4px;border-right:1px solid #ececec;">
+                  <div style="font-size:24px;font-weight:bold;color:#222;line-height:1;">${total}</div>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">${karma ? `${roll.total} + ${karma} karma` : "Roll"}</div></div>
+                <div style="flex:1.4;padding:8px 4px;">
+                  <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${shifted}</div>
+                  <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">Reason column</div></div></div>
+              <div style="padding:8px 12px;font-size:12px;line-height:1.5;">${OUTCOME.txt}</div>
+            </div>`;
+
+          const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls };
+          try { ChatMessage.applyMode(msg, game.settings.get("core", "messageMode")); }
+          catch { try { ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode")); } catch {} }
+          await ChatMessage.create(msg);
+
+          if (karma > 0)
+            await this._hwLogHistory(-karma, "Invention FEAT", `Karma on success roll: ${item.name}`);
+          await this._hwLogHistory(0, "Invention FEAT",
+            `${item.name} (${cost}) - ${banner}`);
+
+          const changes = {
+            "status": OUTCOME.status,
+            "successFeat.rolled": true,
+            "successFeat.color": finalColor,
+            "successFeat.gameDate": dateTag,
+            "successFeat.fineTuneDays": finalColor === "yellow" ? extra : 0,
+            "successFeat.failTurns": finalColor === "green" ? extra : 0
+          };
+          if (finalColor === "white") {
+            changes["time.daysElapsed"] = 0;
+            changes["specialReqCount"] = (Number(hw.specialReqCount) || 0) + 1;
+          }
+          await this._hwUpdate(item, changes);
+          if (!isDialogDetached(dlg)) dlg.close();
+        });
+      }
+    });
   }
 
   activateListeners(html) {
@@ -2711,6 +3096,52 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (!ranks[idx]) return;
       ranks[idx] = { label: row.find('.hw-rank-label').val(), rank: row.find('.hw-rank-rank').val() };
       this._hwUpdate(item, { applicableRanks: ranks });
+    });
+
+    // Slice 2: pipeline actions.
+    html.find('.hw-project .hw-roll-resources').click(ev => {
+      const item = hwItem(ev); if (item) this._hwResourceFeat(item);
+    });
+
+    html.find('.hw-project .hw-day-add').click(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const hw = item.system.hardware ?? {};
+      const ec = computeEffectiveCost(hw);
+      const adj = ec.valid ? adjustedDays(buildDays(ec.costRank), hw.time ?? {}) : 0;
+      const add = Number($(ev.currentTarget).data('days')) || 1;
+      const elapsed = Math.min(adj, (Number(hw.time?.daysElapsed) || 0) + add);
+      this._hwUpdate(item, { "time.daysElapsed": elapsed });
+    });
+
+    html.find('.hw-project .hw-day-complete').click(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const hw = item.system.hardware ?? {};
+      const ec = computeEffectiveCost(hw);
+      const adj = ec.valid ? adjustedDays(buildDays(ec.costRank), hw.time ?? {}) : 0;
+      this._hwUpdate(item, { "time.daysElapsed": adj });
+    });
+
+    html.find('.hw-project .hw-roll-success').click(ev => {
+      const item = hwItem(ev); if (item) this._hwSuccessFeat(item);
+    });
+
+    // Yellow prototype fine-tuned, or GM marks a green device as holding.
+    html.find('.hw-project .hw-finish-tuning').click(ev => {
+      const item = hwItem(ev); if (!item) return;
+      this._hwUpdate(item, { "status": "complete" });
+    });
+
+    // Green-result rebuild: same time, +1 special requirement, no new
+    // Resource FEAT (RAW: repairs done as for White result).
+    html.find('.hw-project .hw-restart').click(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const hw = item.system.hardware ?? {};
+      this._hwUpdate(item, {
+        "status": "building",
+        "time.daysElapsed": 0,
+        "specialReqCount": (Number(hw.specialReqCount) || 0) + 1,
+        "successFeat.rebuild": true
+      });
     });
 
     // Equipment info button

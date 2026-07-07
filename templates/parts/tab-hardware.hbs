@@ -1,4 +1,5 @@
-{{!-- tab-hardware.hbs — v1.0.0: Slice 1 — Hardware tab shell. Inventor strip (Reason/Resources), invention project list over equipment items with system.hardware.enabled, per-project effective-cost calculator (applicable ranks, RAW CS modifiers, custom shift, Beyond-1980s-tech), derivation trace, build-time readout with assistant/round-the-clock reductions. FEAT rolls arrive in Slice 2. --}}
+{{!-- tab-hardware.hbs — v1.1.0: Slice 2 — Resource FEAT button (design), build-day tracker with progress bar (building), success Reason FEAT (building, time complete), testing-state notes with fine-tune/restart links, success-FEAT modifier inputs (talents CS, rebuild) with live shifted-Reason readout and cost-exceeds-Reason degradation warning. --}}
+{{!-- v1.0.0: Slice 1 — tab shell, inventor strip, project list, effective-cost calculator. --}}
 <div class="tab" data-tab="hardware">
   <div class="tab-list-header labeled">
     <span class="th-label">Hardware</span>
@@ -15,7 +16,7 @@
 
   {{#if hardwareProjects.length}}
   {{#each hardwareProjects as |p|}}
-  <div class="hw-project" data-item-id="{{p._id}}">
+  <div class="hw-project hw-status-{{p.system.hardware.status}}" data-item-id="{{p._id}}">
     <div class="hw-project-header">
       <img src="{{p.img}}" class="hw-icon" width="24" height="24" />
       <input type="text" class="hw-name" value="{{p.name}}" placeholder="Invention name" />
@@ -33,6 +34,48 @@
         <a class="hw-delete" title="Delete invention"><i class="fas fa-trash"></i></a>
       </span>
     </div>
+
+    {{#if (eq p.system.hardware.status "design")}}
+    <div class="hw-pipeline">
+      <a class="hw-btn hw-roll-resources" title="Resource FEAT vs effective cost — failure locks attempts for one week"><i class="fas fa-coins"></i> Resource FEAT vs {{p.hw.cost}}</a>
+      <span class="hw-pipe-note">Fund the project to begin construction.</span>
+    </div>
+    {{/if}}
+
+    {{#if (eq p.system.hardware.status "building")}}
+    <div class="hw-pipeline">
+      <span class="hw-funded" title="Funded {{p.system.hardware.resourceFeat.gameDate}}"><i class="fas fa-check"></i> Funded</span>
+      <div class="hw-progress" title="{{p.system.hardware.time.daysElapsed}} of {{p.hw.adjDays}} adjusted days">
+        <div class="hw-progress-fill" style="width:{{p.hw.progressPct}}%;"></div>
+        <span class="hw-progress-label">{{p.system.hardware.time.daysElapsed}} / {{p.hw.adjDays}}d</span>
+      </div>
+      <a class="hw-btn hw-day-add" data-days="1" title="Log one day of work">+1d</a>
+      <a class="hw-btn hw-day-add" data-days="5" title="Log five days of work">+5d</a>
+      <a class="hw-btn hw-day-complete" title="Log remaining build time"><i class="fas fa-forward"></i></a>
+      <a class="hw-btn hw-roll-success {{#unless p.hw.timeDone}}hw-btn-disabled{{/unless}}" title="Reason FEAT — does the invention work?"><i class="fas fa-flask"></i> Success FEAT</a>
+    </div>
+    {{/if}}
+
+    {{#if (eq p.system.hardware.status "testing")}}
+    <div class="hw-pipeline">
+      {{#if (eq p.system.hardware.successFeat.color "yellow")}}
+      <span class="hw-pipe-note"><b>Working prototype</b> — operates at -1CS until fine-tuned ({{p.system.hardware.successFeat.fineTuneDays}} more days).</span>
+      <a class="hw-btn hw-finish-tuning"><i class="fas fa-check"></i> Fine-tuning complete</a>
+      {{/if}}
+      {{#if (eq p.system.hardware.successFeat.color "green")}}
+      <span class="hw-pipe-note"><b>It flies, Wilbur…</b> — device fails after {{p.system.hardware.successFeat.failTurns}} turns. Repair = rebuild (same time, +1 special requirement, no new Resource FEAT).</span>
+      <a class="hw-btn hw-restart"><i class="fas fa-rotate-left"></i> Rebuild</a>
+      <a class="hw-btn hw-finish-tuning" title="GM: device held together"><i class="fas fa-check"></i> Mark complete</a>
+      {{/if}}
+    </div>
+    {{/if}}
+
+    {{#if (eq p.system.hardware.status "complete")}}
+    <div class="hw-pipeline hw-pipeline-done">
+      <span class="hw-funded"><i class="fas fa-check-double"></i> Complete{{#if p.system.hardware.successFeat.gameDate}} — {{p.system.hardware.successFeat.gameDate}}{{/if}}</span>
+      <span class="hw-pipe-note">The device is a normal equipment item on the Equipment tab.</span>
+    </div>
+    {{/if}}
 
     <details class="hw-project-body">
       <summary>Effective-cost calculator</summary>
@@ -110,11 +153,24 @@
           <select class="hw-field" data-hw-path="time.assistant">
             <option value="none"      {{#if (eq p.system.hardware.time.assistant "none")}}selected{{/if}}>None</option>
             <option value="aid"       {{#if (eq p.system.hardware.time.assistant "aid")}}selected{{/if}}>Lab assistant (time ÷2)</option>
-            <option value="brilliant" {{#if (eq p.system.hardware.time.assistant "brilliant")}}selected{{/if}}>Assistant, Reason within one rank (time ÷4)</option>
+            <option value="brilliant" {{#if (eq p.system.hardware.time.assistant "brilliant")}}selected{{/if}}>Assistant, Reason within one rank (time ÷4, +1CS success)</option>
           </select>
         </span>
         <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="time.roundTheClock" {{#if p.system.hardware.time.roundTheClock}}checked{{/if}} /> Working straight through (time ÷2, -1CS on success roll)</label>
         <span class="hw-time-readout">{{p.hw.adjDays}} days ({{p.hw.days}} base) · Resource FEAT vs {{p.hw.cost}}</span>
+      </div>
+
+      <div class="hw-success-mods">
+        <label class="hw-mods-title">Success FEAT modifiers</label>
+        <span class="hw-inline-field">
+          <label>Applicable talents</label>
+          <input type="number" min="0" max="3" step="1" class="hw-field hw-num" data-hw-path="successFeat.talentsCS" value="{{p.system.hardware.successFeat.talentsCS}}" title="+1CS each — e.g. Electronics for a robot, Piloting for a plane. Max +3CS." />
+        </span>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="successFeat.rebuild" {{#if p.system.hardware.successFeat.rebuild}}checked{{/if}} /> Rebuilding from failed experiment / kit-bash salvage (+1CS)</label>
+        <span class="hw-success-readout">Success roll: Reason column <b>{{p.hw.shiftedReason}}</b> ({{#if p.hw.successCSPos}}+{{/if}}{{p.hw.successCS}}CS)</span>
+        {{#if p.hw.degrade}}
+        <span class="hw-degrade-warn"><i class="fas fa-triangle-exclamation"></i> Effective cost exceeds shifted Reason — result reads one color worse.</span>
+        {{/if}}
       </div>
     </details>
   </div>

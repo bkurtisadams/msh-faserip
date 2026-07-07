@@ -1,4 +1,7 @@
-// hardware-rules.mjs v1.0.0 - 2026-07-07
+// hardware-rules.mjs v1.1.0 - 2026-07-07
+// v1.1.0: Slice 2 — defaultHardware() gains resourceFeat / successFeat /
+//         startedGameDate blocks; fundingResourceRank() for solo / combined
+//         (two heroes within one rank, effective +1CS) / Contacts funding.
 // v1.0.0: Slice 1 — pure Hardware chapter rules (Advanced Set pp. 65-70).
 //         Effective cost (highest applicable rank, +2CS equal / +1CS one
 //         below / 2+ below free, situational CS modifiers, Beyond-1980s-tech
@@ -175,6 +178,24 @@ export function rangeRankForAreas(areas) {
   return "Class 1000";
 }
 
+/* ── Resource FEAT funding ────────────────────────────────────────────────── */
+
+/**
+ * Effective Resources rank for the invention Resource FEAT.
+ * solo     — the inventor's own Resources.
+ * combined — two characters with Resources within one rank make a single
+ *            FEAT; treated as one rank above the inventor's Resources
+ *            (RAW example: two Amazing fund a Monstrous project).
+ * contacts — the backing organization's Resources rank is used directly.
+ *            Persuading them (Popularity FEATs, strings attached) is the
+ *            Judge's table, not this function's.
+ */
+export function fundingResourceRank(baseRank, funding = "solo", contactsRank = "") {
+  if (funding === "combined") return shiftRank(baseRank, 1);
+  if (funding === "contacts") return normalizeRank(contactsRank || baseRank);
+  return normalizeRank(baseRank);
+}
+
 /* ── Default sub-schema ───────────────────────────────────────────────────── */
 
 /** Fresh hardware block for a new invention (mirrors template.json). */
@@ -194,6 +215,10 @@ export function defaultHardware() {
     effectiveCost: "Typical",
     derivation: "",
     time: { daysRequired: 6, daysElapsed: 0, assistant: "none", roundTheClock: false },
+    resourceFeat: { made: false, funding: "solo", gameDate: "" },
+    successFeat: { rolled: false, color: "", talentsCS: 0, rebuild: false,
+                   gameDate: "", fineTuneDays: 0, failTurns: 0 },
+    startedGameDate: "",
     notes: ""
   };
 }
@@ -262,6 +287,12 @@ if (isMain) {
   // Kit-bash — RAW p.69: Monstrous (75) effective cost = 750 Karma
   eq("kitbash 75", kitbashKarma(75), 750);
   eq("kitbash partial", kitbashKarma(5), 50);
+
+  // Funding — RAW p.68: two Amazing-Resource heroes fund a Monstrous project
+  eq("funding solo", fundingResourceRank("Amazing", "solo"), "Amazing");
+  eq("funding combined", fundingResourceRank("Amazing", "combined"), "Monstrous");
+  eq("funding contacts", fundingResourceRank("Good", "contacts", "Monstrous"), "Monstrous");
+  eq("default schema has feat blocks", defaultHardware().resourceFeat.made === false && defaultHardware().successFeat.rolled === false, true);
 
   // Range table
   eq("range 4", rangeRankForAreas(4), "Good");
