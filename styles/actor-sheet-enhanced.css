@@ -628,26 +628,26 @@ form.faserip-sheet .popularity-header-link:hover {
 }
 
 /* ── Action buttons: sharper and more distinct ──────────────────────────── */
-.action-buttons {
+form.faserip-sheet .action-buttons {
   background-color: var(--mred-dk) !important;
   border-color: var(--mred-dk) !important;
 }
 
-.action-btn {
+form.faserip-sheet .action-btn {
   font-family: 'Barlow Condensed', sans-serif;
   background-color: var(--cream) !important;
 }
-.action-btn:hover {
+form.faserip-sheet .action-btn:hover {
   background-color: #ffe8d0 !important;
 }
 
-.action-btn .action-abbr {
+form.faserip-sheet .action-btn .action-abbr {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: 1.5em;
 }
 
-.action-btn .action-name {
+form.faserip-sheet .action-btn .action-name {
   font-size: 0.72em;
   font-family: 'Barlow Condensed', sans-serif;
   text-transform: uppercase;
@@ -973,36 +973,36 @@ form.faserip-sheet .sheet-tabs-navigation .item.active::after {
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Action buttons: Ben Day dots per color family ─────────────────────── */
-.action-btn[data-action="blunt-attack"],
-.action-btn[data-action="throwing-blunt"],
-.action-btn[data-action="force"],
-.action-btn[data-action="charging"] {
+form.faserip-sheet .action-btn[data-action="blunt-attack"],
+form.faserip-sheet .action-btn[data-action="throwing-blunt"],
+form.faserip-sheet .action-btn[data-action="force"],
+form.faserip-sheet .action-btn[data-action="charging"] {
   background-image: radial-gradient(ellipse at 50% 50%, rgba(200,120,0,.06) 0%, transparent 70%), radial-gradient(circle, rgba(200,100,0,.05) 0.7px, transparent 0.7px) !important;
   background-size: 100% 100%, 3px 3px;
 }
-.action-btn[data-action="edged-attack"],
-.action-btn[data-action="shooting"],
-.action-btn[data-action="throwing-edged"],
-.action-btn[data-action="energy"] {
+form.faserip-sheet .action-btn[data-action="edged-attack"],
+form.faserip-sheet .action-btn[data-action="shooting"],
+form.faserip-sheet .action-btn[data-action="throwing-edged"],
+form.faserip-sheet .action-btn[data-action="energy"] {
   background-image: radial-gradient(ellipse at 50% 50%, rgba(160,0,0,.05) 0%, transparent 70%), radial-gradient(circle, rgba(140,0,0,.045) 0.7px, transparent 0.7px) !important;
   background-size: 100% 100%, 3px 3px;
 }
-.action-btn[data-action="grappling"],
-.action-btn[data-action="grabbing"],
-.action-btn[data-action="escaping"] {
+form.faserip-sheet .action-btn[data-action="grappling"],
+form.faserip-sheet .action-btn[data-action="grabbing"],
+form.faserip-sheet .action-btn[data-action="escaping"] {
   background-image: radial-gradient(ellipse at 50% 50%, rgba(0,80,180,.05) 0%, transparent 70%), radial-gradient(circle, rgba(0,100,200,.045) 0.7px, transparent 0.7px) !important;
   background-size: 100% 100%, 3px 3px;
 }
-.action-btn[data-action="dodging"],
-.action-btn[data-action="evading"],
-.action-btn[data-action="blocking"],
-.action-btn[data-action="catching"] {
+form.faserip-sheet .action-btn[data-action="dodging"],
+form.faserip-sheet .action-btn[data-action="evading"],
+form.faserip-sheet .action-btn[data-action="blocking"],
+form.faserip-sheet .action-btn[data-action="catching"] {
   background-image: radial-gradient(ellipse at 50% 50%, rgba(0,130,0,.05) 0%, transparent 70%), radial-gradient(circle, rgba(0,150,0,.045) 0.7px, transparent 0.7px) !important;
   background-size: 100% 100%, 3px 3px;
 }
-.action-btn[data-action="stun"],
-.action-btn[data-action="slam"],
-.action-btn[data-action="kill"] {
+form.faserip-sheet .action-btn[data-action="stun"],
+form.faserip-sheet .action-btn[data-action="slam"],
+form.faserip-sheet .action-btn[data-action="kill"] {
   background-image: radial-gradient(ellipse at 50% 50%, rgba(110,0,150,.05) 0%, transparent 70%), radial-gradient(circle, rgba(130,0,170,.045) 0.7px, transparent 0.7px) !important;
   background-size: 100% 100%, 3px 3px;
 }
