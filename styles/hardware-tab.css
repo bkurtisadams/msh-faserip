@@ -1,4 +1,6 @@
-/* styles/hardware-tab.css v1.1.0 - 2026-07-07 - FASERIP Hardware tab
+/* styles/hardware-tab.css v1.2.0 - 2026-07-07 - FASERIP Hardware tab
+ * v1.2.0: Slice 3 - kit-bash button accent, salvage button, MOD/SALVAGE
+ *         badges, modification panel.
  * v1.1.0: Slice 2 - pipeline strip (Resource FEAT button, build progress bar,
  *         day buttons, Success FEAT button, testing notes), status accents,
  *         success-modifier group, degrade warning.
@@ -115,3 +117,15 @@
 .msh-faserip .hw-success-mods { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
 .msh-faserip .hw-success-readout { font-size: 12px; font-weight: 700; color: #3d5a80; }
 .msh-faserip .hw-degrade-warn { font-size: 11px; color: #8a5a00; font-weight: 700; }
+
+.msh-faserip .hw-btn-kitbash { border-color: #b45309; color: #b45309; background: #fdf6ec; }
+.msh-faserip .hw-btn-kitbash:hover { background: #b45309; color: #fff; }
+.msh-faserip .hw-salvage { border-color: #2e7d32; color: #2e7d32; background: #f0f7f0; }
+.msh-faserip .hw-salvage:hover { background: #2e7d32; color: #fff; }
+.msh-faserip .hw-badge-mod { background: #6a4fa3; color: #fff; }
+.msh-faserip .hw-badge-salvage { background: #2e7d32; color: #fff; }
+.msh-faserip .hw-mod-panel {
+  border: 1px dashed #b8a6d9; border-radius: 4px; background: #faf8fd;
+  padding: 6px 8px; margin-bottom: 6px;
+  display: flex; flex-direction: column; gap: 4px;
+}

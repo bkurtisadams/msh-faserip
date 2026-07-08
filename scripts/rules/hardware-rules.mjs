@@ -1,4 +1,13 @@
-// hardware-rules.mjs v1.1.0 - 2026-07-07
+// hardware-rules.mjs v1.2.0 - 2026-07-07
+// v1.2.0: Slice 3 — computeCost() mode dispatcher; computeModificationCost()
+//         (ability boosts one rank at a time at the new rank's cost, easy
+//         bolt-on capability at Typical, device-altering capability at the
+//         new power's rank with Good floor / Monstrous floor for
+//         beyond-1980s tech); kitbashRounds(); repairHours(),
+//         centerRepairAuto(), effectiveRepairReason() for repair centers;
+//         requiredColorVsIntensity() and colorMeets() for the chapter's
+//         Reason-FEAT tools (alien tech, borrowed devices, computers).
+//         defaultHardware() gains mode / mod / kitBashed / salvaged.
 // v1.1.0: Slice 2 — defaultHardware() gains resourceFeat / successFeat /
 //         startedGameDate blocks; fundingResourceRank() for solo / combined
 //         (two heroes within one rank, effective +1CS) / Contacts funding.
@@ -101,6 +110,68 @@ export function computeEffectiveCost(hw = {}) {
   return { valid: true, costRank, baseRank: base.rank, cs, steps };
 }
 
+/* ── Modifications (RAW p.69) ─────────────────────────────────────────────── */
+
+export const HW_MOD_KINDS = {
+  abilityBoost:      "Improve an existing rank (one rank at a time)",
+  addCapabilityEasy: "Add capability, simple installation (e.g. artillery on a tank)",
+  addCapabilityHard: "Add capability, device must be altered (e.g. flight on a car)"
+};
+
+/** A modification may only raise a rank one step at a time. */
+export function validateModStep(fromRank, toRank) {
+  return normalizeRank(toRank) === shiftRank(fromRank, 1);
+}
+
+/**
+ * Effective cost of a modification.
+ * abilityBoost      — cost = the NEW rank, one rank step enforced.
+ * addCapabilityEasy — Typical (installation only).
+ * addCapabilityHard — the new power's rank, never less than Good; never less
+ *                     than Monstrous if not reproducible by 1980s tech
+ *                     (hw.modifiers.beyondTech).
+ */
+export function computeModificationCost(hw = {}) {
+  const m = hw.mod ?? {};
+  const target = m.target ? ` on ${m.target}` : "";
+  if (m.kind === "abilityBoost") {
+    const from = normalizeRank(m.fromRank || "Typical");
+    const to = normalizeRank(m.toRank || shiftRank(from, 1));
+    if (!validateModStep(from, to)) {
+      return { valid: false, costRank: "", steps:
+        [`Invalid step ${from} \u2192 ${to}: modifications raise ranks one at a time.`] };
+    }
+    return { valid: true, costRank: to, steps: [
+      `Modification${target}: ${from} \u2192 ${to}`,
+      `Effective Cost: ${to} (cost of the new rank)`
+    ] };
+  }
+  if (m.kind === "addCapabilityEasy") {
+    return { valid: true, costRank: "Typical", steps: [
+      `Modification${target}: add capability, simple installation`,
+      "Effective Cost: Typical (installation only)"
+    ] };
+  }
+  if (m.kind === "addCapabilityHard") {
+    const power = normalizeRank(m.newPowerRank || "Good");
+    const floor = hw.modifiers?.beyondTech ? "Monstrous" : "Good";
+    const costRank = rankIndex(power) >= rankIndex(floor) ? power : floor;
+    const steps = [`Modification${target}: add ${power}-rank capability, device altered`];
+    if (costRank !== power)
+      steps.push(hw.modifiers?.beyondTech
+        ? "Raised to Monstrous floor (not reproducible by 1980s technology)"
+        : "Raised to Good floor (minimum for device-altering capability)");
+    steps.push(`Effective Cost: ${costRank}`);
+    return { valid: true, costRank, steps };
+  }
+  return { valid: false, costRank: "", steps: ["Choose a modification kind."] };
+}
+
+/** Cost dispatcher: invention (default) vs modification. */
+export function computeCost(hw = {}) {
+  return hw.mode === "modification" ? computeModificationCost(hw) : computeEffectiveCost(hw);
+}
+
 /* ── Time ─────────────────────────────────────────────────────────────────── */
 
 /** Days to build = rank number of the effective cost (Typical → 6 days). */
@@ -162,6 +233,51 @@ export function kitbashKarma(daysRemaining) {
   return Math.ceil(Math.max(0, Number(daysRemaining) || 0) * 10);
 }
 
+/** Each kit-bashed day of work takes one round at the bench. */
+export function kitbashRounds(daysRemaining) {
+  return Math.ceil(Math.max(0, Number(daysRemaining) || 0));
+}
+
+/* ── Repairs (RAW p.70) ───────────────────────────────────────────────────── */
+
+/** Repair-center time to restore a device to targetRank: the rank number in
+ *  hours (restoring to Excellent = 20 hours). */
+export function repairHours(targetRank) {
+  return RANK_VALUES[normalizeRank(targetRank)] ?? 0;
+}
+
+/** Repairs are automatic when the center's rank exceeds the rank being
+ *  restored; otherwise a Reason FEAT is needed. */
+export function centerRepairAuto(centerRank, targetRank) {
+  return rankIndex(centerRank) > rankIndex(targetRank);
+}
+
+/** FEAT uses the repair tech's Reason or the center's value, whichever is
+ *  lower. */
+export function effectiveRepairReason(techReason, centerRank) {
+  return rankIndex(techReason) <= rankIndex(centerRank)
+    ? normalizeRank(techReason) : normalizeRank(centerRank);
+}
+
+/* ── Intensity FEATs ──────────────────────────────────────────────────────── */
+
+/** Standard intensity FEAT: ability at/above intensity needs green; 1-2
+ *  ranks above the ability needs yellow / red; 3+ above is impossible. */
+export function requiredColorVsIntensity(abilityRank, intensityRank) {
+  const d = rankIndex(intensityRank) - rankIndex(abilityRank);
+  if (d <= 0) return "green";
+  if (d === 1) return "yellow";
+  if (d === 2) return "red";
+  return "impossible";
+}
+
+/** Does a rolled color meet the required color? (white<green<yellow<red) */
+export function colorMeets(rolled, required) {
+  const order = { white: 0, green: 1, yellow: 2, red: 3 };
+  if (required === "impossible") return false;
+  return (order[String(rolled).toLowerCase()] ?? -1) >= (order[String(required).toLowerCase()] ?? 4);
+}
+
 /* ── Weapon range → rank ──────────────────────────────────────────────────── */
 
 const RANGE_TABLE = [
@@ -215,6 +331,10 @@ export function defaultHardware() {
     effectiveCost: "Typical",
     derivation: "",
     time: { daysRequired: 6, daysElapsed: 0, assistant: "none", roundTheClock: false },
+    mode: "invention",
+    mod: { kind: "abilityBoost", target: "", fromRank: "Typical", toRank: "Good", newPowerRank: "Good" },
+    kitBashed: false,
+    salvaged: false,
     resourceFeat: { made: false, funding: "solo", gameDate: "" },
     successFeat: { rolled: false, color: "", talentsCS: 0, rebuild: false,
                    gameDate: "", fineTuneDays: 0, failTurns: 0 },
@@ -293,6 +413,38 @@ if (isMain) {
   eq("funding combined", fundingResourceRank("Amazing", "combined"), "Monstrous");
   eq("funding contacts", fundingResourceRank("Good", "contacts", "Monstrous"), "Monstrous");
   eq("default schema has feat blocks", defaultHardware().resourceFeat.made === false && defaultHardware().successFeat.rolled === false, true);
+
+  // Modifications — RAW p.69
+  const modc = (mod, beyondTech=false) => computeModificationCost({ mod, modifiers:{beyondTech} });
+  eq("mod boost cost", modc({kind:"abilityBoost", fromRank:"Good", toRank:"Excellent"}).costRank, "Excellent");
+  eq("mod boost step enforced", modc({kind:"abilityBoost", fromRank:"Good", toRank:"Remarkable"}).valid, false);
+  eq("mod step validator", validateModStep("Excellent","Remarkable"), true);
+  eq("mod easy Typical", modc({kind:"addCapabilityEasy"}).costRank, "Typical");
+  eq("mod hard floor Good", modc({kind:"addCapabilityHard", newPowerRank:"Poor"}).costRank, "Good");
+  eq("mod hard power rank", modc({kind:"addCapabilityHard", newPowerRank:"Remarkable"}).costRank, "Remarkable");
+  eq("mod hard beyondTech floor", modc({kind:"addCapabilityHard", newPowerRank:"Good"}, true).costRank, "Monstrous");
+  eq("computeCost dispatch", computeCost({mode:"modification", mod:{kind:"addCapabilityEasy"}}).costRank, "Typical");
+
+  // Kit-bash rounds — RAW p.69: 75-day project completes in 75 turns
+  eq("kitbash rounds", kitbashRounds(75), 75);
+  eq("kitbash rounds partial", kitbashRounds(2.5), 3);
+
+  // Repairs — RAW p.70 example: restore to Excellent 20 hours, to Remarkable 30
+  eq("repair hours Ex", repairHours("Excellent"), 20);
+  eq("repair hours Rm", repairHours("Remarkable"), 30);
+  eq("repair auto (In center, Ex target)", centerRepairAuto("Incredible","Excellent"), true);
+  eq("repair auto (In center, Rm target)", centerRepairAuto("Incredible","Remarkable"), true);
+  eq("repair not auto (Gd center, Ex target)", centerRepairAuto("Good","Excellent"), false);
+  eq("repair reason lower of", effectiveRepairReason("Remarkable","Incredible"), "Remarkable");
+  eq("repair reason capped by center", effectiveRepairReason("Remarkable","Good"), "Good");
+
+  // Intensity FEATs
+  eq("intensity green", requiredColorVsIntensity("Remarkable","Remarkable"), "green");
+  eq("intensity yellow", requiredColorVsIntensity("Good","Excellent"), "yellow");
+  eq("intensity red", requiredColorVsIntensity("Good","Remarkable"), "red");
+  eq("intensity impossible", requiredColorVsIntensity("Typical","Incredible"), "impossible");
+  eq("colorMeets yellow>=green", colorMeets("yellow","green"), true);
+  eq("colorMeets green<red", colorMeets("green","red"), false);
 
   // Range table
   eq("range 4", rangeRankForAreas(4), "Good");

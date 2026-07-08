@@ -1,4 +1,17 @@
-// actorSheet.js v2.5.0 - 2026-07-07
+// actorSheet.js v2.6.0 - 2026-07-07
+// v2.6.0: Hardware tab Slice 3, completing the Hardware chapter. Cost
+//         computation dispatches through computeCost (invention vs
+//         modification with one-rank-at-a-time boosts and capability-add
+//         floors). Kit-bash dialog (10 Karma per remaining adjusted day,
+//         green Reason FEAT with degrade rule, 1d10 operating rounds,
+//         Karma-source note, salvage bonus honored). Salvage action resets
+//         a dead device to design with rebuild +1CS. Repair dialog (center
+//         repairs: auto when center rank exceeds target, else Reason FEAT
+//         at lower of tech/center, hours = target rank number; field
+//         repairs: intensity FEAT vs original stat, holds 1d10 hours).
+//         Tech FEATs dialog (borrowed devices, alien tech vs Remarkable
+//         intensity, computer access green/red by passwords, reprogramming
+//         with restriction-rank turns).
 // v2.5.0: Hardware tab Slice 2. Resource FEAT dialog per invention (solo /
 //         combined / Contacts funding via fundingResourceRank, reuses the
 //         shared weekly resource lockout flags and requirement thresholds,
@@ -110,8 +123,10 @@ import {
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
-import { computeEffectiveCost, buildDays, adjustedDays, defaultHardware,
-         successFeatCS, costExceedsReason, fundingResourceRank } from "./rules/hardware-rules.mjs";
+import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHardware,
+         successFeatCS, costExceedsReason, fundingResourceRank,
+         kitbashKarma, kitbashRounds, repairHours, centerRepairAuto,
+         effectiveRepairReason, requiredColorVsIntensity, colorMeets } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
@@ -307,7 +322,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       .filter(i => i.system.hardware?.enabled)
       .map(i => {
         const hw = i.system.hardware;
-        const ec = computeEffectiveCost(hw);
+        const ec = computeCost(hw);
         const days = ec.valid ? buildDays(ec.costRank) : 0;
         const adj = adjustedDays(days, hw.time ?? {});
         const sf = hw.successFeat ?? {};
@@ -330,7 +345,10 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
             shiftedReason,
             degrade: ec.valid && costExceedsReason(ec.costRank, shiftedReason),
             progressPct: adj > 0 ? Math.min(100, Math.round(elapsed / adj * 100)) : 0,
-            timeDone: ec.valid && adj > 0 && elapsed >= adj - 1e-9
+            timeDone: ec.valid && adj > 0 && elapsed >= adj - 1e-9,
+            remainingDays: Math.max(0, adj - elapsed),
+            kitKarma: kitbashKarma(Math.max(0, adj - elapsed)),
+            kitRounds: kitbashRounds(Math.max(0, adj - elapsed))
           }
         };
       });
@@ -1046,7 +1064,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       foundry.utils.deepClone(item.system.hardware ?? {}),
       foundry.utils.expandObject(changes)
     );
-    const ec = computeEffectiveCost(hw);
+    const ec = computeCost(hw);
     hw.effectiveCost = ec.valid ? ec.costRank : "";
     hw.derivation = ec.steps.join("\n");
     hw.time = hw.time ?? {};
@@ -1079,12 +1097,476 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     }
   }
 
+  /** Shared banner colors for hardware chat cards. */
+  _hwBanner(color) {
+    const bg = { white:"#f8f8f8", green:"#00a94e", yellow:"#fef102", red:"#ee1e25" }[color] || "#ccc";
+    const fg = ["white","yellow"].includes(color) ? "#222" : "#fff";
+    return { bg, fg };
+  }
+
+  /** Post a hardware chat card in the house style. */
+  async _hwPostCard({ title, subtitle, infoLeft, infoRight, banner, bannerColor, big, bigLabel, colRank, colLabel, body, rolls = [] }) {
+    const { bg, fg } = this._hwBanner(bannerColor);
+    const card = `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;overflow:hidden;color:#333;">
+        <div style="padding:7px 12px;border-bottom:1px solid #d8d8d0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <strong style="color:#8b0000;font-size:14px;letter-spacing:.3px;">${title}</strong>
+          <span style="color:#888;font-size:12px;">${subtitle ?? ""}</span></div>
+        <div style="padding:6px 12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:13px;border-bottom:1px solid #e2e2da;">
+          <span>${infoLeft ?? ""}</span><span>${infoRight ?? ""}</span></div>
+        <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bg};color:${fg};">${banner}</div>
+        ${big !== undefined ? `<div style="display:flex;background:#fff;text-align:center;border-bottom:1px solid #ddd;">
+          <div style="flex:1;padding:8px 4px;border-right:1px solid #ececec;">
+            <div style="font-size:24px;font-weight:bold;color:#222;line-height:1;">${big}</div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:5px;text-transform:uppercase;">${bigLabel ?? "Roll"}</div></div>
+          <div style="flex:1.4;padding:8px 4px;">
+            <div style="font-size:15px;font-weight:bold;color:#333;padding-top:3px;">${colRank ?? ""}</div>
+            <div style="font-size:10px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;text-transform:uppercase;">${colLabel ?? ""}</div></div></div>` : ""}
+        <div style="padding:8px 12px;font-size:12px;line-height:1.5;">${body}</div>
+      </div>`;
+    const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls };
+    try { ChatMessage.applyMode(msg, game.settings.get("core", "messageMode")); }
+    catch { try { ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode")); } catch {} }
+    await ChatMessage.create(msg);
+  }
+
+  /** Hardware Slice 3: kit-bash — 10 Karma per remaining adjusted day,
+   *  each day done in one round; green Reason FEAT; device operates 1d10
+   *  rounds before becoming inoperative (RAW p.69). */
+  _hwKitbash(item) {
+    const hw = item.system.hardware ?? {};
+    const ec = computeCost(hw);
+    if (!ec.valid) return ui.notifications.warn("Set the project cost first.");
+    const cost = ec.costRank;
+    const days = buildDays(cost);
+    const adj = adjustedDays(days, hw.time ?? {});
+    const elapsed = hw.status === "design" ? 0 : (Number(hw.time?.daysElapsed) || 0);
+    const remaining = Math.max(0, adj - elapsed);
+    const kitKarma = kitbashKarma(remaining);
+    const rounds = kitbashRounds(remaining);
+    if (remaining <= 0) return ui.notifications.warn("Nothing left to rush — the build time is already complete.");
+    const reasonRank = this.actor.system.abilities?.reason?.rank ?? "Typical";
+    const shifted = hw.successFeat?.rebuild ? shiftRank(reasonRank, 1) : reasonRank;
+    const degrade = costExceedsReason(cost, shifted);
+    const availableKarma = this.actor.availableKarma ?? 0;
+    const dateTag = this._hwDateTag();
+
+    const degradeWarn = degrade
+      ? `<div class="frp-lockbar locked"><span class="ic">⚠</span><span><b>Cost ${cost} exceeds Reason ${shifted}</b> — the result reads one color worse.</span></div>`
+      : "";
+    const shortWarn = availableKarma < kitKarma
+      ? `<div class="frp-lockbar locked"><span class="ic">⚠</span><span><b>${availableKarma} Karma available</b> — ${kitKarma} needed. Pools, Advancement Karma, and assisting allies may contribute (log their spends separately), or the GM may proceed anyway.</span></div>`
+      : "";
+
+    const content = `
+      <div class="frp-dlg frp-res">
+        <div class="frp-header-v3">
+          <span class="h-action">Kit-Bash</span>
+          <span class="h-paren">·</span>
+          <span class="h-actor">${item.name}</span>
+          <span class="h-spacer"></span>
+          <span class="h-stat"><span class="h-stat-label">Cost</span>
+            <span class="h-stat-rank">${cost}</span></span>
+        </div>
+        ${degradeWarn}${shortWarn}
+        <div class="frp-box"><span class="frp-box-label">Collapsed timescale</span>
+          <div style="font-size:11px;line-height:1.5;">
+            ${remaining} remaining day${remaining===1?"":"s"} of work → <b>${rounds} round${rounds===1?"":"s"}</b> at the bench<br>
+            Karma cost: <b>${kitKarma}</b> (10 per day) — own fund, pools, Advancement, and assisting allies all qualify<br>
+            The device succeeds on a <b>green Reason FEAT</b>${hw.successFeat?.rebuild ? " (+1CS — salvaged pieces)" : ""} and operates <b>1-10 rounds</b> before failing</div></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;">Karma on FEAT roll (declare before roll)</span>
+          <input type="number" id="hwkb-karma" min="0" step="1" value="0" style="width:70px;">
+          <span class="hint">available after time cost: ${Math.max(0, availableKarma - kitKarma)}</span></div>
+        <div class="frp-foot">
+          <div class="frp-foot-btns">
+            <button id="hwkb-roll" class="frp-btn-roll">Spend ${kitKarma} Karma &amp; Roll</button>
+            <button id="hwkb-cancel" class="frp-btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    showFaseripDialog({
+      title: `Kit-Bash: ${item.name}`,
+      content,
+      render: async (html, dlg) => {
+        html.find("#hwkb-cancel").on("click", () => dlg.close());
+        html.find("#hwkb-roll").off("click.hw").on("click.hw", async () => {
+          const featKarma = Math.max(0, Number(html.find("#hwkb-karma").val()) || 0);
+
+          const roll = new Roll("1d100");
+          await roll.evaluate();
+          const total = Math.min(roll.total + featKarma, 100);
+          const rolledColor = game.msh.rollUniversalTable(shifted, total).toLowerCase();
+          const finalColor = degrade
+            ? ({ red:"yellow", yellow:"green", green:"white", white:"white" }[rolledColor] ?? rolledColor)
+            : rolledColor;
+          const success = colorMeets(finalColor, "green");
+
+          const rolls = [roll];
+          let opRounds = 0;
+          if (success) {
+            const d10 = new Roll("1d10");
+            await d10.evaluate();
+            opRounds = d10.total;
+            rolls.push(d10);
+          }
+
+          const banner = degrade && rolledColor !== finalColor
+            ? `ROLLED ${rolledColor.toUpperCase()} → READS ${finalColor.toUpperCase()}`
+            : finalColor.toUpperCase();
+          const body = success
+            ? `<b>It works — for now.</b> The kit-bashed device operates for <b>${opRounds} rounds</b>, then becomes inoperative (possibly in spectacular fashion). Salvaging the pieces grants +1CS on future rolls to duplicate it.`
+            : `<b>The lash-up fails.</b> The parts can be salvaged for +1CS on a future attempt to duplicate the device.`;
+
+          await this._hwPostCard({
+            title: "Kit-Bash", subtitle: item.name,
+            infoLeft: `<span style="color:#888;">Time:</span> <b>${rounds} rounds</b> (${kitKarma} Karma)`,
+            infoRight: `<span style="color:#888;">Cost:</span> <b>${cost}</b>${featKarma ? ` · <span style="color:#888;">Karma:</span> <b>+${featKarma}</b>` : ""}`,
+            banner, bannerColor: finalColor,
+            big: total, bigLabel: featKarma ? `${roll.total} + ${featKarma} karma` : "Roll",
+            colRank: shifted, colLabel: "Reason column",
+            body, rolls
+          });
+
+          await this._hwLogHistory(-kitKarma, "Kit-Bash", `Time cost: ${item.name} (${remaining}d → ${rounds} rounds)`);
+          if (featKarma > 0)
+            await this._hwLogHistory(-featKarma, "Kit-Bash", `Karma on FEAT roll: ${item.name}`);
+
+          await this._hwUpdate(item, {
+            "kitBashed": true,
+            "status": success ? "testing" : "failed",
+            "time.daysElapsed": adj,
+            "successFeat.rolled": true,
+            "successFeat.color": success ? "green" : "white",
+            "successFeat.gameDate": dateTag,
+            "successFeat.failTurns": opRounds
+          });
+          if (!isDialogDetached(dlg)) dlg.close();
+        });
+      }
+    });
+  }
+
+  /** Hardware Slice 3: salvage a dead or failed device — back to design
+   *  with the +1CS rebuild bonus on future rolls to duplicate it. */
+  async _hwSalvage(item) {
+    const ok = await Dialog.confirm({
+      title: "Salvage Device",
+      content: `<p>Strip <b>${item.name}</b> for parts? The project returns to the drawing board with <b>+1CS on future success rolls</b> to duplicate the device. A new Resource FEAT is required (the GM may waive it if the salvaged materials suffice).</p>`
+    });
+    if (!ok) return;
+    await this._hwUpdate(item, {
+      "status": "design",
+      "salvaged": true,
+      "kitBashed": false,
+      "resourceFeat.made": false,
+      "time.daysElapsed": 0,
+      "successFeat.rolled": false,
+      "successFeat.color": "",
+      "successFeat.rebuild": true,
+      "successFeat.failTurns": 0,
+      "successFeat.fineTuneDays": 0
+    });
+    await this._hwPostCard({
+      title: "Salvage", subtitle: item.name,
+      infoLeft: "", infoRight: "",
+      banner: "MATERIALS RECOVERED", bannerColor: "green",
+      body: `${this.actor.name} strips <b>${item.name}</b> for parts. Future FEAT rolls to duplicate the device gain <b>+1CS</b>.`
+    });
+  }
+
+  /** Hardware Slice 3: repair-center and field repairs (RAW p.70). */
+  _hwRepairDialog() {
+    const reasonRank = this.actor.system.abilities?.reason?.rank ?? "Typical";
+    const ranks = this._resourceRanks().slice(1);
+    const opts = (sel) => ranks.map(r => `<option value="${r}" ${r===sel?"selected":""}>${r}</option>`).join("");
+    const availableKarma = this.actor.availableKarma ?? 0;
+
+    const content = `
+      <div class="frp-dlg frp-res">
+        <div class="frp-header-v3">
+          <span class="h-action">Repair&nbsp;Device</span>
+          <span class="h-spacer"></span>
+          <span class="h-stat"><span class="h-stat-label">Reason</span>
+            <span class="h-stat-rank">${reasonRank}</span></span>
+        </div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Device</span>
+          <input type="text" id="hwrep-desc" style="flex:1;" placeholder="e.g. Self Propelled Gun"></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Mode</span>
+          <select id="hwrep-mode" style="flex:1;">
+            <option value="center">Repair center (restores one rank per FEAT)</option>
+            <option value="field">Field repair (holds 1-10 hours)</option>
+          </select></div>
+        <div class="frp-box" id="hwrep-center-rows" style="display:flex;flex-direction:column;gap:6px;">
+          <span style="display:flex;align-items:center;gap:8px;"><span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Center rank</span>
+            <select id="hwrep-center" style="flex:1;">${opts("Good")}</select></span>
+          <span style="display:flex;align-items:center;gap:8px;"><span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Tech Reason</span>
+            <select id="hwrep-tech" style="flex:1;">${opts(reasonRank)}</select></span>
+          <span style="display:flex;align-items:center;gap:8px;"><span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Restore to</span>
+            <select id="hwrep-target" style="flex:1;">${opts("Excellent")}</select></span></div>
+        <div class="frp-box" id="hwrep-field-rows" style="display:none;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Original stat</span>
+          <select id="hwrep-intensity" style="flex:1;">${opts("Good")}</select></div>
+        <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
+          <span id="hwrep-pill" class="frp-feat-pill is-green">—</span>
+          <span id="hwrep-hint" class="hint"></span></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;">Karma (declare before roll)</span>
+          <input type="number" id="hwrep-karma" min="0" max="${availableKarma}" step="1" value="0" style="width:70px;">
+          <span class="hint">available: ${availableKarma}</span></div>
+        <div class="frp-foot">
+          <div class="frp-foot-btns">
+            <button id="hwrep-roll" class="frp-btn-roll">Roll</button>
+            <button id="hwrep-cancel" class="frp-btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    showFaseripDialog({
+      title: `Repair Device: ${this.actor.name}`,
+      content,
+      render: async (html, dlg) => {
+        const $mode = html.find("#hwrep-mode");
+        const $center = html.find("#hwrep-center");
+        const $tech = html.find("#hwrep-tech");
+        const $target = html.find("#hwrep-target");
+        const $intensity = html.find("#hwrep-intensity");
+        const $pill = html.find("#hwrep-pill");
+        const $hint = html.find("#hwrep-hint");
+        const $roll = html.find("#hwrep-roll");
+
+        const state = () => {
+          if ($mode.val() === "center") {
+            const auto = centerRepairAuto($center.val(), $target.val());
+            const eff = effectiveRepairReason($tech.val(), $center.val());
+            const hours = repairHours($target.val());
+            return { mode:"center", auto, eff, hours,
+              required: auto ? "automatic" : "green",
+              hint: `${hours} hours to restore to ${$target.val()}${auto ? " — center rank exceeds target" : ` — FEAT on ${eff} (lower of tech/center)`}` };
+          }
+          const required = requiredColorVsIntensity(reasonRank, $intensity.val());
+          return { mode:"field", eff: reasonRank, required,
+            hint: required === "impossible" ? "intensity 3+ ranks above Reason" : `intensity ${$intensity.val()} vs Reason ${reasonRank}` };
+        };
+        const refresh = () => {
+          html.find("#hwrep-center-rows").css("display", $mode.val()==="center" ? "flex" : "none");
+          html.find("#hwrep-field-rows").css("display", $mode.val()==="field" ? "flex" : "none");
+          const s = state();
+          const cls = { automatic:"is-auto", green:"is-green", yellow:"is-yellow", red:"is-yellow", impossible:"is-impossible" }[s.required] || "is-green";
+          $pill.attr("class", `frp-feat-pill ${cls}`).text(s.required.toUpperCase());
+          $hint.text(s.hint);
+          $roll.prop("disabled", s.required === "impossible")
+               .text(s.required === "automatic" ? "Log Repair" : "Roll");
+        };
+        $mode.on("change", refresh); $center.on("change", refresh);
+        $tech.on("change", refresh); $target.on("change", refresh);
+        $intensity.on("change", refresh);
+        refresh();
+
+        html.find("#hwrep-cancel").on("click", () => dlg.close());
+        $roll.off("click.hw").on("click.hw", async () => {
+          if ($roll.prop("disabled")) return;
+          const desc = (html.find("#hwrep-desc").val() || "device").trim();
+          const karma = Math.min(Math.max(Number(html.find("#hwrep-karma").val()) || 0, 0), availableKarma);
+          const s = state();
+
+          if (s.mode === "center" && s.auto) {
+            await this._hwPostCard({
+              title: "Repair", subtitle: desc,
+              infoLeft: `<span style="color:#888;">Center:</span> <b>${$center.val()}</b>`,
+              infoRight: `<span style="color:#888;">Restore to:</span> <b>${$target.val()}</b>`,
+              banner: "AUTOMATIC", bannerColor: "green",
+              body: `Center rank exceeds the target rank — repairs succeed automatically. <b>${s.hours} hours</b> per rank restored (halve with assistance). Devices reduced below Feeble are beyond repair — salvage only.`
+            });
+            if (!isDialogDetached(dlg)) dlg.close();
+            return;
+          }
+
+          const roll = new Roll("1d100");
+          await roll.evaluate();
+          const total = Math.min(roll.total + karma, 100);
+          const column = s.eff;
+          const color = game.msh.rollUniversalTable(column, total).toLowerCase();
+          const success = colorMeets(color, s.required === "automatic" ? "green" : s.required);
+          const rolls = [roll];
+          let holdHours = 0;
+          if (s.mode === "field" && success) {
+            const d10 = new Roll("1d10");
+            await d10.evaluate();
+            holdHours = d10.total;
+            rolls.push(d10);
+          }
+
+          const body = s.mode === "center"
+            ? (success
+                ? `Restored one rank to <b>${$target.val()}</b> in <b>${s.hours} hours</b> (halve with assistance). Further ranks are separate repairs.`
+                : `The damage is <b>beyond the ability of this shop</b> to repair. Materials may still be salvaged.`)
+            : (success
+                ? `Patched together — holds for <b>${holdHours} hours</b>, then shakes loose: damage returns <b>one rank worse</b> than before.`
+                : `The field repair fails to take.`);
+
+          await this._hwPostCard({
+            title: s.mode === "center" ? "Repair (Center)" : "Field Repair", subtitle: desc,
+            infoLeft: s.mode === "center"
+              ? `<span style="color:#888;">Center:</span> <b>${$center.val()}</b> · <span style="color:#888;">FEAT on:</span> <b>${column}</b>`
+              : `<span style="color:#888;">Intensity:</span> <b>${$intensity.val()}</b>`,
+            infoRight: karma ? `<span style="color:#888;">Karma:</span> <b>+${karma}</b>` : "",
+            banner: color.toUpperCase(), bannerColor: color,
+            big: total, bigLabel: karma ? `${roll.total} + ${karma} karma` : "Roll",
+            colRank: column, colLabel: "Reason column",
+            body, rolls
+          });
+          if (karma > 0)
+            await this._hwLogHistory(-karma, "Repair FEAT", `Karma on repair roll: ${desc}`);
+          if (!isDialogDetached(dlg)) dlg.close();
+        });
+      }
+    });
+  }
+
+  /** Hardware Slice 3: the chapter's remaining Reason FEATs — borrowed
+   *  hi-tech devices, alien technology, computer access, reprogramming. */
+  _hwTechFeatDialog() {
+    const reasonRank = this.actor.system.abilities?.reason?.rank ?? "Typical";
+    const ranks = this._resourceRanks().slice(1);
+    const opts = (sel) => ranks.map(r => `<option value="${r}" ${r===sel?"selected":""}>${r}</option>`).join("");
+    const availableKarma = this.actor.availableKarma ?? 0;
+
+    const content = `
+      <div class="frp-dlg frp-res">
+        <div class="frp-header-v3">
+          <span class="h-action">Tech&nbsp;FEATs</span>
+          <span class="h-spacer"></span>
+          <span class="h-stat"><span class="h-stat-label">Reason</span>
+            <span class="h-stat-rank">${reasonRank}</span></span>
+        </div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">FEAT</span>
+          <select id="hwtf-type" style="flex:1;">
+            <option value="useDevice">Use another hero's device (green FEAT)</option>
+            <option value="alienTech">Alien technology, first encounter (vs intensity)</option>
+            <option value="computerAccess">Computer access (green with passwords, red without)</option>
+            <option value="reprogram">Reprogram robot / computer</option>
+          </select></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;">Subject</span>
+          <input type="text" id="hwtf-desc" style="flex:1;" placeholder="e.g. borrowed gauntlet, alien console, guard robot"></div>
+        <div class="frp-box" id="hwtf-intensity-row" style="display:none;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:72px;" id="hwtf-intensity-lbl">Intensity</span>
+          <select id="hwtf-intensity" style="flex:1;">${opts("Remarkable")}</select></div>
+        <div class="frp-opt-row" id="hwtf-pw-row" style="display:none;"><label><input type="checkbox" id="hwtf-pw" checked> Passwords known</label></div>
+        <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
+          <span id="hwtf-pill" class="frp-feat-pill is-green">GREEN</span>
+          <span id="hwtf-hint" class="hint"></span></div>
+        <div class="frp-box" style="display:flex;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;">Karma (declare before roll)</span>
+          <input type="number" id="hwtf-karma" min="0" max="${availableKarma}" step="1" value="0" style="width:70px;">
+          <span class="hint">available: ${availableKarma}</span></div>
+        <div class="frp-foot">
+          <div class="frp-foot-btns">
+            <button id="hwtf-roll" class="frp-btn-roll">Roll</button>
+            <button id="hwtf-cancel" class="frp-btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    showFaseripDialog({
+      title: `Tech FEATs: ${this.actor.name}`,
+      content,
+      render: async (html, dlg) => {
+        const $type = html.find("#hwtf-type");
+        const $intensity = html.find("#hwtf-intensity");
+        const $pw = html.find("#hwtf-pw");
+        const $pill = html.find("#hwtf-pill");
+        const $hint = html.find("#hwtf-hint");
+        const $roll = html.find("#hwtf-roll");
+
+        const state = () => {
+          const t = $type.val();
+          if (t === "useDevice")
+            return { required: "green", hint: "failure hits the wrong button: -1CS/-2CS or system damage (Judge)" };
+          if (t === "alienTech") {
+            const required = requiredColorVsIntensity(reasonRank, $intensity.val());
+            return { required, hint: required === "impossible" ? "intensity 3+ ranks above Reason" : "success: use the device normally hereafter (new FEAT only for stunts)" };
+          }
+          if (t === "computerAccess") {
+            const known = $pw.is(":checked");
+            return { required: known ? "green" : "red", hint: known ? "passwords known" : "no passwords — red FEAT" };
+          }
+          const restriction = $intensity.val();
+          const turns = _RANK_VALUES[restriction] ?? 0;
+          return { required: "green", hint: `time: ${turns} turns (restriction rank number), one FEAT per robot` };
+        };
+        const refresh = () => {
+          const t = $type.val();
+          html.find("#hwtf-intensity-row").css("display", (t === "alienTech" || t === "reprogram") ? "flex" : "none");
+          html.find("#hwtf-intensity-lbl").text(t === "reprogram" ? "Restriction" : "Intensity");
+          html.find("#hwtf-pw-row").css("display", t === "computerAccess" ? "block" : "none");
+          const s = state();
+          const cls = { green:"is-green", yellow:"is-yellow", red:"is-yellow", impossible:"is-impossible" }[s.required] || "is-green";
+          $pill.attr("class", `frp-feat-pill ${cls}`).text(s.required.toUpperCase());
+          $hint.text(s.hint);
+          $roll.prop("disabled", s.required === "impossible");
+        };
+        $type.on("change", refresh); $intensity.on("change", refresh); $pw.on("change", refresh);
+        refresh();
+
+        html.find("#hwtf-cancel").on("click", () => dlg.close());
+        $roll.off("click.hw").on("click.hw", async () => {
+          if ($roll.prop("disabled")) return;
+          const desc = (html.find("#hwtf-desc").val() || "device").trim();
+          const karma = Math.min(Math.max(Number(html.find("#hwtf-karma").val()) || 0, 0), availableKarma);
+          const s = state();
+          const typeLabel = $type.find("option:selected").text();
+
+          const roll = new Roll("1d100");
+          await roll.evaluate();
+          const total = Math.min(roll.total + karma, 100);
+          const color = game.msh.rollUniversalTable(reasonRank, total).toLowerCase();
+          const success = colorMeets(color, s.required);
+
+          const BODY = {
+            useDevice: success
+              ? "The device responds correctly."
+              : "<b>Wrong button.</b> The Judge assigns -1CS or -2CS to hit / effectiveness, or the system itself is damaged.",
+            alienTech: success
+              ? "<b>Figured it out.</b> The device can now be used in normal situations; a new Reason FEAT is needed only for extenuating circumstances (Power Stunts, Vehicle Stunts)."
+              : "The alien mechanism defies understanding — for now.",
+            computerAccess: success
+              ? "Information retrieved."
+              : "Access denied.",
+            reprogram: success
+              ? `<b>Reprogrammed</b> — the work takes ${_RANK_VALUES[$intensity.val()] ?? 0} turns.`
+              : "The programming resists alteration."
+          }[$type.val()];
+
+          await this._hwPostCard({
+            title: "Tech FEAT", subtitle: desc,
+            infoLeft: `<span style="color:#888;">${typeLabel}</span>`,
+            infoRight: karma ? `<span style="color:#888;">Karma:</span> <b>+${karma}</b>` : "",
+            banner: color.toUpperCase(), bannerColor: color,
+            big: total, bigLabel: karma ? `${roll.total} + ${karma} karma` : "Roll",
+            colRank: reasonRank, colLabel: "Reason column",
+            body: `${BODY} <span style="color:#888;">(needed ${s.required.toUpperCase()})</span>`,
+            rolls: [roll]
+          });
+          if (karma > 0)
+            await this._hwLogHistory(-karma, "Tech FEAT", `Karma on roll: ${desc}`);
+          if (!isDialogDetached(dlg)) dlg.close();
+        });
+      }
+    });
+  }
+
   /** Hardware Slice 2: Resource FEAT vs effective cost. RAW p.68 — solo,
    *  combined (two heroes within one rank), or Contacts funding. Failure
    *  locks further attempts for one week (shared resource-FEAT ledger). */
   _hwResourceFeat(item) {
     const hw = item.system.hardware ?? {};
-    const ec = computeEffectiveCost(hw);
+    const ec = computeCost(hw);
     if (!ec.valid) return ui.notifications.warn("Set at least one applicable rank first.");
     const cost = ec.costRank;
     const ranks = this._resourceRanks();
@@ -1262,7 +1744,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
    *  the rolled color reads one worse. */
   _hwSuccessFeat(item) {
     const hw = item.system.hardware ?? {};
-    const ec = computeEffectiveCost(hw);
+    const ec = computeCost(hw);
     if (!ec.valid) return ui.notifications.warn("Set at least one applicable rank first.");
     const cost = ec.costRank;
     const days = buildDays(cost);
@@ -3031,7 +3513,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     // ── Hardware tab (Slice 1) ──────────────────────────────────────────
     html.find('.hw-add-invention').click(async () => {
       const hw = defaultHardware();
-      const ec = computeEffectiveCost(hw);
+      const ec = computeCost(hw);
       hw.effectiveCost = ec.costRank;
       hw.derivation = ec.steps.join("\n");
       hw.time.daysRequired = buildDays(ec.costRank);
@@ -3106,7 +3588,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     html.find('.hw-project .hw-day-add').click(ev => {
       const item = hwItem(ev); if (!item) return;
       const hw = item.system.hardware ?? {};
-      const ec = computeEffectiveCost(hw);
+      const ec = computeCost(hw);
       const adj = ec.valid ? adjustedDays(buildDays(ec.costRank), hw.time ?? {}) : 0;
       const add = Number($(ev.currentTarget).data('days')) || 1;
       const elapsed = Math.min(adj, (Number(hw.time?.daysElapsed) || 0) + add);
@@ -3116,7 +3598,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     html.find('.hw-project .hw-day-complete').click(ev => {
       const item = hwItem(ev); if (!item) return;
       const hw = item.system.hardware ?? {};
-      const ec = computeEffectiveCost(hw);
+      const ec = computeCost(hw);
       const adj = ec.valid ? adjustedDays(buildDays(ec.costRank), hw.time ?? {}) : 0;
       this._hwUpdate(item, { "time.daysElapsed": adj });
     });
@@ -3142,6 +3624,25 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         "specialReqCount": (Number(hw.specialReqCount) || 0) + 1,
         "successFeat.rebuild": true
       });
+    });
+
+    // Slice 3: kit-bash, salvage, and the tab-level utility dialogs.
+    html.find('.hw-project .hw-kitbash').click(ev => {
+      const item = hwItem(ev); if (item) this._hwKitbash(item);
+    });
+
+    html.find('.hw-project .hw-salvage').click(ev => {
+      const item = hwItem(ev); if (item) this._hwSalvage(item);
+    });
+
+    html.find('.hw-repair-tool').click(() => this._hwRepairDialog());
+    html.find('.hw-tech-feats').click(() => this._hwTechFeatDialog());
+
+    // Modification: from-rank select drives to-rank (one rank at a time).
+    html.find('.hw-project .hw-mod-from').change(ev => {
+      const item = hwItem(ev); if (!item) return;
+      const from = ev.currentTarget.value;
+      this._hwUpdate(item, { "mod.fromRank": from, "mod.toRank": shiftRank(from, 1) });
     });
 
     // Equipment info button

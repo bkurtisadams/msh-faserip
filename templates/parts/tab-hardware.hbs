@@ -1,10 +1,12 @@
-{{!-- tab-hardware.hbs — v1.1.0: Slice 2 — Resource FEAT button (design), build-day tracker with progress bar (building), success Reason FEAT (building, time complete), testing-state notes with fine-tune/restart links, success-FEAT modifier inputs (talents CS, rebuild) with live shifted-Reason readout and cost-exceeds-Reason degradation warning. --}}
-{{!-- v1.0.0: Slice 1 — tab shell, inventor strip, project list, effective-cost calculator. --}}
+{{!-- tab-hardware.hbs — v1.2.0: Slice 3 — invention/modification mode toggle with modification panel (one-rank-at-a-time boosts, easy/hard capability adds), kit-bash button with live Karma cost on design/building projects, salvage action on testing/failed devices, salvaged badge, Repair Device and Tech FEATs utility links in the tab header. --}}
+{{!-- v1.1.0: Slice 2 — pipeline (Resource FEAT, build tracker, success FEAT, testing links). v1.0.0: Slice 1 — shell + effective-cost calculator. --}}
 <div class="tab" data-tab="hardware">
   <div class="tab-list-header labeled">
     <span class="th-label">Hardware</span>
     <div class="th-actions">
-      <a class="th-action-link hw-add-invention" title="Start a new invention">+ new invention</a>
+      <a class="th-action-link hw-repair-tool" title="Repair-center and field repairs">repair</a>
+      <a class="th-action-link hw-tech-feats" title="Alien tech, borrowed devices, computers">tech FEATs</a>
+      <a class="th-action-link hw-add-invention" title="Start a new invention or modification">+ new invention</a>
     </div>
   </div>
 
@@ -20,6 +22,8 @@
     <div class="hw-project-header">
       <img src="{{p.img}}" class="hw-icon" width="24" height="24" />
       <input type="text" class="hw-name" value="{{p.name}}" placeholder="Invention name" />
+      {{#if (eq p.system.hardware.mode "modification")}}<span class="hw-badge hw-badge-mod" title="Modification of an existing device">MOD</span>{{/if}}
+      {{#if p.system.hardware.salvaged}}<span class="hw-badge hw-badge-salvage" title="Built on salvaged materials — +1CS on the success roll">SALVAGE</span>{{/if}}
       <select class="hw-field hw-status" data-hw-path="status">
         <option value="design"   {{#if (eq p.system.hardware.status "design")}}selected{{/if}}>Design</option>
         <option value="building" {{#if (eq p.system.hardware.status "building")}}selected{{/if}}>Building</option>
@@ -38,7 +42,8 @@
     {{#if (eq p.system.hardware.status "design")}}
     <div class="hw-pipeline">
       <a class="hw-btn hw-roll-resources" title="Resource FEAT vs effective cost — failure locks attempts for one week"><i class="fas fa-coins"></i> Resource FEAT vs {{p.hw.cost}}</a>
-      <span class="hw-pipe-note">Fund the project to begin construction.</span>
+      <a class="hw-btn hw-btn-kitbash hw-kitbash" title="Kit-bash from parts at hand: {{p.hw.kitRounds}} rounds, {{p.hw.kitKarma}} Karma"><i class="fas fa-bolt"></i> Kit-bash ({{p.hw.kitKarma}} Karma)</a>
+      <span class="hw-pipe-note">Fund the project to begin construction — or kit-bash it when Terminus pops up.</span>
     </div>
     {{/if}}
 
@@ -52,6 +57,7 @@
       <a class="hw-btn hw-day-add" data-days="1" title="Log one day of work">+1d</a>
       <a class="hw-btn hw-day-add" data-days="5" title="Log five days of work">+5d</a>
       <a class="hw-btn hw-day-complete" title="Log remaining build time"><i class="fas fa-forward"></i></a>
+      <a class="hw-btn hw-btn-kitbash hw-kitbash" title="Rush the remaining {{p.hw.remainingDays}} days in {{p.hw.kitRounds}} rounds for {{p.hw.kitKarma}} Karma"><i class="fas fa-bolt"></i> Kit-bash ({{p.hw.kitKarma}})</a>
       <a class="hw-btn hw-roll-success {{#unless p.hw.timeDone}}hw-btn-disabled{{/unless}}" title="Reason FEAT — does the invention work?"><i class="fas fa-flask"></i> Success FEAT</a>
     </div>
     {{/if}}
@@ -63,22 +69,75 @@
       <a class="hw-btn hw-finish-tuning"><i class="fas fa-check"></i> Fine-tuning complete</a>
       {{/if}}
       {{#if (eq p.system.hardware.successFeat.color "green")}}
-      <span class="hw-pipe-note"><b>It flies, Wilbur…</b> — device fails after {{p.system.hardware.successFeat.failTurns}} turns. Repair = rebuild (same time, +1 special requirement, no new Resource FEAT).</span>
-      <a class="hw-btn hw-restart"><i class="fas fa-rotate-left"></i> Rebuild</a>
+      <span class="hw-pipe-note">{{#if p.system.hardware.kitBashed}}<b>Kit-bashed</b> — operates {{p.system.hardware.successFeat.failTurns}} rounds, then becomes inoperative (possibly spectacularly).{{else}}<b>It flies, Wilbur…</b> — device fails after {{p.system.hardware.successFeat.failTurns}} turns. Repair = rebuild (same time, +1 special requirement, no new Resource FEAT).{{/if}}</span>
+      {{#unless p.system.hardware.kitBashed}}<a class="hw-btn hw-restart"><i class="fas fa-rotate-left"></i> Rebuild</a>{{/unless}}
+      <a class="hw-btn hw-salvage" title="Salvage the pieces — +1CS on future rolls to duplicate the device"><i class="fas fa-recycle"></i> Salvage</a>
       <a class="hw-btn hw-finish-tuning" title="GM: device held together"><i class="fas fa-check"></i> Mark complete</a>
       {{/if}}
+    </div>
+    {{/if}}
+
+    {{#if (eq p.system.hardware.status "failed")}}
+    <div class="hw-pipeline">
+      <span class="hw-pipe-note">The device does not work as built.</span>
+      <a class="hw-btn hw-salvage" title="Salvage the pieces — +1CS on future rolls to duplicate the device"><i class="fas fa-recycle"></i> Salvage</a>
     </div>
     {{/if}}
 
     {{#if (eq p.system.hardware.status "complete")}}
     <div class="hw-pipeline hw-pipeline-done">
       <span class="hw-funded"><i class="fas fa-check-double"></i> Complete{{#if p.system.hardware.successFeat.gameDate}} — {{p.system.hardware.successFeat.gameDate}}{{/if}}</span>
-      <span class="hw-pipe-note">The device is a normal equipment item on the Equipment tab.</span>
+      <span class="hw-pipe-note">The device is a normal equipment item on the Equipment tab.{{#if p.system.hardware.kitBashed}} <b>Kit-bashed:</b> salvage grants +1CS to rebuild it properly.{{/if}}</span>
     </div>
     {{/if}}
 
     <details class="hw-project-body">
       <summary>Effective-cost calculator</summary>
+
+      <div class="hw-row">
+        <label>Project type</label>
+        <select class="hw-field" data-hw-path="mode">
+          <option value="invention"    {{#if (eq p.system.hardware.mode "invention")}}selected{{/if}}>Invention (new device)</option>
+          <option value="modification" {{#if (eq p.system.hardware.mode "modification")}}selected{{/if}}>Modification (existing device)</option>
+        </select>
+      </div>
+
+      {{#if (eq p.system.hardware.mode "modification")}}
+      <div class="hw-mod-panel">
+        <div class="hw-row">
+          <label>Target device</label>
+          <input type="text" class="hw-field hw-mod-target" data-hw-path="mod.target" value="{{p.system.hardware.mod.target}}" placeholder="e.g. the convertible, Web-Shooters" />
+        </div>
+        <div class="hw-row">
+          <label>Kind</label>
+          <select class="hw-field" data-hw-path="mod.kind">
+            <option value="abilityBoost"      {{#if (eq p.system.hardware.mod.kind "abilityBoost")}}selected{{/if}}>Improve a rank (one rank at a time)</option>
+            <option value="addCapabilityEasy" {{#if (eq p.system.hardware.mod.kind "addCapabilityEasy")}}selected{{/if}}>Add capability — simple installation</option>
+            <option value="addCapabilityHard" {{#if (eq p.system.hardware.mod.kind "addCapabilityHard")}}selected{{/if}}>Add capability — device must be altered</option>
+          </select>
+        </div>
+        {{#if (eq p.system.hardware.mod.kind "abilityBoost")}}
+        <div class="hw-row">
+          <label>From rank</label>
+          <select class="hw-mod-from">
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=@root.hwRankChoices selected=p.system.hardware.mod.fromRank}}
+          </select>
+          <span class="hw-class-hint">→ {{p.system.hardware.mod.toRank}} (one rank; further improvements are separate modifications)</span>
+        </div>
+        {{/if}}
+        {{#if (eq p.system.hardware.mod.kind "addCapabilityHard")}}
+        <div class="hw-row">
+          <label>New power rank</label>
+          <select class="hw-field" data-hw-path="mod.newPowerRank">
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=@root.hwRankChoices selected=p.system.hardware.mod.newPowerRank}}
+          </select>
+          <span class="hw-class-hint">Good floor; Monstrous floor if beyond 1980s tech.</span>
+        </div>
+        <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="modifiers.beyondTech" {{#if p.system.hardware.modifiers.beyondTech}}checked{{/if}} /> Not reproducible by 1980s tech (Monstrous minimum)</label>
+        {{/if}}
+        <span class="hw-pipe-note">One modification at a time. Failure may damage the original device.</span>
+      </div>
+      {{else}}
 
       <div class="hw-row">
         <label>Item class</label>
@@ -141,6 +200,7 @@
           <input type="number" min="0" step="1" class="hw-field hw-num" data-hw-path="specialReqCount" value="{{p.system.hardware.specialReqCount}}" title="RM+ cost may have one; MN+ always has at least one. -1CS each on the success roll (max -3CS). Set by the Judge." />
         </span>
       </div>
+      {{/if}}
 
       <div class="hw-derivation">
         {{#each p.hw.steps}}<div class="hw-step">{{this}}</div>{{/each}}
@@ -157,7 +217,7 @@
           </select>
         </span>
         <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="time.roundTheClock" {{#if p.system.hardware.time.roundTheClock}}checked{{/if}} /> Working straight through (time ÷2, -1CS on success roll)</label>
-        <span class="hw-time-readout">{{p.hw.adjDays}} days ({{p.hw.days}} base) · Resource FEAT vs {{p.hw.cost}}</span>
+        <span class="hw-time-readout">{{p.hw.adjDays}} days ({{p.hw.days}} base) · Resource FEAT vs {{p.hw.cost}} · kit-bash: {{p.hw.kitRounds}} rounds, {{p.hw.kitKarma}} Karma</span>
       </div>
 
       <div class="hw-success-mods">

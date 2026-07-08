@@ -373,6 +373,16 @@
           "assistant": "none",
           "roundTheClock": false
         },
+        "mode": "invention",
+        "mod": {
+          "kind": "abilityBoost",
+          "target": "",
+          "fromRank": "Typical",
+          "toRank": "Good",
+          "newPowerRank": "Good"
+        },
+        "kitBashed": false,
+        "salvaged": false,
         "resourceFeat": {
           "made": false,
           "funding": "solo",
