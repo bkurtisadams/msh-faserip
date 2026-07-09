@@ -1,10 +1,11 @@
-{{!-- tab-hardware.hbs — v1.3.1: visible version tag in the tab header for install verification; degrade warning always rendered (hw-hidden toggle); weapon hint gains range-band table. --}}
+{{!-- tab-hardware.hbs — v1.3.2: critical layout constraints moved inline (status select width, name min-width, header wrap, card overflow clip) so the fix cannot be defeated by a stale or out-ranked stylesheet; version tag inline-styled. --}}
+{{!-- v1.3.1: visible version tag in the tab header for install verification; degrade warning always rendered (hw-hidden toggle); weapon hint gains range-band table. --}}
 {{!-- v1.2.0: Slice 3 — invention/modification mode toggle with modification panel (one-rank-at-a-time boosts, easy/hard capability adds), kit-bash button with live Karma cost on design/building projects, salvage action on testing/failed devices, salvaged badge, Repair Device and Tech FEATs utility links in the tab header. --}}
 {{!-- v1.1.0: Slice 2 — pipeline (Resource FEAT, build tracker, success FEAT, testing links). v1.0.0: Slice 1 — shell + effective-cost calculator. --}}
 <div class="tab" data-tab="hardware">
   <div class="tab-list-header labeled">
     <span class="th-label">Hardware</span>
-    <span class="hw-version" title="Hardware tab build">v1.3.1</span>
+    <span class="hw-version" style="margin-left:auto;font-size:9px;opacity:.6;align-self:center;letter-spacing:.5px;" title="Hardware tab build">v1.3.2</span>
     <div class="th-actions">
       <a class="th-action-link hw-repair-tool" title="Repair-center and field repairs">repair</a>
       <a class="th-action-link hw-tech-feats" title="Alien tech, borrowed devices, computers">tech FEATs</a>
@@ -20,13 +21,13 @@
 
   {{#if hardwareProjects.length}}
   {{#each hardwareProjects as |p|}}
-  <div class="hw-project hw-status-{{p.system.hardware.status}}" data-item-id="{{p._id}}">
-    <div class="hw-project-header">
+  <div class="hw-project hw-status-{{p.system.hardware.status}}" data-item-id="{{p._id}}" style="overflow:hidden;">
+    <div class="hw-project-header" style="flex-wrap:wrap;min-width:0;">
       <img src="{{p.img}}" class="hw-icon" width="24" height="24" />
-      <input type="text" class="hw-name" value="{{p.name}}" placeholder="Invention name" />
+      <input type="text" class="hw-name" style="min-width:0;width:auto;flex:1 1 140px;" value="{{p.name}}" placeholder="Invention name" />
       {{#if (eq p.system.hardware.mode "modification")}}<span class="hw-badge hw-badge-mod" title="Modification of an existing device">MOD</span>{{/if}}
       {{#if p.system.hardware.salvaged}}<span class="hw-badge hw-badge-salvage" title="Built on salvaged materials — +1CS on the success roll">SALVAGE</span>{{/if}}
-      <select class="hw-field hw-status" data-hw-path="status">
+      <select class="hw-field hw-status" data-hw-path="status" style="width:110px;max-width:110px;flex:0 0 110px;min-width:0;">
         <option value="design"   {{#if (eq p.system.hardware.status "design")}}selected{{/if}}>Design</option>
         <option value="building" {{#if (eq p.system.hardware.status "building")}}selected{{/if}}>Building</option>
         <option value="testing"  {{#if (eq p.system.hardware.status "testing")}}selected{{/if}}>Testing</option>

@@ -1,4 +1,7 @@
-/* styles/hardware-tab.css v1.3.1 - 2026-07-09 - FASERIP Hardware tab
+/* styles/hardware-tab.css v1.3.2 - 2026-07-09 - FASERIP Hardware tab
+ * v1.3.2: no rule changes; version sync with tab-hardware.hbs v1.3.2, whose
+ *         critical constraints are now inline after a stale-stylesheet
+ *         install was diagnosed via the unstyled version tag.
  * v1.3.1: fix self-inflicted specificity conflict (v1.3.0's .hw-project
  *         select width:auto out-ranked .hw-status width:110px); status
  *         select width now enforced with !important; overflow backstop on
