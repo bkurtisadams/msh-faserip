@@ -1,4 +1,10 @@
-// actorSheet.js v2.7.2 - 2026-07-09
+// actorSheet.js v2.7.3 - 2026-07-09
+// v2.7.3: Harden compendium drops for equipment, contacts, vehicles,
+//         powers, talents, and HQs. Tab-level drop zones and a v14/raw
+//         payload resolver now accept Item/documentName/item-type payloads,
+//         infer the expected item type from the active tab or source pack,
+//         and create the embedded item directly instead of losing legacy or
+//         pluralized compendium drags in the form-level handler.
 // v2.7.2: Hardware help dialog sized to 560px with a resize grip
 //         (dialog-shim now forwards width/resizable to DialogV2); inline
 //         max-width backstop on the content. Was auto-sizing to the
@@ -153,6 +159,107 @@ import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 const DialogV2 = foundry.applications.api.DialogV2;
 
 const MSH_DROP_DEDUPE_MS = 750;
+
+const MSH_ACTOR_ITEM_TYPES = new Set([
+  "power", "talent", "contact", "equipment", "vehicle", "headquarters"
+]);
+
+const MSH_DROP_TAB_ITEM_TYPES = Object.freeze({
+  powers: "power",
+  talents: "talent",
+  contacts: "contact",
+  equipment: "equipment",
+  vehicles: "vehicle",
+  headquarters: "headquarters"
+});
+
+const MSH_DROP_PACK_ITEM_TYPES = Object.freeze({
+  powers: "power",
+  power: "power",
+  talents: "talent",
+  talent: "talent",
+  contacts: "contact",
+  contact: "contact",
+  equipment: "equipment",
+  gear: "equipment",
+  vehicles: "vehicle",
+  vehicle: "vehicle",
+  headquarters: "headquarters",
+  hq: "headquarters"
+});
+
+const MSH_DROP_TYPE_ALIASES = Object.freeze({
+  powers: "power",
+  power: "power",
+  talents: "talent",
+  talent: "talent",
+  contacts: "contact",
+  contact: "contact",
+  equipment: "equipment",
+  gear: "equipment",
+  equipments: "equipment",
+  vehicles: "vehicle",
+  vehicle: "vehicle",
+  headquarters: "headquarters",
+  headquarter: "headquarters",
+  hq: "headquarters"
+});
+
+function normalizeMshItemType(value) {
+  const key = String(value ?? "").trim().toLowerCase();
+  return MSH_DROP_TYPE_ALIASES[key] || key;
+}
+
+function readMshJsonDropPayload(event) {
+  const dt = event?.dataTransfer;
+  if (!dt) return null;
+
+  const types = [
+    "text/plain",
+    "application/json",
+    "text/json",
+    "text/x-foundry-drag-data"
+  ];
+
+  for (const type of types) {
+    try {
+      const raw = dt.getData(type);
+      if (!raw) continue;
+      const data = JSON.parse(raw);
+      if (data && typeof data === "object") return data;
+    } catch (_err) {
+      // Keep trying other dataTransfer flavors. Foundry/core/browser combos
+      // disagree here more often than a henchman near a cursed idol.
+    }
+  }
+
+  return null;
+}
+
+function inferMshItemTypeFromDrop(data, event) {
+  const targetTab = event?.target?.closest?.(".tab[data-tab]")?.dataset?.tab;
+  const targetType = MSH_DROP_TAB_ITEM_TYPES[targetTab];
+  if (targetType) return targetType;
+
+  const explicitType = normalizeMshItemType(
+    data?.itemData?.type ?? data?.data?.type ?? data?.type
+  );
+  if (MSH_ACTOR_ITEM_TYPES.has(explicitType)) return explicitType;
+
+  const packName = String(data?.pack ?? "").split(".").pop();
+  const packType = MSH_DROP_PACK_ITEM_TYPES[packName];
+  if (packType) return packType;
+
+  const uuidPack = String(data?.uuid ?? "").match(/^Compendium\.[^.]+\.([^.]+)/)?.[1];
+  return MSH_DROP_PACK_ITEM_TYPES[uuidPack] || "";
+}
+
+function isMshItemDropData(data) {
+  if (!data) return false;
+  if (data.type === "Item" || data.documentName === "Item") return true;
+  const itemType = normalizeMshItemType(data.itemData?.type ?? data.data?.type ?? data.type);
+  return MSH_ACTOR_ITEM_TYPES.has(itemType);
+}
 
 function buildDropFingerprint(actor, data) {
   if (!data) return "";
@@ -865,6 +972,58 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     return false;
   }
 
+  async _mshGetDropData(event) {
+    const TE = foundry.applications.ux.TextEditor?.implementation
+            ?? globalThis.TextEditor;
+
+    try {
+      const data = await TE?.getDragEventData?.(event);
+      if (data) return data;
+    } catch (err) {
+      console.warn("[FASERIP] TextEditor drag-data resolution failed; trying raw payload", err);
+    }
+
+    return readMshJsonDropPayload(event);
+  }
+
+  _mshBindItemTabDropZones(html) {
+    const root = html?.[0] ?? html;
+    if (!root?.querySelectorAll) return;
+
+    const selector = Object.keys(MSH_DROP_TAB_ITEM_TYPES)
+      .map(tab => `.tab[data-tab="${tab}"]`)
+      .join(",");
+
+    root.querySelectorAll(selector).forEach(tabEl => {
+      const expectedType = MSH_DROP_TAB_ITEM_TYPES[tabEl.dataset.tab];
+      if (!expectedType) return;
+      tabEl.dataset.dropItemType = expectedType;
+
+      tabEl.addEventListener("dragover", ev => {
+        if (ev.__mshDropHandled) return;
+        ev.preventDefault();
+        if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
+        tabEl.classList.add("msh-drop-active");
+      });
+
+      tabEl.addEventListener("dragleave", ev => {
+        if (!tabEl.contains(ev.relatedTarget)) tabEl.classList.remove("msh-drop-active");
+      });
+
+      tabEl.addEventListener("drop", ev => {
+        tabEl.classList.remove("msh-drop-active");
+        if (ev.__mshDropHandled) return;
+
+        const raw = readMshJsonDropPayload(ev);
+        if (String(raw?.type ?? "").endsWith("Sort")) return;
+
+        ev.preventDefault();
+        ev.stopPropagation();
+        return this._onDrop(ev);
+      });
+    });
+  }
+
   // V14-native drop chain. The inherited foundry.appv1.sheets.ActorSheet._onDrop
   // resolves the drag payload through the legacy global TextEditor, which no
   // longer binds in v14 — drops reached the sheet but created nothing. Resolve
@@ -880,16 +1039,15 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     if (event.__mshDropHandled) return;
     event.__mshDropHandled = true;
 
-    const TE = foundry.applications.ux.TextEditor?.implementation
-            ?? globalThis.TextEditor;
-    const data = await TE.getDragEventData(event);
+    const data = await this._mshGetDropData(event);
     if (!data) return;
     if (this._isDuplicateDropData(data)) return false;
 
     if (Hooks.call("dropActorSheetData", this.actor, this, data) === false) return;
 
+    if (isMshItemDropData(data)) return this._onDropItem(event, data);
+
     switch (data.type) {
-      case "Item":         return this._onDropItem(event, data);
       case "ActiveEffect": return this._onDropActiveEffect(event, data);
       case "Folder":       return this._onDropFolder(event, data);
       case "Actor":        return false;
@@ -898,10 +1056,57 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
 
   async _onDropItem(event, data) {
     if (!this.actor.isOwner) return false;
-    const item = await Item.implementation.fromDropData(data);
-    if (!item) return false;
-    if (this.actor.uuid === item.parent?.uuid) return false;
-    return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
+
+    let item = null;
+    try {
+      item = await Item.implementation.fromDropData(data);
+    } catch (err) {
+      console.warn("[FASERIP] Item.fromDropData failed; trying UUID/raw payload", err);
+    }
+
+    if (!item && data.uuid) {
+      try {
+        const doc = await fromUuid(data.uuid);
+        if (doc?.documentName === "Item") item = doc;
+      } catch (err) {
+        console.warn("[FASERIP] fromUuid failed for dropped item", data.uuid, err);
+      }
+    }
+
+    const sourceData = data.itemData ?? data.data;
+    let itemData = item?.toObject?.() ?? (sourceData ? foundry.utils.deepClone(sourceData) : null);
+    if (!itemData) return false;
+
+    if (this.actor.uuid === item?.parent?.uuid) return false;
+
+    // Assign a fresh embedded item id so dropping the same compendium entry
+    // twice does not trip over a copied pack/world _id.
+    delete itemData._id;
+    delete itemData.folder;
+
+    const inferredType = inferMshItemTypeFromDrop(data, event);
+    const currentType = normalizeMshItemType(itemData.type ?? item?.type ?? data.type);
+
+    if (inferredType && currentType !== inferredType) {
+      const wasLegacyOrAmbiguous = !currentType || currentType === "item" || !MSH_ACTOR_ITEM_TYPES.has(currentType);
+      const cameFromMatchingPack = inferredType === inferMshItemTypeFromDrop(data, null);
+
+      if (wasLegacyOrAmbiguous || cameFromMatchingPack) {
+        itemData.type = inferredType;
+      } else {
+        ui.notifications?.warn(`Drop ${itemData.name ?? "item"} on its matching tab (${currentType} ≠ ${inferredType}).`);
+        return false;
+      }
+    } else {
+      itemData.type = currentType;
+    }
+
+    if (!MSH_ACTOR_ITEM_TYPES.has(itemData.type)) {
+      ui.notifications?.warn(`Unsupported FASERIP item type: ${itemData.type || "unknown"}.`);
+      return false;
+    }
+
+    return this.actor.createEmbeddedDocuments("Item", [itemData]);
   }
 
   async _onDropActiveEffect(event, data) {
@@ -2024,6 +2229,8 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       dropEl.addEventListener("dragover", this._mshDragoverHandler);
       dropEl.addEventListener("drop", this._mshDropHandler);
     }
+
+    this._mshBindItemTabDropZones(html);
 
     // Apply compact mode class from actor flag
     const compact = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;

@@ -1,3 +1,7 @@
+// action-utils.js v1.8.14 - 2026-07-09
+// v1.8.14: derivePowerDamage now preserves authored equipment weapon damage
+//          before using power rank/value derivation. Fixes Energy/Force weapons
+//          using system.value/default rank value instead of system.damage.
 // action-utils.js v1.8.13 - 2026-07-09
 // v1.8.13: Let Edged Attack detect Claws powers as edged-capable
 //          sources via battleEffectsColumn EA / physical-edged claw metadata.
@@ -131,20 +135,52 @@ function resolveCombatModeSafe(actor) {
 
 
 // Given a Token or Actor, return the correct Actor document for Active Effects
+function parseDamageValue(value, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+
+  const rank = normalizeRank(raw);
+  if (RANK_VALUES[rank] !== undefined) return Number(RANK_VALUES[rank]) || fallback;
+
+  const parenMatch = raw.match(/\((-?\d+(?:\.\d+)?)\)/);
+  if (parenMatch) return Number(parenMatch[1]) || fallback;
+
+  const direct = Number(raw);
+  if (Number.isFinite(direct)) return direct;
+
+  const firstNumber = raw.match(/-?\d+(?:\.\d+)?/);
+  return firstNumber ? (Number(firstNumber[0]) || fallback) : fallback;
+}
+
 // Derive a power's damage from its system fields, honoring system.damageSource.
 // Single source of truth for energy/force/throwing attacks (previously each
 // action file rolled its own; energy got the damageSource fix, force didn't —
 // which is why a rank-sourced power with a 0/blank fixed-damage field, e.g. a
 // fresh Air Control from the rebuilt pack, dealt 0 damage).
+//
+// Equipment weapons are the exception: their authored system.damage is the
+// printed weapon damage, not an alternate power damageSource. Energy/Force
+// equipment uses those attack columns but should still inflict the listed
+// equipment damage.
+//
+//   equipment weapon                    -> listed/fixed system.damage
 //   "rank" (default) / "material" / blank -> power value (rank-value fallback)
-//   "fixed"                               -> the fixed damage field
-//   "strength" / "endurance"              -> the actor's ability value
+//   "fixed"                            -> the fixed damage field
+//   "strength" / "endurance"           -> the actor's ability value
 export function derivePowerDamage(system, actor) {
   const s = system || {};
+
+  const category = String(s.category || "").toLowerCase();
+  const isEquipmentWeapon = category === "weapon" || !!s.weaponType;
+  if (isEquipmentWeapon) {
+    return parseDamageValue(s.damage, 0);
+  }
+
   const dmgSource = String(s.damageSource || "rank");
   const rankVal = Number(CONFIG.FASERIP?.rankValues?.[s.rank])
     || Number(game.msh?.getRankValue?.(s.rank)) || 0;
-  if (dmgSource === "fixed") return Number(s.damage) || 0;
+  if (dmgSource === "fixed") return parseDamageValue(s.damage, 0);
   if (dmgSource === "strength" || dmgSource === "endurance") {
     const ab = actor?.system?.abilities?.[dmgSource] || {};
     return Number(ab.value)

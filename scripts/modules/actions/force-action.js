@@ -1,3 +1,6 @@
+// scripts/modules/actions/force-action.js v3.3.4 - 2026-07-09
+// v3.3.4: Use derivePowerDamage() for the initial source damage display too,
+//         including equipment force weapons routed through the Force dialog.
 // scripts/modules/actions/force-action.js v3.3.3 - 2026-07-04
 // v3.3.3: Honor system.damageSource when deriving force-power damage (was
 //         reading s.damage first via ??, so a rank-sourced power with a
@@ -160,7 +163,7 @@ export class ForceAction extends RangedAttackAction {
 
     const initialPower = forceItems.find(i => i.id === savedItemId) || forceItems[0];
     const initialPowerRank = savedAdHoc ? savedAdHocRank : (initialPower?.system?.rank ?? initialPower?.system?.powerRank ?? "Remarkable");
-    const initialDamage = savedAdHoc ? savedAdHocDmg : Number(initialPower?.system?.damage ?? initialPower?.system?.value ?? 0);
+    const initialDamage = savedAdHoc ? savedAdHocDmg : derivePowerDamage(initialPower?.system || {}, actor);
     const initialAfterArmor = Math.max(0, initialDamage - targetArmor);
     const initialDisplayRank = savedUsePowerToHit ? initialPowerRank : ability.rank;
 

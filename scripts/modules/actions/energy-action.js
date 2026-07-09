@@ -1,3 +1,7 @@
+// scripts/modules/actions/energy-action.js v3.4.4 - 2026-07-09
+// v3.4.4: Normalize equipment damage type E to energy and use derivePowerDamage()
+//         for initial, dropdown, preview, and roll damage so equipment energy
+//         weapons keep their authored system.damage.
 // scripts/modules/actions/energy-action.js v3.4.3 - 2026-07-04
 // v3.4.3: Use the shared action-utils derivePowerDamage() instead of the local
 //         inlined damageSource block (single source of truth; force/throwing
@@ -100,6 +104,12 @@ import { showFaseripDialog } from "./dialog-shim.js";
 function inferEnergyDamageType(item, fallback = "energy-generic") {
   const sys = item?.system || {};
   const explicit = String(sys.damageType || "").trim();
+  const explicitUpper = explicit.toUpperCase();
+
+  // Equipment sheets store energy weapons as the short code "E". Normalize it
+  // before the armor/damage pipeline so pre-mitigation Body Armor uses the
+  // Energy value instead of treating "E" as an unknown physical damage type.
+  if (explicitUpper === "E") return "energy";
 
   // Keep intentionally specific authored values. Treat blank/generic as a
   // legacy-import gap and infer from canonical power naming.
@@ -221,7 +231,7 @@ export class EnergyAction extends RangedAttackAction {
 
     const initialPower = energyItems.find(i => i.id === savedItemId) || energyItems[0];
     const initialPowerRank = savedAdHoc ? savedAdHocRank : (initialPower?.system?.rank ?? initialPower?.system?.powerRank ?? "Remarkable");
-    const initialDamage = savedAdHoc ? savedAdHocDmg : (initialPower?.system?.damage || initialPower?.system?.value || 0);
+    const initialDamage = savedAdHoc ? savedAdHocDmg : derivePowerDamage(initialPower?.system || {}, actor);
     const initialAfterArmor = Math.max(0, initialDamage - energyArmor);
     const initialDisplayRank = savedUsePowerToHit ? initialPowerRank : ability.rank;
 
@@ -248,7 +258,7 @@ export class EnergyAction extends RangedAttackAction {
     const powerSrcOptions = [];
     for (const item of energyItems) {
       const s = item.system || {};
-      const dmg = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
+      const dmg = derivePowerDamage(s, actor);
       const rank = s.rank ?? s.powerRank ?? "Remarkable";
       const rankAbbr = RANK_ABBR[rank] || rank;
       const sel = (!savedAdHoc && item.id === savedItemId) ? 'selected'
@@ -588,7 +598,7 @@ export class EnergyAction extends RangedAttackAction {
               const item = energyItems.find(i => i.id === itemId);
               if (item) {
                 const s = item.system || {};
-                currentDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
+                currentDamage = derivePowerDamage(s, actor);
                 currentRank = String(s.rank ?? s.powerRank ?? "Remarkable");
                 const nameLower = item.name.toLowerCase();
                 isEnergyGeneration = nameLower.includes('energy generation') ||

@@ -1,199 +1,197 @@
 {
-    "id": "msh-faserip",
-    "name": "msh-faserip",
-    "title": "Marvel Super Heroes (FASERIP)",
-    "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v14.",
-    "version": "2.1.5",
-    "compatibility": {
-        "minimum": "14",
-        "verified": "14.360"
+  "id": "msh-faserip",
+  "name": "msh-faserip",
+  "title": "Marvel Super Heroes (FASERIP)",
+  "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v14.",
+  "version": "2.1.6",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14.360"
+  },
+  "templateVersion": 2,
+  "author": "bk-adams",
+  "url": "",
+  "manifest": "",
+  "download": "",
+  "license": "LICENSE",
+  "socket": true,
+  "dependencies": [
+    {
+      "name": "socketlib",
+      "type": "module"
+    }
+  ],
+  "esmodules": [
+    "scripts/init.js",
+    "scripts/modules/actions/nullify.js",
+    "scripts/modules/actions/check-action.js",
+    "scripts/modules/actions/energy-action.js",
+    "scripts/modules/actions/chat-hooks.js",
+    "scripts/modules/actions/action-dispatcher.js",
+    "scripts/actor.js",
+    "scripts/item.js",
+    "scripts/actorSheet.js",
+    "scripts/itemSheet.js",
+    "scripts/vehicle-actor-sheet.js",
+    "scripts/macros.js",
+    "scripts/gm-utils.js",
+    "scripts/karma.js",
+    "scripts/karmaAdvancement.js",
+    "scripts/karmaPool.js",
+    "scripts/karma.js",
+    "scripts/karma-rules.js",
+    "scripts/karma-multipliers.js",
+    "scripts/teamSheet.js"
+  ],
+  "styles": [
+    "styles/power-sheet-v2.css",
+    "styles/power-chat-card.css",
+    "styles/global.css",
+    "styles/actor-sheet.css",
+    "styles/actor-sheet-enhanced.css",
+    "styles/item-sheet.css",
+    "styles/karma-dialog.css",
+    "styles/faserip-initiative.css",
+    "styles/team-tracker.css",
+    "styles/chargen.css",
+    "styles/hq-sheet.css",
+    "styles/talent-sheet.css",
+    "styles/contact-sheet.css",
+    "styles/combat-panel.css",
+    "styles/gm-tools.css",
+    "styles/action-dialog.css",
+    "styles/vehicle-sheet.css",
+    "styles/compact-mode.css",
+    "styles/universal-table-tab.css",
+    "styles/hardware-tab.css",
+    "styles/equipment-sheet-redesign.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "packs": [
+    {
+      "name": "powers",
+      "label": "Powers",
+      "system": "msh-faserip",
+      "path": "./packs/powers",
+      "type": "Item"
     },
-    "templateVersion": 2,
-    "author": "bk-adams",
-    "url": "",
-    "manifest": "",
-    "download": "",
-    "license": "LICENSE",
-    "socket": true,
-    "dependencies": [
-        {
-        "name": "socketlib",
-        "type": "module"
-        }
-    ],
-    "esmodules": [
-        "scripts/init.js",
-        "scripts/modules/actions/nullify.js",
-        "scripts/modules/actions/check-action.js",
-        "scripts/modules/actions/energy-action.js",
-        "scripts/modules/actions/chat-hooks.js",
-        "scripts/modules/actions/action-dispatcher.js",
-        "scripts/actor.js",
-        "scripts/item.js",
-        "scripts/actorSheet.js",
-        "scripts/itemSheet.js",
-
-        "scripts/vehicle-actor-sheet.js",
-
-        "scripts/macros.js",
-        "scripts/gm-utils.js",
-        "scripts/karma.js",
-        "scripts/karmaAdvancement.js",
-        "scripts/karmaPool.js",
-        "scripts/karma.js",
-        "scripts/karma-rules.js",
-        "scripts/karma-multipliers.js",
-        "scripts/teamSheet.js"
-        ],
-    "styles": [
-        "styles/power-sheet-v2.css",
-        "styles/power-chat-card.css",
-        "styles/global.css",
-        "styles/actor-sheet.css",
-        "styles/actor-sheet-enhanced.css",
-        "styles/item-sheet.css",
-        "styles/karma-dialog.css",
-        "styles/faserip-initiative.css",
-        "styles/team-tracker.css",
-        "styles/chargen.css",
-        "styles/hq-sheet.css",
-        "styles/talent-sheet.css",
-        "styles/contact-sheet.css",
-        "styles/combat-panel.css",
-        "styles/gm-tools.css",
-        "styles/action-dialog.css",
-        "styles/vehicle-sheet.css",
-        "styles/compact-mode.css",
-        "styles/universal-table-tab.css",
-        "styles/hardware-tab.css",
-        "styles/equipment-sheet-redesign.css"
-    ],
-    "languages": [
-        {
-            "lang": "en",
-            "name": "English",
-            "path": "lang/en.json"
-        }
-    ],
-    "packs": [
-        {
-            "name": "powers",
-            "label": "Powers",
-            "system": "msh-faserip",
-            "path": "./packs/powers",
-            "type": "Item"
-        },
-        {
-            "name": "talents",
-            "label": "Talents",
-            "system": "msh-faserip",
-            "path": "./packs/talents.db",
-            "type": "Item"
-        },
-        {
-            "name": "contacts",
-            "label": "Contacts",
-            "system": "msh-faserip",
-            "path": "./packs/contacts.db",
-            "type": "Item"
-        },
-        {
-            "name": "equipment",
-            "label": "Equipment",
-            "system": "msh-faserip",
-            "path": "./packs/equipment.db",
-            "type": "Item"
-        },
-        {
-            "name": "vehicles",
-            "label": "Vehicles",
-            "system": "msh-faserip",
-            "path": "./packs/vehicles.db",
-            "type": "Item"
-        },
-        {
-            "name": "headquarters",
-            "label": "Headquarters",
-            "system": "msh-faserip",
-            "path": "./packs/headquarters.db",
-            "type": "Item"
-        },
-        {
-            "name": "vehicle-weapons",
-            "label": "Vehicle Weapons",
-            "system": "msh-faserip",
-            "path": "./packs/vehicle-weapons.db",
-            "type": "Item"
-        }
-    ],
-    "documentTypes": {
-        "Actor": {
-            "hero": {},
-            "villain": {},
-            "npc": {},
-            "vehicle": {}
-        },
-        "Item": {
-            "power": {},
-            "talent": {},
-            "contact": {},
-            "equipment": {},
-            "vehicle": {},
-            "headquarters": {}
-        },
-        "RegionBehavior": {
-            "areaHazard": {}
-        }
+    {
+      "name": "talents",
+      "label": "Talents",
+      "system": "msh-faserip",
+      "path": "./packs/talents.db",
+      "type": "Item"
     },
-    "relationships": {},
-    "primaryTokenAttribute": "attributes.health",
-    "gridDistance": 44,
-    "gridUnits": "yards",
-    "settings": [
-        {
-            "key": "dailyKarmaEnabled",
-            "name": "Enable Daily Karma",
-            "hint": "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
-            "scope": "world",
-            "config": true,
-            "type": "Boolean",
-            "default": false
-        },
-        {
-            "key": "teamMembers",
-            "name": "Team Members",
-            "hint": "List of hero IDs that are part of the team",
-            "scope": "world",
-            "config": false,
-            "type": "Array",
-            "default": []
-        },
-        {
-            "key": "defeatedVillains",
-            "name": "Defeated Villains",
-            "hint": "List of villains defeated by the team",
-            "scope": "world",
-            "config": false,
-            "type": "Array",
-            "default": []
-        },
-        {
-            "key": "karmaMultiplier",
-            "name": "Karma Multiplier",
-            "hint": "Multiplier for karma awards",
-            "scope": "world",
-            "config": false,
-            "type": "Number",
-            "default": 1
-        },
-        {
-            "key": "compactSheet",
-            "name": "Compact Character Sheet",
-            "hint": "Reduces character sheet size by hiding header details, collapsing abilities, and tightening spacing.",
-            "scope": "client",
-            "config": true,
-            "type": "Boolean",
-            "default": false
-        }
-        ]
+    {
+      "name": "contacts",
+      "label": "Contacts",
+      "system": "msh-faserip",
+      "path": "./packs/contacts.db",
+      "type": "Item"
+    },
+    {
+      "name": "equipment",
+      "label": "Equipment",
+      "system": "msh-faserip",
+      "path": "./packs/equipment.db",
+      "type": "Item"
+    },
+    {
+      "name": "vehicles",
+      "label": "Vehicles",
+      "system": "msh-faserip",
+      "path": "./packs/vehicles.db",
+      "type": "Item"
+    },
+    {
+      "name": "headquarters",
+      "label": "Headquarters",
+      "system": "msh-faserip",
+      "path": "./packs/headquarters.db",
+      "type": "Item"
+    },
+    {
+      "name": "vehicle-weapons",
+      "label": "Vehicle Weapons",
+      "system": "msh-faserip",
+      "path": "./packs/vehicle-weapons.db",
+      "type": "Item"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "hero": {},
+      "villain": {},
+      "npc": {},
+      "vehicle": {}
+    },
+    "Item": {
+      "power": {},
+      "talent": {},
+      "contact": {},
+      "equipment": {},
+      "vehicle": {},
+      "headquarters": {}
+    },
+    "RegionBehavior": {
+      "areaHazard": {}
+    }
+  },
+  "relationships": {},
+  "primaryTokenAttribute": "attributes.health",
+  "gridDistance": 44,
+  "gridUnits": "yards",
+  "settings": [
+    {
+      "key": "dailyKarmaEnabled",
+      "name": "Enable Daily Karma",
+      "hint": "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
+      "scope": "world",
+      "config": true,
+      "type": "Boolean",
+      "default": false
+    },
+    {
+      "key": "teamMembers",
+      "name": "Team Members",
+      "hint": "List of hero IDs that are part of the team",
+      "scope": "world",
+      "config": false,
+      "type": "Array",
+      "default": []
+    },
+    {
+      "key": "defeatedVillains",
+      "name": "Defeated Villains",
+      "hint": "List of villains defeated by the team",
+      "scope": "world",
+      "config": false,
+      "type": "Array",
+      "default": []
+    },
+    {
+      "key": "karmaMultiplier",
+      "name": "Karma Multiplier",
+      "hint": "Multiplier for karma awards",
+      "scope": "world",
+      "config": false,
+      "type": "Number",
+      "default": 1
+    },
+    {
+      "key": "compactSheet",
+      "name": "Compact Character Sheet",
+      "hint": "Reduces character sheet size by hiding header details, collapsing abilities, and tightening spacing.",
+      "scope": "client",
+      "config": true,
+      "type": "Boolean",
+      "default": false
+    }
+  ]
 }
