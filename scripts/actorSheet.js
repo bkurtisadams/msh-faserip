@@ -1,4 +1,14 @@
-// actorSheet.js v2.7.0 - 2026-07-08
+// actorSheet.js v2.7.2 - 2026-07-09
+// v2.7.2: Hardware help dialog sized to 560px with a resize grip
+//         (dialog-shim now forwards width/resizable to DialogV2); inline
+//         max-width backstop on the content. Was auto-sizing to the
+//         paragraphs' preferred width \u2014 the full browser.
+// v2.7.1: Hardware tab help. _hwHelpDialog() quick-reference (lifecycle,
+//         effective cost, Resource FEAT + weekly lockout, build time,
+//         success colors + degrade rule, kit-bash, modifications, salvage,
+//         repairs, tech FEATs) behind the "?" header link. Dialog content
+//         is inline-styled so it renders correctly even if hardware-tab.css
+//         is stale (per the v2.1.3 stylesheet lesson).
 // v2.7.0: Hardware tab stability + layout fix. Calculator value edits
 //         (ranks, labels, checkboxes, CS, time, talents, name, build days)
 //         now update with render:false and patch the DOM surgically via
@@ -1035,6 +1045,51 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       },
       default: "aid"
     }).render(true);
+  }
+
+  /** Hardware tab quick-reference, opened from the "?" header link.
+   *  Inline-styled: must render correctly even with a stale stylesheet. */
+  _hwHelpDialog() {
+    const h3 = 'style="font-size:12px;font-weight:700;color:#3d5a80;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #d8dee5;margin:10px 0 4px 0;padding-bottom:2px;"';
+    const pp = 'style="margin:3px 0;"';
+    const content = `
+      <div class="frp-dlg frp-res" style="max-width:540px;"><div style="font-size:12px;line-height:1.5;max-height:480px;overflow-y:auto;padding-right:4px;">
+        <h3 ${h3} style="margin-top:0;">Project lifecycle</h3>
+        <p ${pp}><b>Design</b> \u2192 Resource FEAT \u2192 <b>Building</b> \u2192 log build days \u2192 Success FEAT \u2192 <b>Testing</b> or <b>Complete</b> (or back to Building on a white result). <b>Failed</b> devices can be salvaged. Projects are ordinary equipment items and also appear on the Equip tab.</p>
+        <h3 ${h3}>Effective cost</h3>
+        <p ${pp}>Take the <b>highest applicable rank</b>; every other rank <b>equal</b> to it adds +2CS, every rank <b>one below</b> adds +1CS, and ranks two or more below are free. Situational modifiers (portable, invisible, melee-only\u2026) shift further; powers beyond 1980s technology add a Monstrous applicable rank. The calculator shows the full derivation. Effective cost sets the Resource FEAT, the build time (rank number in days), and whether the device works.</p>
+        <h3 ${h3}>Resource FEAT</h3>
+        <p ${pp}>Solo, combined (a second hero with Resources within one rank \u2014 counts one rank higher), or Contacts (the organization's Resources; persuasion and strings attached are the Judge's). <b>Failure locks all Resource FEATs for one week</b> \u2014 shared with ordinary purchases.</p>
+        <h3 ${h3}>Build time</h3>
+        <p ${pp}>Days = cost rank number. A lab assistant halves it; one with Reason within a rank of yours quarters it (and gives +1CS on the success roll); working straight through halves it again but costs -1CS. Log days with +1d / +5d / \u23e9.</p>
+        <h3 ${h3}>Success FEAT</h3>
+        <p ${pp}>Reason FEAT with shifts: +1CS brilliant assistant, +1CS per applicable talent (max +3), -1CS rushed, -1CS per special requirement (max -3), +1CS rebuilding from salvage. Karma must be declared before the roll. If the cost exceeds your shifted Reason, <b>the result reads one color worse</b>.</p>
+        <p ${pp}>
+          <b style="display:inline-block;min-width:52px;">RED</b> \u2014 it works.<br>
+          <b style="display:inline-block;min-width:52px;">YELLOW</b> \u2014 working prototype at -1CS until fine-tuned (1-10 days).<br>
+          <b style="display:inline-block;min-width:52px;">GREEN</b> \u2014 works, then fails in 1-10 turns; repair = rebuild.<br>
+          <b style="display:inline-block;min-width:52px;">WHITE</b> \u2014 start over: same time, no new Resource FEAT, +1 special requirement.</p>
+        <h3 ${h3}>Kit-bashing</h3>
+        <p ${pp}>When Terminus pops up: <b>10 Karma per remaining day</b> turns each day into one round. Own Karma, pools, Advancement, and assisting allies all qualify. Green Reason FEAT; the device runs <b>1-10 rounds</b>, then dies \u2014 salvage the pieces for +1CS to rebuild it properly.</p>
+        <h3 ${h3}>Modifications</h3>
+        <p ${pp}>Switch a project to <b>Modification</b> mode. One mod at a time; rank improvements go <b>one rank per modification</b> at the new rank's cost. Simple installs cost Typical; capability adds that alter the device cost the new power's rank (Good minimum, Monstrous if beyond 1980s tech). Failure may damage the original.</p>
+        <h3 ${h3}>Salvage</h3>
+        <p ${pp}>Strip a failed or dead device for parts: back to Design with <b>+1CS on future rolls to duplicate it</b>.</p>
+        <h3 ${h3}>Repairs &amp; Tech FEATs</h3>
+        <p ${pp}>The <b>repair</b> link handles repair centers (one rank per FEAT, automatic if the center outranks the target, hours = rank number) and field repairs (hold 1-10 hours). Below Feeble is salvage-only. The <b>tech FEATs</b> link covers borrowed devices, alien technology, computer access, and reprogramming.</p>
+        <div class="frp-foot"><div class="frp-foot-btns">
+          <button id="hwhelp-close" class="frp-btn-cancel">Close</button>
+        </div></div>
+      </div></div>`;
+    showFaseripDialog({
+      title: "Hardware \u2014 Quick Reference",
+      content,
+      width: 560,
+      resizable: true,
+      render: async (html, dlg) => {
+        html.find("#hwhelp-close").on("click", () => dlg.close());
+      }
+    });
   }
 
   /** Hardware tab: shared display computation for getData and live refresh. */
@@ -3706,6 +3761,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const item = hwItem(ev); if (item) this._hwSalvage(item);
     });
 
+    html.find('.hw-help').click(() => this._hwHelpDialog());
     html.find('.hw-repair-tool').click(() => this._hwRepairDialog());
     html.find('.hw-tech-feats').click(() => this._hwTechFeatDialog());
 

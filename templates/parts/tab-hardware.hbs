@@ -1,12 +1,14 @@
-{{!-- tab-hardware.hbs — v1.3.2: critical layout constraints moved inline (status select width, name min-width, header wrap, card overflow clip) so the fix cannot be defeated by a stale or out-ranked stylesheet; version tag inline-styled. --}}
+{{!-- tab-hardware.hbs — v1.3.3: help "?" link opening the workflow quick-reference dialog; empty state upgraded to a five-step walkthrough. --}}
+{{!-- v1.3.2: critical layout constraints moved inline (status select width, name min-width, header wrap, card overflow clip) so the fix cannot be defeated by a stale or out-ranked stylesheet; version tag inline-styled. --}}
 {{!-- v1.3.1: visible version tag in the tab header for install verification; degrade warning always rendered (hw-hidden toggle); weapon hint gains range-band table. --}}
 {{!-- v1.2.0: Slice 3 — invention/modification mode toggle with modification panel (one-rank-at-a-time boosts, easy/hard capability adds), kit-bash button with live Karma cost on design/building projects, salvage action on testing/failed devices, salvaged badge, Repair Device and Tech FEATs utility links in the tab header. --}}
 {{!-- v1.1.0: Slice 2 — pipeline (Resource FEAT, build tracker, success FEAT, testing links). v1.0.0: Slice 1 — shell + effective-cost calculator. --}}
 <div class="tab" data-tab="hardware">
   <div class="tab-list-header labeled">
     <span class="th-label">Hardware</span>
-    <span class="hw-version" style="margin-left:auto;font-size:9px;opacity:.6;align-self:center;letter-spacing:.5px;" title="Hardware tab build">v1.3.2</span>
+    <span class="hw-version" style="margin-left:auto;font-size:9px;opacity:.6;align-self:center;letter-spacing:.5px;" title="Hardware tab build">v1.3.3</span>
     <div class="th-actions">
+      <a class="th-action-link hw-help" title="How the Hardware tab works">?</a>
       <a class="th-action-link hw-repair-tool" title="Repair-center and field repairs">repair</a>
       <a class="th-action-link hw-tech-feats" title="Alien tech, borrowed devices, computers">tech FEATs</a>
       <a class="th-action-link hw-add-invention" title="Start a new invention or modification">+ new invention</a>
@@ -237,6 +239,16 @@
   </div>
   {{/each}}
   {{else}}
-  <div class="hw-empty">No inventions yet. Use <b>+ new invention</b> to start one — completed devices remain normal equipment items and appear on the Equipment tab.</div>
+  <div class="hw-empty">
+    <p style="margin:4px 0;"><b>No inventions yet.</b> Building a device works like this:</p>
+    <ol style="margin:4px 0 4px 18px;padding:0;">
+      <li style="margin-bottom:3px;"><b>+ new invention</b> creates a project (it's a normal equipment item — it also appears on the Equip tab).</li>
+      <li style="margin-bottom:3px;">Open its <b>Effective-cost calculator</b>, pick the item class (standard rank rows appear), and set the ranks — cost, build days, and derivation update live.</li>
+      <li style="margin-bottom:3px;"><b>Resource FEAT</b> funds the project (solo, a second hero, or Contacts). Failure locks Resource FEATs for a week.</li>
+      <li style="margin-bottom:3px;">Log <b>build days</b> until the bar fills (assistants and round-the-clock work shorten it).</li>
+      <li style="margin-bottom:3px;"><b>Success FEAT</b>: red = it works, yellow = prototype needing fine-tuning, green = fails in 1-10 turns, white = start over.</li>
+    </ol>
+    <p style="margin:4px 0;">In a hurry? <b>Kit-bash</b> trades 10 Karma per remaining day to build in rounds. The <b>?</b> above has the full quick reference, including modifications, salvage, and repairs.</p>
+  </div>
   {{/if}}
 </div>

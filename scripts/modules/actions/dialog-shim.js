@@ -27,10 +27,13 @@ export function isDialogDetached(dialog) {
   } catch (_) { return false; }
 }
 
-export async function showFaseripDialog({ title, content, render, close } = {}) {
+// 2026-07-09: showFaseripDialog now accepts optional width/height (routed to
+// DialogV2 position, matching showFaseripButtonDialog) and resizable (routed
+// to window.resizable) for content-heavy dialogs like the Hardware help.
+export async function showFaseripDialog({ title, content, render, close, width, height, resizable } = {}) {
   const { DialogV2 } = foundry.applications.api;
-  return DialogV2.wait({
-    window: { title },
+  const cfg = {
+    window: { title, ...(resizable ? { resizable: true } : {}) },
     content,
     // V2 requires at least one button. Provide a hidden dummy; the
     // content's own elements drive interaction. We hide the button row
@@ -63,7 +66,9 @@ export async function showFaseripDialog({ title, content, render, close } = {}) 
       try { close?.(); }
       catch (e) { console.warn("FASERIP dialog close error:", e); }
     }
-  });
+  };
+  if (width || height) cfg.position = { ...(width ? { width } : {}), ...(height ? { height } : {}) };
+  return DialogV2.wait(cfg);
 }
 
 // Button-driven DialogV2 wrapper. Maps V1's { buttons: { key: { label, icon,
