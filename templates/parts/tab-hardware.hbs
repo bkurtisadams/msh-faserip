@@ -149,7 +149,7 @@
           <option value="other"     {{#if (eq p.system.hardware.itemClass "other")}}selected{{/if}}>Other Device</option>
         </select>
         <span class="hw-class-hint">
-          {{#if (eq p.system.hardware.itemClass "weapon")}}Applicable ranks: Damage (or Intensity), Range, Material Strength. Thrown weapons ignore the Range rank.{{/if}}
+          {{#if (eq p.system.hardware.itemClass "weapon")}}Applicable ranks: Damage (or Intensity), Range, Material Strength. Thrown weapons ignore the Range rank; melee check the touch-only box. Range bands (areas): 1 Pr · 2 Ty · 3-4 Gd · 5-6 Ex · 7-8 Rm · 9-11 In · 12-20 Am · 21-40 Mn · 41-60 Un.{{/if}}
           {{#if (eq p.system.hardware.itemClass "vehicle")}}Applicable ranks: Control, Speed, Body, Protection.{{/if}}
           {{#if (eq p.system.hardware.itemClass "powersuit")}}Applicable ranks: modified abilities, plus Material Strength or Body Armor (whichever is higher). Shift-style suits: use +1CS custom per ability shift instead of set ranks.{{/if}}
           {{#if (eq p.system.hardware.itemClass "robot")}}Applicable ranks: all listed abilities and Power ranks. Omit abilities the robot lacks.{{/if}}
@@ -228,9 +228,7 @@
         </span>
         <label class="hw-mod"><input type="checkbox" class="hw-field" data-hw-path="successFeat.rebuild" {{#if p.system.hardware.successFeat.rebuild}}checked{{/if}} /> Rebuilding from failed experiment / kit-bash salvage (+1CS)</label>
         <span class="hw-success-readout">Success roll: Reason column <b>{{p.hw.shiftedReason}}</b> ({{#if p.hw.successCSPos}}+{{/if}}{{p.hw.successCS}}CS)</span>
-        {{#if p.hw.degrade}}
-        <span class="hw-degrade-warn"><i class="fas fa-triangle-exclamation"></i> Effective cost exceeds shifted Reason — result reads one color worse.</span>
-        {{/if}}
+        <span class="hw-degrade-warn {{#unless p.hw.degrade}}hw-hidden{{/unless}}"><i class="fas fa-triangle-exclamation"></i> Effective cost exceeds shifted Reason — result reads one color worse.</span>
       </div>
     </details>
   </div>

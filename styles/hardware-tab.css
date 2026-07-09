@@ -1,4 +1,8 @@
-/* styles/hardware-tab.css v1.2.0 - 2026-07-07 - FASERIP Hardware tab
+/* styles/hardware-tab.css v1.3.0 - 2026-07-08 - FASERIP Hardware tab
+ * v1.3.0: fix header overflow (status select inherited core width:100% and
+ *         pushed badges off-sheet); constrain all hardware selects; allow
+ *         header to wrap as a last resort; hw-hidden utility for live
+ *         toggling the degrade warning without a re-render.
  * v1.2.0: Slice 3 - kit-bash button accent, salvage button, MOD/SALVAGE
  *         badges, modification panel.
  * v1.1.0: Slice 2 - pipeline strip (Resource FEAT button, build progress bar,
@@ -23,16 +27,19 @@
 .msh-faserip .hw-project-header {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px;
   background: #eef1f5; border-bottom: 1px solid #dde3ea;
+  flex-wrap: wrap;
 }
 .msh-faserip .hw-icon { border: none; flex: 0 0 auto; }
 .msh-faserip .hw-name {
-  flex: 1 1 auto; min-width: 120px; font-weight: 700;
+  flex: 1 1 140px; width: auto; min-width: 0; font-weight: 700;
   border: 1px solid transparent; background: transparent; height: 22px;
 }
 .msh-faserip .hw-name:hover, .msh-faserip .hw-name:focus {
   border-color: #b8c2cc; background: #fff;
 }
-.msh-faserip .hw-status { flex: 0 0 auto; height: 22px; font-size: 11px; }
+/* Core Foundry + faserip-sheet set select{width:100%}; without an explicit
+   width the status select expands and shoves the badges off-sheet. */
+.msh-faserip .hw-status { flex: 0 0 auto; width: 110px; height: 22px; font-size: 11px; }
 .msh-faserip .hw-badge {
   flex: 0 0 auto; padding: 1px 8px; border-radius: 10px;
   font-size: 11px; font-weight: 700; white-space: nowrap;
@@ -129,3 +136,9 @@
   padding: 6px 8px; margin-bottom: 6px;
   display: flex; flex-direction: column; gap: 4px;
 }
+
+/* Width safety for every select in the Hardware tab. */
+.msh-faserip .hw-project select { width: auto; max-width: 100%; }
+.msh-faserip .hw-rank-rank { width: 140px; }
+.msh-faserip .hw-row select, .msh-faserip .hw-inline-field select { flex: 0 1 auto; max-width: 340px; }
+.msh-faserip .hw-hidden { display: none !important; }

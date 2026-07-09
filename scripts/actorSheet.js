@@ -1,4 +1,14 @@
-// actorSheet.js v2.6.0 - 2026-07-07
+// actorSheet.js v2.7.0 - 2026-07-08
+// v2.7.0: Hardware tab stability + layout fix. Calculator value edits
+//         (ranks, labels, checkboxes, CS, time, talents, name, build days)
+//         now update with render:false and patch the DOM surgically via
+//         _hwRefreshProject \u2014 eliminates the full-sheet re-render that
+//         collapsed the calculator and could re-inject the body PART,
+//         producing duplicated panels. Structural edits (mode / itemClass /
+//         status / mod.kind / rank-row add/remove) still re-render; the
+//         calculator open state persists across those via a per-item Set.
+//         Choosing an item class seeds its standard applicable-rank rows.
+//         Shared display math extracted to _hwDecorate.
 // v2.6.0: Hardware tab Slice 3, completing the Hardware chapter. Cost
 //         computation dispatches through computeCost (invention vs
 //         modification with one-rank-at-a-time boosts and capability-add
@@ -126,7 +136,8 @@ import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-sh
 import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHardware,
          successFeatCS, costExceedsReason, fundingResourceRank,
          kitbashKarma, kitbashRounds, repairHours, centerRepairAuto,
-         effectiveRepairReason, requiredColorVsIntensity, colorMeets } from "./rules/hardware-rules.mjs";
+         effectiveRepairReason, requiredColorVsIntensity, colorMeets,
+         seedApplicableRanks } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
@@ -320,38 +331,10 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     // are recomputed for display so the readout is always canonical.
     context.hardwareProjects = context.equipment
       .filter(i => i.system.hardware?.enabled)
-      .map(i => {
-        const hw = i.system.hardware;
-        const ec = computeCost(hw);
-        const days = ec.valid ? buildDays(ec.costRank) : 0;
-        const adj = adjustedDays(days, hw.time ?? {});
-        const sf = hw.successFeat ?? {};
-        const cs = successFeatCS({
-          assistant: hw.time?.assistant === "brilliant",
-          talents: sf.talentsCS, rushed: !!hw.time?.roundTheClock,
-          specialReqs: hw.specialReqCount, rebuild: !!sf.rebuild
-        });
-        const reasonRank = actorData.system.abilities?.reason?.rank ?? "Typical";
-        const shiftedReason = shiftRank(reasonRank, cs);
-        const elapsed = Number(hw.time?.daysElapsed) || 0;
-        return {
-          _id: i.id, name: i.name, img: i.img, system: i.system,
-          hw: {
-            cost: ec.valid ? ec.costRank : "\u2014",
-            days,
-            adjDays: Number.isInteger(adj) ? adj : adj.toFixed(1),
-            steps: ec.steps,
-            successCS: cs, successCSPos: cs >= 0,
-            shiftedReason,
-            degrade: ec.valid && costExceedsReason(ec.costRank, shiftedReason),
-            progressPct: adj > 0 ? Math.min(100, Math.round(elapsed / adj * 100)) : 0,
-            timeDone: ec.valid && adj > 0 && elapsed >= adj - 1e-9,
-            remainingDays: Math.max(0, adj - elapsed),
-            kitKarma: kitbashKarma(Math.max(0, adj - elapsed)),
-            kitRounds: kitbashRounds(Math.max(0, adj - elapsed))
-          }
-        };
-      });
+      .map(i => ({
+        _id: i.id, name: i.name, img: i.img, system: i.system,
+        hw: this._hwDecorate(i.system.hardware)
+      }));
     context.hwInventor = {
       reasonRank: actorData.system.abilities?.reason?.rank ?? "",
       reasonValue: actorData.system.abilities?.reason?.value ?? 0,
@@ -1054,12 +1037,79 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     }).render(true);
   }
 
-  // In actorSheet.js, add to the activateListeners function
+  /** Hardware tab: shared display computation for getData and live refresh. */
+  _hwDecorate(hw) {
+    hw = hw ?? {};
+    const ec = computeCost(hw);
+    const days = ec.valid ? buildDays(ec.costRank) : 0;
+    const adj = adjustedDays(days, hw.time ?? {});
+    const sf = hw.successFeat ?? {};
+    const cs = successFeatCS({
+      assistant: hw.time?.assistant === "brilliant",
+      talents: sf.talentsCS, rushed: !!hw.time?.roundTheClock,
+      specialReqs: hw.specialReqCount, rebuild: !!sf.rebuild
+    });
+    const reasonRank = this.actor.system.abilities?.reason?.rank ?? "Typical";
+    const shiftedReason = shiftRank(reasonRank, cs);
+    const elapsed = Number(hw.time?.daysElapsed) || 0;
+    const remaining = Math.max(0, adj - elapsed);
+    return {
+      cost: ec.valid ? ec.costRank : "\u2014",
+      days,
+      adjNum: adj,
+      adjDays: Number.isInteger(adj) ? adj : adj.toFixed(1),
+      steps: ec.steps,
+      successCS: cs, successCSPos: cs >= 0,
+      shiftedReason,
+      degrade: ec.valid && costExceedsReason(ec.costRank, shiftedReason),
+      progressPct: adj > 0 ? Math.min(100, Math.round(elapsed / adj * 100)) : 0,
+      timeDone: ec.valid && adj > 0 && elapsed >= adj - 1e-9,
+      remainingDays: remaining,
+      kitKarma: kitbashKarma(remaining),
+      kitRounds: kitbashRounds(remaining)
+    };
+  }
+
+  /** Hardware tab: surgically refresh one project card after a render:false
+   *  update \u2014 keeps the calculator open and input focus intact. */
+  _hwRefreshProject(item) {
+    const root = this.element instanceof HTMLElement ? this.element : this.element?.[0];
+    if (!root) return;
+    const el = root.querySelector(`.hw-project[data-item-id="${item.id}"]`);
+    if (!el) return;
+    const hw = item.system.hardware ?? {};
+    const d = this._hwDecorate(hw);
+    const esc = (s) => (foundry.utils.escapeHTML ? foundry.utils.escapeHTML(String(s)) : String(s));
+    const set = (sel, txt) => { const n = el.querySelector(sel); if (n) n.textContent = txt; };
+
+    set(".hw-badge-cost", d.cost);
+    set(".hw-badge-days", `${d.adjDays}d / ${d.days}d`);
+
+    const deriv = el.querySelector(".hw-derivation");
+    if (deriv) deriv.innerHTML = d.steps.map(s => `<div class="hw-step">${esc(s)}</div>`).join("");
+
+    set(".hw-time-readout",
+      `${d.adjDays} days (${d.days} base) \u00b7 Resource FEAT vs ${d.cost}`);
+
+    const sr = el.querySelector(".hw-success-readout");
+    if (sr) sr.innerHTML = `Success roll: Reason column <b>${esc(d.shiftedReason)}</b> (${d.successCS >= 0 ? "+" : ""}${d.successCS}CS)`;
+    el.querySelector(".hw-degrade-warn")?.classList.toggle("hw-hidden", !d.degrade);
+
+    const fill = el.querySelector(".hw-progress-fill");
+    if (fill) fill.style.width = `${d.progressPct}%`;
+    const elapsed = Number(hw.time?.daysElapsed) || 0;
+    set(".hw-progress-label", `${elapsed} / ${d.adjDays}d`);
+    el.querySelector(".hw-progress")?.setAttribute("title", `${elapsed} of ${d.adjDays} adjusted days`);
+    el.querySelector(".hw-roll-success")?.classList.toggle("hw-btn-disabled", !d.timeDone);
+  }
+
   /**
    * Hardware tab: apply changes (keys relative to system.hardware), recompute
-   * effective cost / derivation / base build days, and persist in one update.
+   * effective cost / derivation / base build days, and persist. When
+   * rerender is false the sheet is not re-rendered; the card is patched in
+   * place via _hwRefreshProject so the calculator does not collapse.
    */
-  async _hwUpdate(item, changes) {
+  async _hwUpdate(item, changes, { rerender = true } = {}) {
     const hw = foundry.utils.mergeObject(
       foundry.utils.deepClone(item.system.hardware ?? {}),
       foundry.utils.expandObject(changes)
@@ -1069,7 +1119,8 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     hw.derivation = ec.steps.join("\n");
     hw.time = hw.time ?? {};
     hw.time.daysRequired = ec.valid ? buildDays(ec.costRank) : 0;
-    await item.update({ "system.hardware": hw });
+    await item.update({ "system.hardware": hw }, rerender ? {} : { render: false });
+    if (!rerender) this._hwRefreshProject(item);
   }
 
   /** Campaign-date tag, "M/D/YYYY" or "". */
@@ -3526,6 +3577,19 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
     const hwItem = ev => this.actor.items.get($(ev.currentTarget).closest('.hw-project').data('itemId'));
 
+    // Persist each calculator's open state across the re-renders that
+    // structural edits still trigger.
+    this._hwOpen ??= new Set();
+    html.find('.hw-project').each((_i, el) => {
+      const id = el.dataset.itemId;
+      const body = el.querySelector('.hw-project-body');
+      if (!id || !body) return;
+      if (this._hwOpen.has(id)) body.open = true;
+      body.addEventListener('toggle', () => {
+        if (body.open) this._hwOpen.add(id); else this._hwOpen.delete(id);
+      });
+    });
+
     html.find('.hw-project .hw-open').click(ev => hwItem(ev)?.sheet.render(true));
 
     html.find('.hw-project .hw-delete').click(async ev => {
@@ -3539,10 +3603,13 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
     html.find('.hw-project .hw-name').change(ev => {
       const item = hwItem(ev); if (!item) return;
-      item.update({ name: ev.currentTarget.value || "New Invention" });
+      item.update({ name: ev.currentTarget.value || "New Invention" }, { render: false });
     });
 
     // Generic hardware field: data-hw-path is relative to system.hardware.
+    // Structural paths change which template branches render (needs a full
+    // re-render); value paths update live via _hwRefreshProject.
+    const HW_STRUCTURAL = ["mode", "itemClass", "status", "mod.kind"];
     html.find('.hw-project .hw-field').change(ev => {
       const item = hwItem(ev); if (!item) return;
       const el = ev.currentTarget;
@@ -3552,7 +3619,11 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (el.type === "checkbox") value = el.checked;
       else if (el.type === "number") value = Number(el.value) || 0;
       else value = el.value;
-      this._hwUpdate(item, { [path]: value });
+      const changes = { [path]: value };
+      // Switching item class seeds that class's standard applicable-rank rows.
+      if (path === "itemClass")
+        changes.applicableRanks = seedApplicableRanks(value, item.system.hardware?.applicableRanks);
+      this._hwUpdate(item, changes, { rerender: HW_STRUCTURAL.includes(path) });
     });
 
     html.find('.hw-project .hw-rank-add').click(ev => {
@@ -3577,7 +3648,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const ranks = foundry.utils.deepClone(item.system.hardware?.applicableRanks ?? []);
       if (!ranks[idx]) return;
       ranks[idx] = { label: row.find('.hw-rank-label').val(), rank: row.find('.hw-rank-rank').val() };
-      this._hwUpdate(item, { applicableRanks: ranks });
+      this._hwUpdate(item, { applicableRanks: ranks }, { rerender: false });
     });
 
     // Slice 2: pipeline actions.
@@ -3592,7 +3663,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const adj = ec.valid ? adjustedDays(buildDays(ec.costRank), hw.time ?? {}) : 0;
       const add = Number($(ev.currentTarget).data('days')) || 1;
       const elapsed = Math.min(adj, (Number(hw.time?.daysElapsed) || 0) + add);
-      this._hwUpdate(item, { "time.daysElapsed": elapsed });
+      this._hwUpdate(item, { "time.daysElapsed": elapsed }, { rerender: false });
     });
 
     html.find('.hw-project .hw-day-complete').click(ev => {
@@ -3600,7 +3671,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const hw = item.system.hardware ?? {};
       const ec = computeCost(hw);
       const adj = ec.valid ? adjustedDays(buildDays(ec.costRank), hw.time ?? {}) : 0;
-      this._hwUpdate(item, { "time.daysElapsed": adj });
+      this._hwUpdate(item, { "time.daysElapsed": adj }, { rerender: false });
     });
 
     html.find('.hw-project .hw-roll-success').click(ev => {

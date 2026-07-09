@@ -1,4 +1,7 @@
-// hardware-rules.mjs v1.2.0 - 2026-07-07
+// hardware-rules.mjs v1.2.1 - 2026-07-08
+// v1.2.1: HW_CLASS_RANKS standard applicable-rank templates per item class
+//         and seedApplicableRanks() to append missing standard rows when the
+//         class changes (dedup by case-insensitive label match).
 // v1.2.0: Slice 3 — computeCost() mode dispatcher; computeModificationCost()
 //         (ability boosts one rank at a time at the new rank's cost, easy
 //         bolt-on capability at Typical, device-altering capability at the
@@ -35,6 +38,35 @@ export const HW_ITEM_CLASSES = {
   robot:     "Robot / Construct",
   other:     "Other Device"
 };
+
+/* ── Standard applicable ranks per item class ─────────────────────────────── */
+
+export const HW_CLASS_RANKS = {
+  weapon:    ["Damage / Intensity", "Range", "Material Strength"],
+  vehicle:   ["Control", "Speed", "Body", "Protection"],
+  powersuit: ["Material Strength / Body Armor"],
+  robot:     ["Fighting", "Agility", "Strength", "Endurance", "Reason", "Material Strength"],
+  other:     ["Material Strength"]
+};
+
+/** Append the class's standard rank rows (at Typical) not already present,
+ *  matching labels case-insensitively so a user's "Damage" row satisfies the
+ *  "Damage / Intensity" template. */
+export function seedApplicableRanks(itemClass, existing = []) {
+  const rows = (existing ?? []).filter(r => r && (r.label || r.rank));
+  const has = (tpl) => rows.some(r => {
+    const a = String(r.label || "").toLowerCase();
+    if (!a) return false;
+    return tpl.toLowerCase().split("/").some(part => {
+      const b = part.trim();
+      return b && (a.includes(b) || b.includes(a));
+    });
+  });
+  for (const tpl of HW_CLASS_RANKS[itemClass] ?? []) {
+    if (!has(tpl)) rows.push({ label: tpl, rank: "Typical" });
+  }
+  return rows;
+}
 
 /* ── Effective-cost CS modifiers ──────────────────────────────────────────────
    beyondTech is NOT here — per RAW it adds a Monstrous applicable rank,
@@ -413,6 +445,13 @@ if (isMain) {
   eq("funding combined", fundingResourceRank("Amazing", "combined"), "Monstrous");
   eq("funding contacts", fundingResourceRank("Good", "contacts", "Monstrous"), "Monstrous");
   eq("default schema has feat blocks", defaultHardware().resourceFeat.made === false && defaultHardware().successFeat.rolled === false, true);
+
+  // Class rank seeding
+  eq("seed weapon count", seedApplicableRanks("weapon", []).length, 3);
+  eq("seed keeps existing count", seedApplicableRanks("weapon", [{label:"Damage", rank:"Excellent"}]).length, 3);
+  eq("seed no dup material", seedApplicableRanks("weapon", [{label:"Material Strength", rank:"Typical"}]).filter(r=>r.label.toLowerCase().includes("material")).length, 1);
+  eq("seed vehicle order", seedApplicableRanks("vehicle", []).map(r=>r.label).join(","), "Control,Speed,Body,Protection");
+  eq("seed preserves rank", seedApplicableRanks("weapon", [{label:"Damage", rank:"Excellent"}])[0].rank, "Excellent");
 
   // Modifications — RAW p.69
   const modc = (mod, beyondTech=false) => computeModificationCost({ mod, modifiers:{beyondTech} });
