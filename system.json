@@ -146,7 +146,7 @@
         }
     },
     "relationships": {},
-    "primaryTokenAttribute": "health",
+    "primaryTokenAttribute": "attributes.health",
     "gridDistance": 44,
     "gridUnits": "yards",
     "settings": [

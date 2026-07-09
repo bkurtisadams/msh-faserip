@@ -4025,3 +4025,49 @@ form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources
   from { opacity: 0; transform: translate(-50%, -100%) translateY(4px); }
   to   { opacity: 1; transform: translate(-50%, -100%) translateY(0); }
 }
+/* Token config: keep tall character art contained in the prototype-token preview. */
+body.system-msh-faserip .application.token-config [data-tab="appearance"] img,
+body.system-msh-faserip .application.prototype-token-config [data-tab="appearance"] img,
+body.system-msh-faserip .window-app.token-config [data-tab="appearance"] img,
+body.system-msh-faserip .window-app.prototype-token-config [data-tab="appearance"] img,
+body.system-msh-faserip form.token-sheet img[data-edit="texture.src"],
+body.system-msh-faserip form.token-sheet img.profile-img {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  display: block !important;
+  box-sizing: border-box;
+}
+
+body.system-msh-faserip .application.token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture),
+body.system-msh-faserip .application.prototype-token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture),
+body.system-msh-faserip .window-app.token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture),
+body.system-msh-faserip .window-app.prototype-token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture),
+body.system-msh-faserip form.token-sheet :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture) {
+  overflow: hidden !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.system-msh-faserip .application.token-config [data-tab="appearance"] :has(> img),
+body.system-msh-faserip .application.prototype-token-config [data-tab="appearance"] :has(> img),
+body.system-msh-faserip .window-app.token-config [data-tab="appearance"] :has(> img),
+body.system-msh-faserip .window-app.prototype-token-config [data-tab="appearance"] :has(> img),
+body.system-msh-faserip form.token-sheet :has(> img[data-edit="texture.src"]),
+body.system-msh-faserip form.token-sheet :has(> img.profile-img) {
+  overflow: hidden !important;
+}
+
+body.system-msh-faserip .application.token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture) > img,
+body.system-msh-faserip .application.prototype-token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture) > img,
+body.system-msh-faserip .window-app.token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture) > img,
+body.system-msh-faserip .window-app.prototype-token-config [data-tab="appearance"] :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture) > img,
+body.system-msh-faserip form.token-sheet :is(.preview, .image-preview, .file-picker-preview, .thumbnail, figure, picture) > img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}

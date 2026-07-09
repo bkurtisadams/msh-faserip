@@ -122,6 +122,49 @@ import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 
+
+const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
+const FASERIP_PROTOTYPE_TOKEN_DEFAULTS_VERSION = 1;
+
+function _tokenDisplayMode(key, fallback) {
+  return globalThis.CONST?.TOKEN_DISPLAY_MODES?.[key] ?? fallback;
+}
+
+function _faseripCharacterPrototypeTokenDefaults() {
+  return {
+    "prototypeToken.displayBars": _tokenDisplayMode("HOVER", 30),
+    "prototypeToken.displayName": _tokenDisplayMode("ALWAYS", 50),
+    "prototypeToken.bar1.attribute": "attributes.health",
+    "prototypeToken.texture.fit": "contain"
+  };
+}
+
+function _faseripVehiclePrototypeTokenDefaults() {
+  return {
+    "prototypeToken.displayBars": _tokenDisplayMode("HOVER", 30),
+    "prototypeToken.displayName": _tokenDisplayMode("ALWAYS", 50),
+    "prototypeToken.bar1.attribute": "resources.body",
+    "prototypeToken.texture.fit": "contain",
+    "prototypeToken.lockRotation": true
+  };
+}
+
+function _tokenDefaultsNeedUpdate(actor, defaults) {
+  const token = actor?.prototypeToken;
+  if (!token) return false;
+  return Object.entries(defaults).some(([path, value]) => {
+    const tokenPath = path.replace(/^prototypeToken\./, "");
+    return foundry.utils.getProperty(token, tokenPath) !== value;
+  });
+}
+
+async function _applyPrototypeTokenDefaults(actor, defaults) {
+  if (!actor || !defaults || !Object.keys(defaults).length) return false;
+  if (!_tokenDefaultsNeedUpdate(actor, defaults)) return false;
+  await actor.update(defaults);
+  return true;
+}
+
 // ── Player-color tint on chat cards ──
 Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
   if (!game.settings.get('msh-faserip', 'chatCardPlayerColor')) return;
@@ -406,6 +449,18 @@ Hooks.once("init", async () => {
   game.msh.playCombatSFX = playCombatSFX;
   game.msh._classifyWeapon = classifyWeapon;
   game.msh.fx = fxService;
+  game.msh.applyPrototypeTokenDefaults = async function (target = null) {
+    const actors = target
+      ? [target.actor ?? target]
+      : game.actors.filter(a => FASERIP_CHARACTER_ACTOR_TYPES.has(a.type));
+    let updated = 0;
+    for (const actor of actors) {
+      if (!FASERIP_CHARACTER_ACTOR_TYPES.has(actor?.type)) continue;
+      if (await _applyPrototypeTokenDefaults(actor, _faseripCharacterPrototypeTokenDefaults())) updated++;
+    }
+    ui.notifications?.info(`FASERIP prototype token defaults applied to ${updated} actor(s).`);
+    return updated;
+  };
 
   // Continuing damage helpers (corrosive, acid, etc.)
   import("./modules/effects/ongoing-engine.js").then(m => {
@@ -440,6 +495,15 @@ Hooks.once("init", async () => {
   }
   // --------------------------------------------------------------------------
   
+  game.settings.register("msh-faserip", "prototypeTokenDefaultsVersion", {
+    name: "Prototype Token Defaults Version",
+    hint: "Internal migration marker for FASERIP prototype token defaults.",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
+
   // Register the debugMode setting FIRST
   game.settings.register("msh-faserip", "debugMode", {
     name: "Debug Mode",
@@ -2126,48 +2190,46 @@ Hooks.once("init", async () => {
 
 Hooks.on("preCreateActor", (document, data, options, userId) => {
   console.log("[FASERIP] preCreateActor - Type:", document.type);
-  
+
   const updates = {};
-  
+
+  if (FASERIP_CHARACTER_ACTOR_TYPES.has(document.type)) {
+    Object.assign(updates, _faseripCharacterPrototypeTokenDefaults());
+  }
+
   switch (document.type) {
     case "hero":
       updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.FRIENDLY;
-      console.log("[FASERIP] Setting hero disposition to FRIENDLY (1)");
+      console.log("[FASERIP] Setting hero token defaults");
       break;
     case "villain":
       updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.HOSTILE;
-      console.log("[FASERIP] Setting villain disposition to HOSTILE (-1)");
+      console.log("[FASERIP] Setting villain token defaults");
       break;
     case "vehicle":
-      if (document.prototypeToken?.disposition === undefined) {
-        updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
-      }
-      if (document.prototypeToken?.lockRotation === undefined) {
-        updates["prototypeToken.lockRotation"] = true;
-      }
+      Object.assign(updates, _faseripVehiclePrototypeTokenDefaults());
+      updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
       if (document.prototypeToken?.width === undefined) {
         updates["prototypeToken.width"] = 2;
       }
       if (document.prototypeToken?.height === undefined) {
         updates["prototypeToken.height"] = 2;
       }
-      if (document.prototypeToken?.bar1?.attribute === undefined) {
-        updates["prototypeToken.bar1.attribute"] = "resources.body";
-      }
       console.log("[FASERIP] Setting vehicle token defaults");
       break;
     case "npc":
     default:
       updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
-      console.log("[FASERIP] Setting NPC disposition to NEUTRAL (0)");
+      console.log("[FASERIP] Setting NPC token defaults");
       break;
   }
-  
+
   if (Object.keys(updates).length > 0) {
     document.updateSource(updates);
     console.log("[FASERIP] preCreateActor updates applied:", updates);
   }
 });
+
 
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
@@ -2447,6 +2509,24 @@ Hooks.once("setup", () => {
 });
 
 Hooks.once("ready", async () => {
+  // One-time migration: make existing character actors match FASERIP's preferred
+  // prototype token visibility and health-bar defaults. New actors are handled by
+  // the preCreateActor hook above; this catches actors created before the fix.
+  try {
+    if (game.user?.isGM) {
+      const currentVersion = Number(game.settings.get("msh-faserip", "prototypeTokenDefaultsVersion") ?? 0);
+      if (currentVersion < FASERIP_PROTOTYPE_TOKEN_DEFAULTS_VERSION) {
+        let updated = 0;
+        for (const actor of game.actors.filter(a => FASERIP_CHARACTER_ACTOR_TYPES.has(a.type))) {
+          if (await _applyPrototypeTokenDefaults(actor, _faseripCharacterPrototypeTokenDefaults())) updated++;
+        }
+        await game.settings.set("msh-faserip", "prototypeTokenDefaultsVersion", FASERIP_PROTOTYPE_TOKEN_DEFAULTS_VERSION);
+        if (updated) console.log(`[FASERIP] Prototype token defaults migration updated ${updated} actor(s)`);
+      }
+    }
+  } catch (e) {
+    console.warn("[FASERIP WARN] Prototype token defaults migration failed:", e);
+  }
   game.msh ??= {};
 
   // Auto-open Action HUD if enabled in settings
