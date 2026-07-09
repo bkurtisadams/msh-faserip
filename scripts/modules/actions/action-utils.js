@@ -1,4 +1,8 @@
-// action-utils.js v1.8.12 - 2026-07-05
+// action-utils.js v1.8.13 - 2026-07-09
+// v1.8.13: Let Edged Attack detect Claws powers as edged-capable
+//          sources via battleEffectsColumn EA / physical-edged claw metadata.
+//          Fixes power-routed Claws falling back to the dialog's default
+//          Good natural weapon damage.
 // v1.8.12: Mode pill legibility — inactive pills are white with dark text and
 //          a mode-colored border (was grey-on-grey #e0e0e0/#999); disabled
 //          pills desaturate instead of opacity:.5. Click-handler inactive
@@ -1272,11 +1276,20 @@ export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RAN
   return { damage: dmg, note: `min(STR ${strVal}, MAT ${matValue})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}` };
 }
 
-// Edged-capable item filter (damageType/attackType tags or "edged"/EA)
+// Edged-capable item filter (damageType/attackType tags or "edged"/EA).
+// Power-routed Claws arrive here as an Item(type="power") with
+// battleEffectsColumn="EA" / damageType="physical-edged", not as equipment.
 export const isEdgedCapable = (it) => {
-  const s = it.system || {};
-  const tagHit = Array.isArray(s.tags) && (s.tags.includes("EA") || s.tags.includes("edged"));
-  return (s.damageType === "EA") || (s.attackType === "edged") || tagHit;
+  const s = it?.system || {};
+  const tags = Array.isArray(s.tags) ? s.tags.map(t => String(t).toLowerCase()) : [];
+  const nameType = `${it?.name || ""} ${s.type || ""}`.toLowerCase();
+  const bec = String(s.battleEffectsColumn || "").toUpperCase();
+  return (bec === "EA")
+    || (String(s.damageType || "") === "EA")
+    || (String(s.damageType || "") === "physical-edged" && (s.specialStrengthType === "claw" || nameType.includes("claws")))
+    || (String(s.attackType || "").toLowerCase() === "edged")
+    || tags.includes("ea")
+    || tags.includes("edged");
 };
 
 // Edged damage: min(STR, MAT) but never less than weapon base damage.

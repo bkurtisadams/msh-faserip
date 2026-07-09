@@ -1,3 +1,9 @@
+// edged-attack-action.js v3.3.2 - 2026-07-09
+// v3.3.2: Treat Claws powers as first-class edged sources. A power
+//         launched through power-router is now added to the damage-source
+//         picker, pre-selected, and resolves living-target damage from
+//         Power rank/value instead of the default Good natural weapon or
+//         the weapon STR/MAT formula.
 // edged-attack-action.js v3.3.1 - 2026-05-23
 // v3.3.1: CS Reason field now persists across reopens (lastEdgedReason flag,
 //         gated by Remember), matching the other attack dialogs.
@@ -45,6 +51,7 @@ import {
   labelFor,
   isEdgedCapable,
   computeEdgedDamage,
+  derivePowerDamage,
   rollWithKarmaAndHistory,
   buildResultGrid,
   bannerColors,
@@ -89,6 +96,52 @@ export class EdgedAttackAction extends AttackAction {
       return Number(ap) || 0;
     };
 
+    const isClawsPower = (it) => {
+      const s = it?.system || {};
+      const nameType = `${it?.name || ""} ${s.type || ""}`.toLowerCase();
+      return it?.type === "power" && (
+        s.specialStrengthType === "claw" ||
+        String(s.battleEffectsColumn || "").toUpperCase() === "EA" && nameType.includes("claws") ||
+        nameType.includes("claws")
+      );
+    };
+
+    const getRankValue = (rank) => Number(CONFIG.FASERIP?.rankValues?.[rank]) || Number(game.msh?.getRankValue?.(rank)) || 0;
+
+    const getClawMaterialRank = (it) => {
+      const s = it?.system || {};
+      let rank = s.clawMaterialStrength || s.rank || "Typical";
+      if (s.isLimited) rank = shiftRank(rank, 2);
+      return rank;
+    };
+
+    const getEdgedMaterialRank = (it) => isClawsPower(it) ? getClawMaterialRank(it) : getItemMaterialRank(it);
+
+    const getEdgedSourceDamage = (it) => {
+      const s = it?.system || {};
+      if (isClawsPower(it)) {
+        const rank = s.rank || "Typical";
+        const damage = Number(s.value) || getRankValue(rank);
+        const matRank = getClawMaterialRank(it);
+        return {
+          damage,
+          note: `Claws Power rank damage: ${rank} (${damage}); material strength ${matRank}`
+        };
+      }
+      if (it?.type === "power") {
+        const damage = derivePowerDamage(s, actor);
+        const label = s.damageSource === "fixed" ? "fixed damage" : "Power rank damage";
+        return { damage, note: `${label}: ${damage}` };
+      }
+      const mat = getItemMaterialRank(it);
+      let base = Number(s.damage || 0);
+      const da = this.opts?.deviceAbility;
+      if (da?.rank && it?.system?.category === "device") {
+        base = Math.max(base, getRankValue(da.rank));
+      }
+      return computeEdgedDamage(strength.rank, strength.value, mat, base);
+    };
+
     // Effective armor after AP reduction (flat or CS-based)
     const _getEffectiveArmor = (base, ap, apCS, apMode) => {
       if (apMode === "cs" && apCS > 0 && base > 0) {
@@ -107,7 +160,7 @@ export class EdgedAttackAction extends AttackAction {
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
     
-    if (passedItem && passedItem.type === "equipment") {
+    if (passedItem && isEdgedCapable(passedItem)) {
       if (!attackItems.find(i => i.id === passedItem.id)) {
         attackItems = [passedItem, ...attackItems];
       }
@@ -159,13 +212,7 @@ export class EdgedAttackAction extends AttackAction {
     if (savedSource === "weapon" && savedItemId) {
       const savedWeapon = attackItems.find(i => i.id === savedItemId);
       if (savedWeapon) {
-        const mat = getItemMaterialRank(savedWeapon);
-        let base = Number(savedWeapon.system?.damage || 0);
-        const da = this.opts?.deviceAbility;
-        if (da?.rank && savedWeapon?.system?.category === "device") {
-          base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
-        }
-        const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
+        const res = getEdgedSourceDamage(savedWeapon);
         initialDamage = res.damage;
         initialAP = getArmorPiercing(savedWeapon);
         initialAPCS = Number(savedWeapon.system?.armorPiercingCS || 0) || 0;
@@ -194,19 +241,14 @@ export class EdgedAttackAction extends AttackAction {
     const damageSrcOptions = [];
     damageSrcOptions.push(`<option value="natural" ${savedSource==='natural'?'selected':''}>Natural Weapon &mdash; ${savedNatRank} (${savedNatDmg})</option>`);
     for (const i of attackItems) {
-      const mat = getItemMaterialRank(i);
-      let base = Number(i.system?.damage || 0);
-      const da = this.opts?.deviceAbility;
-      if (da?.rank && i?.system?.category === "device") {
-        base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
-      }
-      const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
+      const res = getEdgedSourceDamage(i);
       const ap = getArmorPiercing(i);
       const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
       const isBroken = i.system?.broken === true;
       const sel = (savedSource === 'weapon' && savedItemId === i.id && !isBroken) ? 'selected' : '';
       const disabled = isBroken ? 'disabled' : '';
-      const label = isBroken ? `[BROKEN] ${i.name}` : i.name;
+      const sourceKind = i.type === "power" ? "Power" : "Weapon";
+      const label = isBroken ? `[BROKEN] ${i.name}` : `${i.name} (${sourceKind})`;
       damageSrcOptions.push(`<option value="weapon:${i.id}" ${sel} ${disabled}>${label} &mdash; ${res.damage} dmg${apLabel}</option>`);
     }
 
@@ -387,26 +429,26 @@ export class EdgedAttackAction extends AttackAction {
             const csNotes = _csState.get().csNotes;
 
             // Compute damage and notes
-            let weaponMat = "", weaponName = "", damage = natDmg, note = "";
-            let ap = 0, apCS = 0, apMode = "value", bypassFF = false;
+            let weaponMat = "", weaponName = "", damage = natDmg, note = "", sourceItem = null;
+            let ap = 0, apCS = 0, apMode = "value", bypassFF = false, sourceItemType = "";
             if (src === "weapon") {
               const item = attackItems.find(i => i.id === itemId) || null;
               if (!item) {
                 weaponMat = "Feeble"; weaponName = "(No weapon)"; damage = 0; note = "No weapon selected";
               } else {
-                weaponMat = getItemMaterialRank(item);
+                sourceItem = item;
+                sourceItemType = item.type || "";
+                weaponMat = getEdgedMaterialRank(item);
                 weaponName = item.name;
-                let base = Number(item.system?.damage || 0);
                 const da = this.opts?.deviceAbility;
                 if (da?.rank && item?.system?.category === "device") {
-                  base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
                   weaponName = `${da.name} (${item.name})`;
                 }
                 ap = getArmorPiercing(item);
                 apCS = Number(item.system?.armorPiercingCS || 0) || 0;
                 apMode = item.system?.apMode || "value";
                 bypassFF = !!item.system?.bypassForceField;
-                const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
+                const res = getEdgedSourceDamage(item);
                 damage = res.damage; note = res.note;
               }
             } else {
@@ -441,7 +483,7 @@ export class EdgedAttackAction extends AttackAction {
             _resolved = true;
             resolve({
               src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice,
-              weaponMat, weaponName, damage, note,
+              weaponMat, weaponName, damage, note, weapon: sourceItem, sourceItemType,
               armorPiercing: ap, armorPiercingCS: apCS, apMode, bypassForceField: bypassFF,
               multiAttacks, attackCount, multiAdjacent, csNotes
             });
@@ -492,13 +534,7 @@ export class EdgedAttackAction extends AttackAction {
               if (!item) {
                 currentDamage = 0;
               } else {
-                const mat = getItemMaterialRank(item);
-                let base = Number(item.system?.damage || 0);
-                const da = this.opts?.deviceAbility;
-                if (da?.rank && item?.system?.category === "device") {
-                  base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
-                }
-                const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
+                const res = getEdgedSourceDamage(item);
                 currentDamage = res.damage;
                 currentAP = getArmorPiercing(item);
                 currentAPCS = Number(item.system?.armorPiercingCS || 0) || 0;
@@ -704,7 +740,7 @@ export class EdgedAttackAction extends AttackAction {
         damageNote: choice.note,
         sourceName: choice.weaponName || "Natural Weapon",
         attackForm: "edged",
-        breakingFeat: (choice.src === "weapon") ? {
+        breakingFeat: (choice.src === "weapon" && choice.sourceItemType !== "power") ? {
           weaponMat: choice.weaponMat,
           weaponName: choice.weaponName,
           itemUuid: actor.items.get(choice.itemId)?.uuid
@@ -731,7 +767,7 @@ export class EdgedAttackAction extends AttackAction {
           damageNote: choice.note,
           sourceName: choice.weaponName || "Natural Weapon",
           attackForm: "edged",
-          breakingFeat: (choice.src === "weapon") ? {
+          breakingFeat: (choice.src === "weapon" && choice.sourceItemType !== "power") ? {
             weaponMat: choice.weaponMat,
             weaponName: choice.weaponName,
             itemUuid: actor.items.get(choice.itemId)?.uuid
