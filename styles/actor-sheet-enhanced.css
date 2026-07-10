@@ -452,8 +452,8 @@ form.faserip-sheet .health-recovery-inline-btn {
   font-weight: 500;
   letter-spacing: 0.3px;
   color: white;
-  background: #5d7a3a;
-  border: 1px solid #3d5024;
+  background: #3f5c22;
+  border: 1px solid #2b3a19;
   border-radius: 3px;
   cursor: pointer;
   line-height: 1.3;
@@ -470,16 +470,16 @@ form.faserip-sheet .health-recovery-inline-btn:active {
 }
 form.faserip-sheet .health-recovery-inline-btn.is-disabled,
 form.faserip-sheet .health-recovery-inline-btn:disabled {
-  background: #a8b499;
-  border-color: #7e8c72;
-  color: #eef0e8;
+  background: #6e7d61;
+  border-color: #4a5540;
+  color: #f2f4ec;
   cursor: not-allowed;
-  opacity: 0.85;
+  opacity: 1;
 }
 form.faserip-sheet .health-recovery-inline-btn.is-disabled:hover,
 form.faserip-sheet .health-recovery-inline-btn:disabled:hover {
-  background: #a8b499;
-  border-color: #7e8c72;
+  background: #6e7d61;
+  border-color: #4a5540;
 }
 
 /* Healing button — same footprint as Recovery, blue palette to distinguish */
@@ -793,6 +793,14 @@ form.faserip-sheet .sec-col.popularity .sec-head small {
   color: #f48fb1 !important;
 }
 
+/* Comic ink outline on the colored stat titles (Health/Karma/Resources/
+   Popularity). Applied to the title span/button only — the 9px formula
+   <small> is too small to carry a 1px stroke cleanly. */
+form.faserip-sheet .secondary-abilities .sec-head > span,
+form.faserip-sheet .secondary-abilities .sec-head > button {
+  text-shadow: 1px 1px 2px rgba(20, 0, 0, 0.95);
+}
+
 /* ── Tab navigation: flex-wrap so tabs don't clip ───────────────────────── */
 form.faserip-sheet .sheet-tabs-navigation {
   flex-wrap: wrap;
@@ -831,12 +839,16 @@ form.faserip-sheet .sheet-tabs-navigation .item i {
   color: #fff;
 }
 
-/* Colored labels via ::after — bumped to 10px for readability */
+/* Colored labels via ::after — bumped to 10px for readability.
+   Comic ink outline: 4-direction 1px near-black stroke so colored
+   lettering holds contrast on the dark red banner. Letter-spacing
+   widened to keep the outline from bridging condensed letterforms. */
 form.faserip-sheet .sheet-tabs-navigation .item::after {
   font-size: 10px;
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(20, 0, 0, 0.95);
   text-transform: uppercase;
   line-height: 1;
   opacity: 1;
@@ -854,7 +866,7 @@ form.faserip-sheet .sheet-tabs-navigation .item::after {
 }
 
 form.faserip-sheet .sheet-tabs-navigation [data-tab="powers"]::after        { content: "Powers";   color: #c8960c; }
-form.faserip-sheet .sheet-tabs-navigation [data-tab="talents"]::after       { content: "Talents";  color: #2e7d32; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="talents"]::after       { content: "Talents";  color: #66bb6a; }
 form.faserip-sheet .sheet-tabs-navigation [data-tab="contacts"]::after      { content: "Contacts"; color: #90caf9; }
 form.faserip-sheet .sheet-tabs-navigation [data-tab="equipment"]::after     { content: "Equip";    color: #bdbdbd; }
 form.faserip-sheet .sheet-tabs-navigation [data-tab="headquarters"]::after  { content: "HQ";       color: #e0e0e0; }
@@ -966,6 +978,7 @@ form.faserip-sheet .sheet-tabs-navigation .item.active i {
 }
 form.faserip-sheet .sheet-tabs-navigation .item.active::after {
   color: var(--mred) !important;
+  text-shadow: none !important;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

@@ -4084,6 +4084,7 @@ body.system-msh-faserip form.token-sheet :is(.preview, .image-preview, .file-pic
 
 .faserip-sheet table tbody tr {
   background: transparent;
+  border-bottom: 1px solid #d8d2c0;
 }
 
 .faserip-sheet table tbody tr:nth-child(odd) {
@@ -4091,7 +4092,15 @@ body.system-msh-faserip form.token-sheet :is(.preview, .image-preview, .file-pic
 }
 
 .faserip-sheet table tbody tr:nth-child(even) {
-  background: #efefef;
+  background: #ede8da;
+}
+
+/* Field edges: warm dark border replaces #ccc so inputs are findable
+   at a glance on the parchment surfaces. */
+.faserip-sheet input[type="text"],
+.faserip-sheet input[type="number"],
+.faserip-sheet select {
+  border: 1.5px solid #6a6558;
 }
 
 /* ============================================================
