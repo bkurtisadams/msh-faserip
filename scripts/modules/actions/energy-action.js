@@ -109,7 +109,7 @@ function inferEnergyDamageType(item, fallback = "energy-generic") {
   // Equipment sheets store energy weapons as the short code "E". Normalize it
   // before the armor/damage pipeline so pre-mitigation Body Armor uses the
   // Energy value instead of treating "E" as an unknown physical damage type.
-  if (explicitUpper === "E") return "energy";
+  if (explicitUpper === "E") return "energy-generic";
 
   // Keep intentionally specific authored values. Treat blank/generic as a
   // legacy-import gap and infer from canonical power naming.

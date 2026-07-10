@@ -2373,7 +2373,19 @@ function inferArmorNature(sys) {
 }
 
 export function getBodyArmorValues(targetActor, damageType = "physical-blunt", opts = {}) {
-  const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
+  let dmgTypeLower = String(damageType || "physical-blunt").trim().toLowerCase();
+  const _shortToLong = {
+    "e": "energy-generic",
+    "f": "physical-force",
+    "s": "physical-ranged",
+    "ba": "physical-blunt",
+    "ea": "physical-edged",
+    "tb": "physical-throwing-blunt",
+    "te": "physical-throwing-edged",
+    "gp": "grappling",
+    "gb": "grabbing",
+  };
+  if (_shortToLong[dmgTypeLower]) dmgTypeLower = _shortToLong[dmgTypeLower];
   const {
     ignoresNaturalArmor = false,
     ignoresArtificialArmor = false,
@@ -2534,7 +2546,7 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     }
   });
 
-  const isEnergy = CONFIG.FASERIP?.isEnergyDamage?.(dmgTypeLower) ?? 
+  const isEnergy = (CONFIG.FASERIP?.isEnergyDamage?.(dmgTypeLower) === true) ||
                    (dmgTypeLower && dmgTypeLower.includes("energy"));
 
   // Check for active Blocking effect (Strength as Body Armor)

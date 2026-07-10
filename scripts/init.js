@@ -1620,12 +1620,18 @@ Hooks.once("init", async () => {
     "immunity": "Immunity (if rank exceeds attack)"
   };
 
-  // Helper function to check if damage type is energy-based
+  // Helper function to check if damage type is energy-based.
+  // Accept canonical long forms ("energy", "energy-*"), legacy sheet codes
+  // ("E"), and the older touch-energy token so armor math uses Body Armor's
+  // RAW -20 energy protection instead of falling back to physical armor.
   CONFIG.FASERIP.isEnergyDamage = function(damageType) {
-    return damageType && (
-      damageType.startsWith("energy-") || 
-      damageType === "mental" ||
-      damageType === "touch-energy"
+    const dt = String(damageType || "").trim().toLowerCase();
+    return !!dt && (
+      dt === "energy" ||
+      dt === "e" ||
+      dt.startsWith("energy-") ||
+      dt === "mental" ||
+      dt === "touch-energy"
     );
   };
 

@@ -672,7 +672,14 @@ function applyBodyArmorFromAE(damage, armorData, options) {
   let enerArmor = Number(armorData.energy || 0);
 
   if (isEnergyDamage && physArmor > 0) {
-    physArmor = Math.max(0, physArmor - 20);
+    // RAW Body Armor is 20 points less effective vs Energy attacks.
+    // Some older/stale defense AEs stored energy equal to physical, so derive
+    // the effective energy armor from physical when the AE's energy value is
+    // blank, equal to physical, or otherwise higher than the RAW reduction.
+    const rawEnergyFromPhysical = Math.max(0, physArmor - 20);
+    if (!enerArmor || enerArmor >= physArmor || enerArmor > rawEnergyFromPhysical) {
+      enerArmor = rawEnergyFromPhysical;
+    }
   }
 
   if (apMode === "cs" && armorPiercingCS > 0) {
@@ -956,7 +963,14 @@ function applyBodyArmor(damage, armorData, options) {
   let enerArmor = Number(armorData.energy || 0);
   
   if (isEnergyDamage && physArmor > 0) {
-    physArmor = Math.max(0, physArmor - 20);
+    // RAW Body Armor is 20 points less effective vs Energy attacks.
+    // Some older/stale defense AEs stored energy equal to physical, so derive
+    // the effective energy armor from physical when the AE's energy value is
+    // blank, equal to physical, or otherwise higher than the RAW reduction.
+    const rawEnergyFromPhysical = Math.max(0, physArmor - 20);
+    if (!enerArmor || enerArmor >= physArmor || enerArmor > rawEnergyFromPhysical) {
+      enerArmor = rawEnergyFromPhysical;
+    }
   }
   
   if (apMode === "cs" && armorPiercingCS > 0) {
