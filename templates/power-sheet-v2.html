@@ -115,6 +115,12 @@
         <label><input type="checkbox" name="system.grantedByEquipment" {{checked system.grantedByEquipment}} data-dtype="Boolean"> From Equipment</label>
         <label><input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} data-dtype="Boolean"> Continuing Dmg</label>
       </div>
+      <div class="ps2-origin-flags">
+        <div class="ps2-origin-title">Power List Badges</div>
+        <label><input type="checkbox" name="flags.msh-faserip.isBonusPower" {{checked powerOriginFlags.isBonusPower}} data-dtype="Boolean"> Show <span class="ps2-origin-badge-inline bonus">BONUS</span> badge</label>
+        <label><input type="checkbox" name="flags.msh-faserip.isStuntPower" {{checked powerOriginFlags.isStuntPower}} data-dtype="Boolean"> Show <span class="ps2-origin-badge-inline stunt">STUNT</span> badge</label>
+      </div>
+      <p class="ps2-origin-help">These control the small origin badges shown next to the power name on the actor sheet. They do not create or remove entries on the Stunts tab.</p>
       {{#if system.isBonus}}
       <div class="ps2-field" style="margin-top:4px;">
         <label>Bonus From</label>

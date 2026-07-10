@@ -16,7 +16,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /** @override */
   static DEFAULT_OPTIONS = {
     classes: ["msh-faserip", "sheet", "actor", "faserip-sheet"],
-    position: { width: 800, height: 920 },
+    position: { width: 720, height: 840 },
     window: { resizable: true, contentClasses: ["faserip-sheet-content"] },
     form: { submitOnChange: true, closeOnSubmit: false },
     tag: "form",

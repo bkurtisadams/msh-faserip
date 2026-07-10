@@ -13,7 +13,7 @@
                 <th style="text-align: left; padding-left: 8px;">Name<span class="th-inline-actions"><a class="th-action-link add-power" title="Add Power">+ add</a><a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a></span></th>
                 <th>Rank</th>
                 <th>Value</th>
-                <th>Range</th>
+                <th title="Range in areas; Ar = Area">Range</th>
                 <th>Category</th>
                 <th>Actions</th>
               </tr>
@@ -37,16 +37,20 @@
                     <i class="fas fa-bolt {{#if power.system.isActive}}active{{/if}}"></i>
                   </a>
                   {{/if}}
-                  <span class="power-name-text 
-                            {{#if (getFlag power 'msh-faserip' 'isBonusPower')}} bonus-power {{/if}}
-                            {{#if (getFlag power 'msh-faserip' 'isStuntPower')}} stunt-power {{/if}}">
-                    {{power.name}}
+                  <span class="power-name-label">
+                    <span class="power-name-text">{{power.name}}</span>
+                    {{#if (getFlag power 'msh-faserip' 'isStuntPower')}}
+                    <span class="power-origin-badge stunt" title="This power was created from a power stunt">STUNT</span>
+                    {{/if}}
+                    {{#if (getFlag power 'msh-faserip' 'isBonusPower')}}
+                    <span class="power-origin-badge bonus" title="Bonus power">BONUS</span>
+                    {{/if}}
                   </span>
                 </td>
 
                 <td class="power-rank">{{power.system.rank}}</td>
                 <td class="power-value">{{power.system.value}}</td>
-                <td class="power-range">{{resolveRange power.system.range power.system.rank}}</td>
+                <td class="power-range" title="{{resolveRange power.system.range power.system.rank}} (Ar = Area)">{{compactPowerRange power.system.range power.system.rank}}</td>
                 <td class="power-type">{{powerCategoryLabel power.system.category}}</td>
                 <td class="power-controls">
                   <a class="item-control item-edit" title="Edit" data-item-id="{{power._id}}">

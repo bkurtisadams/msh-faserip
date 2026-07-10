@@ -117,6 +117,14 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.calculatedRange = POWER_RANGE[context.system?.rank] || "";
       }
 
+      // Expose power-list origin flags so the editor can control the
+      // STUNT/BONUS badges shown on the actor sheet. These are document
+      // flags, not regular system data fields.
+      context.powerOriginFlags = {
+        isStuntPower: !!this.item.getFlag("msh-faserip", "isStuntPower"),
+        isBonusPower: !!this.item.getFlag("msh-faserip", "isBonusPower")
+      };
+
       // Helpful logging (kept from your original)
       console.log("Power sheet data:", context);
     }

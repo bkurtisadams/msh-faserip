@@ -1,4 +1,6 @@
 /* chargen.css - Character Generation Tab Styles */
+/* 2026-07-10: Scope contact preview selectors to the chargen tab so their
+   amber note styling cannot leak into the actor sheet contact info dialog. */
 
 .chargen-tab {
   padding: 0;
@@ -656,14 +658,14 @@
 }
 
 /* Contact Types */
-.contact-types {
+.chargen-tab .contact-types {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   margin-top: 8px;
 }
 
-.contact-btn {
+.chargen-tab .contact-btn {
   background: #f5f5f0;
   border: 1px solid #ccc;
   padding: 3px 6px;
@@ -672,16 +674,16 @@
   border-radius: 3px;
 }
 
-.contact-btn:hover {
+.chargen-tab .contact-btn:hover {
   background: #e8e8e0;
 }
 
-.contact-btn.chosen {
+.chargen-tab .contact-btn.chosen {
   background: #d4edda;
   border-color: #28a745;
 }
 
-.chosen-contacts {
+.chargen-tab .chosen-contacts {
   margin-top: 8px;
   background: #fff;
   border: 1px solid #ccc;
@@ -689,13 +691,13 @@
   padding: 6px;
 }
 
-.chosen-contacts h4 {
+.chargen-tab .chosen-contacts h4 {
   margin: 0 0 4px 0;
   font-size: 0.8em;
   color: #333;
 }
 
-.chosen-contacts ul {
+.chargen-tab .chosen-contacts ul {
   margin: 0;
   padding-left: 14px;
   font-size: 0.75em;
@@ -1151,7 +1153,7 @@
 }
 
 /* Granted contacts notice */
-.granted-contacts-notice {
+.chargen-tab .granted-contacts-notice {
   background: #e7f3ff;
   border: 1px solid #b6d4fe;
   border-radius: 4px;
@@ -1162,7 +1164,7 @@
 }
 
 /* Contact entries */
-.contact-entry {
+.chargen-tab .contact-entry {
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -1170,17 +1172,17 @@
   margin: 6px 0;
 }
 
-.contact-name {
+.chargen-tab .contact-name {
   font-size: 0.9em;
 }
 
-.contact-specialty {
+.chargen-tab .contact-specialty {
   font-size: 0.8em;
   color: #555;
   margin-top: 4px;
 }
 
-.contact-notes {
+.chargen-tab .contact-notes {
   font-size: 0.75em;
   color: #856404;
   background: #fff3cd;
@@ -1189,11 +1191,11 @@
   margin-top: 4px;
 }
 
-.chosen-contacts {
+.chargen-tab .chosen-contacts {
   margin-top: 12px;
 }
 
-.chosen-contacts h4 {
+.chargen-tab .chosen-contacts h4 {
   margin-bottom: 8px;
   font-size: 0.9em;
 }

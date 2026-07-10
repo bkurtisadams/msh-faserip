@@ -2617,6 +2617,13 @@ export function resolveRange(rangeField, rank) {
   return s;
 }
 
+/** Compact a resolved range for narrow actor-sheet tables.
+ *  Examples: "1 area" -> "1 Ar" and "20 areas" -> "20 Ar". */
+export function compactPowerRange(rangeField, rank) {
+  const resolved = resolveRange(rangeField, rank);
+  return resolved.replace(/\barea(?:s)?\b/gi, "Ar");
+}
+
 /** Display labels for the 10 power category keys (system.category). */
 export const POWER_CATEGORY_LABELS = {
   resistances:              "Resistances",

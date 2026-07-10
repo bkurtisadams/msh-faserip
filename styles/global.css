@@ -657,9 +657,19 @@
   color: #8b0000;
  }
  
- /* Style for the power name text */
+ /* Keep the power name readable and group any origin badges beside it. */
+ .faserip-sheet .power-name-label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+ }
+
  .faserip-sheet .power-name-text {
-  flex: 1;
+  min-width: 0;
+  color: #171717;
   cursor: grab;
   font-size: 14px;
  }
@@ -719,24 +729,30 @@
   outline: 2px dashed #888;
  }
  
- .power-tag {
-  margin-left: 5px;
-  font-size: 0.9em;
+ .faserip-sheet .power-origin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 15px;
+  padding: 1px 4px 0;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
  }
- .power-tag.bonus {
-  color: green;
+
+ .faserip-sheet .power-origin-badge.stunt {
+  color: #9a4d00;
+  background: #fff0d5;
  }
- .power-tag.stunt {
-  color: orange;
- }
- 
- .power-name-text.bonus-power {
-  color: green;
-  font-style: italic;
- }
- .power-name-text.stunt-power {
-  color: orange;
-  text-decoration: underline dotted;
+
+ .faserip-sheet .power-origin-badge.bonus {
+  color: #236b2b;
+  background: #e7f4e8;
  }
  
  /* Power info dialog - use more specific selectors */
@@ -999,27 +1015,75 @@
   padding-top: 10px;
   margin-top: 10px;
  }
- 
- /* Contact notes styling */
- .contact-notes {
-  margin-top: 12px;
-  margin-bottom: 12px;
-  padding: 8px;
-  background-color: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 3px;
+
+ /* Contact information popup: high-contrast parchment treatment. */
+ .contact-information-dialog .window-content {
+  background: #f5f0e8;
+  color: #171717;
  }
- 
- .contact-notes h3, .contact-description h3 {
-  margin: 0 0 5px 0;
+
+ .contact-information-content {
+  color: #171717;
   font-size: 14px;
-  color: #8b0000;
+  line-height: 1.35;
  }
- 
- .contact-description {
-  margin-top: 12px;
+
+ .contact-information-content h2 {
+  margin: 0 0 12px;
+  padding: 0 0 4px;
+  border-bottom: 1px solid #333;
+  color: #111;
+  font-size: 26px;
+  font-weight: 700;
+ }
+
+ .contact-information-content .contact-details {
+  grid-template-columns: 105px 1fr;
+  gap: 6px 10px;
+  margin-bottom: 14px;
+  color: #171717;
+ }
+
+ .contact-information-content .contact-details .label {
+  color: #111;
+  font-weight: 700;
+ }
+
+ .contact-information-content .contact-notes {
+  margin: 12px 0;
+  padding: 8px;
+  color: #171717;
+  font-size: 14px;
+  background: #faf7ef;
+  border: 1px solid #bcb4a3;
+  border-radius: 4px;
+ }
+
+ .contact-information-content .contact-notes h3,
+ .contact-information-content .contact-description h3 {
+  margin: 0 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #333;
+  color: #111;
+  font-size: 14px;
+  font-weight: 700;
+ }
+
+ .contact-information-content .contact-notes > div,
+ .contact-information-content .contact-description > div {
+  color: #171717;
+  white-space: pre-wrap;
+ }
+
+ .contact-information-content .contact-description {
+  margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid #aaa59b;
+ }
+
+ .contact-information-dialog .dialog-buttons button {
+  color: #111;
+  font-weight: 700;
  }
  
  /* Equipment group labels */
@@ -4135,4 +4199,36 @@ body.system-msh-faserip form.token-sheet :is(.preview, .image-preview, .file-pic
 .faserip-sheet select option {
   color: #191813;
   background: #fff;
+}
+/* ===== V2 actor sheet: fixed chrome with vertically scrolling tab content ===== */
+form.faserip-sheet {
+  height: 100%;
+  overflow: hidden;
+}
+
+form.faserip-sheet > .sheet-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+form.faserip-sheet > .sheet-body > .sheet-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+form.faserip-sheet .sheet-tabs-navigation {
+  flex: 0 0 auto;
+}
+
+form.faserip-sheet .sheet-tab-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }

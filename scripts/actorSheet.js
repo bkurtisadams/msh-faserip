@@ -1,4 +1,7 @@
-// actorSheet.js v2.7.3 - 2026-07-09
+// actorSheet.js v2.7.4 - 2026-07-10
+// v2.7.4: Restyle the contact information popup for readable high-contrast
+//         text and add a dedicated dialog class so contact-display styles no
+//         longer depend on broad chargen/global selectors.
 // v2.7.3: Harden compendium drops for equipment, contacts, vehicles,
 //         powers, talents, and HQs. Tab-level drop zones and a v14/raw
 //         payload resolver now accept Item/documentName/item-type payloads,
@@ -3679,39 +3682,46 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
       if (!item) return;
 
-      // Create a dialog to show contact information
-      let content = `
-    <h2>${item.name}</h2>
-    <div class="contact-details">
-      <div class="label">Type:</div><div>${item.system.type || 'None'}</div>
-      <div class="label">Disposition:</div><div>${item.system.disposition || 'Friendly'}</div>
-      <div class="label">Location:</div><div>${item.system.location || 'Unknown'}</div>
-    </div>
-    
-    ${item.system.notes ? `
-    <div class="contact-notes">
-      <h3>Notes:</h3>
-      <div>${item.system.notes}</div>
-    </div>
-    ` : ''}
-    
-    <div class="contact-description">
-      <h3>Description:</h3>
-      <div>${item.system.description || 'No description available.'}</div>
+      // Create a high-contrast dialog to show contact information.
+      // The dedicated wrapper/class keeps chargen contact styles from leaking
+      // into this popup (chargen.css previously turned the notes text gold).
+      const content = `
+    <div class="contact-information-content">
+      <h2>${item.name}</h2>
+      <div class="contact-details">
+        <div class="label">Type:</div><div>${item.system.type || 'None'}</div>
+        <div class="label">Disposition:</div><div>${item.system.disposition || 'Friendly'}</div>
+        <div class="label">Location:</div><div>${item.system.location || 'Unknown'}</div>
+      </div>
+
+      ${item.system.notes ? `
+      <div class="contact-notes">
+        <h3>Notes:</h3>
+        <div>${item.system.notes}</div>
+      </div>
+      ` : ''}
+
+      <div class="contact-description">
+        <h3>Description:</h3>
+        <div>${item.system.description || 'No description available.'}</div>
+      </div>
     </div>
   `;
 
       new Dialog({
         title: "Contact Information",
-        content: content,
+        content,
         buttons: {
           close: {
             label: "Close"
           }
         },
-        width: 400
+        default: "close"
+      }, {
+        width: 400,
+        classes: ["faserip", "contact-information-dialog"]
       }).render(true);
-    });;
+    });
 
     // Edit contact button
     html.find('.contacts-list .item-edit').click(ev => {
