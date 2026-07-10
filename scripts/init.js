@@ -1,4 +1,10 @@
-﻿// init.js v1.12.7 - 2026-07-07
+﻿// init.js v1.12.8 - 2026-07-09
+// v1.12.8: Force themed theme-light on all system-owned V2 windows via
+//          renderApplicationV2 hook. Fixes dark-theme unreadability on
+//          the chargen tab and non-.dialog HUD action dialogs (combat
+//          panel, equipment-action-dialog, actions-dialog, karma sheets,
+//          universal table) without per-surface CSS pinning.
+// init.js v1.12.7 - 2026-07-07
 // v1.12.7: Preload tab-hardware.hbs (Hardware tab, Slice 1).
 // v1.12.6: Defense-power detection (resync + createToken) also recognizes
 //          absorptionSpecific, matching defense-effects.js building an
@@ -440,6 +446,21 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
       }
     }
   }});
+
+/* Force system-owned windows to render with Foundry's light theme.
+   The FASERIP UI is a fixed light-parchment design; a client using the
+   Dark interface theme (or Browser Default on a dark-mode device)
+   otherwise injects dark-theme text/heading/input/table colors into
+   every surface the CSS does not explicitly pin (chargen tab, HUD
+   action dialogs, combat panel, karma sheets). AppV2 unions classes
+   across the inheritance chain, so prefix-matching faserip/msh covers
+   all system apps including shim dialogs and item-sheet subclasses. */
+Hooks.on("renderApplicationV2", (app, element) => {
+  const classes = app.options?.classes ?? [];
+  if (!classes.some(c => c.startsWith("faserip") || c.startsWith("msh"))) return;
+  element.classList.remove("theme-dark");
+  element.classList.add("themed", "theme-light");
+});
 
 Hooks.once("init", async () => {
   // --- Global flag scope & namespace ---
