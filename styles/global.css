@@ -4071,3 +4071,59 @@ body.system-msh-faserip form.token-sheet :is(.preview, .image-preview, .file-pic
   height: 100% !important;
   object-fit: contain !important;
 }
+/* Tables: Foundry core supplies themed row striping and text color
+   wherever the system doesn't declare its own (powers, stunts,
+   equipment, vehicles, HQ, team tables). Pin the light-theme look
+   explicitly so dark-theme clients don't get dark grey rows.
+   Cell-level backgrounds (abilities-table td, red th headers) are
+   painted over row backgrounds and remain unaffected. */
+.faserip-sheet table {
+  background: transparent;
+  color: #191813;
+}
+
+.faserip-sheet table tbody tr {
+  background: transparent;
+}
+
+.faserip-sheet table tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.faserip-sheet table tbody tr:nth-child(even) {
+  background: #efefef;
+}
+
+/* ============================================================
+   Theme-proofing: FASERIP sheets are a light parchment design.
+   Inputs never declared a text color, so clients on the Dark
+   interface theme (or "Browser Default" on a device in dark
+   mode) inherited Foundry's dark-theme tan text color, giving
+   faded orange input text on light backgrounds. Force light
+   color-scheme + core input vars, scoped to the sheet only.
+   ============================================================ */
+.application.faserip-sheet,
+.faserip-sheet {
+  color-scheme: light;
+  --input-text-color: #191813;
+  --input-background-color: rgba(255, 255, 255, 0.85);
+  --input-border-color: #ccc;
+  --input-placeholder-color: #7a7971;
+  --color-form-label: #191813;
+  --color-form-hint: #4b4a44;
+  --color-select-option-bg: #fff;
+  --color-text-primary: #191813;
+  --color-text-secondary: #4b4a44;
+}
+
+.faserip-sheet input[type="text"],
+.faserip-sheet input[type="number"],
+.faserip-sheet select,
+.faserip-sheet textarea {
+  color: #191813;
+}
+
+.faserip-sheet select option {
+  color: #191813;
+  background: #fff;
+}
