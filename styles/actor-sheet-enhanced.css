@@ -652,6 +652,23 @@ form.faserip-sheet .action-btn .action-name {
   font-family: 'Barlow Condensed', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  line-height: 1.05;
+}
+
+/* Let buttons size to their content: core fixes <button> height and
+   clips overflow, and the Oswald 1.5em abbr + uppercase name pushed
+   the stack past it — cutting the ability label off at the bottom.
+   Grid stretch keeps buttons in a row equal height. */
+form.faserip-sheet .action-btn {
+  height: auto !important;
+  min-height: 58px;
+  padding: 5px 2px 6px;
+}
+form.faserip-sheet .action-btn .action-abbr {
+  line-height: 1.1;
+}
+form.faserip-sheet .action-btn .action-ability {
+  line-height: 1.1;
 }
 
 /* ── Scroll indicators: off-cream bg ────────────────────────────────────── */
