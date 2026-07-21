@@ -1,3 +1,9 @@
+// actorSheet.js v2.7.5 - 2026-07-21
+// v2.7.5: Fix compact-sheet sizing under the ApplicationV2 adapter. Compact
+//         mode now switches to auto height only after its natural-height CSS
+//         has been applied, and normal mode restores its numeric dimensions
+//         only when actually leaving compact mode. The toggle no longer runs
+//         a second competing resize after the actor flag re-render.
 // actorSheet.js v2.7.4 - 2026-07-10
 // v2.7.4: Restyle the contact information popup for readable high-contrast
 //         text and add a dedicated dialog class so contact-display styles no
@@ -2252,21 +2258,25 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       $abilitiesSection.addClass('initial-hidden');
     }
 
-    // Apply compact sheet dimensions — only force auto-height on first
-    // compact render so that subsequent re-renders (e.g. toggling an
-    // equipment ActiveEffect) don't remeasure and balloon the window.
-    if (compact) {
-      if (this.position.width > 513) {
-        this.position.width = 513;
-        this.setPosition({ width: 513 });
-      }
-      if (!this._compactSized) {
-        this._compactSized = true;
-        this.position.height = "auto";
-        this.setPosition({ width: this.position.width, height: "auto" });
-      }
-    } else {
+    // Apply compact dimensions once when entering compact mode. Defer the
+    // resize by one animation frame so compact-mode.css has established a
+    // natural-height layout before Foundry measures height: "auto". Re-renders
+    // while already compact deliberately do not remeasure the window.
+    if (compact && !this._compactSized) {
+      this._compactSized = true;
+      requestAnimationFrame(() => {
+        if (!this.rendered) return;
+        this.setPosition({ width: 580, height: "auto" });
+      });
+    } else if (!compact && this._compactSized) {
+      // Restore the configured full-sheet dimensions only when leaving compact
+      // mode. An ordinary initial full-sheet render keeps its configured size.
       this._compactSized = false;
+      const normalSize = this._normalSheetSize ?? { width: 700, height: 800 };
+      requestAnimationFrame(() => {
+        if (!this.rendered) return;
+        this.setPosition(normalSize);
+      });
     }
 
     // ── Ctrl+Wheel zoom on sheet ──
@@ -2300,19 +2310,13 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       await this._toggleSheetLock(html);
     });
 
-    // Compact mode toggle button
+    // Compact mode toggle button. Updating the flag re-renders the actor
+    // sheet; the single sizing block above owns the corresponding resize.
     html.find('.compact-toggle').click(async (event) => {
       event.preventDefault();
       event.stopPropagation();
       const current = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
-      this._compactSized = false; // reset so next render re-applies auto height
       await this.actor.setFlag("msh-faserip", "compactSheet", !current);
-      // Resize sheet for compact mode
-      const newWidth = !current ? 513 : 700;
-      const newHeight = !current ? "auto" : 800;
-      this.position.width = newWidth;
-      this.position.height = newHeight;
-      this.setPosition({ width: newWidth, height: newHeight });
     });
 
     const isLocked = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;

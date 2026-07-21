@@ -1,4 +1,8 @@
-/* compact-mode.css v1.4.1 - 2026-05-23 */
+/* compact-mode.css v1.4.2 - 2026-07-21 */
+/* v1.4.2: Restore natural-height sizing for compact ApplicationV2 sheets.
+ *         Fixed-height flex rules from global.css no longer make height:auto
+ *         expand to the browser viewport; long tab contents scroll in a
+ *         bounded panel instead. */
 /* v1.4.1: Secondary dividers render on .sec-col like the full-size sheet (the */
 /*         red header bar masks them across the header zone); secondary is a */
 /*         grid so the column cells stretch to full height; Health-column */
@@ -57,6 +61,29 @@
 /* ══════════════════════════════════════════════════════════════════════════
    COMPACT MODE — everything below only applies when .compact-mode is set
    ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Natural-height window sizing ──────────────────────────────────────────
+   global.css makes the normal V2 sheet fill its fixed-height application
+   window. In compact mode those height:100% / flex:1 rules create a circular
+   measurement when Foundry applies height:"auto", producing a viewport-tall
+   parchment panel. Break that cycle and let the visible content define the
+   compact window height. */
+form.faserip-sheet.compact-mode {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+form.faserip-sheet.compact-mode > .sheet-body,
+form.faserip-sheet.compact-mode .sheet-tabs {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+form.faserip-sheet.compact-mode > .sheet-body {
+  overflow: visible !important;
+}
 
 /* ── Header: flatten to single row  [portrait] [name] [player] [toggle] ── */
 form.faserip-sheet.compact-mode .msh-compact-header {
@@ -397,10 +424,13 @@ form.faserip-sheet.compact-mode .sheet-tabs-navigation .item::after {
 
 /* ── Tab content: tighter tables, prevent overflow ─────────────────────── */
 form.faserip-sheet.compact-mode .sheet-tab-content {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(46vh, 460px) !important;
   padding: 6px !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
-  min-height: 0 !important;
 }
 
 /* Powers table: override fixed colgroup widths, let columns shrink */

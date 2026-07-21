@@ -67,8 +67,9 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
           case "options":    return v2.options;
           case "isEditable": return v2.isEditable;
           case "rendered":   return v2.rendered;
-          case "position":    return v2.position;
-          case "setPosition": return (...a) => v2.setPosition?.(...a);
+          case "position":         return v2.position;
+          case "_normalSheetSize": return { width: 720, height: 840 };
+          case "setPosition":      return (...a) => v2.setPosition?.(...a);
           case "render":     return (...a) => {
             // v1 callers use render(force, options); v2 expects (options, _options).
             // Promote a leading boolean to { force } so the re-render actually fires.
