@@ -1,3 +1,4 @@
+// karma.js v1.12.0 - 2026-07-23
 // karma.js v1.11.0 - 2026-04-17
 // v1.11.0: Compact column layout for karma history. Real Date and
 //          Game Date columns merged into a single stacked "Date"
@@ -43,6 +44,7 @@
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
 import { RANKS_ORDERED } from "./rules/rules-reference.js";
 import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
+import { computeKarmaTotals } from "./karma-rules.js";
 
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
@@ -1507,22 +1509,13 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   async _updateKarmaHistory(history) {
-    let totalEarned = 0;
-    let totalSpent = 0;
-    
-    history.forEach(event => {
-      const amount = Number(event.amount) || 0;
-      if (amount > 0) totalEarned += amount;
-      else if (amount < 0) totalSpent += Math.abs(amount);
-    });
-    
     const advancementFund = this.object.system.karma?.advancement || 0;
-    const currentKarmaValue = Math.max(0, totalEarned - totalSpent - advancementFund);
+    const { earned, value } = computeKarmaTotals(history, { advancement: advancementFund });
 
     await this.object.update({
       "system.karma.history": history,
-      "system.attributes.karma.value": currentKarmaValue,
-      "system.karma.lifetime": totalEarned
+      "system.attributes.karma.value": value,
+      "system.karma.lifetime": earned
     });
     
     this.render();

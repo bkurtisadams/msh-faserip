@@ -525,6 +525,15 @@ Hooks.once("init", async () => {
     default: 0
   });
 
+  game.settings.register("msh-faserip", "karmaHistorySeedVersion", {
+    name: "Karma History Seed Version",
+    hint: "Internal migration marker for the karma ledger baseline seed.",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
+
   // Register the debugMode setting FIRST
   game.settings.register("msh-faserip", "debugMode", {
     name: "Debug Mode",
@@ -2557,6 +2566,51 @@ Hooks.once("ready", async () => {
     }
   } catch (e) {
     console.warn("[FASERIP WARN] Prototype token defaults migration failed:", e);
+  }
+
+  // One-time migration: seed a Starting Karma baseline entry for actors whose
+  // karma history has no earned entries. The prepareDerivedData reconciliation
+  // assumes history is a complete ledger (chargen seeds new actors); pre-seed
+  // actors kept their baseline only while history stayed empty, and zero-amount
+  // Resource/Popularity FEAT log entries defeat that guard. Seed amount =
+  // source karma value + spent + advancement, so the derived value reproduces
+  // exactly what the sheet showed. Reads _source because prep has already
+  // overwritten the in-memory value for affected actors.
+  try {
+    if (game.user?.isGM) {
+      const seedVersion = Number(game.settings.get("msh-faserip", "karmaHistorySeedVersion") ?? 0);
+      if (seedVersion < 1) {
+        const { computeKarmaTotals } = await import("./karma-rules.js");
+        let seeded = 0;
+        for (const actor of game.actors.filter(a => FASERIP_CHARACTER_ACTOR_TYPES.has(a.type))) {
+          const srcKarma = actor._source?.system?.karma || {};
+          const history = Array.isArray(srcKarma.history) ? foundry.utils.deepClone(srcKarma.history) : [];
+          const { earned, spent } = computeKarmaTotals(history);
+          if (earned > 0) continue;
+          const advancement = Number(srcKarma.advancement) || 0;
+          const srcValue = Number(actor._source?.system?.attributes?.karma?.value) || 0;
+          const seed = srcValue + spent + advancement;
+          if (seed <= 0) continue;
+          history.unshift({
+            timestamp: new Date().toISOString(),
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: seed,
+            type: "Starting Karma",
+            description: "Baseline seeded by karma-ledger migration"
+          });
+          await actor.update({
+            "system.karma.history": history,
+            "system.karma.lifetime": seed
+          });
+          seeded++;
+        }
+        await game.settings.set("msh-faserip", "karmaHistorySeedVersion", 1);
+        if (seeded) console.log(`[FASERIP] Karma ledger migration seeded ${seeded} actor(s)`);
+      }
+    }
+  } catch (e) {
+    console.warn("[FASERIP WARN] Karma ledger migration failed:", e);
   }
   game.msh ??= {};
 

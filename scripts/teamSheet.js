@@ -1,3 +1,4 @@
+// teamSheet.js v4.13.0 - 2026-07-23
 // teamSheet.js v4.12.1 - 2026-05-12
 // v4.12.1: Collapsed encounter row carries precomputed isEvent /
 //          iconClass / typeLabel so the template can render a leading
@@ -114,7 +115,7 @@
 // v4.1.0: Add Event type (foe-less karma events) alongside encounters.
 //         GM Award field on both events and encounters. Missing karma types added.
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
-import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey } from "./karma-rules.js";
+import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey, computeKarmaTotals } from "./karma-rules.js";
 import { EncounterEditor } from "./apps/encounter-editor.js";
 
 export class TeamSheet extends Application {
@@ -1897,13 +1898,11 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       const history = foundry.utils.deepClone(hero.system.karma?.history || []);
       const filtered = history.filter(e => e.encounterId !== enc.id);
       if (filtered.length !== history.length) {
-        let earned = 0, spent = 0;
-        filtered.forEach(e => { const a = Number(e.amount) || 0; if (a > 0) earned += a; else spent += Math.abs(a); });
-        const adv = hero.system.karma?.advancement || 0;
+        const { earned, value } = computeKarmaTotals(filtered, { advancement: hero.system.karma?.advancement });
         await hero.update({
           "system.karma.history": filtered,
           "system.karma.lifetime": earned,
-          "system.attributes.karma.value": Math.max(0, earned - spent - adv)
+          "system.attributes.karma.value": value
         });
       }
     }
@@ -2118,13 +2117,11 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       amount, type, description,
       encounterId: encounterId || null
     });
-    let earned = 0, spent = 0;
-    history.forEach(e => { const a = Number(e.amount) || 0; if (a > 0) earned += a; else spent += Math.abs(a); });
-    const adv = hero.system.karma?.advancement || 0;
+    const { earned, value } = computeKarmaTotals(history, { advancement: hero.system.karma?.advancement });
     await hero.update({
       "system.karma.history": history,
       "system.karma.lifetime": earned,
-      "system.attributes.karma.value": Math.max(0, earned - spent - adv)
+      "system.attributes.karma.value": value
     });
   }
 

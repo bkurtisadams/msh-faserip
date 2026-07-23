@@ -1,3 +1,4 @@
+// actor.js v1.5.0 - 2026-07-23
 // actor.js v1.4.0 - 2026-05-15
 // v1.4.0: Karma reconciliation moved into prepareDerivedData. The displayed
 //         system.attributes.karma.value is now derived from karma.history
@@ -16,6 +17,7 @@
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
 
 import { RANKS_ORDERED, normalizeRank } from "./rules/rules-reference.js";
+import { computeKarmaTotals } from "./karma-rules.js";
 
 export class FaseripActor extends Actor {
   prepareData() {
@@ -211,16 +213,14 @@ export class FaseripActor extends Actor {
     const attrK = this.system?.attributes?.karma;
     const history = k?.history;
     if (attrK && Array.isArray(history) && history.length > 0) {
-      let earned = 0;
-      let spent  = 0;
-      for (const ev of history) {
-        const amt = Number(ev?.amount) || 0;
-        if (amt > 0) earned += amt;
-        else if (amt < 0) spent += Math.abs(amt);
+      const { earned, spent, value } = computeKarmaTotals(history, { advancement: k?.advancement });
+      // Belt-and-braces for unseeded ledgers: a history holding only
+      // zero-amount log entries (Resource/Popularity FEATs) carries no
+      // baseline, so reconciling from it would zero a legacy actor's karma.
+      if (earned > 0 || spent > 0) {
+        attrK.value = value;
+        k.lifetime  = earned;
       }
-      const advancement = Number(k?.advancement) || 0;
-      attrK.value = Math.max(0, earned - spent - advancement);
-      k.lifetime  = earned;
     }
   }
 

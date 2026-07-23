@@ -1,4 +1,4 @@
-// karma-rules.js v1.0.0 - 2026-04-17
+// karma-rules.js v1.1.0 - 2026-07-23
 // RAW category catalog for karma award line items. Each rule maps to a
 // category from the Advanced Set karma rules, with base amount, allowed
 // scopes, and optional caps. UI uses this to auto-set amounts and
@@ -8,6 +8,21 @@
 // allowedScopes: subset of ["split","individual","per_hero"].
 // cap: soft warning threshold — amounts above this show a RAW hint but are
 //      not blocked.
+
+// Canonical karma ledger math. history entries: positive = earned, negative =
+// spend, zero = log-only (Resource/Popularity FEATs). value is the derived
+// current karma. Every reconciliation site delegates here.
+export function computeKarmaTotals(history, { advancement = 0 } = {}) {
+  let earned = 0;
+  let spent = 0;
+  for (const ev of (Array.isArray(history) ? history : [])) {
+    const amt = Number(ev?.amount) || 0;
+    if (amt > 0) earned += amt;
+    else if (amt < 0) spent += Math.abs(amt);
+  }
+  const adv = Number(advancement) || 0;
+  return { earned, spent, value: Math.max(0, earned - spent - adv) };
+}
 
 export const KARMA_RULES = {
   custom: {

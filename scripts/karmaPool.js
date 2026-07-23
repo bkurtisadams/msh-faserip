@@ -1,5 +1,9 @@
+// karmaPool.js v2.1.0 - 2026-07-22
+// v2.1.0: Karma recompute sites delegate to computeKarmaTotals (karma-rules.js).
 // karmaPool.js v2.0.0 - 2026-02-28
 // v2.0.0: Rewrite - fix double-deduct, consistent karma calc, add GM award to pool, clean UI
+import { computeKarmaTotals } from "./karma-rules.js";
+
 export class KarmaPoolSheet extends DocumentSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -127,15 +131,8 @@ export class KarmaPoolSheet extends DocumentSheet {
             const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
             history.push(karmaEvent);
             
-            let totalEarned = 0;
-            let totalSpent = 0;
-            history.forEach(e => {
-              const a = Number(e.amount) || 0;
-              if (a > 0) totalEarned += a;
-              else if (a < 0) totalSpent += Math.abs(a);
-            });
-            const advancementFund = this.object.system.karma?.advancement || 0;
-            const newKarmaValue = Math.max(0, totalEarned - totalSpent - advancementFund);
+            const { earned: totalEarned, value: newKarmaValue } =
+              computeKarmaTotals(history, { advancement: this.object.system.karma?.advancement });
             const totalContribution = (this.object.system.karma?.poolContribution || 0) + amount;
             
             await this.object.update({
@@ -266,15 +263,8 @@ export class KarmaPoolSheet extends DocumentSheet {
             const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
             history.push(karmaEvent);
             
-            let totalEarned = 0;
-            let totalSpent = 0;
-            history.forEach(e => {
-              const a = Number(e.amount) || 0;
-              if (a > 0) totalEarned += a;
-              else if (a < 0) totalSpent += Math.abs(a);
-            });
-            const advancementFund = this.object.system.karma?.advancement || 0;
-            const newKarmaValue = Math.max(0, totalEarned - totalSpent - advancementFund);
+            const { earned: totalEarned, value: newKarmaValue } =
+              computeKarmaTotals(history, { advancement: this.object.system.karma?.advancement });
             
             await this.object.update({
               "system.karma.history": history,
@@ -611,16 +601,10 @@ export class KarmaPoolSheet extends DocumentSheet {
         history.push(karmaEvent);
         updateData["system.karma.history"] = history;
         
-        let totalEarned = 0;
-        let totalSpent = 0;
-        history.forEach(e => {
-          const a = Number(e.amount) || 0;
-          if (a > 0) totalEarned += a;
-          else if (a < 0) totalSpent += Math.abs(a);
-        });
-        const advFund = member.system.karma?.advancement || 0;
+        const { earned: totalEarned, value: newValue } =
+          computeKarmaTotals(history, { advancement: member.system.karma?.advancement });
         updateData["system.karma.lifetime"] = totalEarned;
-        updateData["system.attributes.karma.value"] = Math.max(0, totalEarned - totalSpent - advFund);
+        updateData["system.attributes.karma.value"] = newValue;
       }
       
       updates.push(member.update(updateData));
