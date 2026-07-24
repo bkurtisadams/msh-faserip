@@ -1,3 +1,4 @@
+// scripts/stunts.js v1.2.0 - 2026-07-23
 // scripts/stunts.js v1.1.0 - 2026-04-22
 // v1.1.0: v14 port — DialogV2 conversions; pre-roll karma declaration (RAW);
 //         min-10 karma commitment enforced; GM impossible refund button;
@@ -157,6 +158,11 @@ export class StuntRoller {
   }
 
   async _makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, declaredBoost) {
+    // DialogV2 keeps the stunt dialog open (and clickable) until this method
+    // resolves — a second click on Attempt/Boost re-enters and double-charges.
+    if (this._rolling) return;
+    this._rolling = true;
+    try {
     const roll = new Roll("1d100");
     await roll.evaluate();
     const rollResult = roll.total;
@@ -181,6 +187,9 @@ export class StuntRoller {
     const maxAfterBase = availableKarma - baseCost;
     const minCommit = Math.min(10, maxAfterBase);
     await this._showBoostAmountDialog(stunt, stuntIndex, resolved, rollResult, featColor, baseCost, minCommit, maxAfterBase, initialColor, initialSuccess);
+    } finally {
+      this._rolling = false;
+    }
   }
 
   _checkFeatSuccess(colorRolled, featRequired) {
@@ -228,7 +237,7 @@ export class StuntRoller {
       </form>
     `;
 
-    await DialogV2.wait({
+    const result = await DialogV2.wait({
       window: { title: "Commit Karma Boost" },
       content,
       render: (event, dialog) => {
@@ -264,11 +273,19 @@ export class StuntRoller {
             const finalColor = game.msh.rollUniversalTable(resolved.rank, finalResult);
             const success = this._checkFeatSuccess(String(finalColor || '').toLowerCase(), featColor);
             await this._finalizeStuntRoll(stunt, stuntIndex, resolved, rollResult, featColor, extra, baseCost, success, initialColor);
+            return "committed";
           }
         }
       ],
       rejectClose: false
     });
+    // Dialog closed without committing: the roll was made, so per RAW the
+    // 100 attempt cost and the declared minimum are still spent.
+    if (result !== "committed") {
+      const finalColor = game.msh.rollUniversalTable(resolved.rank, rollResult + minCommit);
+      const success = this._checkFeatSuccess(String(finalColor || '').toLowerCase(), featColor);
+      await this._finalizeStuntRoll(stunt, stuntIndex, resolved, rollResult, featColor, minCommit, baseCost, success, initialColor);
+    }
   }
 
   _computeBreakpoints(rollResult, rank, featColor, minCommit, maxAfterBase) {
