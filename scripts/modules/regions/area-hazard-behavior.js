@@ -1,4 +1,8 @@
-// scripts/modules/regions/area-hazard-behavior.js v1.1.0 - 2026-04-22
+// scripts/modules/regions/area-hazard-behavior.js v1.2.0 - 2026-07-23
+// v1.2.0: Fix double save on grenade detonation. v14 fires TOKEN_ENTER for
+//   tokens already inside when the behavior is created, racing the manual
+//   initial-blast loop in grenade-action.js. Added synchronous per-token
+//   in-flight guard (_resolvedTokenIds), cleared on TOKEN_EXIT.
 // v1.1.0: Declare `static events` map so Foundry's Region event dispatcher
 //   actually routes TOKEN_ENTER / TOKEN_EXIT to this behavior. v14 gates
 //   dispatch on `eventName in behavior.system.constructor.events` BEFORE
@@ -126,6 +130,7 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
     if (!game.user?.isActiveGM) return;
     const tokenDoc = event.data?.token;
     if (!tokenDoc?.actor) return;
+    this._resolvedTokenIds?.delete(tokenDoc.id);
     await this._clearHazardEffect(tokenDoc.actor);
   }
 
@@ -151,6 +156,13 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
     if (!actor) return;
     const regionId = this.region?.id;
     if (!regionId) return;
+
+    // Synchronous dedupe — v14 fires TOKEN_ENTER when the behavior is created
+    // over tokens already inside, so the entry event and grenade-action's
+    // initial-blast loop both call this. Guard BEFORE any await; cleared on exit.
+    this._resolvedTokenIds ??= new Set();
+    if (this._resolvedTokenIds.has(tokenDoc.id)) return;
+    this._resolvedTokenIds.add(tokenDoc.id);
 
     // Already hazarded by this Region? Skip (no double saves on re-entry).
     const existing = actor.effects.find(e =>

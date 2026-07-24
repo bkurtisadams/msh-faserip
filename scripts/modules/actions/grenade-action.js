@@ -591,9 +591,9 @@ export class GrenadeAction extends RangedAttackAction {
       </div>`
     });
 
-    // Fire save-on-entry for each token already inside. For flash grenades,
-    // saveOnEntry is false on the behavior (so later entries don't trigger),
-    // but _initialBlast tells us to save the caught-in-blast crowd regardless.
+    // Fallback resolve for tokens already inside. v14 usually fires TOKEN_ENTER
+    // for these at behavior creation (behavior dedupes the double call); this
+    // loop covers flash (_initialBlast, saveOnEntry false) and any missed fires.
     if (behaviorDoc?.system) {
       const hazard = behaviorDoc.system;
       const initialSaveAll = hazard.saveOnEntry || _initialBlast;
