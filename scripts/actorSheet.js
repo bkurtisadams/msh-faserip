@@ -1926,9 +1926,12 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
           <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Funding</span>
           <select id="hwres-funding" style="flex:1;">
             <option value="solo">Solo \u2014 my Resources (${baseRank})</option>
-            <option value="combined">Combined \u2014 second hero, Resources within one rank (counts as ${fundingResourceRank(baseRank, "combined")})</option>
+            <option value="combined">Combined \u2014 second hero, Resources within one rank</option>
             <option value="contacts">Contacts \u2014 backing organization</option>
           </select></div>
+        <div class="frp-box" id="hwres-helper-row" style="display:none;align-items:center;gap:8px;">
+          <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">2nd Hero</span>
+          <select id="hwres-helper" style="flex:1;">${contactOpts}</select></div>
         <div class="frp-box" id="hwres-contact-row" style="display:none;align-items:center;gap:8px;">
           <span class="frp-box-label" style="margin:0;flex-shrink:0;min-width:62px;">Contact</span>
           <select id="hwres-contact" style="flex:1;">${contactOpts}</select></div>
@@ -1956,9 +1959,26 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
         const $hint = html.find("#hwres-hint");
         const $roll = html.find("#hwres-roll");
 
-        const effRank = () => fundingResourceRank(baseRank, $funding.val(), $contact.val());
+        const $helperRow = html.find("#hwres-helper-row");
+        const $helper = html.find("#hwres-helper");
+        $helper.val(baseRank);
+        const pairGap = () => Math.abs(_RANKS.indexOf($helper.val()) - _RANKS.indexOf(baseRank));
+        const effRank = () => {
+          if ($funding.val() === "combined") {
+            const hi = _RANKS.indexOf($helper.val()) > _RANKS.indexOf(baseRank) ? $helper.val() : baseRank;
+            return fundingResourceRank(hi, "combined");
+          }
+          return fundingResourceRank(baseRank, $funding.val(), $contact.val());
+        };
         const refresh = () => {
           $contactRow.css("display", $funding.val() === "contacts" ? "flex" : "none");
+          $helperRow.css("display", $funding.val() === "combined" ? "flex" : "none");
+          if ($funding.val() === "combined" && pairGap() > 1) {
+            $pill.attr("class", "frp-feat-pill is-impossible").text("INVALID");
+            $hint.text("Resources must be within one rank of each other");
+            $roll.prop("disabled", true).text("Roll");
+            return;
+          }
           const req = self._resourceFeatRequirement(_RANKS.indexOf(effRank()), costIdx, false);
           const cls = { "Automatic":"is-auto","Green":"is-green","Yellow":"is-yellow","Impossible":"is-impossible" }[req.color] || "is-green";
           $pill.attr("class", `frp-feat-pill ${cls}`).text(req.color.toUpperCase());
