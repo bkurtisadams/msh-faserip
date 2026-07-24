@@ -230,7 +230,7 @@ export class StuntRoller {
         <div style="margin-top:10px;padding:6px;border-top:1px solid #ccc;">
           <label><input type="radio" name="karmaChoice" value="custom">
             <strong>Custom amount:</strong>
-            <input type="number" name="customAmount" value="${minCommit}" min="${minCommit}" max="${maxAfterBase}" style="width:70px;margin-left:6px;" disabled>
+            <input type="number" name="customAmount" value="${minCommit}" min="${minCommit}" max="${Math.min(maxAfterBase, Math.max(minCommit, 100 - rollResult))}" style="width:70px;margin-left:6px;" disabled>
             <span style="font-size:0.85em;color:#666;">(${minCommit} - ${maxAfterBase})</span>
           </label>
         </div>
@@ -264,7 +264,8 @@ export class StuntRoller {
             if (selected) {
               if (selected.value === 'custom') {
                 const customInput = root.querySelector('input[name="customAmount"]');
-                extra = Math.max(minCommit, Math.min(maxAfterBase, Number(customInput.value) || minCommit));
+                const maxUseful = Math.min(maxAfterBase, Math.max(minCommit, 100 - rollResult));
+                extra = Math.max(minCommit, Math.min(maxUseful, Number(customInput.value) || minCommit));
               } else {
                 extra = Number(selected.value) || minCommit;
               }
