@@ -1,19 +1,47 @@
 {
   "id": "msh-faserip",
+  "name": "msh-faserip",
   "title": "Marvel Super Heroes (FASERIP)",
   "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v14.",
-  "version": "2.1.10",
+  "version": "2.1.7",
   "compatibility": {
     "minimum": "14",
     "verified": "14.360"
   },
+  "templateVersion": 2,
+  "author": "bk-adams",
   "url": "",
   "manifest": "",
   "download": "",
   "license": "LICENSE",
   "socket": true,
+  "dependencies": [
+    {
+      "name": "socketlib",
+      "type": "module"
+    }
+  ],
   "esmodules": [
-    "scripts/init.js"
+    "scripts/init.js",
+    "scripts/modules/actions/nullify.js",
+    "scripts/modules/actions/check-action.js",
+    "scripts/modules/actions/energy-action.js",
+    "scripts/modules/actions/chat-hooks.js",
+    "scripts/modules/actions/action-dispatcher.js",
+    "scripts/actor.js",
+    "scripts/item.js",
+    "scripts/actorSheet.js",
+    "scripts/itemSheet.js",
+    "scripts/vehicle-actor-sheet.js",
+    "scripts/macros.js",
+    "scripts/gm-utils.js",
+    "scripts/karma.js",
+    "scripts/karmaAdvancement.js",
+    "scripts/karmaPool.js",
+    "scripts/karma.js",
+    "scripts/karma-rules.js",
+    "scripts/karma-multipliers.js",
+    "scripts/teamSheet.js"
   ],
   "styles": [
     "styles/power-sheet-v2.css",
@@ -57,42 +85,42 @@
       "name": "talents",
       "label": "Talents",
       "system": "msh-faserip",
-      "path": "./packs/talents",
+      "path": "./packs/talents.db",
       "type": "Item"
     },
     {
       "name": "contacts",
       "label": "Contacts",
       "system": "msh-faserip",
-      "path": "./packs/contacts",
+      "path": "./packs/contacts.db",
       "type": "Item"
     },
     {
       "name": "equipment",
       "label": "Equipment",
       "system": "msh-faserip",
-      "path": "./packs/equipment",
+      "path": "./packs/equipment.db",
       "type": "Item"
     },
     {
       "name": "vehicles",
       "label": "Vehicles",
       "system": "msh-faserip",
-      "path": "./packs/vehicles",
+      "path": "./packs/vehicles.db",
       "type": "Item"
     },
     {
       "name": "headquarters",
       "label": "Headquarters",
       "system": "msh-faserip",
-      "path": "./packs/headquarters",
+      "path": "./packs/headquarters.db",
       "type": "Item"
     },
     {
       "name": "vehicle-weapons",
       "label": "Vehicle Weapons",
       "system": "msh-faserip",
-      "path": "./packs/vehicle-weapons",
+      "path": "./packs/vehicle-weapons.db",
       "type": "Item"
     }
   ],
@@ -115,22 +143,55 @@
       "areaHazard": {}
     }
   },
-  "relationships": {
-    "requires": [
-      {
-        "id": "socketlib",
-        "type": "module"
-      }
-    ]
-  },
+  "relationships": {},
   "primaryTokenAttribute": "attributes.health",
-  "authors": [
+  "gridDistance": 44,
+  "gridUnits": "yards",
+  "settings": [
     {
-      "name": "bk-adams"
+      "key": "dailyKarmaEnabled",
+      "name": "Enable Daily Karma",
+      "hint": "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
+      "scope": "world",
+      "config": true,
+      "type": "Boolean",
+      "default": false
+    },
+    {
+      "key": "teamMembers",
+      "name": "Team Members",
+      "hint": "List of hero IDs that are part of the team",
+      "scope": "world",
+      "config": false,
+      "type": "Array",
+      "default": []
+    },
+    {
+      "key": "defeatedVillains",
+      "name": "Defeated Villains",
+      "hint": "List of villains defeated by the team",
+      "scope": "world",
+      "config": false,
+      "type": "Array",
+      "default": []
+    },
+    {
+      "key": "karmaMultiplier",
+      "name": "Karma Multiplier",
+      "hint": "Multiplier for karma awards",
+      "scope": "world",
+      "config": false,
+      "type": "Number",
+      "default": 1
+    },
+    {
+      "key": "compactSheet",
+      "name": "Compact Character Sheet",
+      "hint": "Reduces character sheet size by hiding header details, collapsing abilities, and tightening spacing.",
+      "scope": "client",
+      "config": true,
+      "type": "Boolean",
+      "default": false
     }
-  ],
-  "grid": {
-    "distance": 44,
-    "units": "yards"
-  }
+  ]
 }

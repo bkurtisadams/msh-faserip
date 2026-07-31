@@ -28,11 +28,7 @@
         "legalStatus": "",
         "occupation": "",
         "maritalStatus": "",
-        "history": "",
-        "details": {
-          "isDead": false,
-          "isDeactivated": false
-        }
+        "history": ""
       },
       "abilities": {
         "abilities": {
@@ -264,7 +260,7 @@
       "bodyCSLoss": 0,
       "speedCSLoss": 0,
       "controlCSLoss": 0,
-      "currentSpeed": 0,
+      "currentSpeed": "",
       "outOfControl": false,
       "damageLog": [],
       "resources": {
@@ -316,7 +312,6 @@
       "preLimitationRank": "",
       "range": "",
       "customRange": "",
-      "calculatedRange": "",
       "area": 0,
       "duration": "",
       "customDuration": "",
@@ -408,7 +403,6 @@
       "forceFieldPersonal": false,
       "forceFieldCoverage": 0,
       "resistanceType": "",
-      "resistanceSpecific": "",
       "resistanceIsInvulnerability": false,
       "isLimited": false,
       "limitation": {
@@ -428,14 +422,12 @@
       "telekinesisStrength": "",
       "isBodyArmor": false,
       "armorPhysical": 0,
-      "armorPhysicalCustom": false,
       "armorEnergy": 0,
       "armorEnergyCustom": false,
       "isForceField": false,
       "forceFieldType": "personal",
       "isResistance": false,
       "resistanceEffect": "damageReduction",
-      "resistanceValue": 0,
       "resistanceIsConductive": false,
       "resistanceMinRank": "",
       "isEnergyReflection": false,
@@ -538,7 +530,6 @@
       },
       "healingType": "",
       "regenerationType": "",
-      "regenerationRate": "",
       "absorptionType": "",
       "absorptionSpecific": "",
       "hasRecoveryPower": false,
