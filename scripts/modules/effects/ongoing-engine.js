@@ -1379,6 +1379,12 @@ function _getGameDate() {
     const ct = te.getCurrentTime?.();
     if (ct) return `${ct.year}-${ct.month}-${ct.day}`;
   }
+  // No CTT: derive the day from Foundry worldTime, which is core and always
+  // present. Falling back to the wall clock made "once per day" limits track
+  // the real-world date, so advancing a week of game time never reset them
+  // and a long real-world session reset them without any game time passing.
+  const worldTime = Number(game.time?.worldTime);
+  if (Number.isFinite(worldTime)) return `WT-${Math.floor(worldTime / 86400)}`;
   return new Date().toDateString();
 }
 

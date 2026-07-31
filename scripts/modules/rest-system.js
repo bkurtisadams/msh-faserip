@@ -105,6 +105,7 @@
 import { getFlagScope } from "./actions/flags.js";
 import { safeActorSetFlag } from "../gm-utils.js";
 import { RANKS_ORDERED } from "../rules/rules-reference.js";
+import { getCurrentGameDate } from "./effects/ongoing-engine.js";
 
 const SCOPE = getFlagScope();
 
@@ -349,9 +350,9 @@ export class RestSystem {
       };
     }
 
-    // Check once-per-day limit
+    // Check once-per-day limit (game days, not real-world days)
     const lastRecoveryDate = actor.getFlag(SCOPE, "lastRecoveryDate");
-    const today = new Date().toDateString();
+    const today = getCurrentGameDate();
     
     if (lastRecoveryDate === today) {
       return { 
@@ -360,17 +361,20 @@ export class RestSystem {
       };
     }
 
-    // Check if enough time has passed (10 turns = 60 seconds in FASERIP)
-    const lastDamageTime = actor.getFlag(SCOPE, "lastDamageTime");
-    if (lastDamageTime) {
-      const timeSinceDamage = Date.now() - lastDamageTime;
-      const tenTurns = 60 * 1000; // 60 seconds
+    // RAW p.32: Recovery lands 10 turns after damage. 1 turn = 1 round = 6s,
+    // so 10 turns = 60 seconds of WORLD time — not 60 seconds at the table.
+    // Matches the Healing gate below, which already reads worldTime.
+    const lastDamageWorldTime = actor.getFlag(SCOPE, "lastDamageWorldTime");
+    if (lastDamageWorldTime != null) {
+      const worldNow = game.time?.worldTime ?? 0;
+      const timeSinceDamage = worldNow - lastDamageWorldTime;
+      const tenTurns = 60; // 10 turns x 6s
       
       if (timeSinceDamage < tenTurns) {
-        const remaining = Math.ceil((tenTurns - timeSinceDamage) / 1000);
+        const remaining = Math.ceil((tenTurns - timeSinceDamage) / 6);
         return { 
           canRest: false, 
-          reason: `Must wait ${remaining} more seconds since last damage (10 turns total)` 
+          reason: `Must wait ${remaining} more turn(s) since last damage (10 turns total)` 
         };
       }
     }
@@ -403,8 +407,8 @@ export class RestSystem {
       "system.attributes.health.value": newHealth
     });
 
-    // Mark recovery as used today
-    const today = new Date().toDateString();
+    // Mark recovery as used today (game day)
+    const today = getCurrentGameDate();
     await actor.setFlag(SCOPE, "lastRecoveryDate", today);
 
     const message = `${actor.name} recovered ${healAmount} Health (10 turns of rest)`;

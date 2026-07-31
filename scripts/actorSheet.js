@@ -594,7 +594,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
 
     // Recovery button: disable if already used today
     const lastRecoveryDate = this.actor.getFlag(scope, "lastRecoveryDate");
-    context.recoveryUsedToday = lastRecoveryDate === new Date().toDateString();
+    context.recoveryUsedToday = lastRecoveryDate === getCurrentGameDate();
 
     // Healing button: disable if health at max, no damage recorded, or still on 1-hour cooldown
     const hpValue = context.system?.attributes?.health?.value ?? 0;

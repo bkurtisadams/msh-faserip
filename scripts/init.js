@@ -3677,60 +3677,12 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   // processDyingRound is called there for each dying actor, ensuring exactly 1 rank loss
   // per round regardless of how many combatant turns exist within a Foundry round.
 
-  // Check for Recovery/Healing timers
-  
-  for (const combatant of combat.combatants) {
-    const actor = combatant.actor;
-    if (!actor) continue;
-    
-    // Check Recovery timers
-    const recoveryEffect = actor.effects.find(e => 
-      e.flags?.[scope]?.recoveryTimer && 
-      e.flags?.[scope]?.fallbackMode === "combat"
-    );
-    
-    if (recoveryEffect) {
-      const turnsRemaining = recoveryEffect.getFlag(scope, "turnsRemaining") || 0;
-      const newRemaining = turnsRemaining - 1;
-      
-      if (newRemaining <= 0) {
-        // Recovery complete
-        const flags = recoveryEffect.flags[scope];
-        const manager = game.msh?.faseripIntegration?.recoveryManager;
-        if (manager) {
-          await manager.completeRecovery(actor, flags);
-          await actor.deleteEmbeddedDocuments("ActiveEffect", [recoveryEffect.id]);
-        }
-      } else {
-        await recoveryEffect.setFlag(scope, "turnsRemaining", newRemaining);
-        await recoveryEffect.update({ name: `Recovery Timer (${newRemaining} turns)` });
-      }
-    }
-    
-    // Check Healing timers
-    const healingEffect = actor.effects.find(e => 
-      e.flags?.[scope]?.healingTimer && 
-      e.flags?.[scope]?.fallbackMode === "combat"
-    );
-    
-    if (healingEffect) {
-      const turnsRemaining = healingEffect.getFlag(scope, "turnsRemaining") || 0;
-      const newRemaining = turnsRemaining - 1;
-      
-      if (newRemaining <= 0) {
-        // Healing complete
-        const flags = healingEffect.flags[scope];
-        const manager = game.msh?.faseripIntegration?.recoveryManager;
-        if (manager) {
-          await manager.completeHealing(actor, flags);
-          await actor.deleteEmbeddedDocuments("ActiveEffect", [healingEffect.id]);
-        }
-      } else {
-        await healingEffect.setFlag(scope, "turnsRemaining", newRemaining);
-        await healingEffect.update({ name: `${healingEffect.name.split('(')[0].trim()} (${newRemaining} turns)` });
-      }
-    }
-  }
+  // Recovery/Healing are handled natively by rest-system.js against
+  // game.time.worldTime (see attemptRecovery / attemptHealing), which works
+  // with or without CTT. The old AE "turnsRemaining" fallback that lived here
+  // required game.msh.faseripIntegration.recoveryManager, which is only ever
+  // assigned by the CTT module, and looked for fallbackMode:"combat" flags
+  // that nothing in this system writes. Removed.
 });
 
 // MA-D study cleanup: when a combat is deleted (ended), purge any

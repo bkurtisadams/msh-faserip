@@ -159,7 +159,10 @@ export class GMToolsApp extends Application {
     // Ability-rank test controls (State tab)
     html.find(".grt-btn").click(ev => this._onRankTestBtn(ev));
 
-    // Re-render when actors / tokens / scenes / time change
+    // Re-render when actors / tokens / scenes / time change.
+    // activateListeners runs on every render; register once per instance.
+    if (!this._hooksBound) {
+      this._hooksBound = true;
     Hooks.on("createActor", this._onActorChange);
     Hooks.on("deleteActor", this._onActorChange);
     Hooks.on("updateActor", this._onActorChange);
@@ -173,10 +176,12 @@ export class GMToolsApp extends Application {
     Hooks.on("updateToken", this._onTokenChange);
     Hooks.on("updateScene", this._onTokenChange);
     Hooks.on("updateWorldTime", this._onTokenChange);
+    }
   }
 
   close(options) {
     if (this._renderTimer) { clearTimeout(this._renderTimer); this._renderTimer = null; }
+    this._hooksBound = false;
     Hooks.off("createActor", this._onActorChange);
     Hooks.off("deleteActor", this._onActorChange);
     Hooks.off("updateActor", this._onActorChange);
