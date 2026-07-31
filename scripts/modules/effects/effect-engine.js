@@ -77,13 +77,18 @@ function _normalizeChangeMode(change) {
   return change;
 }
 
-/** Safe handle to CTT time engine (if installed & active) */
-function getCTT() {
+/** Safe handle to CTT's public API (if installed, active, and sync-enabled). */
+function getCTTApi() {
   const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
-  if (cttSyncMode === "off") return null; // Setting is off, don't use CTT
-  
+  if (cttSyncMode === "off") return null;
+
   const mod = game.modules.get("calendar-time-tracker");
-  return mod?.active ? (mod.api?.timeEngine ?? null) : null;
+  return mod?.active && mod.api ? mod.api : null;
+}
+
+/** Safe handle to CTT's underlying conversion/read engine. */
+function getCTT() {
+  return getCTTApi()?.timeEngine ?? null;
 }
 
 /** World setting helpers (with sane fallbacks) */
@@ -1061,11 +1066,19 @@ export async function applyWeakened(actor, { rounds = 1, originUuid = null } = {
   }, opts);
 }
 
-/** Optionally advance CTT by N turns if sync is enabled */
+/** Optionally advance CTT by N turns through its supported public API. */
 export function advanceCTTByTurns(n = 1) {
-  const te = getCTT();
-  if (!te || typeof te.advance !== "function") return false;
-  try { te.advance(n, "turn"); return true; } catch { return false; }
+  const api = getCTTApi();
+  const turns = Number(n);
+  if (!api || typeof api.advanceTime !== "function") return false;
+  if (!Number.isFinite(turns) || turns <= 0) return false;
+  try {
+    api.advanceTime(turns, "turn");
+    return true;
+  } catch (error) {
+    console.warn("[FASERIP WARN] CTT advanceTime failed:", error);
+    return false;
+  }
 }
 
 

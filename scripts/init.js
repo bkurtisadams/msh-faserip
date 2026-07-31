@@ -1,4 +1,8 @@
-﻿// init.js v1.12.8 - 2026-07-09
+// init.js v1.12.9 - 2026-07-30
+// v1.12.9: V14 manifest/schema bootstrap repairs; unified configurable turn timing;
+//          corrected elapsed dying ticks and round-based Recovery/Healing cadence;
+//          added cross-client Health change tracking; forwarded legacy column shifts.
+// init.js v1.12.8 - 2026-07-09
 // v1.12.8: Force themed theme-light on all system-owned V2 windows via
 //          renderApplicationV2 hook. Fixes dark-theme unreadability on
 //          the chargen tab and non-.dialog HUD action dialogs (combat
@@ -132,6 +136,88 @@ import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
 const FASERIP_PROTOTYPE_TOKEN_DEFAULTS_VERSION = 1;
 
+// The GM receives replicated Actor updates after the document has already been
+// updated locally, so actor.system cannot be used to reconstruct the previous
+// Health value. Keep a small per-client cache initialized at ready and updated
+// after every Health change instead.
+const _lastKnownActorHealth = new Map();
+
+function _actorHealthKey(actor) {
+  return actor?.uuid || actor?.id || null;
+}
+
+function _cacheActorHealth(actor, value = actor?.system?.attributes?.health?.value) {
+  const key = _actorHealthKey(actor);
+  const numeric = Number(value);
+  if (!key || !Number.isFinite(numeric)) return;
+  _lastKnownActorHealth.set(key, numeric);
+}
+
+function _extractHealthUpdate(updateData) {
+  if (!updateData || typeof updateData !== "object") return undefined;
+  const flat = updateData["system.attributes.health.value"];
+  const nested = foundry.utils.getProperty(updateData, "system.attributes.health.value");
+  const raw = flat ?? nested;
+  if (raw === undefined) return undefined;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function _getTurnSeconds() {
+  try {
+    const configured = Number(game.settings?.get?.("msh-faserip", "turnSeconds"));
+    if (Number.isFinite(configured) && configured > 0) return configured;
+  } catch (_) { /* setting is not registered yet during module evaluation */ }
+  return 6;
+}
+
+function _elapsedFaseripTurns(deltaSeconds) {
+  const seconds = Number(deltaSeconds);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  return Math.floor(seconds / _getTurnSeconds());
+}
+
+function _findDyingEffect(actor, scope) {
+  return actor?.effects?.find?.(effect =>
+    (effect.flags?.[scope]?.ongoingId === "dying" || effect.flags?.[scope]?.isDying) &&
+    !effect.disabled
+  );
+}
+
+/**
+ * Process all meaningful dying turns represented by an elapsed time jump.
+ * The loop is capped at the number of stabilization rounds plus the rank steps
+ * needed to reach death, avoiding runaway work on very large calendar jumps.
+ */
+async function _processDyingForElapsedTurns(actors, turnsElapsed, source) {
+  const requestedTurns = Math.max(0, Math.floor(Number(turnsElapsed) || 0));
+  if (!requestedTurns) return;
+
+  const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+
+  for (const actor of actors) {
+    let dyingEffect = _findDyingEffect(actor, scope);
+    if (!dyingEffect) continue;
+
+    const stabilizedRounds = Math.max(0, Number(dyingEffect.getFlag(scope, "stabilizedRounds")) || 0);
+    const currentRank = normalizeRank(
+      game.msh?.getEnduranceRankName?.(actor) ?? actor.system?.abilities?.endurance?.rank
+    );
+    const rankIndex = RANKS_ORDERED.indexOf(currentRank);
+    const turnsUntilTerminal = rankIndex >= 0 ? rankIndex + 1 : RANKS_ORDERED.length + 1;
+    const turnsToProcess = Math.min(requestedTurns, stabilizedRounds + turnsUntilTerminal);
+
+    console.log(`[FASERIP:DYING] ${source}: processing ${turnsToProcess}/${requestedTurns} elapsed turn(s) for ${actor.name}`);
+    for (let i = 0; i < turnsToProcess; i++) {
+      const result = await processDyingRound(actor);
+      if (result === "dead" || result === "none") break;
+      dyingEffect = _findDyingEffect(actor, scope);
+      if (!dyingEffect) break;
+    }
+  }
+}
+
 function _tokenDisplayMode(key, fallback) {
   return globalThis.CONST?.TOKEN_DISPLAY_MODES?.[key] ?? fallback;
 }
@@ -218,10 +304,19 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   if (!game.user.isGM) return;
   
   const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
-  if (syncEnabled) {
-    // Advance Foundry world time by 6 seconds (1 FASERIP turn)
-    await game.time.advance(6);
-    console.log("[FASERIP] Combat advanced time by 6 seconds");
+  const cttModule = game.modules.get("calendar-time-tracker");
+  const cttIsAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") === true;
+  const cttOwnsClock = cttIsAuthority
+    && cttModule?.active
+    && typeof cttModule.api?.advanceTime === "function";
+
+  if (syncEnabled && !cttOwnsClock) {
+    const turnSeconds = _getTurnSeconds();
+    // One Foundry round equals one FASERIP turn.
+    await game.time.advance(turnSeconds);
+    console.log(`[FASERIP] Combat advanced time by ${turnSeconds} seconds`);
+  } else if (syncEnabled && cttOwnsClock) {
+    console.debug("[FASERIP] CTT is Time Authority; skipping direct worldTime advancement.");
   }
   
   // Trigger hook to update team sheet display
@@ -420,29 +515,21 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
     }
   }
 
-  // Dying out-of-combat: process 1 rank loss per turn elapsed.
-  // combatRound hook owns this during active combat.
-  // timeTracker.timeAdvanced hook owns this when CTT is active (avoids race condition,
-  // since CTT calls game.time.advance() internally which also fires this hook).
+  // Dying out-of-combat: process one Endurance step per elapsed FASERIP turn.
+  // combatRound owns this during combat. When CTT is active, its bridge hook owns
+  // manual calendar advances so the same time change is not processed twice.
   const cttActiveForDying = game.modules.get("calendar-time-tracker")?.active;
   if (!game.combat?.active && !cttActiveForDying && !game.msh._dyingInProgress) {
-    if (dt >= 6) {
+    const turnsElapsed = _elapsedFaseripTurns(dt);
+    if (turnsElapsed > 0) {
       try {
-        const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        for (const actor of Effects.getAllTokenActors()) {
-          if (!actor?.effects?.size) continue;
-          const dyingAE = actor.effects.find(e =>
-            (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
-            !e.disabled
-          );
-          if (!dyingAE) continue;
-          console.log(`[FASERIP:DYING] worldTime advance: processing 1 dying round for ${actor.name} (dt=${dt}s)`);
-          const result = await processDyingRound(actor);
-          console.log(`[FASERIP:DYING] worldTime: ${actor.name} â†’ ${result}`);
-        }
+        await _processDyingForElapsedTurns(
+          Effects.getAllTokenActors(),
+          turnsElapsed,
+          `worldTime advance (${dt}s)`
+        );
       } catch (e) {
-        console.error("[FASERIP ERROR] worldTime dying round processing failed:", e);
+        console.error("[FASERIP ERROR] worldTime dying processing failed:", e);
       }
     }
   }});
@@ -1454,9 +1541,8 @@ Hooks.once("init", async () => {
     Hooks.on("timeTracker.timeAdvanced", async (amount, unitId) => {
       Hooks.callAll("msh-faserip.timeUpdated");
 
-      // Process dying whenever CTT manually advances time (in OR out of combat).
-      // If ctt.syncMode also fires this after a combatRound hook, the dedup stamp
-      // in processDyingRound (lastProcessedWorldTime) blocks the duplicate.
+      // Process elapsed dying turns for manual CTT advances outside combat.
+      // During combat, combatRound is the single dying authority.
       if (!game.user.isGM) return;
 
       // Guard against re-entrant calls while an async processDyingRound is in flight
@@ -1473,27 +1559,18 @@ Hooks.once("init", async () => {
         } catch (_) {}
       }
       if (deltaSeconds <= 0 && amount > 0) {
-        deltaSeconds = Number(amount) * 6;
+        deltaSeconds = Number(amount) * _getTurnSeconds();
       }
 
       try {
-        const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-
-        // Process 1 dying round per character per CTT advance.
-        // During combat, combatRound hook handles dying (1 per round).
-        // Out of combat, each manual CTT advance ticks dying once â€” GM controls pacing.
-        for (const actor of Effects.getAllTokenActors()) {
-          if (!actor?.effects?.size) continue;
-          const dyingAE = actor.effects.find(e =>
-            (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
-            !e.disabled
+        // combatRound is the sole dying authority while combat is active.
+        if (!game.combat?.active) {
+          const turnsElapsed = _elapsedFaseripTurns(deltaSeconds);
+          await _processDyingForElapsedTurns(
+            Effects.getAllTokenActors(),
+            turnsElapsed,
+            `CTT advance (${amount} ${unitId}, ${deltaSeconds}s)`
           );
-          if (!dyingAE) continue;
-
-          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s â€” processing 1 dying round for ${actor.name}`);
-          const result = await processDyingRound(actor);
-          console.log(`[FASERIP:DYING] CTT: ${actor.name} â†’ ${result}`);
         }
       } catch (e) {
         console.error("[FASERIP ERROR] CTT dying processing failed:", e);
@@ -1770,7 +1847,7 @@ Hooks.once("init", async () => {
     // Call new dispatcher
     return await ActionDispatcher.roll(actionType, {
       actor,
-      opts: { karma, ...options }
+      opts: { shift: Number(columnShift) || 0, karma, ...options }
     });
   };
   // Add the rollUniversalTable function to the namespace, wrapped to emit hook
@@ -2549,6 +2626,9 @@ Hooks.once("setup", () => {
 });
 
 Hooks.once("ready", async () => {
+  // Seed the previous-Health cache before any player-originated updates arrive.
+  for (const actor of Effects.getAllTokenActors()) _cacheActorHealth(actor);
+
   // One-time migration: make existing character actors match FASERIP's preferred
   // prototype token visibility and health-bar defaults. New actors are handled by
   // the preCreateActor hook above; this catches actors created before the fix.
@@ -3228,7 +3308,9 @@ Hooks.on("deleteItem", async (item, options, userId) => {
 Hooks.on("createToken", async (tokenDoc, options, userId) => {
   if (!game.user.isGM) return;
   const actor = tokenDoc.actor;
-  if (!actor || tokenDoc.actorLink) return;
+  if (!actor) return;
+  _cacheActorHealth(actor);
+  if (tokenDoc.actorLink) return;
   const powers = actor.items.filter(i => i.type === "power");
   const hasDefense = powers.some(p => p.system?.isBodyArmor || p.system?.isForceField || p.system?.isResistance || p.system?.absorptionType || p.system?.absorptionSpecific);
   if (!hasDefense) return;
@@ -3241,22 +3323,43 @@ Hooks.on("createToken", async (tokenDoc, options, userId) => {
   }
 });
 
-// Capture old health value before update
+// Capture old Health before locally initiated updates. This handles both
+// nested form updates and Foundry's common flattened dot-path updates.
 Hooks.on('preUpdateActor', (actor, updateData, options, userId) => {
-  if (options.mshDyingTick) return;
-  const newHealth = updateData.system?.attributes?.health?.value;
+  if (options?.mshDyingTick) return;
+  const newHealth = _extractHealthUpdate(updateData);
   if (newHealth === undefined) return;
-  
-  const oldHealth = actor.system.attributes.health.value;
-  
-  options.healthChange = {
-    old: oldHealth,
-    new: newHealth
-  };
+
+  const oldHealth = Number(actor.system?.attributes?.health?.value ?? 0);
+  _cacheActorHealth(actor, oldHealth);
+  options.healthChange = { old: oldHealth, new: newHealth };
+});
+
+Hooks.on("createActor", actor => _cacheActorHealth(actor));
+Hooks.on("deleteActor", actor => {
+  const key = _actorHealthKey(actor);
+  if (key) _lastKnownActorHealth.delete(key);
 });
 
 // Process damage and start timers
 Hooks.on('updateActor', async (actor, updateData, options, userId) => {
+  const explicitChange = options?.healthChange;
+  const incomingHealth = _extractHealthUpdate(updateData);
+  if (!explicitChange && incomingHealth === undefined) return;
+
+  const cacheKey = _actorHealthKey(actor);
+  let oldHealth = Number(explicitChange?.old);
+  if (!Number.isFinite(oldHealth)) oldHealth = Number(_lastKnownActorHealth.get(cacheKey));
+  if (!Number.isFinite(oldHealth)) oldHealth = Number(actor.system?.attributes?.health?.value ?? 0);
+
+  let newHealth = Number(explicitChange?.new ?? incomingHealth);
+  if (!Number.isFinite(newHealth)) newHealth = Number(actor.system?.attributes?.health?.value ?? 0);
+  if (!Number.isFinite(newHealth)) return;
+
+  // Advance the cache before any awaited automation so a rapid second update
+  // sees this update as its previous value, even while the first hook is running.
+  _cacheActorHealth(actor, newHealth);
+
   try {
     // --- GM-ONLY GUARD -----------------------------------------
     // Only the GM should run damage/effect logic.
@@ -3273,35 +3376,16 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
     // --- DYING TICK GUARD -----------------------------------------
     // Dying only reduces Endurance ranks (not Health). If HP was capped
     // at the new max Health, skip damage processing â€” this is not combat damage.
-    if (options.mshDyingTick) return;
+    if (options?.mshDyingTick) return;
     // -----------------------------------------------------------
 
-    // We prefer explicit healthChange when present (local updates),
-    // but remote clients (like the GM when a player caused the change)
-    // usually won't see options.healthChange at all.
-    let oldHealth, newHealth;
-
-    if (options?.healthChange) {
-      ({ old: oldHealth, new: newHealth } = options.healthChange);
-    } else {
-      // Derive from actor + updateData for remote/replicated updates
-      const path = "system.attributes.health.value";
-
-      // If this update didn't touch Health at all, bail out
-      const incoming = foundry.utils.getProperty(updateData, path);
-      if (incoming === undefined) return;
-
-      oldHealth = Number(foundry.utils.getProperty(actor, path) ?? 0);
-      newHealth = Number(incoming ?? 0);
-
-      if (game.settings.get("msh-faserip", "debugMode")) {
-        console.log("FASERIP | Derived healthChange for remote update", {
-          actor: actor.name,
-          user: game.user.name,
-          oldHealth,
-          newHealth
-        });
-      }
+    if (!explicitChange && game.settings.get("msh-faserip", "debugMode")) {
+      console.log("FASERIP | Resolved replicated Health change from cache", {
+        actor: actor.name,
+        user: game.user.name,
+        oldHealth,
+        newHealth
+      });
     }
 
     // Ignore healing or non-damage changes (including 0->0)
@@ -3542,7 +3626,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     return;
   }
 
-  // Note: World time advances on round changes (6 seconds per FASERIP turn) via combatRound hook.
+  // Note: World time advances on round changes using the configured FASERIP turn length.
   // Individual combatant turn changes within a round do NOT advance time.
 
   // Dedup guard: track last processed round+turn to prevent duplicate effect processing
@@ -3558,12 +3642,11 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   // Optional CTT sync
   const syncMode = game.settings.get("msh-faserip", "ctt.syncMode");
   try {
-    if (syncMode === "turn" && ("turn" in changed || "round" in changed)) {
+    if (syncMode === "turn" && ("turn" in changed)) {
       Effects.advanceCTTByTurns(1);
     } else if (syncMode === "round" && ("round" in changed)) {
-      // Estimate turns per round: number of combatants (fallback 1)
-      const turns = Math.max(1, combat.turns?.length ?? combat.combatants.size ?? 1);
-      Effects.advanceCTTByTurns(turns);
+      // One Foundry round equals one FASERIP turn, regardless of combatant count.
+      Effects.advanceCTTByTurns(1);
     }
   } catch (_) { /* no-op */ }
 
@@ -3657,57 +3740,58 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   // processDyingRound is called there for each dying actor, ensuring exactly 1 rank loss
   // per round regardless of how many combatant turns exist within a Foundry round.
 
-  // Check for Recovery/Healing timers
-  
-  for (const combatant of combat.combatants) {
-    const actor = combatant.actor;
-    if (!actor) continue;
-    
-    // Check Recovery timers
-    const recoveryEffect = actor.effects.find(e => 
-      e.flags?.[scope]?.recoveryTimer && 
-      e.flags?.[scope]?.fallbackMode === "combat"
-    );
-    
-    if (recoveryEffect) {
-      const turnsRemaining = recoveryEffect.getFlag(scope, "turnsRemaining") || 0;
-      const newRemaining = turnsRemaining - 1;
+  // Check Recovery/Healing fallback timers once per Foundry round.
+  if ("round" in changed) {
+    for (const combatant of combat.combatants) {
+      const actor = combatant.actor;
+      if (!actor) continue;
       
-      if (newRemaining <= 0) {
-        // Recovery complete
-        const flags = recoveryEffect.flags[scope];
-        const manager = game.msh?.faseripIntegration?.recoveryManager;
-        if (manager) {
-          await manager.completeRecovery(actor, flags);
-          await actor.deleteEmbeddedDocuments("ActiveEffect", [recoveryEffect.id]);
+      // Check Recovery timers
+      const recoveryEffect = actor.effects.find(e => 
+        e.flags?.[scope]?.recoveryTimer && 
+        e.flags?.[scope]?.fallbackMode === "combat"
+      );
+      
+      if (recoveryEffect) {
+        const turnsRemaining = recoveryEffect.getFlag(scope, "turnsRemaining") || 0;
+        const newRemaining = turnsRemaining - 1;
+        
+        if (newRemaining <= 0) {
+          // Recovery complete
+          const flags = recoveryEffect.flags[scope];
+          const manager = game.msh?.faseripIntegration?.recoveryManager;
+          if (manager) {
+            await manager.completeRecovery(actor, flags);
+            await actor.deleteEmbeddedDocuments("ActiveEffect", [recoveryEffect.id]);
+          }
+        } else {
+          await recoveryEffect.setFlag(scope, "turnsRemaining", newRemaining);
+          await recoveryEffect.update({ name: `Recovery Timer (${newRemaining} turns)` });
         }
-      } else {
-        await recoveryEffect.setFlag(scope, "turnsRemaining", newRemaining);
-        await recoveryEffect.update({ name: `Recovery Timer (${newRemaining} turns)` });
       }
-    }
-    
-    // Check Healing timers
-    const healingEffect = actor.effects.find(e => 
-      e.flags?.[scope]?.healingTimer && 
-      e.flags?.[scope]?.fallbackMode === "combat"
-    );
-    
-    if (healingEffect) {
-      const turnsRemaining = healingEffect.getFlag(scope, "turnsRemaining") || 0;
-      const newRemaining = turnsRemaining - 1;
       
-      if (newRemaining <= 0) {
-        // Healing complete
-        const flags = healingEffect.flags[scope];
-        const manager = game.msh?.faseripIntegration?.recoveryManager;
-        if (manager) {
-          await manager.completeHealing(actor, flags);
-          await actor.deleteEmbeddedDocuments("ActiveEffect", [healingEffect.id]);
+      // Check Healing timers
+      const healingEffect = actor.effects.find(e => 
+        e.flags?.[scope]?.healingTimer && 
+        e.flags?.[scope]?.fallbackMode === "combat"
+      );
+      
+      if (healingEffect) {
+        const turnsRemaining = healingEffect.getFlag(scope, "turnsRemaining") || 0;
+        const newRemaining = turnsRemaining - 1;
+        
+        if (newRemaining <= 0) {
+          // Healing complete
+          const flags = healingEffect.flags[scope];
+          const manager = game.msh?.faseripIntegration?.recoveryManager;
+          if (manager) {
+            await manager.completeHealing(actor, flags);
+            await actor.deleteEmbeddedDocuments("ActiveEffect", [healingEffect.id]);
+          }
+        } else {
+          await healingEffect.setFlag(scope, "turnsRemaining", newRemaining);
+          await healingEffect.update({ name: `${healingEffect.name.split('(')[0].trim()} (${newRemaining} turns)` });
         }
-      } else {
-        await healingEffect.setFlag(scope, "turnsRemaining", newRemaining);
-        await healingEffect.update({ name: `${healingEffect.name.split('(')[0].trim()} (${newRemaining} turns)` });
       }
     }
   }
