@@ -1064,8 +1064,14 @@ export async function applyWeakened(actor, { rounds = 1, originUuid = null } = {
 /** Optionally advance CTT by N turns if sync is enabled */
 export function advanceCTTByTurns(n = 1) {
   const te = getCTT();
-  if (!te || typeof te.advance !== "function") return false;
-  try { te.advance(n, "turn"); return true; } catch { return false; }
+  if (!te || typeof te.advanceTime !== "function") {
+    console.warn("[FASERIP] CTT sync enabled but timeEngine.advanceTime is unavailable");
+    return false;
+  }
+  try { te.advanceTime(n, "turn"); return true; } catch (e) {
+    console.warn("[FASERIP] CTT advanceTime failed:", e);
+    return false;
+  }
 }
 
 

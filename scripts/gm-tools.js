@@ -1253,8 +1253,8 @@ export class GMToolsApp extends Application {
     try {
       const cttMod = game.modules.get("calendar-time-tracker");
       const te = cttMod?.active ? cttMod.api?.timeEngine : null;
-      if (te?.advance) {
-        await te.advance(seconds, "second");
+      if (typeof te?.advanceTime === "function") {
+        te.advanceTime(seconds, "second");
       } else {
         await game.time.advance(seconds);
       }

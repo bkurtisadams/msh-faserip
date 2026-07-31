@@ -217,8 +217,14 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // ðŸ”’ GM-only â€“ only the GM advances world time
   if (!game.user.isGM) return;
   
+  // Single clock authority: when CTT sync is on, the updateCombat hook advances
+  // the CTT calendar and CTT pushes the matching worldTime delta itself.
+  // Advancing here too would move worldTime twice per round.
+  const cttDrivesClock = game.settings.get("msh-faserip", "ctt.syncMode") !== "off"
+    && game.modules.get("calendar-time-tracker")?.active === true;
+
   const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
-  if (syncEnabled) {
+  if (syncEnabled && !cttDrivesClock) {
     // Advance Foundry world time by 6 seconds (1 FASERIP turn)
     await game.time.advance(6);
     console.log("[FASERIP] Combat advanced time by 6 seconds");
@@ -3555,17 +3561,27 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   }
   await combat.setFlag("msh-faserip", "lastDyingProcessed", dyingKey);
 
-  // Optional CTT sync
+  // Optional CTT sync. RAW: 1 FASERIP Turn = 6s = 1 Foundry round;
+  // 1 FASERIP Round = 10 Turns = 1 minute. Elapsed time is driven by Foundry
+  // rounds only — never by combatant count, which is not a rules quantity.
   const syncMode = game.settings.get("msh-faserip", "ctt.syncMode");
-  try {
-    if (syncMode === "turn" && ("turn" in changed || "round" in changed)) {
-      Effects.advanceCTTByTurns(1);
-    } else if (syncMode === "round" && ("round" in changed)) {
-      // Estimate turns per round: number of combatants (fallback 1)
-      const turns = Math.max(1, combat.turns?.length ?? combat.combatants.size ?? 1);
-      Effects.advanceCTTByTurns(turns);
-    }
-  } catch (_) { /* no-op */ }
+  if (syncMode !== "off" && "round" in changed) {
+    try {
+      const lastSynced = combat.getFlag("msh-faserip", "cttSyncedRound") ?? (combat.round - 1);
+      const roundsPassed = combat.round - lastSynced;
+      if (roundsPassed > 0) {
+        await combat.setFlag("msh-faserip", "cttSyncedRound", combat.round);
+        if (syncMode === "turn") {
+          // Tick 6s per Foundry round
+          Effects.advanceCTTByTurns(roundsPassed);
+        } else {
+          // Tick 1 minute per completed 10-round FASERIP round
+          const completed = Math.floor(combat.round / 10) - Math.floor(lastSynced / 10);
+          if (completed > 0) Effects.advanceCTTByTurns(completed * 10);
+        }
+      }
+    } catch (e) { console.warn("[FASERIP WARN] CTT combat sync failed:", e); }
+  }
 
   // Auto-expire round-based and seconds-based effects
   if (combat?.active) {
