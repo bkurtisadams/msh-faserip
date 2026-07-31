@@ -1335,7 +1335,11 @@ Hooks.once("init", async () => {
       name: "CTT Sync Mode",
       hint: "Advance Calendar Time Tracker when combat advances.",
       scope: "world", config: true, type: String,
-      choices: { "off":"Off", "turn":"Per Turn", "round":"Per Round" },
+      choices: {
+        "off": "Off",
+        "turn": "Per Combatant Turn (house rule)",
+        "round": "Per Round (RAW — 6s/round)"
+      },
       default: "off"
     });
 
@@ -3561,25 +3565,25 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   }
   await combat.setFlag("msh-faserip", "lastDyingProcessed", dyingKey);
 
-  // Optional CTT sync. RAW: 1 FASERIP Turn = 6s = 1 Foundry round;
-  // 1 FASERIP Round = 10 Turns = 1 minute. Elapsed time is driven by Foundry
-  // rounds only — never by combatant count, which is not a rules quantity.
+  // Optional CTT sync. RAW: 1 FASERIP Turn = 1 round = 6s (turn and round are
+  // the same unit in MSH). Labels below are Foundry's: "Per Round" is RAW
+  // (6s per Foundry round); "Per Turn" is the house-rule faster clock
+  // (6s per combatant turn). Combatant count is not a rules quantity.
   const syncMode = game.settings.get("msh-faserip", "ctt.syncMode");
-  if (syncMode !== "off" && "round" in changed) {
+  if (syncMode === "round" && "round" in changed) {
     try {
       const lastSynced = combat.getFlag("msh-faserip", "cttSyncedRound") ?? (combat.round - 1);
       const roundsPassed = combat.round - lastSynced;
       if (roundsPassed > 0) {
         await combat.setFlag("msh-faserip", "cttSyncedRound", combat.round);
-        if (syncMode === "turn") {
-          // Tick 6s per Foundry round
-          Effects.advanceCTTByTurns(roundsPassed);
-        } else {
-          // Tick 1 minute per completed 10-round FASERIP round
-          const completed = Math.floor(combat.round / 10) - Math.floor(lastSynced / 10);
-          if (completed > 0) Effects.advanceCTTByTurns(completed * 10);
-        }
+        Effects.advanceCTTByTurns(roundsPassed);
       }
+    } catch (e) { console.warn("[FASERIP WARN] CTT combat sync failed:", e); }
+  } else if (syncMode === "turn" && ("turn" in changed || "round" in changed)) {
+    // Dedup guard above already keys on `${round}-${turn}`, so this fires
+    // exactly once per combatant turn.
+    try {
+      Effects.advanceCTTByTurns(1);
     } catch (e) { console.warn("[FASERIP WARN] CTT combat sync failed:", e); }
   }
 
