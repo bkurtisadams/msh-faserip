@@ -1,3 +1,6 @@
+// actorSheet.js v2.8.0 - 2026-08-01
+// v2.8.0: Synchronize Resources rank/value in one submit, use canonical
+//         standard rank numbers, preserve custom values, and expose all ranks.
 // actorSheet.js v2.7.6 - 2026-07-31
 // v2.7.6: _rollVehicleControl driver-Agility rank now uses canonical
 //         valueToRank (printed Rank Range semantics: 8 = Good, not Typical).
@@ -157,7 +160,8 @@ import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
-  RANK_ALIASES, normalizeRank, shiftRank, valueToRank,
+  RANK_ABBR as _RANK_ABBR, RANK_ALIASES, normalizeRank, shiftRank, valueToRank,
+  rankValueForStorage,
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
@@ -660,6 +664,12 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     }
 
     context.rankList = _RANKS;
+    context.resourceRankOptions = _RANKS.map(rank => ({
+      name: rank,
+      abbreviation: _RANK_ABBR[rank] ?? rank
+    }));
+    context.resourcesValueInfinite =
+      normalizeRank(context.system.attributes?.resources?.rank) === "Beyond";
 
     return context;
   }
@@ -904,6 +914,32 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
 
   /** @override */
   _updateObject(event, formData) {
+    // Keep Resources rank and numeric value synchronized without allowing
+    // submitOnChange to race a rank-select update against a stale number.
+    const resourceRankPath = "system.attributes.resources.rank";
+    const resourceValuePath = "system.attributes.resources.value";
+    const storedRank = normalizeRank(this.actor.system.attributes?.resources?.rank || "Typical");
+    const storedValue = Number(this.actor.system.attributes?.resources?.value ?? 0);
+    const submittedRank = normalizeRank(formData[resourceRankPath] ?? storedRank);
+    const submittedValueRaw = formData[resourceValuePath];
+    const submittedValue = Number(submittedValueRaw);
+    const changedField = event?.target?.name ?? event?.currentTarget?.name ?? "";
+    const rankChanged = changedField === resourceRankPath || submittedRank !== storedRank;
+    const valueChanged = changedField === resourceValuePath ||
+      (submittedValueRaw !== undefined && Number.isFinite(submittedValue) && submittedValue !== storedValue);
+
+    if (rankChanged) {
+      formData[resourceRankPath] = submittedRank;
+      formData[resourceValuePath] = rankValueForStorage(submittedRank);
+    } else if (valueChanged && Number.isFinite(submittedValue)) {
+      const normalizedValue = Math.max(0, submittedValue);
+      const valueRank = valueToRank(normalizedValue);
+      formData[resourceRankPath] = valueRank;
+      formData[resourceValuePath] = valueRank === "Beyond"
+        ? rankValueForStorage(valueRank)
+        : normalizedValue;
+    }
+
     // ── GUARD: Prevent effect-shifted ability display values from being persisted ──
     // The sheet display code overwrites rank selects and value inputs with shifted
     // visuals (e.g. Remarkable→Typical when grappled at -2CS). Despite removeAttr('name'),
@@ -2382,29 +2418,13 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       }
     });
 
-    // Auto-populate Resources value when rank changes
-    html.find('select[name="system.attributes.resources.rank"]').change((event) => {
-      const selectedRank = $(event.currentTarget).val();
-      
-      const rankList = [
-        { name: "Shift-0", min: 0 },
-        { name: "Feeble", min: 1 },
-        { name: "Poor", min: 3 },
-        { name: "Typical", min: 5 },
-        { name: "Good", min: 8 },
-        { name: "Excellent", min: 16 },
-        { name: "Remarkable", min: 26 },
-        { name: "Incredible", min: 36 },
-        { name: "Amazing", min: 46 },
-        { name: "Monstrous", min: 63 },
-        { name: "Unearthly", min: 88 }
-      ];
-      
-      const rank = rankList.find(r => r.name === selectedRank);
-      if (rank) {
-        html.find('input[name="system.attributes.resources.value"]').val(rank.min);
-        this.actor.update({ "system.attributes.resources.value": rank.min });
-      }
+    // Update the visible Resources number before the form-level
+    // submitOnChange handler serializes the sheet. _updateObject then persists
+    // rank and number together in one actor update.
+    html.find('select[name="system.attributes.resources.rank"]').on('change', (event) => {
+      const selectedRank = normalizeRank($(event.currentTarget).val());
+      const standardValue = rankValueForStorage(selectedRank);
+      html.find('input[name="system.attributes.resources.value"]').val(standardValue);
     });
 
     // Auto-populate ability value when rank changes — if current value is
@@ -5302,8 +5322,7 @@ html.find('.headquarters-row').each((i, row) => {
   // Resource FEAT Roll (standard mode, no RP) — DialogV2, gold header,
   // live required-color pill, weekly lockout (setting-gated) + GM override.
   _resourceRanks() {
-    return ["Shift-0","Feeble","Poor","Typical","Good","Excellent",
-            "Remarkable","Incredible","Amazing","Monstrous","Unearthly"];
+    return _RANKS;
   }
 
   // Required FEAT color for an item rank vs a resource rank (house thresholds).

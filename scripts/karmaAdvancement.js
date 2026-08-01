@@ -1,3 +1,5 @@
+// karmaAdvancement.js v1.0.1 - 2026-08-01
+// v1.0.1: Preserve Shift-0 Resources value 0 during advancement.
 export class KarmaAdvancementSheet extends DocumentSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -249,7 +251,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         
       case "resource":
         const resourceRank = this.object.system.attributes.resources.rank || "Typical";
-        const resourceValue = this.object.system.attributes.resources.value || 6;
+        const resourceValue = this.object.system.attributes.resources.value ?? 6;
         const nextResourceValue = resourceValue + 1;
         const resourceCresting = this._isCresting(resourceValue, nextResourceValue);
         

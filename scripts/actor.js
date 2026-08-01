@@ -1,4 +1,6 @@
-// actor.js v1.6.0 - 2026-07-31
+// actor.js v1.7.0 - 2026-08-01
+// v1.7.0: Resources use canonical standard rank numbers; preserve Shift-0
+//         value 0 and remove the conflicting local rank-range table.
 // v1.6.0: Fix pool double-subtract in availableLifetime (pool contributions
 //         are negative history entries, already inside spent). Delegate all
 //         spent math to computeKarmaTotals; remove _calculateTotalSpentLifetime
@@ -22,7 +24,7 @@
 // v1.2.0: Remove daily karma system - karma now uses lifetime only
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
 
-import { RANKS_ORDERED, normalizeRank } from "./rules/rules-reference.js";
+import { RANKS_ORDERED, normalizeRank, rankValueForStorage } from "./rules/rules-reference.js";
 import { computeKarmaTotals } from "./karma-rules.js";
 
 export class FaseripActor extends Actor {
@@ -106,32 +108,20 @@ export class FaseripActor extends Actor {
     // Store available lifetime karma separately for other uses
     system.karma.availableLifetime = availableLifetimeKarma;
 
-    // Set Resources value based on rank
+    // Resources rank and rank number are independently editable, but missing
+    // values initialize from the canonical Standard Rank Number table. A
+    // legitimate Shift-0 value of 0 must never be treated as missing.
     if (system.attributes.resources) {
-      const resourcesRank = system.attributes.resources.rank || "Typical";
-      const rankRanges = {
-        "Shift-0": { min: 0, max: 1, default: 0 },
-        "Feeble": { min: 2, max: 3, default: 2 },
-        "Poor": { min: 4, max: 5, default: 4 },
-        "Typical": { min: 6, max: 9, default: 6 },
-        "Good": { min: 10, max: 19, default: 10 },
-        "Excellent": { min: 20, max: 29, default: 20 },
-        "Remarkable": { min: 30, max: 39, default: 30 },
-        "Incredible": { min: 40, max: 49, default: 40 },
-        "Amazing": { min: 50, max: 74, default: 50 },
-        "Monstrous": { min: 75, max: 99, default: 75 },
-        "Unearthly": { min: 100, max: 149, default: 100 },
-        "Shift-X": { min: 150, max: 199, default: 150 },
-        "Shift-Y": { min: 200, max: 499, default: 200 },
-        "Shift-Z": { min: 500, max: 999, default: 500 },
-        "Class 1000": { min: 1000, max: 2999, default: 1000 },
-        "Class 3000": { min: 3000, max: 4999, default: 3000 },
-        "Class 5000": { min: 5000, max: 9999, default: 5000 },
-        "Beyond": { min: 10000, max: Infinity, default: 10000 }
-      };
+      const resourcesRank = normalizeRank(system.attributes.resources.rank || "Typical");
+      system.attributes.resources.rank = resourcesRank;
 
-      if (!system.attributes.resources.value) {
-        system.attributes.resources.value = rankRanges[resourcesRank]?.default || 6;
+      const rawResourceValue = system.attributes.resources.value;
+      const resourceValueMissing = rawResourceValue === null ||
+        rawResourceValue === undefined || rawResourceValue === "" ||
+        !Number.isFinite(Number(rawResourceValue));
+
+      if (resourceValueMissing) {
+        system.attributes.resources.value = rankValueForStorage(resourcesRank);
       }
 
       // Resource Points derived values (for template display)

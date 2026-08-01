@@ -3820,7 +3820,7 @@ form.faserip-sheet .secondary-abilities .resources-row select {
   box-sizing: border-box;
 }
 
-form.faserip-sheet .secondary-abilities .resources-row input[type="number"] {
+form.faserip-sheet .secondary-abilities .resources-row .resources-rank-number {
   width: 56px !important;
   min-width: 56px !important;
   max-width: 56px !important;

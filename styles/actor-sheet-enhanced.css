@@ -256,7 +256,7 @@ form.faserip-sheet .secondary-abilities .stacked-values input[type="number"]:dis
 }
 
 /* Resources rank number */
-form.faserip-sheet .secondary-abilities .resources-row input[type="number"] {
+form.faserip-sheet .secondary-abilities .resources-row .resources-rank-number {
   font-family: 'Oswald', sans-serif !important;
   font-size: 16px !important;
   font-weight: 700 !important;

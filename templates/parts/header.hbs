@@ -323,19 +323,18 @@
       </div>
       <div class="sec-body resources-row">
         <select name="system.attributes.resources.rank" title="Resources rank">
-          <option value="Shift-0"   title="Shift-0"    {{#if (eq system.attributes.resources.rank "Shift-0")}}selected{{/if}}>Sh0</option>
-          <option value="Feeble"    title="Feeble"     {{#if (eq system.attributes.resources.rank "Feeble")}}selected{{/if}}>Fe</option>
-          <option value="Poor"      title="Poor"       {{#if (eq system.attributes.resources.rank "Poor")}}selected{{/if}}>Pr</option>
-          <option value="Typical"   title="Typical"    {{#if (eq system.attributes.resources.rank "Typical")}}selected{{/if}}>Ty</option>
-          <option value="Good"      title="Good"       {{#if (eq system.attributes.resources.rank "Good")}}selected{{/if}}>Gd</option>
-          <option value="Excellent" title="Excellent"  {{#if (eq system.attributes.resources.rank "Excellent")}}selected{{/if}}>Ex</option>
-          <option value="Remarkable" title="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable")}}selected{{/if}}>Rm</option>
-          <option value="Incredible" title="Incredible" {{#if (eq system.attributes.resources.rank "Incredible")}}selected{{/if}}>In</option>
-          <option value="Amazing"   title="Amazing"    {{#if (eq system.attributes.resources.rank "Amazing")}}selected{{/if}}>Am</option>
-          <option value="Monstrous" title="Monstrous"  {{#if (eq system.attributes.resources.rank "Monstrous")}}selected{{/if}}>Mn</option>
-          <option value="Unearthly" title="Unearthly"  {{#if (eq system.attributes.resources.rank "Unearthly")}}selected{{/if}}>Un</option>
+          {{#each resourceRankOptions}}
+          <option value="{{this.name}}" title="{{this.name}}"
+                  {{#if (eq this.name ../system.attributes.resources.rank)}}selected{{/if}}>{{this.abbreviation}}</option>
+          {{/each}}
         </select>
-        <input type="number" name="system.attributes.resources.value" value="{{system.attributes.resources.value}}" />
+        {{#if resourcesValueInfinite}}
+        <input class="resources-rank-number" type="text" value="∞" disabled
+               title="Beyond has an infinite standard rank number" />
+        {{else}}
+        <input class="resources-rank-number" type="number" min="0" name="system.attributes.resources.value"
+               value="{{system.attributes.resources.value}}" title="Resources rank number" />
+        {{/if}}
       </div>
       {{#if useResourcePoints}}
       <div class="rp-tracker">

@@ -1,4 +1,6 @@
-// rules-reference.js v1.5.1 - 2026-08-01
+// rules-reference.js v1.6.0 - 2026-08-01
+// v1.6.0: Correct Beyond standard rank number to Infinity and add
+//         rankValueForStorage() for document-safe persistence.
 // v1.5.1: PR5 ruling — carrier toxins require penetrating damage; Target
 //         Save panel is the authoring surface; exposure FEAT is the save.
 // rules-reference.js v1.5.0 - 2026-08-01
@@ -39,7 +41,7 @@ export const RANK_VALUES = {
   "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
   "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
   "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-  "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 9999
+  "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": Infinity
 };
 
 // Legacy alias — old code that imported RANKS as the values object
@@ -92,6 +94,19 @@ export function rankValue(name) {
   if (!name) return 0;
   const n = normalizeRank(name);
   return RANK_VALUES[n] ?? CONFIG?.FASERIP?.rankValues?.[n] ?? 0;
+}
+
+/**
+ * Numeric value safe to persist in a Foundry document. Beyond's printed
+ * standard rank number is infinite, which JSON cannot store, so use the
+ * first value in the Beyond range as an internal sentinel. Sheets should
+ * display the rank as Infinite/∞ rather than exposing this sentinel.
+ */
+export function rankValueForStorage(name) {
+  const n = normalizeRank(name);
+  const standard = RANK_VALUES[n];
+  if (standard === Infinity) return RANK_RANGES.Beyond[0];
+  return Number.isFinite(standard) ? standard : 0;
 }
 
 /** Get the rank name for a numeric value per the printed Rank Range table

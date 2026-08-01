@@ -383,7 +383,7 @@ form.faserip-sheet.compact-mode .secondary-abilities .resources-row select {
   max-width: 100px !important;
 }
 
-form.faserip-sheet.compact-mode .secondary-abilities .resources-row input[type="number"] {
+form.faserip-sheet.compact-mode .secondary-abilities .resources-row .resources-rank-number {
   height: 22px !important;
   width: 44px !important;
   min-width: 44px !important;
