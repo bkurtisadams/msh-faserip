@@ -1,3 +1,9 @@
+// scripts/modules/effects/defense-effects.js v1.7.0 - 2026-07-31
+// v1.7.0: registerDefenseAE — skip the update when nothing changed (auto-sync
+//         was rewriting ~100 identical AEs every load); strip statuses another
+//         AE already provides so creates aren't core-rejected (Body Armor vs
+//         Growth-derived armor fight); log a warning instead of "created"
+//         when creation was prevented.
 // scripts/modules/effects/defense-effects.js v1.6.0 - 2026-07-02
 // v1.6.0: Energy Reflection defense AE (Step #3 slice 1). New defenseType
 //         "energyReflection" built when sys.isEnergyReflection. Flags:
@@ -405,12 +411,35 @@ async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
   const itemId = newFlags.powerItemId || getItemIdForEffectId(effectId);
   const existing = actor.effects.find(e => matchesDefenseAEForItem(e, effectId, defenseType, itemId));
 
+  // Core rejects an AE whose status another AE already provides (e.g. a
+  // Body Armor power alongside Growth-derived armor). Strip duplicates so
+  // creates aren't prevented and updates don't collide; the status icon
+  // is already shown by the other AE.
+  const wanted = Array.isArray(aeData.statuses) ? aeData.statuses : [];
+  const statuses = wanted.filter(s =>
+    !actor.effects.some(e => e !== existing && e.statuses?.has?.(s))
+  );
+
   if (existing) {
+    // Skip the DB write when nothing changed — the auto-sync runs every
+    // load and was rewriting ~100 identical AEs per boot.
+    const eq = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
+    const curStatuses = existing.statuses instanceof Set ? [...existing.statuses] : (existing.statuses ?? []);
+    const flagsCur = existing.flags?.[scope] ?? {};
+    const unchanged =
+      existing.name === aeData.name &&
+      existing.img === aeData.img &&
+      existing.disabled === disabled &&
+      curStatuses.length === statuses.length &&
+      statuses.every(s => curStatuses.includes(s)) &&
+      Object.entries(newFlags).every(([k, v]) => eq(flagsCur[k], v));
+    if (unchanged) return existing;
+
     // Update in place — set disabled state from power's isActive
     const updates = {
       name: aeData.name,
       img: aeData.img,
-      statuses: aeData.statuses,
+      statuses: statuses,
       disabled: disabled,
     };
     // Merge flags
@@ -424,9 +453,14 @@ async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
   }
 
   // Create new AE with correct disabled state
+  aeData.statuses = statuses;
   aeData.disabled = disabled;
   const ae = await applyEffect(actor, aeData);
-  console.log(`[FASERIP] Defense AE created: ${aeData.name} on ${actor.name} (disabled=${disabled})`);
+  if (ae) {
+    console.log(`[FASERIP] Defense AE created: ${aeData.name} on ${actor.name} (disabled=${disabled})`);
+  } else {
+    console.warn(`[FASERIP WARN] Defense AE creation was prevented: ${aeData.name} on ${actor.name}`);
+  }
   return ae;
 }
 
