@@ -119,6 +119,7 @@ import * as Effects from "./modules/effects/effect-engine.js";
 import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
 import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
+import { registerDataModels } from "./data-models.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
 import { fxService } from "./modules/fx/fx-service.js";
@@ -476,6 +477,11 @@ Hooks.on("renderApplicationV2", (app, element) => {
 Hooks.once("init", async () => {
   // --- Global flag scope & namespace ---
   globalThis.MSH_FLAG_SCOPE = game.system?.id || "msh-faserip";
+
+  // Dormant by default (REGISTER_DATA_MODELS = false in data-models.js, see the
+  // v2.4.2 note there). Called so the flag is a live switch rather than an
+  // orphan — nothing imported the module, so flipping it did nothing.
+  registerDataModels();
 
   game.msh = game.msh || {};
   game.msh.playCombatSFX = playCombatSFX;
