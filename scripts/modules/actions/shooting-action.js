@@ -1,3 +1,6 @@
+// shooting-action.js v3.7.8 - 2026-07-31
+// v3.7.8: Mercy Shot armor gate honors borderline equality (>= not >) per
+//        the "one more point" rule in the GM RULINGS LOG.
 // shooting-action.js v3.7.7 - 2026-06-12
 // v3.7.7: Mercy KO intensity also reads the unified system.intensityRank.
 // shooting-action.js v3.7.6 - 2026-06-12
@@ -902,10 +905,12 @@ export class ShootingAction extends RangedAttackAction {
       const { applyUnconscious } = await import("../effects/effect-engine.js");
 
       // Armor gate: would a normal (non-mercy) shot have penetrated?
+      // Borderline ("one more point") rule per GM RULINGS LOG: at exact
+      // equality the target is affected, so >= not >.
       const stdDamage = Number(weapon?.system?.damage) || 0;
       const armorData = getBodyArmorValues(targetActor, damageType);
       const armorValue = Number(armorData?.applicable) || 0;
-      const wouldPenetrate = armorValue <= 0 || stdDamage > armorValue;
+      const wouldPenetrate = armorValue <= 0 || stdDamage >= armorValue;
 
       if (!wouldPenetrate) {
         await ChatMessage.create({

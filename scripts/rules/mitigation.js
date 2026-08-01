@@ -1,3 +1,10 @@
+// scripts/rules/mitigation.js v3.6.0 - 2026-07-31
+// v3.6.0: Borderline "one more point" rule (GM RULINGS LOG). Every layer
+//         reports its blocking capacity (absorbed or not); result.borderline
+//         is true when total capacity exactly equals rawDamage with net 0.
+//         Infinity (phasing, projected-FF breach) and indeterminate layers
+//         are never borderline. Invulnerability thresholds count as finite
+//         capacity per the printed rule naming natural invulnerabilities.
 // scripts/rules/mitigation.js v3.5.0 - 2026-07-04
 // v3.5.0: Phasing intangibility (audit Step #8, 8a-ii) — a target with an
 //         active body-control phasing effect takes 0 from any non-mental
@@ -136,6 +143,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     // Energy Reflection: blocked amount banked for the redirect workflow.
     //   { amount, damageType, aeId, reflectRangeRank } or null.
     reflectBank: null,
+    // Borderline "one more point" rule (GM RULINGS LOG): true when total
+    // defenses exactly equal rawDamage, so Slam/Stun/Kill still apply.
+    borderline: false,
   };
   
   // Normalize short-form damage codes (E/S/F/BA/EA/TB/TE/GP/Gb) to long form.
@@ -171,6 +181,23 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   
   let currentDamage = rawDamage;
 
+  // ── Borderline capacity tracking ──
+  // Sum every applicable layer's blocking capacity, absorbed or not; an
+  // unused trailing defense means one more point would NOT reach the
+  // target. Infinity (phasing, projected-FF breach) = defenses exceed.
+  let _defCap = 0;
+  let _defCapBlocked = false;
+  const _addCap = (layer) => {
+    const c = layer?.capacity;
+    if (c === Infinity) _defCapBlocked = true;
+    else if (Number.isFinite(c)) _defCap += c;
+    else if ((layer?.absorbed || 0) > 0) _defCapBlocked = true;
+  };
+  const _finalizeBorderline = () => {
+    result.borderline = rawDamage > 0 && result.netDamage === 0
+      && !_defCapBlocked && _defCap === rawDamage;
+  };
+
   // ── Try defense AEs first, fall back to item-based lookup ──
   const aeDefenses = getDefensesFromAEs(targetActor, dmgTypeLower, {
     ignoresNaturalArmor,
@@ -188,6 +215,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     const reflLayer = applyEnergyReflectionFromAE(currentDamage, aeDefenses.reflection, {
       dmgTypeLower, targetActor
     });
+    _addCap(reflLayer);
     if (reflLayer.absorbed > 0) {
       currentDamage -= reflLayer.absorbed;
       result.absorbed += reflLayer.absorbed;
@@ -210,6 +238,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     const absLayer = applyAbsorptionFromAE(currentDamage, aeDefenses.absorption, {
       dmgTypeLower, isEnergyDamage, targetActor
     });
+    _addCap(absLayer);
     if (absLayer.absorbed > 0) {
       currentDamage -= absLayer.absorbed;
       result.absorbed += absLayer.absorbed;
@@ -232,6 +261,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       const ffLayer = applyForceFieldFromAE(currentDamage, aeDefenses.forceField, {
         isEnergyDamage, targetActorUuid: targetActor.uuid, attackIntensity
       });
+      _addCap(ffLayer);
       if (ffLayer.absorbed > 0) {
         currentDamage -= ffLayer.absorbed;
         result.absorbed += ffLayer.absorbed;
@@ -250,6 +280,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
 
         if (!aeDefenses.forceField.isPersonal) {
           currentDamage = 0;
+          _addCap({ capacity: Infinity }); // unharmed regardless — never borderline
           if (debug) console.log('[MITIGATION] Projected FF breach — target unharmed');
         }
       }
@@ -258,6 +289,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     // AE-based resistance
     if (hasAEDefenses && aeDefenses.hasResistance) {
       const resLayer = applyResistanceFromAE(currentDamage, aeDefenses.resistance, { rawDamage });
+      _addCap(resLayer);
       if (resLayer.absorbed > 0 || resLayer.immune) {
         currentDamage = resLayer.remainingDamage;
         result.absorbed += resLayer.absorbed;
@@ -268,6 +300,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       const resistanceLayer = applyResistance(currentDamage, targetActor, {
         damageType: dmgTypeLower, rawDamage
       });
+      _addCap(resistanceLayer);
       if (resistanceLayer.absorbed > 0 || resistanceLayer.immune) {
         currentDamage = resistanceLayer.remainingDamage;
         result.absorbed += resistanceLayer.absorbed;
@@ -276,6 +309,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     }
 
     result.netDamage = Math.max(0, currentDamage);
+    _finalizeBorderline();
     if (debug) console.log('[MITIGATION] Result (bypass+FF+resistance)', result);
     return result;
   }
@@ -293,6 +327,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       const armorLayer = applyBodyArmorFromAE(currentDamage, aeDefenses.armor, {
         isEnergyDamage, armorPiercing, armorPiercingCS, apMode
       });
+      _addCap(armorLayer);
       if (armorLayer.absorbed > 0) {
         currentDamage -= armorLayer.absorbed;
         result.absorbed += armorLayer.absorbed;
@@ -308,6 +343,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       const ffLayer = applyForceFieldFromAE(currentDamage, aeDefenses.forceField, {
         isEnergyDamage, targetActorUuid: targetActor.uuid, attackIntensity
       });
+      _addCap(ffLayer);
       if (ffLayer.absorbed > 0) {
         currentDamage -= ffLayer.absorbed;
         result.absorbed += ffLayer.absorbed;
@@ -330,6 +366,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
         // Personal FF: excess damage passes through normally.
         if (!aeDefenses.forceField.isPersonal) {
           currentDamage = 0;
+          _addCap({ capacity: Infinity }); // unharmed regardless — never borderline
           if (debug) console.log('[MITIGATION] Projected FF breach — target unharmed');
         }
       }
@@ -340,6 +377,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       const resLayer = applyResistanceFromAE(currentDamage, aeDefenses.resistance, {
         rawDamage
       });
+      _addCap(resLayer);
       if (resLayer.absorbed > 0 || resLayer.immune) {
         currentDamage = resLayer.remainingDamage;
         result.absorbed += resLayer.absorbed;
@@ -351,6 +389,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     const blockLayer = applyBlockingArmor(currentDamage, targetActor, {
       isEnergyDamage, dmgTypeLower, existingPhysical: hasPersonalFF ? 0 : aeDefenses.armor.physical,
     });
+    _addCap(blockLayer);
     if (blockLayer.absorbed > 0) {
       currentDamage -= blockLayer.absorbed;
       result.absorbed += blockLayer.absorbed;
@@ -368,6 +407,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       const armorLayer = applyBodyArmor(currentDamage, armorData, {
         isEnergyDamage, armorPiercing, armorPiercingCS, apMode
       });
+      _addCap(armorLayer);
       if (armorLayer.absorbed > 0) {
         currentDamage -= armorLayer.absorbed;
         result.absorbed += armorLayer.absorbed;
@@ -378,6 +418,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     // Layer 2: Force Field
     if (armorData.isForceField && !bypassForceField) {
       const forceFieldLayer = applyForceField(currentDamage, armorData, { isEnergyDamage });
+      _addCap(forceFieldLayer);
       if (forceFieldLayer.absorbed > 0) {
         currentDamage -= forceFieldLayer.absorbed;
         result.absorbed += forceFieldLayer.absorbed;
@@ -389,6 +430,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     const resistanceLayer = applyResistance(currentDamage, targetActor, {
       damageType: dmgTypeLower, rawDamage
     });
+    _addCap(resistanceLayer);
     if (resistanceLayer.absorbed > 0 || resistanceLayer.immune) {
       currentDamage = resistanceLayer.remainingDamage;
       result.absorbed += resistanceLayer.absorbed;
@@ -400,6 +442,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   const passiveArmorLayer = applyPassiveArmor(currentDamage, targetActor, {
     damageType: dmgTypeLower
   });
+  _addCap(passiveArmorLayer);
   if (passiveArmorLayer.absorbed > 0) {
     currentDamage -= passiveArmorLayer.absorbed;
     result.absorbed += passiveArmorLayer.absorbed;
@@ -407,6 +450,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   }
   
   result.netDamage = Math.max(0, currentDamage);
+  _finalizeBorderline();
   
   if (debug) console.log('[MITIGATION] Result', result);
   
@@ -697,6 +741,7 @@ function applyBodyArmorFromAE(damage, armorData, options) {
   return {
     type: 'Body Armor',
     absorbed: Math.min(damage, eff),
+    capacity: eff,
     original: isEnergyDamage ? armorData.energy : armorData.physical,
     modified: eff,
     apApplied: (armorPiercing > 0 || armorPiercingCS > 0),
@@ -736,6 +781,7 @@ function applyForceFieldFromAE(damage, ffData, options) {
   const result = {
     type: 'Force Field',
     absorbed: absorbThisHit,
+    capacity: Math.min(eff, remainingCapacity),
     original: isEnergyDamage ? ffData.energy : ffData.physical,
     modified: eff,
     ignoresAP: true,
@@ -762,6 +808,7 @@ function applyEnergyReflectionFromAE(damage, reflData, options) {
   const layer = {
     type: 'Energy Reflection',
     absorbed: blocked,
+    capacity: threshold,
     threshold,
     ignoresAP: true,
     source: "defense-ae",
@@ -826,6 +873,7 @@ function applyAbsorptionFromAE(damage, absData, options) {
   const layer = {
     type: 'Absorption',
     absorbed: absorbThisHit,
+    capacity: rank,
     rank,
     ignoresAP: true,
     source: "defense-ae",
@@ -892,6 +940,7 @@ function applyResistanceFromAE(damage, resData, options) {
     return {
       type: `${resData.type} Invulnerability`,
       absorbed,
+      capacity: threshold,
       remainingDamage,
       immune: remainingDamage <= 0,
       reason: remainingDamage <= 0
@@ -907,6 +956,7 @@ function applyResistanceFromAE(damage, resData, options) {
       return {
         type: `${resData.type} Resistance`,
         absorbed: damage,
+        capacity: resData.damageReduction,
         remainingDamage: 0,
         immune: true,
         reason: `Attack intensity (${rawDamage}) below resistance (${resData.damageReduction})`,
@@ -917,6 +967,7 @@ function applyResistanceFromAE(damage, resData, options) {
     return {
       type: `${resData.type} Resistance`,
       absorbed,
+      capacity: resData.damageReduction,
       remainingDamage: damage - absorbed,
       immune: false,
       source: "defense-ae",
@@ -949,6 +1000,7 @@ function applyBlockingArmor(damage, targetActor, options) {
   return {
     type: `Block (${blockFlags.armorRank || "?"})`,
     absorbed: extra,
+    capacity: blockingArmor - existingPhysical,
     blockingArmor,
     source: "blocking-ae",
   };
@@ -988,6 +1040,7 @@ function applyBodyArmor(damage, armorData, options) {
   return {
     type: 'Body Armor',
     absorbed: Math.min(damage, effectiveArmor),
+    capacity: effectiveArmor,
     original: isEnergyDamage ? armorData.energy : armorData.physical,
     modified: effectiveArmor,
     apApplied: (armorPiercing > 0 || armorPiercingCS > 0)
@@ -1008,6 +1061,7 @@ function applyForceField(damage, armorData, options) {
   return {
     type: 'Force Field',
     absorbed: Math.min(damage, effectiveField),
+    capacity: effectiveField,
     original: isEnergyDamage ? armorData.energy : armorData.physical,
     modified: effectiveField,
     ignoresAP: true
@@ -1034,6 +1088,7 @@ function applyResistance(damage, targetActor, options) {
     return {
       type: `${resistanceType} Resistance`,
       absorbed: damage,
+      capacity: resistanceValue,
       remainingDamage: 0,
       immune: true,
       reason: `Attack intensity (${rawDamage}) below resistance (${resistanceValue})`
@@ -1044,6 +1099,7 @@ function applyResistance(damage, targetActor, options) {
   return {
     type: `${resistanceType} Resistance`,
     absorbed,
+    capacity: resistanceValue,
     remainingDamage: damage - absorbed,
     immune: false
   };
@@ -1069,6 +1125,7 @@ function applyPassiveArmor(damage, targetActor, options) {
   return {
     type: `Passive Armor (${armorPower.name || "Unnamed"})`,
     absorbed: Math.min(damage, armorPower.value ?? 0),
+    capacity: armorPower.value ?? 0,
     powerName: armorPower.name
   };
 }

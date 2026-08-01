@@ -108,6 +108,7 @@
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
 import {
@@ -1296,8 +1297,9 @@ export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RAN
   if (sIdx < mIdx) {
     const nextRankName = RANKS_LOCAL[sIdx + 1] || strRank;
     const nextRangeMin = RANK_RANGES[nextRankName]?.[0];
-    // If the next rank has a defined range minimum, use it; otherwise fall
-    // back to RANK_VALUES (e.g. Class 1000 has no range entry).
+    // Use the next rank's range minimum; fall back to RANK_VALUES for any
+    // rank without a range entry (all ranks have one as of rules-reference
+    // v1.4.0 — the fallback is defensive).
     const bumped = (nextRangeMin ?? getVal(nextRankName));
     const dmg = Math.max(bumped, weaponBase);
     return {
@@ -2021,7 +2023,10 @@ export async function applyDamageToTargets({
       // ===== HANDLE KILL RESULT THAT DIDN'T REDUCE TO 0 =====
       // Per rules: "For any one of these three results to be effective on a target, 
       // the attacker must inflict some damage on the target."
-      else if (wasKillResult && netDamage > 0 && after > 0) {
+      // Borderline ("one more point") rule: when damage exactly equals the
+      // target's defenses (net 0), the Kill effect STILL applies.
+      else if (wasKillResult && after > 0
+               && canEffectsApply(netDamage, { borderline: mitResult?.borderline === true })) {
         console.log("💀 FASERIP | Kill result with damage but target survived:", targetName);
         
         const mode = resolveCombatModeSafe(targetActor) || "manual";
