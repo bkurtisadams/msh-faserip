@@ -329,6 +329,8 @@
           {{/each}}
         </select>
         {{#if resourcesValueInfinite}}
+        <input type="hidden" name="system.attributes.resources.value"
+               value="{{system.attributes.resources.value}}" />
         <input class="resources-rank-number" type="text" value="∞" disabled
                title="Beyond has an infinite standard rank number" />
         {{else}}

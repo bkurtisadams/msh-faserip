@@ -1,3 +1,7 @@
+// actorSheet.js v2.9.0 - 2026-08-01
+// v2.9.0: Remove core-rank confirmation dialogs, synchronize rank/value
+//         fields before submit, restore focus across submitOnChange renders,
+//         restore predictable Tab navigation, and make sheet locking keyboard-safe.
 // actorSheet.js v2.8.0 - 2026-08-01
 // v2.8.0: Synchronize Resources rank/value in one submit, use canonical
 //         standard rank numbers, preserve custom values, and expose all ranks.
@@ -159,7 +163,7 @@ import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
 import {
-  RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
+  RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES,
   RANK_ABBR as _RANK_ABBR, RANK_ALIASES, normalizeRank, shiftRank, valueToRank,
   rankValueForStorage,
   resolveRange, getPowerDerivations
@@ -178,6 +182,32 @@ const MSH_DROP_DEDUPE_MS = 750;
 
 const MSH_ACTOR_ITEM_TYPES = new Set([
   "power", "talent", "contact", "equipment", "vehicle", "headquarters"
+]);
+
+// Keyboard order for the editable core-stat fields. Derived maximums,
+// chargen-only initial columns, and optional Resource Point accounting are
+// intentionally omitted. Hidden/disabled fields are skipped at runtime.
+const CORE_STAT_TAB_ORDER = Object.freeze([
+  "system.abilities.fighting.rank",
+  "system.abilities.fighting.value",
+  "system.abilities.agility.rank",
+  "system.abilities.agility.value",
+  "system.abilities.strength.rank",
+  "system.abilities.strength.value",
+  "system.abilities.endurance.rank",
+  "system.abilities.endurance.value",
+  "system.abilities.reason.rank",
+  "system.abilities.reason.value",
+  "system.abilities.intuition.rank",
+  "system.abilities.intuition.value",
+  "system.abilities.psyche.rank",
+  "system.abilities.psyche.value",
+  "system.attributes.health.value",
+  "system.attributes.karma.value",
+  "system.attributes.resources.rank",
+  "system.attributes.resources.value",
+  "system.attributes.popularity.hero.value",
+  "system.attributes.popularity.secretId.value"
 ]);
 
 const MSH_DROP_TAB_ITEM_TYPES = Object.freeze({
@@ -674,31 +704,41 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     return context;
   }
 
+  /**
+   * Apply the sheet lock to real form controls, not only pointer styling.
+   * CSS pointer-events prevents mouse edits but still permits keyboard focus
+   * and arrow-key changes. Disabling the controls closes that loophole while
+   * preserving controls that were already disabled by the template.
+   */
+  _applySheetLockState(html, isLocked) {
+    const form = html.closest('.faserip-sheet');
+    form.toggleClass('sheet-locked', isLocked);
+
+    html.find('input, select, textarea').each((_index, element) => {
+      if (isLocked) {
+        if (element.dataset.mshLockWasDisabled === undefined) {
+          element.dataset.mshLockWasDisabled = element.disabled ? 'true' : 'false';
+        }
+        element.disabled = true;
+      } else if (element.dataset.mshLockWasDisabled !== undefined) {
+        element.disabled = element.dataset.mshLockWasDisabled === 'true';
+        delete element.dataset.mshLockWasDisabled;
+      }
+    });
+
+    const lockButton = html.find('.sheet-lock-toggle');
+    const lockIcon = lockButton.find('i');
+    lockButton.toggleClass('locked', isLocked);
+    lockButton.attr('title', isLocked ? 'Unlock Sheet' : 'Lock Sheet');
+    lockIcon.toggleClass('fa-lock', isLocked);
+    lockIcon.toggleClass('fa-lock-open', !isLocked);
+  }
+
   async _toggleSheetLock(html) {
     const currentLock = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;
     const newLock = !currentLock;
-    
     await this.actor.setFlag('msh-faserip', 'sheetLocked', newLock);
-    
-    const form = html.closest('.faserip-sheet');
-    if (newLock) {
-      form.addClass('sheet-locked');
-    } else {
-      form.removeClass('sheet-locked');
-    }
-    
-    const lockButton = html.find('.sheet-lock-toggle');
-    const lockIcon = lockButton.find('i');
-    
-    if (newLock) {
-      lockButton.addClass('locked');
-      lockButton.attr('title', 'Unlock Sheet');
-      lockIcon.removeClass('fa-lock-open').addClass('fa-lock');
-    } else {
-      lockButton.removeClass('locked');
-      lockButton.attr('title', 'Lock Sheet');
-      lockIcon.removeClass('fa-lock').addClass('fa-lock-open');
-    }
+    this._applySheetLockState(html, newLock);
   }
 
   /**
@@ -912,8 +952,169 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     return "Active Effect";
   }
 
+  _findSheetScroller(root = this.element?.[0] ?? this.element) {
+    if (!root) return null;
+    const candidates = [
+      root.querySelector?.('.sheet-tab-content'),
+      root.querySelector?.('.sheet-body'),
+      root.closest?.('.window-content'),
+      root
+    ];
+    for (const element of candidates) {
+      if (element && element.scrollHeight > element.clientHeight) return element;
+    }
+    return null;
+  }
+
+  _captureSheetFocus() {
+    const root = this.element?.[0] ?? this.element;
+    const active = document.activeElement;
+    if (!root?.contains?.(active) || !active?.name) return;
+
+    let selectionStart = null;
+    let selectionEnd = null;
+    if ('selectionStart' in active) {
+      try {
+        selectionStart = active.selectionStart;
+        selectionEnd = active.selectionEnd;
+      } catch (_error) {
+        // Number inputs and selects may reject caret inspection.
+      }
+    }
+
+    const scroller = this._findSheetScroller(root);
+    this._sheetFocusSnapshot = {
+      name: active.name,
+      scrollTop: scroller?.scrollTop ?? 0,
+      selectionStart,
+      selectionEnd
+    };
+  }
+
+  _restoreSheetFocus(html) {
+    const snapshot = this._sheetFocusSnapshot;
+    if (!snapshot) return;
+
+    const root = html?.[0] ?? html;
+    const scroller = this._findSheetScroller(root);
+    if (scroller && Number.isFinite(snapshot.scrollTop)) {
+      scroller.scrollTop = snapshot.scrollTop;
+    }
+
+    const named = Array.from(root?.querySelectorAll?.('[name]') ?? []);
+    let target = named.find(element =>
+      element.name === snapshot.name &&
+      !element.disabled &&
+      element.type !== 'hidden' &&
+      element.offsetParent !== null
+    );
+
+    // A Resources number ceases to be a visible field when its rank becomes
+    // Beyond. In that case, continue forward to the next available core field
+    // rather than dropping keyboard focus altogether.
+    if (!target) {
+      const snapshotIndex = CORE_STAT_TAB_ORDER.indexOf(snapshot.name);
+      if (snapshotIndex >= 0) {
+        target = this._coreStatTabFields(root)
+          .find(element => CORE_STAT_TAB_ORDER.indexOf(element.name) > snapshotIndex);
+      }
+    }
+
+    if (target) {
+      target.focus({ preventScroll: true });
+      if (Number.isInteger(snapshot.selectionStart) && 'setSelectionRange' in target) {
+        try {
+          target.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+        } catch (_error) {
+          // Selects and type=number inputs do not support selection ranges.
+        }
+      }
+    }
+
+    this._sheetFocusSnapshot = null;
+  }
+
+  _coreStatTabFields(root) {
+    const named = Array.from(root?.querySelectorAll?.('[name]') ?? []);
+    return CORE_STAT_TAB_ORDER
+      .map(name => named.find(element => element.name === name))
+      .filter(element => {
+        if (!element || element.disabled || element.tabIndex < 0) return false;
+        if (element.type === 'hidden' || element.offsetParent === null) return false;
+        if (element.name === 'system.attributes.resources.value') {
+          const rank = root.querySelector('select[name="system.attributes.resources.rank"]')?.value;
+          if (normalizeRank(rank) === 'Beyond') return false;
+        }
+        const style = globalThis.getComputedStyle?.(element);
+        return !style || (style.display !== 'none' && style.visibility !== 'hidden');
+      });
+  }
+
+  /**
+   * Keep Tab/Shift+Tab moving through current FASERIP ranks and numbers, then
+   * Health, Karma, Resources, and Popularity. Moving focus before the old
+   * field's change event submits means the subsequent re-render snapshots the
+   * destination field instead of throwing keyboard users back to the start.
+   */
+  _bindCoreStatTabbing(html) {
+    const root = html?.[0] ?? html;
+    if (!root) return;
+
+    if (this._coreStatTabRoot && this._coreStatTabHandler) {
+      this._coreStatTabRoot.removeEventListener('keydown', this._coreStatTabHandler);
+    }
+
+    this._coreStatTabHandler = event => {
+      if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+      const fields = this._coreStatTabFields(root);
+      const index = fields.indexOf(event.target);
+      if (index < 0) return;
+
+      const nextIndex = index + (event.shiftKey ? -1 : 1);
+      const next = fields[nextIndex];
+      if (!next) return; // Allow normal tabbing out of the core-stat group.
+
+      event.preventDefault();
+      next.focus({ preventScroll: true });
+    };
+
+    root.addEventListener('keydown', this._coreStatTabHandler);
+    this._coreStatTabRoot = root;
+  }
+
+  /** Capture the live focused field immediately before appv1 replaces the DOM. */
+  async _render(force = false, options = {}) {
+    this._captureSheetFocus();
+    return super._render(force, options);
+  }
+
   /** @override */
   _updateObject(event, formData) {
+    const changedField = event?.target?.name ?? event?.currentTarget?.name ?? '';
+    const abilityKeys = ['fighting', 'agility', 'strength', 'endurance', 'reason', 'intuition', 'psyche'];
+
+    // Keep each current ability rank and rank number coherent. Rank changes
+    // use the canonical standard number; manual number edits retain the typed
+    // number and derive the rank from the printed Rank Range table.
+    for (const ability of abilityKeys) {
+      const rankPath = `system.abilities.${ability}.rank`;
+      const valuePath = `system.abilities.${ability}.value`;
+
+      if (changedField === rankPath) {
+        const rank = normalizeRank(formData[rankPath] ?? this.actor.system.abilities?.[ability]?.rank);
+        formData[rankPath] = rank;
+        formData[valuePath] = rankValueForStorage(rank);
+      } else if (changedField === valuePath) {
+        const submittedValue = Number(formData[valuePath]);
+        if (Number.isFinite(submittedValue)) {
+          const value = Math.max(0, submittedValue);
+          const rank = valueToRank(value);
+          formData[rankPath] = rank;
+          formData[valuePath] = rank === 'Beyond' ? rankValueForStorage(rank) : value;
+        }
+      }
+    }
+
     // Keep Resources rank and numeric value synchronized without allowing
     // submitOnChange to race a rank-select update against a stale number.
     const resourceRankPath = "system.attributes.resources.rank";
@@ -923,7 +1124,6 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     const submittedRank = normalizeRank(formData[resourceRankPath] ?? storedRank);
     const submittedValueRaw = formData[resourceValuePath];
     const submittedValue = Number(submittedValueRaw);
-    const changedField = event?.target?.name ?? event?.currentTarget?.name ?? "";
     const rankChanged = changedField === resourceRankPath || submittedRank !== storedRank;
     const valueChanged = changedField === resourceValuePath ||
       (submittedValueRaw !== undefined && Number.isFinite(submittedValue) && submittedValue !== storedValue);
@@ -950,8 +1150,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     if (shifts) {
       const RANKS = _RANKS;
       const rankValues = _RANK_VALUES;
-      const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
-      for (const ab of abilities) {
+      for (const ab of abilityKeys) {
         const cs = Number(shifts[ab]) || 0;
         if (cs === 0) continue;
 
@@ -2277,6 +2476,8 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    this._restoreSheetFocus(html);
+    this._bindCoreStatTabbing(html);
 
     // V14 (core 14.364): appv1 DragDrop no longer delivers sheet-level
     // drops. Bind natively on the form; _onDrop dedupes via its
@@ -2379,9 +2580,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     });
 
     const isLocked = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;
-    if (isLocked) {
-      html.closest('.faserip-sheet').addClass('sheet-locked');
-    }
+    this._applySheetLockState(html, isLocked);
 
     // Movement info chat button
     html.find('.movement-chat-btn').on('click', (event) => {
@@ -2418,60 +2617,32 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       }
     });
 
-    // Update the visible Resources number before the form-level
-    // submitOnChange handler serializes the sheet. _updateObject then persists
-    // rank and number together in one actor update.
-    html.find('select[name="system.attributes.resources.rank"]').on('change', (event) => {
-      const selectedRank = normalizeRank($(event.currentTarget).val());
-      const standardValue = rankValueForStorage(selectedRank);
-      html.find('input[name="system.attributes.resources.value"]').val(standardValue);
+    // Synchronize paired rank/value controls in the live DOM before the
+    // form-level submitOnChange handler serializes the sheet. This avoids a
+    // second actor.update, eliminates the old confirmation dialog, and works
+    // for both the appv1 sheet and the V2 adapter.
+    html.find('select[name="system.attributes.resources.rank"]').on('change', event => {
+      const rank = normalizeRank($(event.currentTarget).val());
+      html.find('input[name="system.attributes.resources.value"]').val(rankValueForStorage(rank));
+    });
+    html.find('input[name="system.attributes.resources.value"]').on('change', event => {
+      const value = Math.max(0, Number($(event.currentTarget).val()) || 0);
+      html.find('select[name="system.attributes.resources.rank"]').val(valueToRank(value));
     });
 
-    // Auto-populate ability value when rank changes — if current value is
-    // outside the new rank's range, confirm before snapping to standard value.
-    // Respects custom in-range values (e.g. Unearthly 95 stays 95 on re-select).
-    // Shift-0 always snaps to 0 (no range defined).
-    const ABILITY_KEYS = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
+    const ABILITY_KEYS = ['fighting', 'agility', 'strength', 'endurance', 'reason', 'intuition', 'psyche'];
     for (const ability of ABILITY_KEYS) {
-      html.find(`select[name="system.abilities.${ability}.rank"]`).change(async (event) => {
-        const $sel = $(event.currentTarget);
-        const newRank = $sel.val();
-        const currentValue = Number(this.actor.system?.abilities?.[ability]?.value ?? 0);
-        const stdValue = _RANK_VALUES[newRank] ?? 0;
-        const range = _RANK_RANGES[newRank];
+      const rankSelector = `select[name="system.abilities.${ability}.rank"]`;
+      const valueSelector = `input[name="system.abilities.${ability}.value"]`;
 
-        // Shift-0 or unknown ranks: snap to standard (no confirm — no meaningful value)
-        if (!range) {
-          await this.actor.update({ [`system.abilities.${ability}.value`]: stdValue });
-          return;
-        }
+      html.find(rankSelector).on('change', event => {
+        const rank = normalizeRank($(event.currentTarget).val());
+        html.find(valueSelector).val(rankValueForStorage(rank));
+      });
 
-        const [min, max] = range;
-        // In-range → preserve custom value, no prompt
-        if (currentValue >= min && currentValue <= max) return;
-
-        const abilityLabel = ability.charAt(0).toUpperCase() + ability.slice(1);
-        const rangeLabel = Number.isFinite(max) ? `${min}–${max}` : `${min}+`;
-        const proceed = await Dialog.confirm({
-          title: `Update ${abilityLabel} value?`,
-          content: `
-            <div style="padding:6px 0;font-size:13px;">
-              <p>Current ${abilityLabel} value <strong>${currentValue}</strong> is outside
-                the <strong>${newRank}</strong> range (${rangeLabel}).</p>
-              <p>Update to standard value <strong>${stdValue}</strong>?</p>
-              <p style="color:#888;font-size:12px;">Choose "Keep ${currentValue}" to preserve
-                a custom value (rank and value will be mismatched).</p>
-            </div>
-          `,
-          yes: () => true,
-          no:  () => false,
-          defaultYes: true,
-          options: { jQuery: false }
-        });
-        if (proceed) {
-          await this.actor.update({ [`system.abilities.${ability}.value`]: stdValue });
-        }
-        // proceed === false or null → keep current value, no update needed
+      html.find(valueSelector).on('change', event => {
+        const value = Math.max(0, Number($(event.currentTarget).val()) || 0);
+        html.find(rankSelector).val(valueToRank(value));
       });
     }
 

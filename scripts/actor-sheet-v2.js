@@ -1,4 +1,6 @@
-// scripts/actor-sheet-v2.js
+// scripts/actor-sheet-v2.js v1.1.0 - 2026-08-01
+// v1.1.0: Preserve focused core-stat fields across submitOnChange renders so
+//         keyboard Tab navigation survives ApplicationV2 PART replacement.
 // FASERIP ActorSheetV2 — Slice 1 (scaffolding).
 // Wraps the existing actor-sheet.html template as a single PART and delegates
 // both data preparation and listener binding to the legacy v1 sheet via an
@@ -132,6 +134,21 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /* -------------------------------------------- */
   /*  Lifecycle                                   */
   /* -------------------------------------------- */
+
+  /**
+   * Snapshot focus immediately before ApplicationV2 replaces its PART DOM.
+   * The snapshot lives on the v1 adapter because activateListeners restores it
+   * after the fresh controls have been bound.
+   */
+  _preRender(context, options) {
+    if (super._preRender) super._preRender(context, options);
+    try {
+      const v1 = this._v1();
+      v1._captureSheetFocus.call(this._adapterThis(v1));
+    } catch (err) {
+      console.warn('FaseripActorSheetV2 | focus snapshot failed', err);
+    }
+  }
 
   /** @override */
   async _prepareContext(options) {
