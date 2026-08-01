@@ -1,3 +1,20 @@
+// scripts/modules/effects/poison-engine.js v1.2.0 - 2026-08-01
+// v1.2.0: Target Save panel is the authoring surface. Carrier detection
+//         reads requiresSave + save.onFail.effect "poisoned" (power; toxin
+//         intensity = save intensity, optional save.onFail.toxinId) or
+//         intensityEffect "poisoned" (equipment; intensityRank). The
+//         carrierToxin* fields and Venomous checkbox are removed.
+// scripts/modules/effects/poison-engine.js v1.1.1 - 2026-08-01
+// v1.1.1: Carrier detection is authored-only — the Venomous checkbox or
+//         explicit toxin fields on the power/equipment sheet. Name-convention
+//         (/venom|poison/) removed per design decision: the power editor is
+//         the single authoring surface.
+// scripts/modules/effects/poison-engine.js v1.1.0 - 2026-08-01
+// v1.1.0: applyCarrierToxinOnHit — auto-exposure when a venomous weapon
+//         deals penetrating damage. Authoring: carrierToxinId (catalog),
+//         carrierToxinIntensity[+Name] (custom), or /venom|poison/ name
+//         convention (intensity = weapon rank). System fields or item
+//         flags both read. Gate: damageDealt > 0.
 // scripts/modules/effects/poison-engine.js v1.0.3 - 2026-08-01
 // v1.0.3: Governor clock skew — endRankLossThisTurn accepts a `now` param;
 //         the re-FEAT failure path passes effectiveNow. During a pre-advance
@@ -382,6 +399,61 @@ export async function haltPoison(actor, { reason = "" } = {}) {
     await poisonChat(actor, "Poison Halted", reason, { border: "#2e7d32", bg: "#e8f5e9" });
   }
   return true;
+}
+
+/**
+ * Carrier toxin: auto-expose a target when a weapon/power authored as
+ * poisonous deals penetrating damage. Called from attack-action (full auto)
+ * and chat-hooks (manual apply) at the same sites as continuing damage.
+ *
+ * Authoring surface is the standard editor save config — no parallel fields:
+ *  - Power: Target Save panel — requiresSave + save.onFail.effect "poisoned".
+ *    Toxin intensity = save intensity (power-rank or fixedRank); optional
+ *    save.onFail.toxinId picks a TOXINS catalog entry instead.
+ *  - Equipment: intensityEffect "poisoned"; intensityRank is the toxin
+ *    intensity.
+ *
+ * The poison engine's exposure FEAT IS the save (End vs Intensity with
+ * Resistance to Toxins substitution) — callers must not roll the generic
+ * save for effect "poisoned" (see intensity-action / _applyIntensityOnHit).
+ *
+ * Gate: damageDealt > 0 — injected venom needs a wound (GM ruling PR5).
+ * Contact/inhaled poisons that ignore armor: manual GM Tools exposure or
+ * the Intensity action.
+ *
+ * @returns {string} exposure result, or "not-carrier" | "no-damage"
+ */
+export async function applyCarrierToxinOnHit(targetActor, weapon, { damageDealt = 0 } = {}) {
+  if (!targetActor || !weapon) return "not-carrier";
+
+  const wSys = weapon.system || {};
+  let toxinId = null;
+  let intensity = null;
+
+  if (weapon.type === "power") {
+    const save = wSys.save || {};
+    if (!(wSys.requiresSave && save.onFail?.effect === "poisoned")) return "not-carrier";
+    toxinId = save.onFail?.toxinId || null;
+    intensity = save.intensity === "fixed-rank"
+      ? (save.fixedRank || "Typical")
+      : (wSys.rank || "Typical");
+  } else if (weapon.type === "equipment") {
+    if (wSys.intensityEffect !== "poisoned") return "not-carrier";
+    intensity = wSys.intensityRank || "Typical";
+  } else {
+    return "not-carrier";
+  }
+
+  if (damageDealt <= 0) {
+    console.log(`[FASERIP:POISON] ${weapon.name}: no penetrating damage — venom does not transfer`);
+    return "no-damage";
+  }
+
+  const opts = toxinId && TOXINS[toxinId]
+    ? { toxinId, sourceName: weapon.name }
+    : { intensity, name: `${weapon.name} Toxin`, sourceName: weapon.name };
+
+  return applyPoisonExposure(targetActor, opts);
 }
 
 /**

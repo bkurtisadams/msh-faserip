@@ -442,6 +442,7 @@
               <option value="slammed"       {{#if (eq system.save.onFail.effect "slammed")}}selected{{/if}}>Slammed</option>
               <option value="grabbed"       {{#if (eq system.save.onFail.effect "grabbed")}}selected{{/if}}>Grabbed</option>
               <option value="weakened"      {{#if (eq system.save.onFail.effect "weakened")}}selected{{/if}}>Weakened</option>
+              <option value="poisoned"      {{#if (eq system.save.onFail.effect "poisoned")}}selected{{/if}}>Poisoned (Toxin)</option>
               <option value="custom"        {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
             </select>
           </div>
@@ -466,6 +467,18 @@
             {{/each}}
           </select>
         </div>
+        {{/if}}
+        {{#if (eq system.save.onFail.effect "poisoned")}}
+        <div class="ps2-field" style="margin-top:4px;">
+          <label>Toxin (catalog, optional)</label>
+          <select name="system.save.onFail.toxinId">
+            <option value="" {{#unless system.save.onFail.toxinId}}selected{{/unless}}>— Use Save Intensity as toxin Intensity —</option>
+            {{#each carrierToxinOptions}}
+            <option value="{{this.id}}" {{#if (eq this.id ../system.save.onFail.toxinId)}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <p class="ps2-origin-help">Poisoned: the poison rules run the FEAT (Endurance vs Intensity, Resistance to Toxins substitutes) — Duration above is ignored; the poison manages its own re-FEAT windows, and on-hit exposure requires damage past armor.</p>
         {{/if}}
         <div class="ps2-flags">
           <label><input type="checkbox" name="system.save.rerollOnKarmaLoss" {{checked system.save.rerollOnKarmaLoss}} data-dtype="Boolean"> Re-roll if Karma-losing</label>

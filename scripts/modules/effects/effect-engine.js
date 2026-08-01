@@ -2,6 +2,10 @@
 // v1.14.1: applySlam — guard existing slam-marker delete with canWriteEffectsOn +
 //          executeAsGM("deleteActiveEffects") fallback so non-owner players don't
 //          throw "lacks permission to delete ActiveEffect" on auto-triggered slams.
+// scripts/modules/effects/effect-engine.js v1.15.0 - 2026-08-01
+// v1.15.0: Defensive "poisoned" case in applyIntensityEffect — delegates to
+//          applyPoisonExposure with a console warning; callers should branch
+//          to the poison engine before rolling the generic save.
 // scripts/modules/effects/effect-engine.js v1.14.0 - 2026-06-12
 // v1.14.0: Add exported applyIntensityEffect(target, effect, {rounds,originUuid,desc})
 //          — shared effect dispatcher used by both the Intensity action and the
@@ -1355,6 +1359,18 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
   const durationLabel = rounds === 999 ? "scene/escape" : `${rounds} round${rounds !== 1 ? "s" : ""}`;
   try {
     switch (effectType) {
+      case "poisoned": {
+        // Defensive routing only — the Intensity action and the on-hit
+        // hooks branch to the poison engine BEFORE rolling the generic
+        // save (poison's exposure FEAT is the save). If this is reached,
+        // a caller skipped that branch; delegate rather than fake it.
+        console.warn("[FASERIP:POISON] applyIntensityEffect reached with 'poisoned' — caller should route to applyPoisonExposure directly");
+        const { applyPoisonExposure } = await import("./poison-engine.js");
+        const result = await applyPoisonExposure(targetActor, {
+          intensity: "Typical", name: desc || "Toxin", sourceName: desc || "Intensity effect",
+        });
+        return result === "resisted" ? "Resisted the toxin" : "Poisoned (see poison card)";
+      }
       case "blinded":
         await applyBlinded(targetActor, { rounds, originUuid });
         return `Blinded for ${durationLabel}`;

@@ -1,3 +1,10 @@
+// scripts/data-models.js v2.4.4 - 2026-08-01
+// v2.4.4: carrierToxin* keys removed — poison authoring lives in the save
+//         object (save.onFail.toxinId nests under the existing AnyField).
+// scripts/data-models.js v2.4.3 - 2026-08-01
+// v2.4.3: carrierToxin/Id/Intensity/Name keys on power + equipment models
+//         (dormant while REGISTER_DATA_MODELS is off; template.json carries
+//         the live defaults).
 // scripts/data-models.js v2.4.2 - 2026-05-23
 // v2.4.2: Disabled model registration via REGISTER_DATA_MODELS flag. Foundry
 //         core fixed the unlinked-token ActorDelta crash in 14.363 (it was a

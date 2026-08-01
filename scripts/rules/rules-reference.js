@@ -1,3 +1,6 @@
+// rules-reference.js v1.5.1 - 2026-08-01
+// v1.5.1: PR5 ruling — carrier toxins require penetrating damage; Target
+//         Save panel is the authoring surface; exposure FEAT is the save.
 // rules-reference.js v1.5.0 - 2026-08-01
 // v1.5.0: POISON_RULES + TOXINS catalog (Advanced Set poisons & toxins,
 //         GM rulings PR1-PR4 inline). Consumed by poison-engine.js.
@@ -3039,6 +3042,11 @@ export const POISON_RULES = {
   //      not succeed; yellow needed at parity, standard intensity ladder).
   // PR4: Repeat exposure while already poisoned is ignored in v1; GM may
   //      raise effective Intensity manually for massive doses.
+  // PR5: Carrier toxins (bite/blade authored via the Target Save panel with
+  //      On Fail "Poisoned") require damage past armor to transfer. The
+  //      poison engine's exposure FEAT IS the save — never rolled twice.
+  //      Contact/inhaled poisons that ignore armor: Intensity action or
+  //      manual GM Tools exposure.
 };
 
 export const TOXINS = {

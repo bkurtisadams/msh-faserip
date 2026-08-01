@@ -1,3 +1,9 @@
+// itemSheet.js v2.1.2 - 2026-08-01
+// v2.1.2: carrierToxinOptions feeds the Target Save panel's Poisoned toxin
+//         dropdown; carrierToxinRanks removed with the Venomous block.
+// itemSheet.js v2.1.1 - 2026-08-01
+// v2.1.1: carrierToxinOptions (TOXINS catalog) + carrierToxinRanks in the
+//         power sheet context for the Venomous fields.
 // itemSheet.js v2.1.0 - 2026-04-25
 // v2.1.0: V2 form-snapshot bug workaround
 //
@@ -102,6 +108,12 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         "10 areas", "20 areas", "40 areas", "60 areas", "80 areas",
         "160 areas", "400 areas", "Line of Sight"
       ];
+
+      // Toxin catalog for the Target Save panel's Poisoned option
+      const { TOXINS } = await import("./rules/rules-reference.js");
+      context.carrierToxinOptions = Object.entries(TOXINS).map(([id, t]) => ({
+        id, label: `${t.name} (${t.intensity})`,
+      }));
 
       context.durationOptions = [
         "Instant", "Concentration", "Maintenance", "Permanent"

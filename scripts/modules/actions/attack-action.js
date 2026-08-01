@@ -1,3 +1,9 @@
+// attack-action.js v1.9.49 - 2026-08-01
+// v1.9.49: _applyIntensityOnHit skips effect "poisoned" — carrier path owns
+//          it (penetration gate + poison engine's own exposure FEAT).
+// attack-action.js v1.9.48 - 2026-08-01
+// v1.9.48: Carrier toxin exposure after continuing-damage block in the
+//          full-auto damage path (applyCarrierToxinOnHit, afterArmor gate).
 // attack-action.js v1.9.47 - 2026-07-03
 // v1.9.47: Magical damage wiring (powers audit Step #4, slice 4b). Derive
 //          isMagic in _executeSingleAttack from the source power's
@@ -739,6 +745,12 @@ export class AttackAction extends BaseAction {
 
     const effect = sys.intensityEffect || "stunned";
     const desc = sys.intensityDescription || "";
+
+    // Poisoned routes through applyCarrierToxinOnHit (penetrating-damage
+    // gate + the poison engine's own exposure FEAT with Resistance to
+    // Toxins substitution). Rolling the generic End FEAT here would
+    // double-save and bypass the armor gate.
+    if (effect === "poisoned") return;
 
     const { getAbilityInfo } = await import("./action-utils.js");
     const { requiredColorForIntensity } = await import("./breaking-feat.js");
@@ -1950,6 +1962,19 @@ export class AttackAction extends BaseAction {
             originUuid: actor.uuid,
             img: isCorrosive ? "icons/svg/acid.svg" : "icons/svg/blood.svg",
           });
+        }
+
+        // ── Carrier toxin (venomous bite, poisoned blade) ──
+        // Mirrors the continuing-damage anchor: fires only when the hit
+        // penetrated armor. Detection/authoring conventions live in
+        // poison-engine.applyCarrierToxinOnHit — no-ops for normal weapons.
+        if (weapon && targetActor) {
+          try {
+            const { applyCarrierToxinOnHit } = await import("../effects/poison-engine.js");
+            await applyCarrierToxinOnHit(targetActor, weapon, { damageDealt: afterArmor });
+          } catch (e) {
+            console.warn("[FASERIP] Carrier toxin (auto apply) failed:", e);
+          }
         }
       }
 

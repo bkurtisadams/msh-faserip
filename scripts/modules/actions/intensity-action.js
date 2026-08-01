@@ -1,3 +1,8 @@
+// intensity-action.js v4.2.0 - 2026-08-01
+// v4.2.0: Poisoned save branch — targets of effect "poisoned" route to
+//         applyPoisonExposure (its FEAT is the save; no generic d100).
+//         resolveIntensityFields surfaces save.onFail.toxinId; EFFECT_LABELS
+//         gains poisoned.
 // intensity-action.js v4.1.3 - 2026-06-12
 // v4.1.3: _applyIntensityEffect now delegates to the shared applyIntensityEffect
 //         in effect-engine (no behavior change; de-duplicates the effect map).
@@ -54,6 +59,7 @@ const EFFECT_LABELS = {
   slammed: "Slammed",
   grabbed: "Grabbed",
   weakened: "Weakened",
+  poisoned: "Poisoned (Toxin)",
   custom: "Affected"
 };
 
@@ -105,7 +111,8 @@ function resolveIntensityFields(item, attackMode = null) {
       description: onFail.notes || "",
       saveAbility: save.ability || "endurance",
       durationMode: onFail.duration || "1-10",
-      fixedRounds: Number(onFail.rounds) || 0
+      fixedRounds: Number(onFail.rounds) || 0,
+      toxinId: onFail.toxinId || null
     };
   }
 
@@ -232,6 +239,30 @@ export class IntensityAction extends BaseAction {
     for (const targetToken of targets) {
       const targetActor = targetToken.actor;
       if (!targetActor) continue;
+
+      // Poisoned: the poison engine's exposure FEAT IS the save (End vs
+      // Intensity with Resistance to Toxins substitution, KO + rank loss +
+      // windowed re-FEATs on failure). No generic d100 here — that would
+      // double-roll the save.
+      if (intensityEffect === "poisoned") {
+        const { applyPoisonExposure } = await import("../effects/poison-engine.js");
+        const toxinId = fields.toxinId || null;
+        const result = await applyPoisonExposure(targetActor, toxinId
+          ? { toxinId, sourceName: item.name }
+          : { intensity: intensityRank, name: `${item.name} Toxin`, sourceName: item.name });
+        const resisted = result === "resisted";
+        const badge = buildResultBadge(resisted ? "green" : "white",
+          resisted ? "Resists" : (result === "already-poisoned" ? "Already Poisoned" : "Poisoned"));
+        resultRows.push({
+          targetName: targetToken.name,
+          endRank: getAbilityInfo(targetActor, saveAbility).rank || "Typical",
+          rollDisplay: `<em>poison FEAT (see card)</em>`,
+          badge,
+          appliedLine: "",
+          saveAbilityLabel,
+        });
+        continue;
+      }
 
       const endInfo = getAbilityInfo(targetActor, saveAbility);
       const endRank = endInfo.rank || "Typical";
