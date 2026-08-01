@@ -1,3 +1,6 @@
+// chat-hooks.js v1.7.3 - 2026-07-31
+// v1.7.3: Fix automatic-nullification card text (Endurance 2+ ranks below
+//         intensity, not 3+) per adopted Impossible FEATs rule.
 // chat-hooks.js v1.7.2 - 2026-07-03
 // v1.7.2: apply-damage handler reads data-is-magic and forwards isMagic so
 //         a magical resistance reduces magical damage on the manual path
@@ -1451,7 +1454,7 @@ export function installActionChatHandlers() {
       await ChatMessage.create({
         content: `<div style="border:2px solid #7b1fa2;border-radius:4px;padding:6px;">
           <div style="font-size:.9em;">
-            <b>${targetActor.name}</b> — automatic nullification (3+ ranks below intensity).
+            <b>${targetActor.name}</b> — automatic nullification (Endurance 2+ ranks below intensity).
             <span style="color:#b71c1c;font-weight:600;">NULLIFIED</span>
           </div>
         </div>`

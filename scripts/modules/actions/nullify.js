@@ -1,3 +1,5 @@
+// scripts/modules/actions/nullify.js v3.0.1 - 2026-07-31
+// v3.0.1: Fix auto-fail comment (intensity 2+ ranks above Endurance, not 3+).
 // scripts/modules/actions/nullify.js v3.0.0 - 2026-03-22
 // v3.0.0: Region-based aura. startAura/stopAura create/destroy a Scene Region
 //         that moves with the caster token. Tokens entering/exiting the region
@@ -195,7 +197,7 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
     let total = 0, colorLower = "—", saved = false;
 
     if (req === "auto-fail") {
-      // 3+ ranks below intensity — automatic fail, no roll
+      // Intensity 2+ ranks above Endurance — impossible to resist, no roll
       saved = false;
       colorLower = "auto-fail";
     } else {

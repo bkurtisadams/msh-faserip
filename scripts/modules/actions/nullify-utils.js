@@ -1,3 +1,6 @@
+// scripts/modules/actions/nullify-utils.js v1.0.1 - 2026-07-31
+// v1.0.1: Fix requiredColorFromDelta comments — thresholds unchanged; auto-fail
+//         is intensity 2+ ranks above ability per adopted Impossible FEATs rule.
 // scripts/modules/actions/nullify-utils.js v1.0.0 - 2026-03-22
 // Shared utilities for nullify.js and nullify-aura.js.
 // Extracted to break circular import dependency.
@@ -36,11 +39,11 @@ export function getNullifyRange(powerRank) {
  *   Intensity 2+ ranks above (delta >= 2)          = Impossible = auto-fail
  */
 export function requiredColorFromDelta(delta) {
-  if (delta >= 2)  return "auto-fail";   // impossible to resist
+  if (delta >= 2)  return "auto-fail";   // intensity 2+ ranks above ability = impossible (optional rule, adopted)
   if (delta === 1) return "red";
   if (delta === 0) return "yellow";
   if (delta >= -2) return "green";
-  return "auto-success";                 // 3+ ranks below intensity = automatic resist
+  return "auto-success";                 // ability 3+ ranks above intensity = automatic resist
 }
 
 export function meetsThreshold(rolledColor, requiredColor) {

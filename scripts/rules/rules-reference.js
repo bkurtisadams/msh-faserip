@@ -423,6 +423,11 @@ export const FEAT_DIFFICULTY = {
   // "three or more ranks lower than the hero's Ability" in the Judge's
   // Book and published modules, e.g. After Midnight.)
   automatic: "Ability 3+ ranks above intensity",
+  // Impossible FEATs (printed Optional Rule, adopted by GM ruling
+  // 2026-07-31): any action more than one rank above the ability —
+  // i.e. intensity 2+ ranks above — automatically fails, no roll.
+  // Resource FEATs are ALWAYS limited this way (not optional).
+  impossible: "Intensity 2+ ranks above ability",
   // Power Stunts:
   powerStunts: {
     neverTried: "red",
