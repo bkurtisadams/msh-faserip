@@ -1,3 +1,15 @@
+// rules-reference.js v1.4.0 - 2026-07-31
+// v1.4.0: valueToRank now walks the printed Rank Range table (8 = Good).
+//         RANK_RANGES verified against the book and extended with upper
+//         tiers per GM ruling: ShZ 351-999, Cl1000 1000-2999, Cl3000
+//         3000-4999, Cl5000 = 5000, Beyond 5001+. Initiative modifier
+//         bands book-verified (rank number, 75 → +5).
+// rules-reference.js v1.3.0 - 2026-07-31
+// v1.3.0: Remove corrupted UNIVERSAL_TABLE grid, UNIVERSAL_TABLE_RANK_INDEX,
+//         and lookupUniversalTable (zero callers; non-monotonic bands; live
+//         resolver is modules/dice/universal-table.js). Fix
+//         ATTACK_RESULTS.grappling.red "Full" -> "Hold" per Gp column. Fix
+//         Es column header comment (G=Miss). Simplify normalizeRank.
 // rules-reference.js v1.2.0 - 2026-04-21
 // v1.2.0: Added POWER_DERIVATIONS table, resolveRange() and getPowerDerivations()
 //         helpers for the power chat card stat strip.
@@ -29,11 +41,18 @@ export const RANK_VALUES = {
 export const RANKS = RANK_VALUES;
 
 // ── Rank ranges (for value → rank lookups) ───────────────────────────────────
+// Verified against the printed table 2026-07-31. Monstrous is printed
+// "63-67" (misprint; Un starts at 88, so 63-87 is the coherent reading).
+// Upper tiers per GM ruling 2026-07-31: ShZ 351-999, Class 1000 =
+// 1000-2999, Class 3000 = 3000-4999, Class 5000 = 5000 exactly,
+// Beyond = everything above.
 export const RANK_RANGES = {
   "Feeble": [1, 2], "Poor": [3, 4], "Typical": [5, 7], "Good": [8, 15],
   "Excellent": [16, 25], "Remarkable": [26, 35], "Incredible": [36, 45],
   "Amazing": [46, 62], "Monstrous": [63, 87], "Unearthly": [88, 125],
-  "Shift-X": [126, 175], "Shift-Y": [176, 350], "Shift-Z": [351, Infinity]
+  "Shift-X": [126, 175], "Shift-Y": [176, 350], "Shift-Z": [351, 999],
+  "Class 1000": [1000, 2999], "Class 3000": [3000, 4999],
+  "Class 5000": [5000, 5000], "Beyond": [5001, Infinity]
 };
 
 // ── Rank abbreviations ───────────────────────────────────────────────────────
@@ -60,7 +79,7 @@ export const RANK_ALIASES = {
 export function normalizeRank(name) {
   if (!name) return "Shift-0";
   const s = String(name).trim();
-  return RANK_ALIASES[s] ?? (RANK_VALUES[s] !== undefined ? s : (RANK_ALIASES[s] ?? s));
+  return RANK_ALIASES[s] ?? s;
 }
 
 /** Get the standard numeric value for a rank name. */
@@ -70,15 +89,16 @@ export function rankValue(name) {
   return RANK_VALUES[n] ?? CONFIG?.FASERIP?.rankValues?.[n] ?? 0;
 }
 
-/** Get the rank name for a numeric value (highest rank whose value ≤ val). */
+/** Get the rank name for a numeric value per the printed Rank Range table
+ *  (upper tiers per GM ruling — see RANK_RANGES). Ranges are contiguous
+ *  from 1 upward, so the walk always resolves; 0 and below are Shift-0. */
 export function valueToRank(val) {
-  if (val <= 0) return "Shift-0";
-  let best = "Shift-0";
-  for (const r of RANKS_ORDERED) {
-    if ((RANK_VALUES[r] ?? 0) <= val) best = r;
-    else break;
+  const v = Number(val) || 0;
+  if (v <= 0) return "Shift-0";
+  for (const [rank, [lo, hi]] of Object.entries(RANK_RANGES)) {
+    if (v >= lo && v <= hi) return rank;
   }
-  return best;
+  return "Beyond";
 }
 
 /** Shift a rank name up/down by delta steps. Class 1000+ ranks cannot be shifted. Clamps to Shift-Z. */
@@ -115,7 +135,7 @@ export const ATTACK_RESULTS = {
   energy:        { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Kill" },
   force:         { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Stun" },
   charging:      { white: "Miss", green: "Hit",      yellow: "Slam",     red: "Stun" },
-  grappling:     { white: "Miss", green: "Miss",     yellow: "Partial",  red: "Full" },
+  grappling:     { white: "Miss", green: "Miss",     yellow: "Partial",  red: "Hold" },
   escaping:      { white: "Miss", green: "Miss",     yellow: "Escape",   red: "Reverse" },
   grabbing:      { white: "Miss", green: "Take",     yellow: "Grab",     red: "Break" }
 };
@@ -378,7 +398,10 @@ export const INITIATIVE = {
   changeAction: "Yellow Agility FEAT, -1CS on subsequent FEATs"
 };
 
-// Intuition modifier lookup
+// Intuition modifier lookup. Verified against the printed table 2026-07-31:
+// keys on rank NUMBER (0-10:0, 11-20:1, 21-30:2, 31-40:3, 41-50:4, 51-75:5,
+// "75 and up":6). The printed rows overlap at exactly 75; treated here as a
+// misprint for "76 and up", so 75 (Monstrous) → +5.
 export function getInitiativeModifier(intuitionValue) {
   if (intuitionValue <= 10) return 0;
   if (intuitionValue <= 20) return 1;
@@ -394,8 +417,12 @@ export const FEAT_DIFFICULTY = {
   // Intensity > Ability = red needed
   // Intensity = Ability = yellow needed
   // Ability > Intensity = green needed
-  // 3+ ranks below intensity = automatic
-  automatic: "3+ ranks below intensity",
+  // Ability 3+ ranks above intensity = automatic success.
+  // (GM ruling 2026-07-31: the Player's Book's "over 3 ranks" is a
+  // misprint — contradicted later in the same book and verified as
+  // "three or more ranks lower than the hero's Ability" in the Judge's
+  // Book and published modules, e.g. After Midnight.)
+  automatic: "Ability 3+ ranks above intensity",
   // Power Stunts:
   powerStunts: {
     neverTried: "red",
@@ -896,7 +923,7 @@ export const VEHICLE_CATALOG = {
 //   Fo (Agility):   W=Miss,  G=Hit,      Y=Bullseye, R=Stun
 //   Gp (Strength):  W=Miss,  G=Miss,     Y=Partial,  R=Hold
 //   Gb (Strength):  W=Miss,  G=Take,     Y=Grab,     R=Break
-//   Es (Strength):  W=Miss,  G=Escape,   Y=Escape,   R=Reverse
+//   Es (Strength):  W=Miss,  G=Miss,     Y=Escape,   R=Reverse
 //   Ch (Endurance): W=Miss,  G=Hit,      Y=Slam,     R=Stun
 //   Do (Agility):   W=None,  G=-2CS,     Y=-4CS,     R=-6CS
 //   Ev (Fighting):  W=Autohit, G=Evasion, Y=+1CS,    R=+2CS
@@ -906,60 +933,11 @@ export const VEHICLE_CATALOG = {
 //   Sl (Endurance): W=Gr.Slam, G=1 area, Y=Stagger,  R=No
 //   Ki (Endurance): W=En.Loss, G=E/S,    Y=No,       R=No
 
-// Universal Table grid: d100 roll vs rank → color result.
-// Each row is [rollMin, rollMax, ...colorPerRank] where ranks are indexed:
-//   0=Sh0, 1=Fe, 2=Pr, 3=Ty, 4=Gd, 5=Ex, 6=Rm, 7=In, 8=Am, 9=Mn, 10=Un,
-//   11=ShX, 12=ShY, 13=ShZ, 14=CL1000, 15=CL3000, 16=CL5000, 17=Beyond
-// W=white, G=green, Y=yellow, R=red
-
-export const UNIVERSAL_TABLE = [
-  //           Sh0  Fe   Pr   Ty   Gd   Ex   Rm   In   Am   Mn   Un   ShX  ShY  ShZ  1K   3K   5K   B
-  [  1,  1,  "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W"],
-  [  2,  3,  "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W"],
-  [  4,  6,  "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "G", "G", "G", "G", "G"],
-  [  7, 10,  "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "W", "G", "G", "G", "G", "G", "G"],
-  [ 11, 15,  "W", "W", "W", "W", "W", "W", "W", "W", "W", "G", "G", "G", "G", "G", "G", "G", "G", "G"],
-  [ 16, 20,  "W", "W", "W", "W", "W", "W", "W", "W", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G"],
-  [ 21, 25,  "W", "W", "W", "W", "W", "W", "W", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G"],
-  [ 26, 30,  "W", "W", "W", "W", "W", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G"],
-  [ 31, 35,  "W", "W", "W", "W", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y"],
-  [ 36, 40,  "W", "W", "W", "W", "G", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y"],
-  [ 41, 45,  "W", "W", "W", "W", "G", "G", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y"],
-  [ 46, 50,  "W", "W", "W", "W", "W", "G", "G", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y"],
-  [ 51, 55,  "W", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y"],
-  [ 56, 60,  "W", "W", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "Y"],
-  [ 61, 65,  "W", "W", "W", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "G", "Y", "Y", "Y", "Y"],
-  [ 66, 70,  "W", "W", "W", "W", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y"],
-  [ 71, 75,  "W", "W", "W", "W", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "R", "R", "R"],
-  [ 76, 80,  "W", "W", "W", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "R", "R", "R", "R", "R"],
-  [ 81, 85,  "W", "W", "W", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "Y", "R", "R", "R", "R", "R", "R"],
-  [ 86, 90,  "W", "W", "W", "G", "G", "G", "G", "Y", "Y", "Y", "Y", "R", "R", "R", "R", "R", "R", "R"],
-  [ 91, 94,  "W", "W", "G", "G", "G", "Y", "Y", "Y", "Y", "Y", "R", "R", "R", "R", "R", "R", "R", "R"],
-  [ 95, 97,  "W", "W", "G", "G", "Y", "Y", "Y", "Y", "Y", "R", "R", "R", "R", "R", "R", "R", "R", "R"],
-  [ 98, 99,  "W", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R"],
-  [100,100,  "W", "W", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R"]
-];
-
-// Rank index for UNIVERSAL_TABLE columns
-export const UNIVERSAL_TABLE_RANK_INDEX = {
-  "Shift-0": 0, "Feeble": 1, "Poor": 2, "Typical": 3, "Good": 4,
-  "Excellent": 5, "Remarkable": 6, "Incredible": 7, "Amazing": 8,
-  "Monstrous": 9, "Unearthly": 10, "Shift X": 11, "Shift Y": 12,
-  "Shift Z": 13, "Class 1000": 14, "Class 3000": 15, "Class 5000": 16,
-  "Beyond": 17
-};
-
-// Lookup function: given a rank name and d100 roll, return color string
-export function lookupUniversalTable(rank, roll) {
-  const col = UNIVERSAL_TABLE_RANK_INDEX[rank];
-  if (col === undefined) return "white";
-  for (const row of UNIVERSAL_TABLE) {
-    if (roll >= row[0] && roll <= row[1]) {
-      return { W: "white", G: "green", Y: "yellow", R: "red" }[row[col + 2]] || "white";
-    }
-  }
-  return "white";
-}
+// The Universal Table grid itself lives in modules/dice/universal-table.js
+// (rank rows verified against the published chart; see its v1.2.0/v1.3.0
+// changelog). A corrupted duplicate grid and lookupUniversalTable() were
+// removed from this file in v1.3.0 — resolve rolls via
+// game.msh.rollUniversalTable / action-utils.universalColor().
 
 // Color-to-label maps for each action column
 export const ACTION_COLUMN_RESULTS = {
@@ -1776,7 +1754,7 @@ export const SPELL_EFFECTS = {
   areaOfEffect:      ["None", "Touch",  "Touch",  "Touch",  "Same Area","1 Area","2 Areas","5 Areas","12 Areas","1 sq.mi.","10 sq.mi.","1 planet","1 planet","1 planet","1 dimen.","1 dimen.","5 dimen.","ALL"],
   standardDamage:    [0,       2,        4,        6,        10,       20,       30,       40,       50,        75,        100,       150,       200,       500,       1000,      3000,      5000,      Infinity]
 };
-// Rank index matches UNIVERSAL_TABLE_RANK_INDEX (0=Sh0 through 17=Beyond).
+// Rank index order matches RANKS_ORDERED (0=Sh0 through 17=Beyond).
 
 // ══════════════════════════════════════════════════════════════
 // HARDWARE: BUILDING, MODIFYING, & ALIEN TECHNOLOGY

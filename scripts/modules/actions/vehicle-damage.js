@@ -1,8 +1,12 @@
-// scripts/modules/actions/vehicle-damage.js v1.1.0 - 2026-03-13
+// scripts/modules/actions/vehicle-damage.js v1.2.0 - 2026-07-31
+// v1.2.0: Import canonical valueToRank from rules-reference (printed Rank
+//         Range semantics) instead of local standard-value-floor copy.
 // v1.1.0: Store CS losses as negative (matching rules "-1CS"), abs for rank math
 // v1.0.0: Vehicle damage routing for applyDamageToTargets
 // Implements: Protection as passenger armor, Body as vehicle HP,
 // Vehicle Damage Table (p.50-51) for CS degradation
+
+import { valueToRank } from "../../rules/rules-reference.js";
 
 const RANK_VALUES = {
   "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
@@ -22,15 +26,6 @@ const RANK_ORDER = [
 function rankValue(name) {
   if (!name) return 0;
   return RANK_VALUES[name] ?? CONFIG?.FASERIP?.rankValues?.[name] ?? 0;
-}
-
-function valueToRank(val) {
-  let best = "Shift-0";
-  for (const r of RANK_ORDER) {
-    if (RANK_VALUES[r] <= val) best = r;
-    else break;
-  }
-  return best;
 }
 
 function shiftRank(name, steps) {

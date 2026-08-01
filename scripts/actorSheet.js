@@ -1,3 +1,6 @@
+// actorSheet.js v2.7.6 - 2026-07-31
+// v2.7.6: _rollVehicleControl driver-Agility rank now uses canonical
+//         valueToRank (printed Rank Range semantics: 8 = Good, not Typical).
 // actorSheet.js v2.7.5 - 2026-07-21
 // v2.7.5: Fix compact-sheet sizing under the ApplicationV2 adapter. Compact
 //         mode now switches to auto height only after its natural-height CSS
@@ -154,7 +157,7 @@ import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
-  RANK_ALIASES, normalizeRank, shiftRank,
+  RANK_ALIASES, normalizeRank, shiftRank, valueToRank,
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
@@ -5772,15 +5775,8 @@ _rollVehicleControl(vehicle) {
     "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
     "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
   ];
-  const rankMinValues = [0, 2, 4, 6, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500, 1000, 3000, 5000, 10000];
-  const rankValues = Object.fromEntries(rankTable.map((r, i) => [r, rankMinValues[i]]));
 
-  const getRankFromValue = (val) => {
-    for (let i = rankTable.length - 1; i >= 0; i--) {
-      if (rankValues[rankTable[i]] <= val) return rankTable[i];
-    }
-    return rankTable[0];
-  };
+  const getRankFromValue = (val) => valueToRank(val);
 
  // Compare RAW values to find limiting factor
   const controlRank = vehicle.system.control || "Typical";
