@@ -225,9 +225,14 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
 
   const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
   if (syncEnabled && !cttDrivesClock) {
-    // Advance Foundry world time by 6 seconds (1 FASERIP turn)
-    await game.time.advance(6);
-    console.log("[FASERIP] Combat advanced time by 6 seconds");
+    // Advance world time by one FASERIP turn. RAW is 6s; the turnSeconds
+    // setting (default 6) is the house-rule knob, and ongoing-engine,
+    // effect-engine and gm-tools already read it. This site used to
+    // hard-code 6, so changing the setting desynced the clock from
+    // effect durations.
+    const turnSeconds = Number(game.settings.get("msh-faserip", "turnSeconds")) || 6;
+    await game.time.advance(turnSeconds);
+    console.log(`[FASERIP] Combat advanced time by ${turnSeconds} seconds`);
   }
   
   // Trigger hook to update team sheet display
@@ -1780,7 +1785,7 @@ Hooks.once("init", async () => {
     // Call new dispatcher
     return await ActionDispatcher.roll(actionType, {
       actor,
-      opts: { karma, ...options }
+      opts: { shift: columnShift, karma, ...options }
     });
   };
   // Add the rollUniversalTable function to the namespace, wrapped to emit hook

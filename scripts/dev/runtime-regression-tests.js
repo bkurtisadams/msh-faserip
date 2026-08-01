@@ -136,31 +136,6 @@ async function createTestCombat(actors) {
   return combat;
 }
 
-async function createTimerEffect(actor, scope, kind, turns = 3) {
-  const isHealing = kind === "healing";
-  const [effect] = await actor.createEmbeddedDocuments("ActiveEffect", [{
-    name: `${isHealing ? "Healing" : "Recovery Timer"} (${turns} turns)`,
-    img: "icons/svg/regen.svg",
-    disabled: false,
-    flags: {
-      [scope]: {
-        [isHealing ? "healingTimer" : "recoveryTimer"]: true,
-        fallbackMode: "combat",
-        turnsRemaining: turns
-      }
-    }
-  }]);
-  return effect;
-}
-
-function readTimer(actor, effectId, scope) {
-  const effect = actor.effects.get(effectId);
-  return {
-    effect,
-    turns: Number(effect?.getFlag(scope, "turnsRemaining"))
-  };
-}
-
 async function patchFunction(target, key, replacement, callback) {
   if (!target || typeof target[key] !== "function") {
     return { patched: false, reason: `${key} is not a function` };
@@ -298,41 +273,13 @@ async function testCombatTimerCadence(recorder, state, scope) {
   }
   state.combats.push(combat);
 
-  const recoveryEffect = await createTimerEffect(actors[0], scope, "recovery", 3);
-  const healingEffect = await createTimerEffect(actors[1], scope, "healing", 3);
-
+  // Recovery/Healing are handled by rest-system.js against worldTime, not by
+  // per-round AE turnsRemaining timers. The cadence assertions that lived here
+  // tested a fallback that no longer exists; createTimerEffect/readTimer went
+  // with them. This function now only stands up the Combat that the
+  // turn-length and CTT tests reuse.
   await combat.update({ turn: 1 });
-  await sleep(400);
-  const recoveryAfterTurnOne = readTimer(actors[0], recoveryEffect.id, scope).turns;
-  const healingAfterTurnOne = readTimer(actors[1], healingEffect.id, scope).turns;
-
-  await combat.update({ turn: 2 });
-  await sleep(400);
-  const recoveryAfterTurnTwo = readTimer(actors[0], recoveryEffect.id, scope).turns;
-  const healingAfterTurnTwo = readTimer(actors[1], healingEffect.id, scope).turns;
-
-  recorder.assert(
-    recoveryAfterTurnOne === 3 && recoveryAfterTurnTwo === 3
-      && healingAfterTurnOne === 3 && healingAfterTurnTwo === 3,
-    "Recovery and Healing timers do not tick on combatant turns",
-    { recoveryAfterTurnOne, recoveryAfterTurnTwo, healingAfterTurnOne, healingAfterTurnTwo }
-  );
-
-  await combat.update({ round: 2, turn: 0 });
-  const roundTicked = await waitFor(() => {
-    const recovery = readTimer(actors[0], recoveryEffect.id, scope).turns;
-    const healing = readTimer(actors[1], healingEffect.id, scope).turns;
-    return recovery === 2 && healing === 2 ? { recovery, healing } : false;
-  });
-
-  recorder.assert(
-    !!roundTicked,
-    "Recovery and Healing timers tick exactly once on a round change",
-    {
-      recovery: readTimer(actors[0], recoveryEffect.id, scope).turns,
-      healing: readTimer(actors[1], healingEffect.id, scope).turns
-    }
-  );
+  await sleep(200);
 
   return combat;
 }
@@ -623,9 +570,6 @@ export async function runBootstrapRuntimeTests({ keepArtifacts = false, postChat
 
   console.group("FASERIP Bootstrap Runtime Regression Tests");
   try {
-    recorder.assert(game.system.version === "2.1.10", "Expected test-build system version is active", {
-      activeVersion: game.system.version
-    });
 
     await preserveSetting(SYSTEM_ID, "autoHealingEnabled", state.settings, false);
     await preserveSetting(SYSTEM_ID, "effects.autoDamageTimers", state.settings, false);

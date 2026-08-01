@@ -1080,20 +1080,6 @@ export function advanceCTTByTurns(n = 1) {
 /* These wrappers maintain backward compatibility for existing callers. */
 
 /**
- * Get current game time in seconds.
- * Prefers CTT totalSeconds, falls back to Foundry worldTime.
- * @returns {number}
- */
-export function getGameTime() {
-  const te = getCTT();
-  if (te) {
-    const t = te.getCurrentTime?.()?.totalSeconds;
-    if (Number.isFinite(t)) return t;
-  }
-  return game.time?.worldTime ?? 0;
-}
-
-/**
  * Collect every unique actor in the world, including unlinked scene tokens.
  * @returns {Actor[]}
  */
