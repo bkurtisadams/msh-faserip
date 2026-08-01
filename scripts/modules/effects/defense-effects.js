@@ -2,8 +2,8 @@
 // v1.7.0: registerDefenseAE — skip the update when nothing changed (auto-sync
 //         was rewriting ~100 identical AEs every load); strip statuses another
 //         AE already provides so creates aren't core-rejected (Body Armor vs
-//         Growth-derived armor fight); log a warning instead of "created"
-//         when creation was prevented.
+//         Growth-derived armor fight); drop per-AE updated/created info logs,
+//         warn only when creation was prevented.
 // scripts/modules/effects/defense-effects.js v1.6.0 - 2026-07-02
 // v1.6.0: Energy Reflection defense AE (Step #3 slice 1). New defenseType
 //         "energyReflection" built when sys.isEnergyReflection. Flags:
@@ -448,7 +448,6 @@ async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
       updates[`${flagPath}.${k}`] = v;
     }
     await existing.update(updates);
-    console.log(`[FASERIP] Defense AE updated: ${aeData.name} on ${actor.name} (disabled=${disabled})`);
     return existing;
   }
 
@@ -456,9 +455,7 @@ async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
   aeData.statuses = statuses;
   aeData.disabled = disabled;
   const ae = await applyEffect(actor, aeData);
-  if (ae) {
-    console.log(`[FASERIP] Defense AE created: ${aeData.name} on ${actor.name} (disabled=${disabled})`);
-  } else {
+  if (!ae) {
     console.warn(`[FASERIP WARN] Defense AE creation was prevented: ${aeData.name} on ${actor.name}`);
   }
   return ae;
