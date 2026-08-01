@@ -551,6 +551,15 @@ Hooks.once("init", async () => {
     default: 0
   });
 
+  game.settings.register("msh-faserip", "dataMigrationVersion", {
+    name: "Data Migration Version",
+    hint: "Internal marker for one-time document migrations.",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
+
   // Register the debugMode setting FIRST
   game.settings.register("msh-faserip", "debugMode", {
     name: "Debug Mode",
@@ -2672,15 +2681,22 @@ Hooks.once("ready", async () => {
     console.warn("MSH FASERIP | GM Tools registration failed:", e);
   }
 
+  // One-time document migrations below, gated on dataMigrationVersion.
+  // A failed block leaves the version unset so it retries next load.
+  const _mshMigrationsPending = game.user?.isGM === true
+    && Number(game.settings.get("msh-faserip", "dataMigrationVersion") ?? 0) < 1;
+  let _mshMigrationFailed = false;
+
   // Migrate body armor powers: backfill armorPhysical/armorEnergy on old powers that used armorUseRankValue
-  if (game.user.isGM) {
+  if (_mshMigrationsPending) {
     try {
-      for (const actor of game.actors) {
+      for (const actor of Effects.getAllTokenActors()) {
         for (const item of actor.items) {
           if (item.type !== "power" || !item.system.isBodyArmor) continue;
           const sys = item.system;
-          // Old powers with armorUseRankValue=true have armorPhysical/armorEnergy at 0
-          if (sys.armorUseRankValue === true || (sys.armorPhysical === 0 && sys.armorEnergy === 0)) {
+          // armorUseRankValue is the legacy marker. (0,0) alone is a
+          // legitimate config and must not trigger a backfill.
+          if (sys.armorUseRankValue === true) {
             const baseVal = typeof sys.value === "number" ? sys.value : (CONFIG.FASERIP?.rankValues?.[sys.rank] || 0);
             const updates = {};
             if (!sys.armorPhysical) updates["system.armorPhysical"] = baseVal;
@@ -2694,6 +2710,7 @@ Hooks.once("ready", async () => {
         }
       }
     } catch (e) {
+      _mshMigrationFailed = true;
       console.warn("[FASERIP WARN] Body armor migration failed:", e);
     }
   }
@@ -2703,11 +2720,11 @@ Hooks.once("ready", async () => {
   // stored armor value differs from what the rank formula would produce
   // (physical = value, energy = max(0, value - 20) for non-FF powers;
   // for Force Fields: physical = max(0, value - 10), energy = value).
-  if (game.user.isGM) {
+  if (_mshMigrationsPending) {
     try {
       let flaggedPhys = 0;
       let flaggedEner = 0;
-      for (const actor of game.actors) {
+      for (const actor of Effects.getAllTokenActors()) {
         for (const item of actor.items) {
           if (item.type !== "power" || !item.system.isBodyArmor) continue;
           const sys = item.system;
@@ -2733,6 +2750,7 @@ Hooks.once("ready", async () => {
         console.log(`[FASERIP] Armor override migration: ${flaggedPhys} physical, ${flaggedEner} energy flagged as custom`);
       }
     } catch (e) {
+      _mshMigrationFailed = true;
       console.warn("[FASERIP WARN] Armor custom-flag migration failed:", e);
     }
   }
@@ -2744,10 +2762,10 @@ Hooks.once("ready", async () => {
   // directory is not migrated by existing patterns; if a user has loose
   // equipment items in the Items sidebar with the typo, they can fix them
   // by hand or call this loop with game.items in place of actor.items.
-  if (game.user.isGM) {
+  if (_mshMigrationsPending) {
     try {
       let fixed = 0;
-      for (const actor of game.actors) {
+      for (const actor of Effects.getAllTokenActors()) {
         for (const item of actor.items) {
           if (item.type !== "equipment") continue;
           if (item.system?.intensityRank === "Shift X") {
@@ -2759,6 +2777,7 @@ Hooks.once("ready", async () => {
       }
       if (fixed) console.log(`[FASERIP] intensityRank migration: ${fixed} equipment item(s) updated`);
     } catch (e) {
+      _mshMigrationFailed = true;
       console.warn("[FASERIP WARN] intensityRank migration failed:", e);
     }
   }
@@ -2773,7 +2792,7 @@ Hooks.once("ready", async () => {
   // freshly-created item reads undefined and is skipped. Covers world
   // Items + actor-owned items. Compendia skipped (usually locked; unlock
   // and re-run to migrate pack contents).
-  if (game.user.isGM) {
+  if (_mshMigrationsPending) {
     try {
       const FIELD_MOVES = [
         ["detection", "precognition",        "mental",        "precognition"],
@@ -2800,13 +2819,14 @@ Hooks.once("ready", async () => {
       for (const item of game.items) {
         if (await migratePowerItem(item, "World")) count++;
       }
-      for (const actor of game.actors) {
+      for (const actor of Effects.getAllTokenActors()) {
         for (const item of actor.items) {
           if (await migratePowerItem(item, actor.name)) count++;
         }
       }
       if (count) console.log(`[FASERIP] Power field re-home migration: ${count} power item(s) updated`);
     } catch (e) {
+      _mshMigrationFailed = true;
       console.warn("[FASERIP WARN] Power field re-home migration failed:", e);
     }
   }
@@ -2975,7 +2995,7 @@ Hooks.once("ready", async () => {
   // These were incorrectly added; dying characters above 0 HP can still act (rules p.31).
   // Migration: fix Impaired Endurance AEs that used wrong key system.columnShift instead of
   // system.combatMods.attackShift â€” the old key was never read during attack resolution.
-  if (game.user.isGM) {
+  if (_mshMigrationsPending) {
     try {
       const DYING_STALE_KEYS = new Set([
         "system.combatMods.canAct",
@@ -2984,7 +3004,7 @@ Hooks.once("ready", async () => {
       ]);
       let dyingMigrated = 0;
       let impairedMigrated = 0;
-      for (const actor of game.actors) {
+      for (const actor of Effects.getAllTokenActors()) {
         for (const effect of actor.effects) {
           // Dying AE cleanup
           const isDying = effect.flags?.["msh-faserip"]?.effectType === "dying"
@@ -3027,8 +3047,14 @@ Hooks.once("ready", async () => {
       if (dyingMigrated) console.log(`[FASERIP] Migrated ${dyingMigrated} Dying AE(s): removed stale canAct/canMove/movementMult changes`);
       if (impairedMigrated) console.log(`[FASERIP] Migrated ${impairedMigrated} Impaired Endurance AE(s): fixed columnShift â†’ combatMods.attackShift`);
     } catch (e) {
+      _mshMigrationFailed = true;
       console.warn("[FASERIP WARN] AE migration failed:", e);
     }
+  }
+
+  if (_mshMigrationsPending && !_mshMigrationFailed) {
+    await game.settings.set("msh-faserip", "dataMigrationVersion", 1);
+    console.log("[FASERIP] One-time document migrations complete (dataMigrationVersion=1)");
   }
 
 });

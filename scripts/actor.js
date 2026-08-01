@@ -1,3 +1,9 @@
+// actor.js v1.6.0 - 2026-07-31
+// v1.6.0: Fix pool double-subtract in availableLifetime (pool contributions
+//         are negative history entries, already inside spent). Delegate all
+//         spent math to computeKarmaTotals; remove _calculateTotalSpentLifetime
+//         and dead currentKarma getter. Fix getFlightInfo closest-match
+//         overshoot below Typical. Normalize ranks in movement getters.
 // actor.js v1.5.0 - 2026-07-23
 // actor.js v1.4.0 - 2026-05-15
 // v1.4.0: Karma reconciliation moved into prepareDerivedData. The displayed
@@ -85,11 +91,12 @@ export class FaseripActor extends Actor {
       };
     }
 
-    // Calculate AVAILABLE karma (lifetime minus spent minus funds)
-    const lifetimeSpent = this._calculateTotalSpentLifetime(system.karma.history);
+    // Calculate AVAILABLE karma. Pool contributions are negative history
+    // entries (karma.js), so they are already inside spent — do not
+    // subtract karma.pool again.
+    const { spent: lifetimeSpent } = computeKarmaTotals(system.karma.history);
     const advancementFund = system.karma.advancement || 0;
-    const karmaPool = system.karma.pool || 0;
-    const availableLifetimeKarma = Math.max(0, system.karma.lifetime - lifetimeSpent - advancementFund - karmaPool);
+    const availableLifetimeKarma = Math.max(0, system.karma.lifetime - lifetimeSpent - advancementFund);
 
     // karma.max = R+I+P (base starting karma, for reference display)
     // karma.value is persisted in DB — managed by karma.js, combat-handler, rolls.js, etc.
@@ -236,30 +243,9 @@ export class FaseripActor extends Actor {
 
   // Getter for available lifetime karma (for bottom left display)
   get availableKarma() {
-    const lifetimeSpent = this._calculateTotalSpentLifetime(this.system.karma?.history || []);
-    const advancementFund = this.system.karma?.advancement || 0;
-    return Math.max(0, (this.system.karma?.lifetime || 0) - lifetimeSpent - advancementFund);
-  }
-
-  get currentKarma() {
-    if (!this.system.abilities) return 0;
-    const reason = this.system.abilities.reason?.value || 0;
-    const intuition = this.system.abilities.intuition?.value || 0;
-    const psyche = this.system.abilities.psyche?.value || 0;
-    return reason + intuition + psyche;
-  }
-
-  // Helper method to calculate total spent karma
-  _calculateTotalSpentLifetime(history) {
-    if (!history || !history.length) return 0;
-
-    let totalSpent = 0;
-    history.forEach(event => {
-      if (event.amount < 0) {
-        totalSpent += Math.abs(event.amount);
-      }
-    });
-    return totalSpent;
+    const k = this.system.karma;
+    const spent = computeKarmaTotals(k?.history).spent;
+    return Math.max(0, (k?.lifetime || 0) - spent - (k?.advancement || 0));
   }
 
   // Movement data tables
@@ -287,6 +273,7 @@ export class FaseripActor extends Actor {
       "Class 5000": { areas: 100, mph: 1500 }
     },
     // Air speed by rank: { areas/round, mph, groundAreas (for low altitude) }
+    // Shift-Z mph is 3750 per the printed Advanced Set table (not areas×15).
     airSpeed: {
       "Feeble": { areas: 2, mph: 30, groundAreas: 1 },
       "Poor": { areas: 4, mph: 60, groundAreas: 2 },
@@ -376,19 +363,19 @@ export class FaseripActor extends Actor {
         return { rank, ...data };
       }
     }
-    // If no exact match, find closest
-    let closest = { rank: "Typical", areas: 6, mph: 90, groundAreas: 3 };
+    // If no exact match, use the highest entry not exceeding airAreas
+    let closest = null;
     for (const [rank, data] of Object.entries(FaseripActor.MOVEMENT_DATA.airSpeed)) {
-      if (data.areas <= airAreas && data.areas > closest.areas) {
+      if (data.areas <= airAreas && (!closest || data.areas > closest.areas)) {
         closest = { rank, ...data };
       }
     }
-    return closest;
+    return closest ?? { rank: "Feeble", ...FaseripActor.MOVEMENT_DATA.airSpeed["Feeble"] };
   }
 
   // Calculate suggested movement (areas/turn) based on Endurance rank
   get suggestedMovement() {
-    const enduranceRank = this.system.abilities?.endurance?.rank || "Typical";
+    const enduranceRank = normalizeRank(this.system.abilities?.endurance?.rank || "Typical");
     const oneAreaRanks = ["Feeble"];
     const twoAreaRanks = ["Poor", "Typical", "Good", "Excellent"];
     if (oneAreaRanks.includes(enduranceRank)) return 1;
@@ -398,13 +385,13 @@ export class FaseripActor extends Actor {
 
   // Get leaping data based on Strength rank
   get leapingData() {
-    const strengthRank = this.system.abilities?.strength?.rank || "Typical";
+    const strengthRank = normalizeRank(this.system.abilities?.strength?.rank || "Typical");
     return FaseripActor.MOVEMENT_DATA.leaping[strengthRank] || { upFeet: 6, acrossFeet: 6, downFeet: 9, upFloors: 0.4, acrossAreas: 0, downFloors: 0.6 };
   }
 
   // Get exhaustion threshold (turns before first FEAT check)
   get exhaustionThreshold() {
-    const enduranceRank = this.system.abilities?.endurance?.rank || "Typical";
+    const enduranceRank = normalizeRank(this.system.abilities?.endurance?.rank || "Typical");
     return FaseripActor.MOVEMENT_DATA.rankNumbers[enduranceRank] || 6;
   }
 
