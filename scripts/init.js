@@ -1,4 +1,10 @@
-﻿// init.js v1.12.8 - 2026-07-09
+﻿// init.js v1.13.1 - 2026-08-01
+// v1.13.1: CTT timeAdvanced site passes deltaSeconds as pendingSeconds to
+//          processPoisonRound (CTT fires pre-worldTime-advance).
+// init.js v1.13.0 - 2026-08-01
+// v1.13.0: Poison processing wired into all three dying call sites
+//          (combatRound, out-of-combat updateWorldTime, CTT timeAdvanced),
+//          always BEFORE dying so poison rank losses take RAW priority.
 // v1.12.8: Force themed theme-light on all system-owned V2 windows via
 //          renderApplicationV2 hook. Fixes dark-theme unreadability on
 //          the chargen tab and non-.dialog HUD action dialogs (combat
@@ -246,10 +252,20 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   game.msh._dyingInProgress = true;
   try {
     const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+    const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
     const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
     for (const c of combat.combatants) {
       const actor = c?.actor;
       if (!actor) continue;
+      // Poison BEFORE dying: poison Endurance losses take priority (RAW),
+      // and the endRankLoss stamp it sets makes dying defer its step.
+      const poisonAE = actor.effects.find(e =>
+        e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
+      );
+      if (poisonAE) {
+        console.log(`[FASERIP:POISON] combatRound: processing poison for ${actor.name}`);
+        await processPoisonRound(actor);
+      }
       const dyingAE = actor.effects.find(e =>
         (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
         !e.disabled
@@ -441,9 +457,18 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
     if (dt >= 6) {
       try {
         const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+        const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
         const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
         for (const actor of Effects.getAllTokenActors()) {
           if (!actor?.effects?.size) continue;
+          // Poison BEFORE dying (priority + governor stamp)
+          const poisonAE = actor.effects.find(e =>
+            e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
+          );
+          if (poisonAE) {
+            console.log(`[FASERIP:POISON] worldTime advance: processing poison for ${actor.name} (dt=${dt}s)`);
+            await processPoisonRound(actor);
+          }
           const dyingAE = actor.effects.find(e =>
             (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
             !e.disabled
@@ -1508,6 +1533,7 @@ Hooks.once("init", async () => {
 
       try {
         const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+        const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
         const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
 
         // Process 1 dying round per character per CTT advance.
@@ -1515,6 +1541,14 @@ Hooks.once("init", async () => {
         // Out of combat, each manual CTT advance ticks dying once â€” GM controls pacing.
         for (const actor of Effects.getAllTokenActors()) {
           if (!actor?.effects?.size) continue;
+          // Poison BEFORE dying (priority + governor stamp)
+          const poisonAE = actor.effects.find(e =>
+            e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
+          );
+          if (poisonAE) {
+            console.log(`[FASERIP:POISON] CTT timeAdvanced: processing poison for ${actor.name} (pending ${deltaSeconds}s)`);
+            await processPoisonRound(actor, { pendingSeconds: deltaSeconds });
+          }
           const dyingAE = actor.effects.find(e =>
             (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
             !e.disabled

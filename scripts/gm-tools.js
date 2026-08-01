@@ -1,4 +1,10 @@
-// gm-tools.js v1.4.1 - 2026-07-03
+// gm-tools.js v1.4.3 - 2026-08-01
+// v1.4.3: Poison dialog — capture button/form refs before awaits
+//         (ev.currentTarget is nulled after handler yields); button shows
+//         Applied state instead of fragile auto-close.
+// gm-tools.js v1.4.2 - 2026-08-01
+// v1.4.2: Poison button on Effects tab — opens toxin-picker dialog
+//         (TOXINS catalog + custom intensity + source) → applyPoisonExposure.
 // v1.4.1: Move the ability-rank test controls into the template (State tab,
 //         six non-Endurance ability rows via _snapshotState.abilityRanks);
 //         drop the activateListeners DOM injection. De-dup Endurance: the
@@ -783,6 +789,7 @@ export class GMToolsApp extends Application {
       case "weakened":    return applyWeakened(actor, { rounds: 5 });
       case "unconscious": return applyUnconscious(actor, { rounds: 10 });
       case "dying":       return applyDying(actor, {});
+      case "poison":      return this._openPoisonDialog(actor);
       case "charging":    return applyCharging(actor, { rounds: 1 });
       case "evade":       return applyEvade(actor, { evadeSuccessful: true });
       case "block":       return applyBlock(actor, { armorRank: "Good", armorValue: 10 });
@@ -791,6 +798,63 @@ export class GMToolsApp extends Application {
       case "reversed":    return applyReversed(actor);
       default: throw new Error(`Unknown effect id: ${id}`);
     }
+  }
+
+  async _openPoisonDialog(actor) {
+    const { TOXINS } = await import("./rules/rules-reference.js");
+    const { showFaseripDialog } = await import("./modules/actions/dialog-shim.js");
+    const toxinOpts = Object.entries(TOXINS)
+      .map(([id, t]) => `<option value="${id}">${t.name} (${t.intensity})</option>`)
+      .join("");
+    const rankOpts = RANKS_ORDERED
+      .filter(r => r !== "Shift-0" && r !== "Beyond")
+      .map(r => `<option value="${r}" ${r === "Typical" ? "selected" : ""}>${r}</option>`)
+      .join("");
+    const content = `
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label>Toxin:
+          <select name="toxinId" style="width:100%;">
+            ${toxinOpts}
+            <option value="">— Custom (use Intensity below) —</option>
+          </select>
+        </label>
+        <label>Custom Intensity:
+          <select name="intensity" style="width:100%;">${rankOpts}</select>
+        </label>
+        <label>Source (optional):
+          <input type="text" name="sourceName" placeholder="e.g. Snake bite" style="width:100%;">
+        </label>
+        <button type="button" name="apply-poison"
+                style="margin-top:4px;background:#6a1b9a;color:#fff;border:none;border-radius:3px;padding:6px;cursor:pointer;">
+          <i class="fas fa-skull-crossbones"></i> Expose ${actor.name}
+        </button>
+      </div>`;
+    return showFaseripDialog({
+      title: `Poison Exposure — ${actor.name}`,
+      content,
+      width: 320,
+      render: (html) => {
+        const root = html instanceof HTMLElement ? html : html?.[0];
+        root?.querySelector('[name="apply-poison"]')?.addEventListener("click", async (ev) => {
+          // Capture refs synchronously — ev.currentTarget is nulled once the
+          // handler yields at the first await.
+          const btnEl = ev.currentTarget;
+          const form = btnEl.closest("div");
+          const toxinId = form.querySelector('[name="toxinId"]')?.value || "";
+          const intensity = form.querySelector('[name="intensity"]')?.value || "Typical";
+          const sourceName = form.querySelector('[name="sourceName"]')?.value || "";
+          btnEl.disabled = true;
+          const { applyPoisonExposure } = await import("./modules/effects/poison-engine.js");
+          const result = await applyPoisonExposure(actor, {
+            toxinId: toxinId || null,
+            intensity,
+            sourceName,
+          });
+          ui.notifications.info(`Poison exposure: ${actor.name} — ${result}`);
+          btnEl.innerHTML = '<i class="fas fa-check"></i> Applied';
+        });
+      },
+    });
   }
 
   _otherSideName(actor) {

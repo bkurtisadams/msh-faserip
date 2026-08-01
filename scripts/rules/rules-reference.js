@@ -1,4 +1,6 @@
-// rules-reference.js v1.4.0 - 2026-07-31
+// rules-reference.js v1.5.0 - 2026-08-01
+// v1.5.0: POISON_RULES + TOXINS catalog (Advanced Set poisons & toxins,
+//         GM rulings PR1-PR4 inline). Consumed by poison-engine.js.
 // v1.4.0: valueToRank now walks the printed Rank Range table (8 = Good).
 //         RANK_RANGES verified against the book and extended with upper
 //         tiers per GM ruling: ShZ 351-999, Cl1000 1000-2999, Cl3000
@@ -3009,4 +3011,45 @@ export const GRAND_SLAM_AREAS = {
   "Class 1000": 100,
   "Class 3000": 200,
   "Class 5000": 500
+};
+
+// ── POISONS & TOXINS ──
+// Advanced Set RAW: Endurance FEAT vs toxin Intensity. Failure = unconscious
+// 1-10 rounds + immediate loss of 1 Endurance rank. Re-FEAT at lowered rank
+// after 1-10 turns: success halts, failure loses another rank. Endurance
+// Shift-0 from poison = death. Poison losses override other Endurance losses;
+// max 1 rank lost per round regardless of cause. Only the victim's own FEAT
+// — or trained help (First Aid/Medicine) WITH antitoxin — halts the poison.
+// Resistance to Toxins: rolls in place of Endurance; on failure End drops,
+// the Power rank does not.
+export const POISON_RULES = {
+  exposureFeat: "Endurance FEAT vs toxin Intensity (Resistance to Toxins substitutes).",
+  failure: "Unconscious 1-10 rounds. Lose 1 Endurance rank immediately.",
+  reFeat: "After 1-10 turns, Endurance FEAT at lowered rank. Success halts. Failure: lose another rank, new 1-10 turn window.",
+  death: "Endurance Shift-0 from poison = death.",
+  cap: "Max 1 Endurance rank lost per round, any cause. Poison losses take priority over dying/Kill losses.",
+  halting: "Victim's own FEAT, or treater with First Aid/Medicine talent AND antitoxin. Untrained help cannot halt.",
+  recovery: "Lost Endurance heals per Impaired Endurance: 1 rank/week, 1 rank/day with medical care.",
+  // GM RULINGS (Kurt):
+  // PR1: KO duration (1d10 rounds) and re-FEAT window (1d10 turns) are
+  //      separate rolls; turn = round for this purpose.
+  // PR2: No -2CS Impaired Endurance penalty from poison rank loss alone —
+  //      the lowered rank is the penalty. (Dying's -2CS is a dying rule.)
+  // PR3: FEAT color per FEAT_INTENSITY_RULES (green vs equal intensity does
+  //      not succeed; yellow needed at parity, standard intensity ladder).
+  // PR4: Repeat exposure while already poisoned is ignored in v1; GM may
+  //      raise effective Intensity manually for massive doses.
+};
+
+export const TOXINS = {
+  knockoutTy:   { name: "Knockout Drug (weak)",       intensity: "Typical",    delivery: "injected", notes: "Street-grade sedative dart." },
+  knockoutEx:   { name: "Knockout Drug",              intensity: "Excellent",  delivery: "injected", notes: "Kraven's darts, gas grenades." },
+  snakeVenomGd: { name: "Snake Venom",                intensity: "Good",       delivery: "injected", notes: "Venomous snake bite. GM addition for Kraven's lair (module snakes are constrictors)." },
+  snakeVenomEx: { name: "Snake Venom (potent)",       intensity: "Excellent",  delivery: "injected", notes: "Krait, mamba, sea snake." },
+  spiderVenom:  { name: "Spider Venom",               intensity: "Typical",    delivery: "injected", notes: "Widow/recluse class." },
+  cyanide:      { name: "Cyanide",                    intensity: "Remarkable", delivery: "ingested", notes: "Fast-acting industrial poison." },
+  arsenic:      { name: "Arsenic",                    intensity: "Excellent",  delivery: "ingested", notes: "Classic slow poison." },
+  nerveAgent:   { name: "Nerve Agent",                intensity: "Incredible", delivery: "inhaled",  notes: "Military-grade. Gas mask negates." },
+  contactPoison:{ name: "Contact Poison",             intensity: "Good",       delivery: "contact",  notes: "Skin absorption; gloves negate." },
+  savageryDrug: { name: "Savagery Formula (Kraven)",  intensity: "Good",       delivery: "injected", notes: "Rat-bite chemical. Failure = savage rage, not KO — GM narrates in place of unconsciousness." },
 };

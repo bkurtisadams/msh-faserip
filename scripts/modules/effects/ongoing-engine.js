@@ -1,4 +1,8 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.8 - 2026-05-15
+// scripts/modules/effects/ongoing-engine.js v1.7.9 - 2026-08-01
+// v1.7.9: Poison integration. processOneEffect hard-skips "poison" (owned by
+//         poison-engine.js processPoisonRound). _processDyingRoundInner defers
+//         its rank step when the endRankLoss flag shows poison already took
+//         this turn's rank (RAW: poison losses override, max 1 rank/round).
 // v1.7.8: loseOneEnduranceRank export — mirror of restoreOneEnduranceRank.
 //         Reduces End rank by one step, recalcs max Health, drops current HP
 //         by the delta. Returns belowFeeble flag for the RAW "healer dies"
@@ -398,7 +402,9 @@ export async function processOngoingEffects(worldTime, dt = 0) {
 async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
   // Skip combat-only effects — dying is handled by processDyingRound on round change,
   // not by worldTime ticks. Hard-code "dying" as safety net for saved configs missing the flag.
-  if (config.combatOnly || effectId === "dying") return;
+  // "poison" is handled by poison-engine.js processPoisonRound (windowed re-FEATs,
+  // not per-cycle stat.loss) — never let the generic engine tick it.
+  if (config.combatOnly || effectId === "dying" || effectId === "poison") return;
 
   // Find corresponding AE — must be enabled
   const ae = actor.effects.find(e =>
@@ -838,6 +844,22 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
     }); } catch (_e) { /* best-effort */ }
 
     return "dead";
+  }
+
+  // ── Poison priority governor ─────────────────────────────────────
+  // RAW: poison Endurance losses override other losses, max 1 rank/round
+  // regardless of cause. If poison-engine already took this turn's rank
+  // (endRankLoss flag stamped source:"poison" within the turn window),
+  // dying defers its step this round. init.js processes poison before
+  // dying at every call site so the stamp is fresh when we read it.
+  const rankLossStamp = actor.getFlag(scope, "endRankLoss");
+  if (rankLossStamp?.source === "poison") {
+    const turnSecs = Number(game.settings.get("msh-faserip", "turnSeconds")) || 6;
+    const elapsed = game.time.worldTime - rankLossStamp.at;
+    if (elapsed >= 0 && elapsed < turnSecs) {
+      console.log(`[FASERIP:DYING] ${actor.name}: poison took this turn's rank loss — dying step deferred`);
+      return "none";
+    }
   }
 
   // ── Step endurance down ──────────────────────────────────────────

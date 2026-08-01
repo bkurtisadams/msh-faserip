@@ -1,4 +1,6 @@
-// chat-hooks.js v1.7.3 - 2026-07-31
+// chat-hooks.js v1.7.4 - 2026-08-01
+// v1.7.4: administer-antitoxin chat button handler (3b). Treater = selected
+//         token; poison-engine validates First Aid/Medicine + antitoxin item.
 // v1.7.3: Fix automatic-nullification card text (Endurance 2+ ranks below
 //         intensity, not 3+) per adopted Impossible FEATs rule.
 // chat-hooks.js v1.7.2 - 2026-07-03
@@ -660,6 +662,40 @@ export function installActionChatHandlers() {
         }
       } catch (e) {
         console.error("[FASERIP] Wash continuing damage handler failed:", e);
+      }
+    });
+
+    // 3b) Administer Antitoxin (poison-engine). Treater = selected token's
+    // actor. Validates First Aid/Medicine talent + antitoxin item in-engine.
+    html.on("click", '[data-action="administer-antitoxin"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorUuid = btn.dataset.actorUuid;
+      if (!actorUuid) return;
+      try {
+        const doc = await fromUuid(actorUuid);
+        const patient = doc?.actor ?? doc ?? null;
+        if (!patient) return;
+        const healer = canvas.tokens?.controlled?.[0]?.actor ?? game.user?.character ?? null;
+        if (!healer) {
+          ui.notifications.warn("Select the treating character's token first.");
+          return;
+        }
+        if (!healer.isOwner && !game.user.isGM) {
+          ui.notifications.warn("You don't own the treating character.");
+          return;
+        }
+        const { administerAntitoxin } = await import("../effects/poison-engine.js");
+        const result = await administerAntitoxin(patient, healer);
+        if (result.ok) {
+          btn.disabled = true;
+          btn.style.opacity = "0.5";
+          btn.innerHTML = '<i class="fas fa-check"></i> Treated';
+        } else {
+          ui.notifications.warn(result.reason);
+        }
+      } catch (e) {
+        console.error("[FASERIP] Administer antitoxin handler failed:", e);
       }
     });
 
