@@ -3179,7 +3179,7 @@ function buildSlamEffectPill(slamEffect) {
 export function buildCollapsibleSlamSection(result, opts = {}) {
   if (!result) return "";
   
-  const { colorLower, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, targetName, defenderUuid, roll, effectiveEndRank } = result;
+  const { colorLower, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, targetName, defenderUuid, roll, effectiveEndRank, karmaUsed = 0, cappedTotal } = result;
   
   // Color-coded summary based on slam effect
   const effectColors = {
@@ -3216,7 +3216,7 @@ export function buildCollapsibleSlamSection(result, opts = {}) {
     <div class="frp-check-roll-info" style="padding:8px;font-size:.85em;color:#555;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
       <span>Endurance: ${effectiveEndRank}</span>
       <span>|</span>
-      <span>Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span></span>
+      <span>Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span>${karmaUsed > 0 ? ` <span style="color:#1565c0;">+ ${karmaUsed} Karma = ${cappedTotal ?? Math.min(100, roll + karmaUsed)}</span>` : ""}</span>
       <span>|</span>
       <span>Result:</span>
       ${colorPill}
@@ -3250,7 +3250,7 @@ export function buildCollapsibleSlamSection(result, opts = {}) {
 export function buildCollapsibleStunSection(result, opts = {}) {
   if (!result) return "";
   
-  const { colorLower, stunDuration, roll, effectiveEndRank } = result;
+  const { colorLower, stunDuration, roll, effectiveEndRank, karmaUsed = 0, cappedTotal } = result;
 
   const colorKey = String(colorLower || '').toLowerCase();
   let colors = { bg: "#28A745", fg: "#fff", icon: "&#x1F6E1;" };
@@ -3275,7 +3275,7 @@ export function buildCollapsibleStunSection(result, opts = {}) {
     <div class="frp-check-roll-info" style="padding:8px;font-size:.85em;color:#555;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
       <span>Endurance: ${effectiveEndRank}</span>
       <span>|</span>
-      <span>Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span></span>
+      <span>Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span>${karmaUsed > 0 ? ` <span style="color:#1565c0;">+ ${karmaUsed} Karma = ${cappedTotal ?? Math.min(100, roll + karmaUsed)}</span>` : ""}</span>
       <span>|</span>
       <span>Result:</span>
       ${colorPill}

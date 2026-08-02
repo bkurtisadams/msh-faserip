@@ -5,6 +5,9 @@
 // 2026-08-02: promptKarmaDeclaration() — Phase 1 as a standalone two-button
 // prompt for reactive/defensive FEATs (intensity resists) that are rolled by
 // the pipeline rather than from a roll dialog. Gate on ownership at call site.
+// 2026-08-02 (3): localDeclareTimeoutMs option — high-frequency callers
+// (Slam/Stun/Kill checks) countdown the LOCAL GM/owner prompt too, so
+// full-auto NPC saves auto-decline instead of parking on a dialog.
 // 2026-08-02 (2): resolveResistFeat() router — routes the whole resist
 // sequence (declare with 10s countdown → roll → Phase-2 amount → deduct) to
 // an active owning player's client via socketlib executeAsUser; falls back to
@@ -117,6 +120,11 @@ export async function resolveResistFeatSequence(actor, {
  */
 export async function resolveResistFeat(targetActor, opts = {}) {
   const declareTimeoutMs = opts.declareTimeoutMs ?? 10000;
+  // Local (GM/owner) prompts default to untimed — the deciding human is
+  // looking at the dialog. High-frequency callers (Slam/Stun/Kill checks in
+  // full-auto) pass localDeclareTimeoutMs so NPC saves auto-decline instead
+  // of parking combat on an unattended dialog.
+  const localDeclareTimeoutMs = opts.localDeclareTimeoutMs ?? 0;
   const hasKarma = getAvailableKarma(targetActor) > 0;
 
   if (hasKarma) {
@@ -142,7 +150,7 @@ export async function resolveResistFeat(targetActor, opts = {}) {
       return resolveResistFeatSequence(targetActor, { ...opts, skipPrompt: true });
     }
     if (game.user.isGM || targetActor.isOwner) {
-      return resolveResistFeatSequence(targetActor, { ...opts, declareTimeoutMs: 0 });
+      return resolveResistFeatSequence(targetActor, { ...opts, declareTimeoutMs: localDeclareTimeoutMs });
     }
   }
   return resolveResistFeatSequence(targetActor, { ...opts, skipPrompt: true });

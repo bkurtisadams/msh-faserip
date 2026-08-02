@@ -1,3 +1,15 @@
+// scripts/modules/actions/check-action.js v1.12.0 - 2026-08-02
+// v1.12.0: Defender Karma on Slam/Stun/Kill checks (RAW two-phase, routed).
+//          Both roll sites (full-auto fast-path and the manual/semi dialog)
+//          roll through _rollCheckWithKarma → resolveResistFeat: an active
+//          owning player gets the declaration prompt (10s auto-decline) on
+//          their client with Phase-2 amount dialog; local GM prompts also
+//          countdown (localDeclareTimeoutMs) so full-auto NPC saves never
+//          park combat on an unattended dialog. Blindside gate honored per
+//          RAW ("target cannot add Karma to Slam/Stun/Kill FEATs") via
+//          prefill.blindside / opts.blindside — nothing sets it yet; the
+//          +2CS blindside attack option is a future slice. karmaUsed is
+//          threaded into result payloads for card display.
 // scripts/modules/actions/check-action.js v1.11.0 - 2026-04-16
 // v1.11.0: Check-action rules fixes and cleanup.
 //          - CA2: _strengthToAreas now reads GRAND_SLAM_AREAS from rules-reference,
@@ -62,6 +74,45 @@ export class CheckAction extends BaseAction {
   /** Build a simple select */
   _rankOptions(selected) {
     return RANKS.map(r => `<option value="${r}" ${String(r).toLowerCase()===String(selected).toLowerCase()?"selected":""}>${r}</option>`).join("");
+  }
+
+  /**
+   * Roll the defender's check d100 with the Karma offer (RAW two-phase).
+   * Routes through resolveResistFeat: active owning player → declaration
+   * prompt with 10s auto-decline on THEIR client, Phase-2 amount dialog,
+   * deduction under their ownership; GM/owner local prompt with the same
+   * countdown (localDeclareTimeoutMs) so full-auto NPC saves auto-decline
+   * rather than parking combat. Blindsided targets get no offer per RAW.
+   * Returns { roll, rollTotal, capped, karmaUsed, viaKarmaPath }.
+   */
+  async _rollCheckWithKarma(actor, { rank, sourceName, blindside = false }) {
+    if (!blindside) {
+      try {
+        const { getAvailableKarma, resolveResistFeat } = await import("../dice/dice-roller.js");
+        if (getAvailableKarma(actor) > 0) {
+          const fr = await resolveResistFeat(actor, {
+            sourceName,
+            rank,
+            declareTimeoutMs: 10000,
+            localDeclareTimeoutMs: 10000
+          });
+          if (fr && typeof fr.cappedTotal === "number") {
+            return {
+              roll: { total: fr.rollTotal },
+              rollTotal: fr.rollTotal,
+              capped: Math.min(100, fr.cappedTotal),
+              karmaUsed: fr.karmaUsed || 0,
+              viaKarmaPath: true
+            };
+          }
+        }
+      } catch (e) {
+        console.warn("[FASERIP] Check karma routing failed; rolling plain:", e);
+      }
+    }
+    const roll = new Roll("1d100");
+    await roll.evaluate();
+    return { roll, rollTotal: roll.total, capped: Math.min(100, roll.total), karmaUsed: 0, viaKarmaPath: false };
   }
 
   async execute() {
@@ -149,24 +200,34 @@ export class CheckAction extends BaseAction {
       const preRolled = this.opts?.preRolledResult;
       
       let roll, capped, colorLower;
+      let checkKarmaUsed = 0;
       
       if (preRolled && preRolled.colorLower) {
         // Use pre-rolled result (from inline check for consolidated mode)
         colorLower = preRolled.colorLower;
-        capped = preRolled.roll || 50;
-        roll = { total: capped };  // Synthetic roll object for compatibility
+        capped = preRolled.cappedTotal ?? preRolled.roll ?? 50;
+        roll = { total: preRolled.roll ?? capped };  // Synthetic roll object for compatibility
+        checkKarmaUsed = Number(preRolled.karmaUsed) || 0;
         debugLog("Using pre-rolled result", { colorLower, capped, preRolled });
       } else {
-        // Roll percent normally
-        roll = new Roll("1d100");
-        await roll.evaluate();
+        // Roll with the defender Karma offer (RAW: blindsided targets
+        // cannot add Karma to Slam/Stun/Kill FEATs).
+        const blindside = !!(prefill.blindside || this.opts?.blindside);
+        const kr = await this._rollCheckWithKarma(actor, {
+          rank: effectiveEndRank,
+          sourceName: `${actionName} Check${prefill.attackerName ? ` vs ${prefill.attackerName}` : ""}`,
+          blindside
+        });
+        roll = kr.roll;
+        checkKarmaUsed = kr.karmaUsed;
         
-        // Show dice animation (skip if using pre-rolled or skipChatMessage)
-        if (!this.opts?.skipDice && !skipChatMessage) {
+        // Dice animation only for the plain local roll — the karma-routed
+        // path rolled on the deciding client via rollD100AndApplyKarma.
+        if (!kr.viaKarmaPath && !this.opts?.skipDice && !skipChatMessage) {
           await showDiceAnimation(roll, actor, `${actionName}: ${targetName} (${effectiveEndRank})`, useConsolidated);
         }
         
-        capped = Math.min(100, roll.total);
+        capped = kr.capped;
         colorLower = String(universalColor(effectiveEndRank, capped) || "white").toLowerCase();
       }
       
@@ -207,6 +268,8 @@ export class CheckAction extends BaseAction {
             attackerStrengthRank,
             targetName,
             roll: roll.total,
+            cappedTotal: capped,
+            karmaUsed: checkKarmaUsed,
             effectiveEndRank,
             defenderUuid,
             effectsSuppressed: false
@@ -230,6 +293,8 @@ export class CheckAction extends BaseAction {
             stunDuration: stunDur,
             targetName,
             roll: roll.total,
+            cappedTotal: capped,
+            karmaUsed: checkKarmaUsed,
             effectiveEndRank,
             defenderUuid,
             effectsSuppressed: false
@@ -242,6 +307,8 @@ export class CheckAction extends BaseAction {
           colorLower,
           targetName,
           roll: roll.total,
+          cappedTotal: capped,
+          karmaUsed: checkKarmaUsed,
           effectiveEndRank,
           defenderUuid
         };
@@ -521,6 +588,7 @@ export class CheckAction extends BaseAction {
         actor, actionType, effectiveEndRank, shiftDisplay,
         roll, colorLower, effectText, effectsSuppressed, extraHtml,
         targetName,
+        karmaUsed: checkKarmaUsed, cappedTotal: capped,
         saveAbility: isSaveNullify ? (this.abilityName || null) : null
       });
       if (!skipChatMessage) {
@@ -605,14 +673,23 @@ export class CheckAction extends BaseAction {
       useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
     } catch (_e) { /* setting not registered yet */ }
     
-    const roll = new Roll("1d100");
-    await roll.evaluate();
+    // Roll with the defender Karma offer (RAW: blindsided targets cannot
+    // add Karma to Slam/Stun/Kill FEATs). Routed to the owning player when
+    // one is active; the GM's local prompt counts down 10s the same way.
+    const _blindside = !!(prefill.blindside || this.opts?.blindside);
+    const _kr = await this._rollCheckWithKarma(actor, {
+      rank: effectiveEndRank,
+      sourceName: `${labelFor(actionType)} Check${prefill.attackerName ? ` vs ${prefill.attackerName}` : ""}`,
+      blindside: _blindside
+    });
+    const roll = _kr.roll;
+    const _checkKarmaUsed = _kr.karmaUsed;
     
     // Roll is always embedded in the card (no separate roll.toMessage)
     
     const color = (typeof rollUniversalTable === "function")
-      ? rollUniversalTable(effectiveEndRank, Math.min(100, roll.total))
-      : (game?.msh?.rollUniversalTable?.(effectiveEndRank, Math.min(100, roll.total)) ?? "white");
+      ? rollUniversalTable(effectiveEndRank, _kr.capped)
+      : (game?.msh?.rollUniversalTable?.(effectiveEndRank, _kr.capped) ?? "white");
     const colorLower = String(color || "white").toLowerCase();
 
     let finalEffect = mapping[colorLower] || color;
@@ -827,6 +904,7 @@ export class CheckAction extends BaseAction {
       actor, actionType, effectiveEndRank, shiftDisplay,
       roll, colorLower, effectText, effectsSuppressed, extraHtml,
       targetName: choice.targetName || prefill.targetName || null,
+      karmaUsed: _checkKarmaUsed, cappedTotal: _kr.capped,
       saveAbility: isSaveNullify ? (this.abilityName || null) : null
     });
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
@@ -894,9 +972,12 @@ export class CheckAction extends BaseAction {
     }, opts);
   }
 
-  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml, targetName = null, saveAbility = null }) {
+  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml, targetName = null, saveAbility = null, karmaUsed = 0, cappedTotal = null }) {
     const { bg, fg } = bannerColors(colorLower);
-    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const _karmaNote = karmaUsed > 0
+      ? ` <span style="color:#1565c0;font-size:.9em;">+ ${karmaUsed} Karma = ${cappedTotal ?? Math.min(100, roll.total + karmaUsed)}</span>`
+      : "";
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>${_karmaNote}`;
     const displayName = targetName || actor.name;
 
     // Use save ability for mental power saves, else default to Endurance
