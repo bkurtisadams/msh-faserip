@@ -2,6 +2,14 @@
 // Two-phase karma system per FASERIP rules:
 // Phase 1: Declare intent to spend karma BEFORE rolling
 // Phase 2: After seeing roll, decide amount (minimum 10 or all remaining)
+// 2026-08-02: promptKarmaDeclaration() — Phase 1 as a standalone two-button
+// prompt for reactive/defensive FEATs (intensity resists) that are rolled by
+// the pipeline rather than from a roll dialog. Gate on ownership at call site.
+// 2026-08-02 (2): resolveResistFeat() router — routes the whole resist
+// sequence (declare with 10s countdown → roll → Phase-2 amount → deduct) to
+// an active owning player's client via socketlib executeAsUser; falls back to
+// a local sequence for the GM/owner, or a plain roll. Handler registered in
+// gm-utils registerSocket.
 
 import { runAsGM } from '../../gm-utils.js';
 
@@ -12,6 +20,132 @@ function debugLog(...args) {
       console.log("FASERIP DEBUG |", ...args);
     }
   } catch (_) {}
+}
+
+/**
+ * Phase-1 declaration prompt for a reactive FEAT (e.g. resisting a stun
+ * weapon's Intensity). RAW: karma must be declared before the die is rolled,
+ * with a minimum commitment (10, or all remaining if less) that is spent even
+ * if the raw roll would have sufficed. Returns true if karma was declared.
+ * Callers should skip this entirely for automatic/impossible FEATs (no roll)
+ * and when the target has no karma.
+ * timeoutMs > 0 shows a countdown and auto-declines (closes → false) when it
+ * expires — used when the prompt is routed to the owning player's client.
+ */
+export async function promptKarmaDeclaration(actor, { sourceName = "FEAT", rank = "", intensityRank = "", requirement = "", timeoutMs = 0 } = {}) {
+  const available = getAvailableKarma(actor);
+  if (available <= 0) return false;
+  const minKarma = getMinimumKarmaCommitment(actor);
+  const { showFaseripButtonDialog } = await import("../actions/dialog-shim.js");
+  const needLine = requirement
+    ? `<div style="margin-bottom:6px;">Need <b>${String(requirement).toUpperCase()}</b> \u2014 ${rank}${intensityRank ? ` vs ${intensityRank} Intensity` : ""}</div>`
+    : "";
+  const countdownLine = timeoutMs > 0
+    ? `<div style="margin-top:6px;text-align:center;font-size:.9em;color:#c62828;">Auto-declines in <b><span class="karma-countdown">${Math.ceil(timeoutMs / 1000)}</span></b>s</div>`
+    : "";
+  let timer = null;
+  let tick = null;
+  const result = await showFaseripButtonDialog({
+    title: `Karma \u2014 ${actor.name}: ${sourceName}`,
+    content: `<div style="min-width:340px;padding:4px 2px;">
+      ${needLine}
+      <div style="padding:6px 8px;background:#fff3e0;border-left:4px solid #ff9800;font-size:.9em;">
+        Declare Karma <b>before</b> the roll. Minimum commitment <b>${minKarma}</b> is spent
+        even if the raw roll succeeds. Available: <b>${available}</b>.
+      </div>
+      ${countdownLine}
+    </div>`,
+    buttons: {
+      declare: { label: `Declare Karma (min ${minKarma})`, icon: "fas fa-star", callback: () => true },
+      roll:    { label: "Roll Without Karma", icon: "fas fa-dice", callback: () => false }
+    },
+    default: "roll",
+    render: ($html, dialog) => {
+      if (timeoutMs > 0) {
+        let remaining = Math.ceil(timeoutMs / 1000);
+        tick = setInterval(() => {
+          remaining -= 1;
+          $html.find(".karma-countdown").text(Math.max(0, remaining));
+        }, 1000);
+        timer = setTimeout(() => { try { dialog.close(); } catch (_) {} }, timeoutMs);
+      }
+    },
+    close: () => {
+      if (timer) clearTimeout(timer);
+      if (tick) clearInterval(tick);
+    }
+  });
+  return result === true;
+}
+
+/**
+ * Full resist-FEAT sequence on THIS client: Phase-1 declaration (optional
+ * countdown) → d100 via rollD100AndApplyKarma (Phase-2 amount dialog +
+ * deduction when declared). Returns plain serializable numbers so the socket
+ * handler can relay it. skipPrompt rolls straight with no karma.
+ */
+export async function resolveResistFeatSequence(actor, {
+  sourceName = "FEAT", rank = "Typical", intensityRank = "", requirement = "",
+  declareTimeoutMs = 0, skipPrompt = false
+} = {}) {
+  let declared = false;
+  if (!skipPrompt && getAvailableKarma(actor) > 0) {
+    declared = await promptKarmaDeclaration(actor, {
+      sourceName, rank, intensityRank, requirement, timeoutMs: declareTimeoutMs
+    });
+  }
+  const { roll, cappedTotal, karmaUsed } = await rollD100AndApplyKarma(actor, {
+    spendKarma: declared,
+    rank,
+    sourceName,
+    skipDiceDisplay: true
+  });
+  return { rollTotal: roll.total, cappedTotal, karmaUsed, declared };
+}
+
+/**
+ * Router for a defender's resist FEAT. Preference order:
+ *   1. An active non-GM owner of the target (other than the executing user)
+ *      → route the whole sequence to their client via socketlib
+ *      executeAsUser, with the declaration countdown running there. Guarded
+ *      by a local timeout (declare window + 120s for the Phase-2 amount
+ *      dialog); on guard expiry or socket error, fall back to a plain local
+ *      roll with no karma.
+ *   2. Executing user is GM or owns the target → local sequence (no
+ *      countdown; the deciding human is the one looking at the dialog).
+ *   3. Otherwise → plain roll, no karma prompt.
+ */
+export async function resolveResistFeat(targetActor, opts = {}) {
+  const declareTimeoutMs = opts.declareTimeoutMs ?? 10000;
+  const hasKarma = getAvailableKarma(targetActor) > 0;
+
+  if (hasKarma) {
+    const owner = game.users.find(u =>
+      u.active && !u.isGM && u.id !== game.user.id &&
+      targetActor.testUserPermission(u, "OWNER")
+    );
+    if (owner && game.msh?.socket) {
+      ui.notifications?.info(`Waiting for ${owner.name}: Karma declaration (${Math.ceil(declareTimeoutMs / 1000)}s)...`);
+      const guardMs = declareTimeoutMs + 120000;
+      try {
+        const remote = await Promise.race([
+          game.msh.socket.executeAsUser("resolveResistFeat", owner.id, {
+            ...opts, declareTimeoutMs, actorUuid: targetActor.uuid
+          }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("resist-feat-guard-timeout")), guardMs))
+        ]);
+        if (remote && typeof remote.cappedTotal === "number") return remote;
+      } catch (e) {
+        console.warn(`[FASERIP] Remote resist FEAT for ${owner.name} failed/timed out — rolling locally without karma:`, e?.message || e);
+      }
+      // Fall through: plain local roll, no double-prompt.
+      return resolveResistFeatSequence(targetActor, { ...opts, skipPrompt: true });
+    }
+    if (game.user.isGM || targetActor.isOwner) {
+      return resolveResistFeatSequence(targetActor, { ...opts, declareTimeoutMs: 0 });
+    }
+  }
+  return resolveResistFeatSequence(targetActor, { ...opts, skipPrompt: true });
 }
 
 /**

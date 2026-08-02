@@ -1,3 +1,15 @@
+// attack-action.js v1.9.52 - 2026-08-02
+// v1.9.52: Resist FEAT routed through resolveResistFeat (dice-roller): the
+//          whole karma sequence runs on an active owning player's client via
+//          socketlib executeAsUser with a 10s auto-decline countdown; local
+//          GM/owner prompt as fallback, plain roll otherwise.
+// attack-action.js v1.9.51 - 2026-08-02
+// v1.9.51: _applyIntensityOnHit offers the defender Karma on the resist FEAT
+//          (RAW two-phase: promptKarmaDeclaration before the roll, min-10
+//          commitment, amount via showKarmaDecisionDialog after seeing it).
+//          Gated on getAvailableKarma > 0 and the executing user being GM or
+//          target owner; skipped for automatic/impossible FEATs (no roll to
+//          modify). Roll routed through rollD100AndApplyKarma.
 // attack-action.js v1.9.50 - 2026-08-02
 // v1.9.50: _applyIntensityOnHit resolves the Endurance FEAT through
 //          determineFeatRequirement (ability-feat-dialog) instead of the
@@ -792,12 +804,27 @@ export class AttackAction extends BaseAction {
       resisted = false;
       featLine = `Endurance (${endRank}) vs ${intensityRank} Intensity \u2014 2+ ranks below: IMPOSSIBLE FEAT, no roll`;
     } else {
-      const r = await (new Roll("1d100")).evaluate();
+      // Karma on the resist FEAT (RAW two-phase: declare before the roll,
+      // 10-point minimum commitment; amount chosen after seeing the die).
+      // resolveResistFeat routes the whole sequence to an active owning
+      // player's client (10s auto-decline countdown there), falls back to a
+      // local prompt for the GM/owner, else a plain roll.
+      const { resolveResistFeat } = await import("../dice/dice-roller.js");
+      const fr = await resolveResistFeat(targetActor, {
+        sourceName: `Resist ${weapon?.name || "Intensity"}`,
+        rank: endRank,
+        intensityRank,
+        requirement: req.requirement,
+        declareTimeoutMs: 10000
+      });
       const featColor = String(
-        (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total)) || "white"
+        (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, fr.cappedTotal)) || "white"
       ).toLowerCase();
       resisted = checkFeatSuccess(featColor, req.requirement);
-      featLine = `Endurance FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${req.requirement.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColor.toUpperCase()}</b>`;
+      const rollPart = fr.karmaUsed > 0
+        ? `rolled ${fr.rollTotal} + ${fr.karmaUsed} Karma = ${fr.cappedTotal}`
+        : `rolled ${fr.rollTotal}`;
+      featLine = `Endurance FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${req.requirement.toUpperCase()}: ${rollPart} \u2192 <b>${featColor.toUpperCase()}</b>`;
     }
 
     let line;

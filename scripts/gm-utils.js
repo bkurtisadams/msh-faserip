@@ -162,6 +162,26 @@ export function registerSocket() {
     socket.register("updateActor", updateActor);
     socket.register("renameEffectWithRemaining", gmRenameEffectWithRemaining);
 
+    // Player-side handler: runs the defender's resist-FEAT karma sequence on
+    // the owning player's client (executeAsUser from resolveResistFeat in
+    // dice-roller.js). Dynamic import avoids a static gm-utils ↔ dice-roller
+    // cycle. Returns plain serializable numbers.
+    socket.register("resolveResistFeat", async (payload) => {
+      try {
+        const { resolveResistFeatSequence } = await import("./modules/dice/dice-roller.js");
+        const resolved = await fromUuid(payload.actorUuid);
+        const actor = resolved?.documentName === "Token" ? resolved.actor : resolved;
+        if (!actor) {
+          console.warn("[FASERIP] resolveResistFeat: actor not found for", payload.actorUuid);
+          return null;
+        }
+        return await resolveResistFeatSequence(actor, payload);
+      } catch (e) {
+        console.error("[FASERIP] resolveResistFeat handler failed:", e);
+        return null;
+      }
+    });
+
 
     // Expose on game.msh for other modules/files
     game.msh = game.msh || {};

@@ -1,3 +1,12 @@
+// intensity-action.js v4.5.0 - 2026-08-02
+// v4.5.0: Save routed through resolveResistFeat (dice-roller): karma sequence
+//         on the owning player's client via socketlib executeAsUser, 10s
+//         auto-decline countdown; local GM/owner prompt fallback.
+// intensity-action.js v4.4.0 - 2026-08-02
+// v4.4.0: Karma on the save (RAW two-phase): promptKarmaDeclaration before
+//         the roll, min-10 commitment, amount via showKarmaDecisionDialog;
+//         roll routed through rollD100AndApplyKarma. Gated on available
+//         karma + GM/owner; skipped for automatic/impossible FEATs.
 // intensity-action.js v4.3.0 - 2026-08-02
 // v4.3.0: Target save honors FEAT difficulty vs Intensity (was: white = fail,
 //         any color = resist, regardless of relative ranks — a Feeble-Endurance
@@ -37,7 +46,6 @@ import { BaseAction } from "./base-action.js";
 import {
   getTargetData,
   buildResultBadge,
-  buildRollDisplay,
   getAbilityInfo,
   RANKS
 } from "./action-utils.js";
@@ -280,12 +288,25 @@ export class IntensityAction extends BaseAction {
         colorLower = "white";
         rollDisplay = `<em>impossible \u2014 Intensity 2+ ranks above</em>`;
       } else {
-        const r = await (new Roll("1d100")).evaluate();
-        const total = r.total;
-        const color = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, total));
+        // Karma on the save (RAW two-phase). resolveResistFeat routes the
+        // whole sequence to an active owning player's client (10s auto-
+        // decline countdown there), falls back to a local GM/owner prompt,
+        // else a plain roll. Skipped for automatic/impossible (no roll).
+        const { resolveResistFeat } = await import("../dice/dice-roller.js");
+        const fr = await resolveResistFeat(targetActor, {
+          sourceName: `Resist ${item.name}`,
+          rank: endRank,
+          intensityRank,
+          requirement: req.requirement,
+          declareTimeoutMs: 10000
+        });
+        const color = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, fr.cappedTotal));
         colorLower = (color || "white").toLowerCase();
         resisted = checkFeatSuccess(colorLower, req.requirement);
-        rollDisplay = `${buildRollDisplay(r)} <span style="color:#888;font-size:.85em;">(need ${req.requirement})</span>`;
+        const karmaNote = fr.karmaUsed > 0
+          ? ` <span style="color:#1565c0;font-size:.85em;">+ ${fr.karmaUsed} Karma = ${fr.cappedTotal}</span>`
+          : "";
+        rollDisplay = `<strong>${fr.rollTotal}</strong>${karmaNote} <span style="color:#888;font-size:.85em;">(need ${req.requirement})</span>`;
       }
 
       const badge = buildResultBadge(resisted ? colorLower : "white", resisted ? "Resists" : "Affected");
