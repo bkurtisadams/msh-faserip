@@ -1,3 +1,11 @@
+// rules-reference.js v1.7.0 - 2026-08-02
+// v1.7.0: SHOOTING_WEAPONS price/range columns corrected against the printed
+//         table (pp.42-43). The rank-letter column is PRICE (prose anchor:
+//         Concussion Pistol "listed value of Incredible"); the numeric column
+//         is RANGE in areas. Previous data had the price ranks in `range` and
+//         fabricated `price` values (prior audit artifact). Range now numeric.
+//         Laser Rifle type left "S" as printed, with a note: prose says lasers
+//         use the Energy column — GM ruling pending.
 // rules-reference.js v1.6.0 - 2026-08-01
 // v1.6.0: Correct Beyond standard rank number to Infinity and add
 //         rankValueForStorage() for document-safe persistence.
@@ -989,8 +997,10 @@ export const ACTION_COLUMN_RESULTS = {
 // ══════════════════════════════════════════════════════════════
 // EQUIPMENT: WEAPONS
 // ══════════════════════════════════════════════════════════════
-// Range: max range in areas. -1CS per area beyond first for weapons (not powers).
-// Price: Resource rank to meet/beat on Resource FEAT.
+// Range: max range in areas (numeric, per printed table). -1CS per area beyond
+//   the first for weapons (not powers). Missile launcher range varies by missile.
+// Price: Resource rank to meet/beat on Resource FEAT (the rank-letter column;
+//   prose anchor: Concussion Pistol listed at Incredible).
 // Black market: +1CS cost. Illegal items = Other Crime to possess.
 // Rate: shots per round. "burst" = up to 3 adjacent targets, 1 roll.
 //   "scatter" = all in 1 area of target hit.
@@ -1000,49 +1010,51 @@ export const ACTION_COLUMN_RESULTS = {
 
 export const SHOOTING_WEAPONS = {
   // Handguns
-  cheapHandgun:      { name: "Cheap Handgun",       range: "Fe",  price: "Pr", damage: 6,  type: "S", rate: 1, shots: 6,  material: "Pr", notes: "One-handed, no special ammo" },
-  handgun:           { name: "Handgun/Pistol",       range: "Ty",  price: "Ty", damage: 6,  type: "S", rate: 1, shots: "6,8,9", material: "Ex", notes: "One-handed" },
-  targetPistol:      { name: "Target Pistol",        range: "Ty",  price: "Ex", damage: 6,  type: "S", rate: 1, shots: 1,  material: "Ex", notes: "One-handed, no range penalty when firing two-handed" },
-  variablePistol:    { name: "Variable Pistol",      range: "Gd",  price: "Ty", damage: 6,  type: "S", rate: 1, shots: "6,8,9", material: "Ex", notes: "One-handed, may change ammo type in field" },
-  gyroJetPistol:     { name: "GyroJet Pistol",       range: "Ex",  price: "Ex", damage: 10, type: "S", rate: "1 per 2", shots: 3, material: "Gd", notes: "One-handed, gyro-jet ammo only, illegal" },
-  laserPistol:       { name: "Laser Pistol",         range: "Rm",  price: "In", damage: 10, type: "E", rate: 1, shots: 10, material: "Pr", notes: "One-handed, power pack, illegal" },
-  stunPistol:        { name: "Stun Pistol",          range: "Rm",  price: "Pr", damage: null, type: "stun", rate: 1, shots: 10, material: "Pr", notes: "One-handed, power pack, Typical Intensity stunning" },
-  concussionPistol:  { name: "Concussion Pistol",    range: "In",  price: "In", damage: 10, type: "F", rate: 1, shots: 5, material: "Ty", notes: "One-handed, power pack, illegal" },
-  plasmaBeam:        { name: "Plasma Beam Handgun",  range: "Am",  price: "Mn", damage: 20, type: "F", rate: 1, shots: 10, material: "Ex", notes: "One-handed, power pack" },
-  machinePistol:     { name: "Machine Pistol",       range: "Ex",  price: "Rm", damage: 20, type: "S", rate: 1, shots: 6, material: "Ex", notes: "One-handed, bursts, military" },
+  cheapHandgun:      { name: "Cheap Handgun",       range: 2,  price: "Fe", damage: 6,  type: "S", rate: 1, shots: 6,  material: "Pr", notes: "One-handed, no special ammo" },
+  handgun:           { name: "Handgun/Pistol",       range: 3,  price: "Ty", damage: 6,  type: "S", rate: 1, shots: "6,8,9", material: "Ex", notes: "One-handed" },
+  targetPistol:      { name: "Target Pistol",        range: 5,  price: "Ty", damage: 6,  type: "S", rate: 1, shots: 1,  material: "Ex", notes: "One-handed, no range penalty when firing two-handed" },
+  variablePistol:    { name: "Variable Pistol",      range: 3,  price: "Gd", damage: 6,  type: "S", rate: 1, shots: "6,8,9", material: "Ex", notes: "One-handed, may change ammo type in field" },
+  gyroJetPistol:     { name: "GyroJet Pistol",       range: 5,  price: "Ex", damage: 10, type: "S", rate: "1 per 2", shots: 3, material: "Gd", notes: "One-handed, gyro-jet ammo only, illegal" },
+  laserPistol:       { name: "Laser Pistol",         range: 10, price: "Rm", damage: 10, type: "E", rate: 1, shots: 10, material: "Pr", notes: "One-handed, power pack, illegal" },
+  stunPistol:        { name: "Stun Pistol",          range: 2,  price: "Rm", damage: null, type: "stun", rate: 1, shots: 10, material: "Pr", notes: "One-handed, power pack, Typical Intensity stunning" },
+  concussionPistol:  { name: "Concussion Pistol",    range: 4,  price: "In", damage: 10, type: "F", rate: 1, shots: 5, material: "Ty", notes: "One-handed, power pack, illegal" },
+  plasmaBeam:        { name: "Plasma Beam Handgun",  range: 7,  price: "Am", damage: 20, type: "F", rate: 1, shots: 10, material: "Ex", notes: "One-handed, power pack" },
+  machinePistol:     { name: "Machine Pistol",       range: 3,  price: "Ex", damage: 20, type: "S", rate: 1, shots: 6, material: "Ex", notes: "One-handed, bursts, military" },
 
   // Rifles
-  rifle:             { name: "Rifle",                range: "Ty",  price: "Gd", damage: 10, type: "S", rate: 1, shots: 4, material: "Gd", notes: "Two-handed, fire one-handed at -2CS" },
-  huntingRifle:      { name: "Hunting Rifle",        range: "Gd",  price: "Gd", damage: 10, type: "S", rate: 1, shots: "6,7,8", material: "Gd", notes: "Two-handed" },
-  sniperRifle:       { name: "Sniper Rifle",         range: "Gd",  price: "Gd", damage: 15, type: "S", rate: 1, shots: 4, material: "Gd", notes: "Two-handed, no range penalty" },
-  assaultRifle:      { name: "Assault Rifle",        range: "Ex",  price: "Rm", damage: 10, type: "S", rate: 2, shots: 20, material: "Gd", notes: "Military" },
-  laserRifle:        { name: "Laser Rifle",          range: "Rm",  price: "In", damage: 20, type: "S", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal" },
-  stunRifle:         { name: "Stun Rifle",           range: "Rm",  price: "In", damage: null, type: "stun", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal, Remarkable Intensity stunning" },
-  concussionRifle:   { name: "Concussion Rifle",     range: "Rm",  price: "Rm", damage: 10, type: "F", rate: 1, shots: 12, material: "Gd", notes: "Power pack, illegal" },
-  automaticRifle:    { name: "Automatic Rifle",      range: "Ex",  price: "Ex", damage: 15, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Military, bursts" },
-  shotgun:           { name: "Shotgun",              range: "Gd",  price: "Ty", damage: 20, type: "S", rate: "1,2", shots: 2, material: "Gd", notes: "Bursts, may fire 1 or both barrels" },
-  riotGun:           { name: "Riot Gun",             range: "Gd",  price: "Pr", damage: 15, type: "S", rate: 1, shots: 6, material: "Ex", notes: "Fire one-handed at -1CS, fires canister shot" },
-  grenadeLauncher:   { name: "Grenade Launcher",     range: "Ex",  price: "In", damage: null, type: "S", rate: "1 per 2", shots: 1, material: "Gd", notes: "Military, fires grenades, no range penalty" },
+  rifle:             { name: "Rifle",                range: 10, price: "Ty", damage: 10, type: "S", rate: 1, shots: 4, material: "Gd", notes: "Two-handed, fire one-handed at -2CS" },
+  huntingRifle:      { name: "Hunting Rifle",        range: 10, price: "Gd", damage: 10, type: "S", rate: 1, shots: "6,7,8", material: "Gd", notes: "Two-handed" },
+  sniperRifle:       { name: "Sniper Rifle",         range: 10, price: "Gd", damage: 15, type: "S", rate: 1, shots: 4, material: "Gd", notes: "Two-handed, no range penalty" },
+  assaultRifle:      { name: "Assault Rifle",        range: 7,  price: "Ex", damage: 10, type: "S", rate: 2, shots: 20, material: "Gd", notes: "Military" },
+  // Type "S" as printed; prose says lasers use the Energy column (cf. laserPistol/
+  // laserCannon "E"). Likely table misprint — GM ruling pending.
+  laserRifle:        { name: "Laser Rifle",          range: 4,  price: "Rm", damage: 20, type: "S", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal" },
+  stunRifle:         { name: "Stun Rifle",           range: 5,  price: "Rm", damage: null, type: "stun", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal, Remarkable Intensity stunning" },
+  concussionRifle:   { name: "Concussion Rifle",     range: 7,  price: "Rm", damage: 10, type: "F", rate: 1, shots: 12, material: "Gd", notes: "Power pack, illegal" },
+  automaticRifle:    { name: "Automatic Rifle",      range: 5,  price: "Ex", damage: 15, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Military, bursts" },
+  shotgun:           { name: "Shotgun",              range: 3,  price: "Gd", damage: 20, type: "S", rate: "1,2", shots: 2, material: "Gd", notes: "Bursts, may fire 1 or both barrels" },
+  riotGun:           { name: "Riot Gun",             range: 2,  price: "Gd", damage: 15, type: "S", rate: 1, shots: 6, material: "Ex", notes: "Fire one-handed at -1CS, fires canister shot" },
+  grenadeLauncher:   { name: "Grenade Launcher",     range: 4,  price: "Ex", damage: null, type: "S", rate: "1 per 2", shots: 1, material: "Gd", notes: "Military, fires grenades, no range penalty" },
 
   // Heavy weapons
-  subMachineGun:     { name: "Sub-Machine Gun",      range: "Rm",  price: "Rm", damage: 25, type: "S", rate: 1, shots: 7, material: "Gd", notes: "Fire one-handed at -2CS, bursts, military" },
-  machineGun:        { name: "Machine Gun",          range: "In",  price: "In", damage: 30, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Bursts, military, not one-handed" },
-  flamethrower:      { name: "Flamethrower",         range: "In",  price: "In", damage: 30, type: "E", rate: 1, shots: 5, material: "Ty/Gd", notes: "Military, scatter, burns In(40) first round then 10/round for 1-10 rounds" },
-  bazooka:           { name: "Bazooka",              range: "In",  price: "In", damage: 40, type: "S", rate: "1 per 2", shots: 1, material: "Gd", notes: "Military, two men to fire" },
-  law:               { name: "LAW",                  range: "Am",  price: "Am", damage: 40, type: "S", rate: 1, shots: 6, material: "Gd", notes: "Military, one man to fire" },
-  lightArtillery:    { name: "Light Artillery",      range: "Am",  price: "Am", damage: 40, type: "S", rate: 1, shots: 20, material: "Ex", notes: "Military, two men to operate" },
-  stunCannon:        { name: "Stun Cannon",          range: "Am",  price: "Am", damage: null, type: "stun", rate: 1, shots: 10, material: "Rm", notes: "Two men, one-man at -1CS, In Intensity stunning, bursts, power pack" },
-  concussionCannon:  { name: "Concussion Cannon",    range: "Am",  price: "Am", damage: 40, type: "F", rate: 1, shots: 10, material: "Rm", notes: "Power pack, stationary" },
-  laserCannon:       { name: "Laser Cannon",         range: "Am",  price: "Mn", damage: 30, type: "E", rate: 1, shots: 10, material: "Ex", notes: "Power pack, stationary" },
-  heavyArtillery:    { name: "Heavy Artillery",      range: "Mn",  price: "Mn", damage: 50, type: "S", rate: 1, shots: 30, material: "Rm", notes: "Military, two men to fire, scatter" },
-  superHeavy:        { name: "Superheavy Artillery",  range: "Un",  price: "Un", damage: 50, type: "S", rate: 1, shots: 30, material: "In", notes: "Stationary, military, two men to fire" },
-  missileLauncher:   { name: "Missile Launcher",     range: "In",  price: "In", damage: null, type: "missile", rate: 1, shots: 10, material: "Rm", notes: "Fires missiles, military" },
+  subMachineGun:     { name: "Sub-Machine Gun",      range: 7,  price: "Rm", damage: 25, type: "S", rate: 1, shots: 7, material: "Gd", notes: "Fire one-handed at -2CS, bursts, military" },
+  machineGun:        { name: "Machine Gun",          range: 10, price: "In", damage: 30, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Bursts, military, not one-handed" },
+  flamethrower:      { name: "Flamethrower",         range: 2,  price: "In", damage: 30, type: "E", rate: 1, shots: 5, material: "Ty/Gd", notes: "Military, scatter, burns In(40) first round then 10/round for 1-10 rounds" },
+  bazooka:           { name: "Bazooka",              range: 4,  price: "In", damage: 40, type: "S", rate: "1 per 2", shots: 1, material: "Gd", notes: "Military, two men to fire" },
+  law:               { name: "LAW",                  range: 4,  price: "Am", damage: 40, type: "S", rate: 1, shots: 6, material: "Gd", notes: "Military, one man to fire" },
+  lightArtillery:    { name: "Light Artillery",      range: 10, price: "Am", damage: 40, type: "S", rate: 1, shots: 20, material: "Ex", notes: "Military, two men to operate" },
+  stunCannon:        { name: "Stun Cannon",          range: 10, price: "Am", damage: null, type: "stun", rate: 1, shots: 10, material: "Rm", notes: "Two men, one-man at -1CS, In Intensity stunning, bursts, power pack" },
+  concussionCannon:  { name: "Concussion Cannon",    range: 15, price: "Am", damage: 40, type: "F", rate: 1, shots: 10, material: "Rm", notes: "Power pack, stationary" },
+  laserCannon:       { name: "Laser Cannon",         range: 20, price: "Am", damage: 30, type: "E", rate: 1, shots: 10, material: "Ex", notes: "Power pack, stationary" },
+  heavyArtillery:    { name: "Heavy Artillery",      range: 40, price: "Mn", damage: 50, type: "S", rate: 1, shots: 30, material: "Rm", notes: "Military, two men to fire, scatter" },
+  superHeavy:        { name: "Superheavy Artillery",  range: 80, price: "Un", damage: 50, type: "S", rate: 1, shots: 30, material: "In", notes: "Stationary, military, two men to fire" },
+  missileLauncher:   { name: "Missile Launcher",     range: null, price: "In", damage: null, type: "missile", rate: 1, shots: 10, material: "Rm", notes: "Fires missiles, military; range varies by missile (LAW-class to Heavy Artillery equivalents)" },
 
   // Bows
-  regularBow:        { name: "Regular Bow",          range: "Pr",  price: "Ex", damage: 6,  type: "S", rate: 1, shots: 1, material: "Pr", notes: "Two-handed, -1CS without Bow talent" },
-  longBow:           { name: "Long Bow",             range: "Ty",  price: "Rm", damage: 10, type: "S", rate: 1, shots: 1, material: "Ty", notes: "Two-handed, -1CS without Bow talent" },
-  compoundBow:       { name: "Compound Bow",         range: "Ex",  price: "In", damage: 15, type: "S", rate: 1, shots: 1, material: "Gd", notes: "Two-handed, -1CS without Bow talent" },
-  crossbow:          { name: "Crossbow",             range: "Gd",  price: "Rm", damage: 10, type: "S", rate: "1 per 2", shots: 1, material: "Ty", notes: "One-handed at -2CS, -1CS without Bow talent" }
+  regularBow:        { name: "Regular Bow",          range: 5,  price: "Pr", damage: 6,  type: "S", rate: 1, shots: 1, material: "Pr", notes: "Two-handed, -1CS without Bow talent" },
+  longBow:           { name: "Long Bow",             range: 6,  price: "Ty", damage: 10, type: "S", rate: 1, shots: 1, material: "Ty", notes: "Two-handed, -1CS without Bow talent" },
+  compoundBow:       { name: "Compound Bow",         range: 7,  price: "Ex", damage: 15, type: "S", rate: 1, shots: 1, material: "Gd", notes: "Two-handed, -1CS without Bow talent" },
+  crossbow:          { name: "Crossbow",             range: 3,  price: "Gd", damage: 10, type: "S", rate: "1 per 2", shots: 1, material: "Ty", notes: "One-handed at -2CS, -1CS without Bow talent" }
 };
 
 export const MELEE_WEAPONS = {

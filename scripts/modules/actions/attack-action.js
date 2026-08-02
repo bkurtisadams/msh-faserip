@@ -1,3 +1,12 @@
+// attack-action.js v1.9.50 - 2026-08-02
+// v1.9.50: _applyIntensityOnHit resolves the Endurance FEAT through
+//          determineFeatRequirement (ability-feat-dialog) instead of the
+//          green/yellow/red-only requiredColorForIntensity: Endurance 3+
+//          ranks above Intensity = automatic resist, no roll; Intensity 2+
+//          ranks above Endurance = impossible FEAT, auto-succumb (per the
+//          FEAT_DIFFICULTY GM rulings 2026-07-31). Matters for stun weapons:
+//          a Typical-Intensity Stun Pistol can no longer drop a Remarkable-
+//          Endurance hero on a bad d100.
 // attack-action.js v1.9.49 - 2026-08-01
 // v1.9.49: _applyIntensityOnHit skips effect "poisoned" — carrier path owns
 //          it (penetration gate + poison engine's own exposure FEAT).
@@ -753,7 +762,7 @@ export class AttackAction extends BaseAction {
     if (effect === "poisoned") return;
 
     const { getAbilityInfo } = await import("./action-utils.js");
-    const { requiredColorForIntensity } = await import("./breaking-feat.js");
+    const { determineFeatRequirement, checkFeatSuccess } = await import("./ability-feat-dialog.js");
     const { rollUniversalTable } = await import("../dice/universal-table.js");
     const { applyIntensityEffect } = await import("../effects/effect-engine.js");
 
@@ -771,14 +780,25 @@ export class AttackAction extends BaseAction {
 
     const endInfo = getAbilityInfo(targetActor, "endurance");
     const endRank = endInfo?.rank || "Typical";
-    const requiredColor = requiredColorForIntensity(endRank, intensityRank);
+    // FEAT_DIFFICULTY (GM rulings 2026-07-31): 3+ ranks above = automatic
+    // success; intensity 2+ ranks above ability = impossible, auto-fail.
+    const req = determineFeatRequirement(endRank, intensityRank);
 
-    const r = await (new Roll("1d100")).evaluate();
-    const featColor = String(
-      (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total)) || "white"
-    ).toLowerCase();
-    const order = { white: 0, green: 1, yellow: 2, red: 3 };
-    const resisted = (order[featColor] ?? 0) >= (order[requiredColor] ?? 1);
+    let resisted, featLine;
+    if (req.automatic) {
+      resisted = true;
+      featLine = `Endurance (${endRank}) vs ${intensityRank} Intensity \u2014 3+ ranks above: AUTOMATIC resist, no roll`;
+    } else if (req.impossible) {
+      resisted = false;
+      featLine = `Endurance (${endRank}) vs ${intensityRank} Intensity \u2014 2+ ranks below: IMPOSSIBLE FEAT, no roll`;
+    } else {
+      const r = await (new Roll("1d100")).evaluate();
+      const featColor = String(
+        (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total)) || "white"
+      ).toLowerCase();
+      resisted = checkFeatSuccess(featColor, req.requirement);
+      featLine = `Endurance FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${req.requirement.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColor.toUpperCase()}</b>`;
+    }
 
     let line;
     if (resisted) {
@@ -799,7 +819,7 @@ export class AttackAction extends BaseAction {
       content: `<div style="background:#e3f2fd;border:1px solid #1565c0;border-radius:3px;padding:6px 8px;margin:4px 0;">
         <div style="font-weight:bold;color:#0d47a1;margin-bottom:3px;">${weapon?.name || "Weapon"} \u2014 Intensity (on hit)</div>
         ${descLine}
-        <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${requiredColor.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColor.toUpperCase()}</b></div>
+        <div style="font-size:.85em;">${featLine}</div>
         ${line}
       </div>`
     });

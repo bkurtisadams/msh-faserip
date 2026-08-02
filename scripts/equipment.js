@@ -1,4 +1,12 @@
-// equipment.js v2.2.0 - 2026-05-14
+// equipment.js v2.3.0 - 2026-08-02
+// v2.3.0: v14 crash fixes + dead code removal. Bare duplicate() → foundry.utils.duplicate
+//         (global removed in v14; add/remove-granted-power and remove-custom-ability threw
+//         ReferenceError). _rollPowerItem: global Ray → Math.hypot distance (Ray global
+//         removed in v14). Remove unreachable legacy weapon-roll path (rollEquipment/
+//         _rollWeapon/_selectAndRollWeaponMode/_rollWeaponWithMode/_parseDamage/
+//         _normalizeDamageType + .roll-equipment listener): checked nonexistent
+//         system.modes, applied damage on a Miss, used removed evaluate({async:true});
+//         actorSheet/init route through equipment-action-dialog, so nothing called it.
 // v2.2.0: Fix empty Material/Price selects (rankListMortal was never set in context;
 //         rank-options.hbs iterated undefined and emitted zero options). Port live-form
 //         rescan into _prepareSubmitData so V2's partial formData no longer drops the
@@ -17,9 +25,6 @@
 //         in getData() — no duplicate form fields. Array reconstruction in _updateObject.
 // v1.4.0: Rewrite effects to use standard changes[] — system.* for mechanics, faserip.token.* for visuals
 // v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
-import { applyDamageToTargets } from "./modules/actions/action-utils.js";
-import { debugLog } from "./modules/actions/action-utils.js";
-import { rollUniversalTable } from "./modules/dice/universal-table.js";
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -505,7 +510,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
 
     html.find(".add-granted-power").on("click", ev => {
       ev.preventDefault();
-      const powers = duplicate(this.item.system.powers || []);
+      const powers = foundry.utils.duplicate(this.item.system.powers || []);
       powers.push({
         name: "",
         rank: "Typical",
@@ -520,7 +525,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     html.find(".remove-granted-power").on("click", ev => {
       ev.preventDefault();
       const index = Number(ev.currentTarget.dataset.index);
-      const powers = duplicate(this.item.system.powers || []);
+      const powers = foundry.utils.duplicate(this.item.system.powers || []);
       powers.splice(index, 1);
       this.item.update({ "system.powers": powers });
     });
@@ -713,7 +718,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     html.find('.remove-custom-ability').click(async ev => {
       const index = parseInt(ev.currentTarget.dataset.index);
 
-      let abilities = duplicate(this.item.system.customAbilities || []);
+      let abilities = foundry.utils.duplicate(this.item.system.customAbilities || []);
       if (!Array.isArray(abilities)) {
         abilities = []; // Ensure it's an array for splice to work
         console.warn("customAbilities was not an array, creating empty array");
@@ -874,13 +879,6 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       this.render(true);
     });
 
-    // Save attack mode changes on field change (without re-render)
-    
-
-    // Roll equipment button
-    html.find('.roll-equipment').click(ev => {
-      this.rollEquipment();
-    });
   }
 
   // ── Preset effect templates using standard Foundry changes[] ──
@@ -1043,216 +1041,6 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     return this._v14NormalizeAE(raw);
   }
 
-  // Method to handle equipment rolls
-  // --- helpers used by equipment rolling ---
-  _parseDamage(value) {
-    if (typeof value === "number") return value;
-    const s = String(value ?? "").trim();
-    const m = s.match(/\((\d+)\)/); // e.g., "RM (30)"
-    if (m) return Number(m[1]);
-    const n = Number(s);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  _normalizeDamageType(t) {
-    const map = {
-      "S":"physical-shooting",
-      "BA":"physical-blunt",
-      "EA":"physical-edged",
-      "TB":"physical-throwing-blunt",
-      "TE":"physical-throwing-edged",
-      "E":"energy",
-      "F":"force",
-      "GP":"grappling",
-      "Gb":"grabbing"
-    };
-    const norm = map[t] || String(t || "").toLowerCase();
-    return norm;
-  }
-
-async rollEquipment() {
-    const item = this.item;
-    const actor = item.actor;
-    if (!actor) return ui.notifications.error("No actor linked to item!");
-
-    const type = item.system?.type || "";
-    const cat = item.system?.category || "";
-
-    // Device category check first — devices may not have system.type set
-    if (cat === "device" || cat === "custom" || type === "custom") {
-      const dfns = item.system.deviceFunctions || [];
-      if (dfns.length > 0) return this._rollDeviceFunction(item, actor);
-      return this._rollCustomAbility(item, actor);
-    }
-    if (type === "weapon" || cat === "weapon") return this._rollWeapon(item, actor);
-    if (type === "power" || cat === "power-item") return this._rollPowerItem(item, actor);
-    return ui.notifications.warn("This equipment type cannot be rolled!");
-  }
-
-
-  // Roll a weapon attack
-  async _rollWeapon(item, actor) {
-    // Route to mode picker if defined; otherwise use base
-    const hasModes = Array.isArray(item.system?.modes) && item.system.modes.length;
-    if (hasModes) return this._selectAndRollWeaponMode(item, actor);
-    // Synthesize a base "mode" from item fields
-    const baseMode = {
-      name: "Standard",
-      ability: item.system.ability || "fighting",
-      damage: item.system.damage || 0,
-      damageType: item.system.damageType || "S",
-      rangeRank: item.system.rangeRank || (actor.system?.abilities?.agility?.rank ?? "Typical"),
-      heatSeeking: !!item.system?.heatSeeking,
-      multiAttacks: Number(item.system?.multiAttacks || 1) || 1
-    };
-    return this._rollWeaponWithMode(item, actor, baseMode);
-  }
-
-  async _selectAndRollWeaponMode(item, actor) {
-    const modes = item.system?.modes || [];
-    const options = modes.map(m => `<option value="${m.name}">${m.name}</option>`).join("");
-    return new Promise((resolve) => {
-      new Dialog({
-        title: `${item.name}: Select Mode`,
-        content: `<div style="margin-top:6px;">
-          <label style="display:inline-block;width:120px;">Mode:</label>
-          <select name="mode">${options}</select>
-        </div>`,
-        buttons: {
-          roll: {
-            label: "Continue",
-            callback: html => {
-              const sel = html.find('[name="mode"]').val();
-              const mode = modes.find(m => m.name === sel) || modes[0];
-              resolve(this._rollWeaponWithMode(item, actor, mode));
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll"
-      }).render(true);
-    });
-  }
-
-
-  async _rollWeaponWithMode(item, actor, mode) {
-    const ranks = [
-      "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable",
-      "Incredible","Amazing","Monstrous","Unearthly","Shift X","Shift Y","Shift Z",
-      "Class 1000","Class 3000","Class 5000","Beyond"
-    ];
-
-    // Build roll dialog
-    const rangeRank = mode.rangeRank || item.system?.rangeRank || actor.system?.abilities?.agility?.rank || "Typical";
-    const content = `
-      <div style="min-width:420px">
-        <div style="margin-bottom:8px;">
-          <label style="display:inline-block;width:140px;">Target Distance:</label>
-          <input type="number" name="distance" value="1" min="1" style="width:70px;"> areas
-        </div>
-        <div style="margin-bottom:8px;">
-          <label style="display:inline-block;width:140px;">Column Shift:</label>
-          <input type="number" name="shift" value="0" style="width:70px;">
-          <span style="color:#666;font-size:.9em;">(+ right, − left)</span>
-        </div>
-        <div style="margin-bottom:8px;">
-          <label style="display:inline-block;width:140px;">Karma Points:</label>
-          <input type="number" name="karma" value="0" min="0" style="width:70px;">
-        </div>
-        <div style="margin-top:10px;color:#555;">Range Rank: <b>${rangeRank}</b></div>
-      </div>`;
-
-    return new Promise(resolve => {
-      new Dialog({
-        title: `${item.name} — ${mode.name}`,
-        content,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $ = sel => html.find(sel);
-              const distance = Math.max(1, Number($('[name="distance"]').val() || 1));
-              const shift    = Number($('[name="shift"]').val() || 0);
-              const karma    = Math.max(0, Number($('[name="karma"]').val() || 0));
-
-              // Compute effective rank with range
-              const rangeAreas = (globalThis.CONFIG?.FASERIP?.rankValues?.[rangeRank] ?? 0) * 2; // fallback approx
-              let rangePenaltyCS = 0;
-              if (!mode.heatSeeking) {
-                // simple bracket logic: each multiple of rangeAreas beyond first gives -1CS
-                if (rangeAreas > 0) {
-                  const bracket = Math.ceil(distance / Math.max(1, rangeAreas));
-                  rangePenaltyCS = Math.max(0, bracket - 1);
-                }
-              }
-
-              // Base ability
-              const abilityKey = (mode.ability || "fighting").toLowerCase();
-              const abilityRank = actor.system?.abilities?.[abilityKey]?.rank || "Typical";
-              const abilityIndex = Math.max(0, ranks.indexOf(abilityRank));
-              let effectiveIndex = abilityIndex - rangePenaltyCS + shift;
-              effectiveIndex = Math.max(0, Math.min(ranks.length - 1, effectiveIndex));
-              const effectiveRank = ranks[effectiveIndex];
-
-              // Roll with optional Karma
-              const r = await (new Roll("1d100")).evaluate({ async: true });
-              let total = r.total;
-              let karmaUsed = 0;
-              if (karma > 0) {
-                const cap = Math.min(100, total + karma);
-                karmaUsed = cap - total;
-                total = cap;
-              }
-              if (karmaUsed > 0) {
-                const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-                history.push({ timestamp: new Date().toISOString(), realDate: new Date().toLocaleDateString(), gameDate: "", amount: -karmaUsed, type: "Die Roll", description: `Spent on ${item.name} - ${mode.name}` });
-                await actor.update({ "system.karma.history": history });
-              }
-
-              // Determine color & effect
-              const color = rollUniversalTable(effectiveRank, Math.min(100, total))?.toLowerCase() || "white";
-
-              // Prepare attack payload
-              const target = game.user.targets.first()?.document ?? null;
-              const baseDamage = this._parseDamage(mode.damage ?? item.system.damage ?? 0);
-              const damageType = this._normalizeDamageType(mode.damageType || item.system.damageType || "S");
-
-              // Derive attackForm from normalized damageType
-              const attackForm = damageType.includes("shooting") ? "shooting"
-                : damageType.includes("edged")   ? "edged"
-                : damageType.includes("energy")  ? "energy"
-                : damageType.includes("force")   ? "force"
-                : damageType.includes("throwing-edged") ? "throwing-edged"
-                : damageType.includes("throwing-blunt") ? "throwing-blunt"
-                : "blunt";
-              const wasKillResult = (color === "red" && (damageType.includes("edged") || damageType.includes("shooting") || damageType.includes("energy")));
-              const targetTokens = target ? [target] : [];
-
-              // Multiple attacks (max 3)
-              const attacks = Math.max(1, Math.min(3, Number(mode.multiAttacks || item.system.multiAttacks || 1)));
-
-              for (let i = 1; i <= attacks; i++) {
-                await applyDamageToTargets({
-                  damage: baseDamage,
-                  damageType,
-                  attackForm,
-                  attackerUuid: actor.uuid,
-                  targets: targetTokens,
-                  wasKillResult,
-                  showNotification: true
-                });
-              }
-
-              resolve();
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll"
-      }).render(true);
-    });
-  }
-
   // Roll a power-based item
   async _rollPowerItem(item, actor) {
     // Get item's power information
@@ -1266,8 +1054,12 @@ async rollEquipment() {
     const targetToken = game.user.targets.first();
     if (targetToken && canvas.tokens.controlled.length > 0) {
       const controlledToken = canvas.tokens.controlled[0];
-      const ray = new Ray(controlledToken.center, targetToken.center);
-      initialDistance = Math.round(ray.distance / canvas.scene.grid.size);
+      // v14: global Ray removed — plain pixel distance is all that's needed here.
+      const dist = Math.hypot(
+        targetToken.center.x - controlledToken.center.x,
+        targetToken.center.y - controlledToken.center.y
+      );
+      initialDistance = Math.round(dist / canvas.scene.grid.size);
     }
 
     let dialogPowerRangeInfo = "";

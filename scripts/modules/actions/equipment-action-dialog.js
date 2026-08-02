@@ -1,3 +1,6 @@
+// equipment-action-dialog.js v1.7.1 - 2026-08-02
+// v1.7.1: MECHANIC_LABEL gains "Stun" → STUN chip (stun-weapon primary attack
+//         buttons rendered with an empty mechanic tag).
 // equipment-action-dialog.js v1.7.0 - 2026-06-12
 // v1.7.0: Suppress the standalone "Intensity Attack" button when the item has an
 //         attack action — the intensity now rides the hit (attack-action
@@ -50,7 +53,7 @@ const LOW_AMMO_THRESHOLD = 0.25;
 // Mechanic-tag label per damageType code (right-side chip on Combat buttons).
 const MECHANIC_LABEL = {
   "BA": "BLUNT", "EA": "EDGED", "S": "SHOOTING", "E": "ENERGY", "F": "FORCE",
-  "TE": "THROW", "TB": "THROW", "GP": "GRAPPLE", "Gb": "GRAB"
+  "TE": "THROW", "TB": "THROW", "GP": "GRAPPLE", "Gb": "GRAB", "Stun": "STUN"
 };
 
 // ── Action grouping ──

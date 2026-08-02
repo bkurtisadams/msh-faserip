@@ -1,3 +1,11 @@
+// intensity-action.js v4.3.0 - 2026-08-02
+// v4.3.0: Target save honors FEAT difficulty vs Intensity (was: white = fail,
+//         any color = resist, regardless of relative ranks — a Feeble-Endurance
+//         mook resisted Amazing KO gas on any green). Route through
+//         determineFeatRequirement: green/yellow/red requirement by rank gap,
+//         Endurance 3+ ranks above = automatic resist, Intensity 2+ ranks
+//         above = impossible FEAT, auto-fail (FEAT_DIFFICULTY GM rulings
+//         2026-07-31). Matches attack-action's on-hit intensity path.
 // intensity-action.js v4.2.0 - 2026-08-01
 // v4.2.0: Poisoned save branch — targets of effect "poisoned" route to
 //         applyPoisonExposure (its FEAT is the save; no generic d100).
@@ -34,18 +42,8 @@ import {
   RANKS
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
-
-// White = fail (affected), Green+ = resist
-function intensityResult(colorLower) {
-  switch (colorLower) {
-    case "white": return "Affected";
-    case "green": return "Resists";
-    case "yellow": return "Resists";
-    case "red":   return "Fully Resists";
-    default:      return "Unknown";
-  }
-}
 
 const EFFECT_LABELS = {
   blinded: "Blinded",
@@ -267,18 +265,34 @@ export class IntensityAction extends BaseAction {
       const endInfo = getAbilityInfo(targetActor, saveAbility);
       const endRank = endInfo.rank || "Typical";
 
-      const r = await (new Roll("1d100")).evaluate();
-      const total = r.total;
-      const color = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, total));
-      const colorLower = (color || "white").toLowerCase();
-      const effectLabel = intensityResult(colorLower);
+      // FEAT difficulty vs Intensity (FEAT_DIFFICULTY, GM rulings 2026-07-31):
+      // green/yellow/red requirement by rank gap; 3+ ranks above = automatic
+      // resist; intensity 2+ ranks above ability = impossible, auto-fail.
+      const req = determineFeatRequirement(endRank, intensityRank);
 
-      const rollDisplay = buildRollDisplay(r);
-      const badge = buildResultBadge(colorLower, effectLabel);
+      let colorLower, resisted, rollDisplay;
+      if (req.automatic) {
+        resisted = true;
+        colorLower = "green";
+        rollDisplay = `<em>automatic \u2014 ${saveAbilityLabel} 3+ ranks above</em>`;
+      } else if (req.impossible) {
+        resisted = false;
+        colorLower = "white";
+        rollDisplay = `<em>impossible \u2014 Intensity 2+ ranks above</em>`;
+      } else {
+        const r = await (new Roll("1d100")).evaluate();
+        const total = r.total;
+        const color = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, total));
+        colorLower = (color || "white").toLowerCase();
+        resisted = checkFeatSuccess(colorLower, req.requirement);
+        rollDisplay = `${buildRollDisplay(r)} <span style="color:#888;font-size:.85em;">(need ${req.requirement})</span>`;
+      }
 
-      // On White (fail), apply the effect
+      const badge = buildResultBadge(resisted ? colorLower : "white", resisted ? "Resists" : "Affected");
+
+      // On failed FEAT, apply the effect
       let appliedLine = "";
-      if (colorLower === "white" && intensityEffect) {
+      if (!resisted && intensityEffect) {
         const dur = await resolveDuration(durationMode, fixedRounds, intensityRank);
         appliedLine = await this._applyIntensityEffect(
           targetActor, intensityEffect, dur.rounds, actor.uuid, intensityDesc
@@ -286,7 +300,7 @@ export class IntensityAction extends BaseAction {
         if (appliedLine) {
           appliedLine = `<div style="color:#d32f2f;font-weight:bold;font-size:.85em;margin-top:2px;">\u2192 ${appliedLine} (${dur.label})</div>`;
         }
-      } else if (colorLower === "white" && !intensityEffect) {
+      } else if (!resisted && !intensityEffect) {
         appliedLine = `<div style="color:#d32f2f;font-style:italic;font-size:.85em;margin-top:2px;">\u2192 Affected (GM adjudicate)</div>`;
       }
 

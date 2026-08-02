@@ -653,7 +653,8 @@
         "rubber": false,
         "explosive": false,
         "canister": false,
-        "heatSeeker": false
+        "heatSeeker": false,
+        "powerPack": false
       },
       "attackModes": [],
       "burstScatter": "none",
@@ -688,6 +689,7 @@
       "intensityRank": "",
       "intensityDescription": "",
       "intensityEffect": "",
+      "intensityDuration": "",
       "areaRadius": 0,
       "resistances": [],
       "gearType": "",

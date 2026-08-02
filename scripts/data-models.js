@@ -1,3 +1,6 @@
+// scripts/data-models.js v2.4.5 - 2026-08-02
+// v2.4.5: intensityDuration on equipment KEYS (dormant; template.json now
+//         carries the live default alongside the other intensity fields).
 // scripts/data-models.js v2.4.4 - 2026-08-01
 // v2.4.4: carrierToxin* keys removed — poison authoring lives in the save
 //         object (save.onFail.toxinId nests under the existing AnyField).
@@ -159,7 +162,7 @@ class FaseripEquipmentData extends PermissiveDataModel {
     "customAbilities", "damage", "damageType", "description", "deviceFunctions",
     "duration", "durationUnit", "entangling", "gearType", "grenadeDamage",
     "grenadeDamageType", "grenadeIntensity", "grenadeRadius", "grenadeType",
-    "guidanceSystem", "intensityDescription", "intensityEffect", "intensityRank",
+    "guidanceSystem", "intensityDescription", "intensityDuration", "intensityEffect", "intensityRank",
     "isGrenade", "isIllegal", "isMissile", "legality", "linkedAbility", "materialStrength",
     "militaryOnly", "missileBody", "missileControl", "missileDamage", "missileDamageType",
     "missileSecondaryDamage", "missileSpeed", "missileType", "movementSpeed",

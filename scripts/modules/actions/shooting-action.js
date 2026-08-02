@@ -1,3 +1,10 @@
+// shooting-action.js v3.8.0 - 2026-08-02
+// v3.8.0: Weapon dropdown filter widened: weaponType "shooting" and damageType
+//        "Stun" now qualify (previously only damageType "S" / attackType
+//        "shooting" / tags). A Stun Pistol (weaponType shooting, damage 0,
+//        damageType Stun, intensityRank) was invisible from the Actions tab —
+//        it only worked when dispatched from the equipment hub because the
+//        passed item gets prepended.
 // shooting-action.js v3.7.8 - 2026-07-31
 // v3.7.8: Mercy Shot armor gate honors borderline equality (>= not >) per
 //        the "one more point" rule in the GM RULINGS LOG.
@@ -143,7 +150,11 @@ export class ShootingAction extends RangedAttackAction {
       if (i.type !== "equipment") return false;
       const s = i.system || {};
       const tagHit = Array.isArray(s.tags) && (s.tags.includes("S") || s.tags.includes("shooting"));
-      return (s.damageType === "S") || (s.attackType === "shooting") || tagHit;
+      return (s.damageType === "S")
+        || (s.damageType === "Stun")
+        || (s.attackType === "shooting")
+        || (String(s.weaponType || "").toLowerCase() === "shooting")
+        || tagHit;
     });
 
     if (passedItem && passedItem.type === "equipment") {
