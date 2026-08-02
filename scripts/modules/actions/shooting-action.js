@@ -1,3 +1,8 @@
+// shooting-action.js v3.9.3 - 2026-08-02
+// v3.9.3: Tear Gas effect flags nest under the msh-faserip scope (v14
+//        mangles top-level primitive flags to {} — confirmed in-world:
+//        flags = { effectType: {} }). Dedupe matcher already checks the
+//        scoped location first.
 // shooting-action.js v3.9.2 - 2026-08-02
 // v3.9.2: Tear-gas dedupe matcher hardened — CTT renames managed effects
 //        ("Tear Gas (12s)") so exact-name match missed, and top-level
@@ -1277,7 +1282,7 @@ export class ShootingAction extends RangedAttackAction {
                   { key: "system.combatMods.attackShift", mode: "add", value: "-3", priority: 20 },
                   { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
                 ],
-                flags: { effectType: "tearGas" },
+                flags: { "msh-faserip": { effectType: "tearGas" } },
                 statuses: ["blinded"]
               });
             } catch (e) { console.error("[FASERIP ERROR] Canister gas failed:", e); }
@@ -1302,7 +1307,7 @@ export class ShootingAction extends RangedAttackAction {
                   { key: "system.combatMods.attackShift", mode: "add", value: "-2", priority: 20 },
                   { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
                 ],
-                flags: { effectType: "smoke" }
+                flags: { "msh-faserip": { effectType: "smoke" } }
               });
             } catch (e) { console.error("[FASERIP ERROR] Canister smoke failed:", e); }
           }

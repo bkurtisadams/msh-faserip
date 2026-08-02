@@ -1,3 +1,7 @@
+// scripts/modules/regions/area-hazard-behavior.js v1.4.1 - 2026-08-02
+// v1.4.1: incapacitated/immobilized hazard effects nest flags under the
+//   msh-faserip scope (top-level primitive flags are mangled to {} by
+//   v14's DocumentFlagsField and invisible to the scoped readers).
 // scripts/modules/regions/area-hazard-behavior.js v1.4.0 - 2026-08-02
 // v1.4.0: Cross-source dedupe — a token already suffering the hazard's
 //   effect (from another region or a canister) skips the save entirely.
@@ -292,7 +296,7 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
               { key: "system.combatMods.defenseShiftRanged", mode: "add",      value: "-2", priority: 20 },
               { key: "system.combatMods.movementMult",       mode: "multiply", value: "0.5", priority: 20 }
             ],
-            flags: { effectType: "incapacitated", status: { isIncapacitated: true }, intensitySource: this.label },
+            flags: { "msh-faserip": { effectType: "incapacitated", status: { isIncapacitated: true }, intensitySource: this.label } },
             statuses: ["incapacitated"]
           });
           break;
@@ -306,7 +310,7 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
               { key: "system.combatMods.defenseShift",       mode: "add",      value: "-2",    priority: 20 },
               { key: "system.combatMods.defenseShiftRanged", mode: "add",      value: "-2",    priority: 20 }
             ],
-            flags: { effectType: "immobilized", status: { isImmobilized: true }, intensitySource: this.label },
+            flags: { "msh-faserip": { effectType: "immobilized", status: { isImmobilized: true }, intensitySource: this.label } },
             statuses: ["immobilized"]
           });
           break;

@@ -1,3 +1,12 @@
+// scripts/modules/effects/effect-engine.js v1.15.0 - 2026-08-02
+// v1.15.0: applyIntensityEffect incapacitated/immobilized/nullified cases
+//          wrote flags at TOP LEVEL (flags.effectType = "..."). v14's
+//          DocumentFlagsField treats top-level keys as package scopes and
+//          mangles primitive values to {} — and the scoped readers
+//          (nullify.js, init.js, chat-hooks) could never see them anyway.
+//          Nullified-via-intensity was invisible to the nullify machinery.
+//          All three now nest under the msh-faserip scope like the applyX
+//          wrappers always have.
 // scripts/modules/effects/effect-engine.js v1.14.1 - 2026-06-25
 // v1.14.1: applySlam — guard existing slam-marker delete with canWriteEffectsOn +
 //          executeAsGM("deleteActiveEffects") fallback so non-owner players don't
@@ -1392,7 +1401,7 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
             { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-2", priority: 20 },
             { key: "system.combatMods.movementMult", mode: "multiply", value: "0.5", priority: 20 }
           ],
-          flags: { effectType: "incapacitated", status: { isIncapacitated: true }, intensitySource: desc || "Intensity" },
+          flags: { "msh-faserip": { effectType: "incapacitated", status: { isIncapacitated: true }, intensitySource: desc || "Intensity" } },
           statuses: ["incapacitated"]
         });
         return `Incapacitated for ${durationLabel}`;
@@ -1405,7 +1414,7 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
             { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 },
             { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-2", priority: 20 }
           ],
-          flags: { effectType: "immobilized", status: { isImmobilized: true }, intensitySource: desc || "Intensity" },
+          flags: { "msh-faserip": { effectType: "immobilized", status: { isImmobilized: true }, intensitySource: desc || "Intensity" } },
           statuses: ["immobilized"]
         });
         return `Immobilized for ${durationLabel}`;
@@ -1416,7 +1425,7 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
         await applyEffect(targetActor, {
           name: "Nullified", img: "icons/svg/cancel.svg", rounds, originUuid,
           changes: [],
-          flags: { effectType: "nullified", status: { isNullified: true }, intensitySource: desc || "Intensity" },
+          flags: { "msh-faserip": { effectType: "nullified", status: { isNullified: true }, intensitySource: desc || "Intensity" } },
           statuses: ["nullified"]
         });
         return `Nullified for ${durationLabel}`;
@@ -1424,7 +1433,7 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
         await applyEffect(targetActor, {
           name: "Slammed", img: "icons/svg/falling.svg", rounds: 1, originUuid,
           changes: [ { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 } ],
-          flags: { effectType: "slammed", status: { isSlammed: true }, intensitySource: desc || "Intensity" },
+          flags: { "msh-faserip": { effectType: "slammed", status: { isSlammed: true }, intensitySource: desc || "Intensity" } },
           statuses: ["prone"]
         });
         return "Slammed (knocked down)";
@@ -1435,7 +1444,7 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
             { key: "system.combatMods.attackShift", mode: "add", value: "-2", priority: 20 },
             { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 }
           ],
-          flags: { effectType: "grabbed", status: { isGrabbed: true }, intensitySource: desc || "Intensity" },
+          flags: { "msh-faserip": { effectType: "grabbed", status: { isGrabbed: true }, intensitySource: desc || "Intensity" } },
           statuses: ["restrained"]
         });
         return `Grabbed for ${durationLabel}`;
@@ -1446,7 +1455,7 @@ export async function applyIntensityEffect(targetActor, effectType, { rounds = 1
         await applyEffect(targetActor, {
           name: desc || "Intensity Effect", img: "icons/svg/hazard.svg", rounds, originUuid,
           changes: [],
-          flags: { effectType: "intensityCustom", status: { isAffected: true }, intensitySource: desc || "Intensity" },
+          flags: { "msh-faserip": { effectType: "intensityCustom", status: { isAffected: true }, intensitySource: desc || "Intensity" } },
           statuses: ["affected"]
         });
         return `${desc || "Affected"} for ${durationLabel}`;
