@@ -1,3 +1,8 @@
+// scripts/modules/actions/grenade-action.js v3.4.0 - 2026-08-02
+// v3.4.0: Initial-blast saves resolve in PARALLEL (Promise.all) so each
+//   caught hero's karma declaration window (area-hazard-behavior v1.3.0,
+//   10s auto-decline) opens simultaneously on the owning players' clients
+//   instead of stacking serially. Dedupe unchanged (_resolvedTokenIds).
 // scripts/modules/actions/grenade-action.js v3.3.0 - 2026-04-22
 // v3.3.0: Intensity grenades now place a visible Drawing overlay alongside the
 //   Region (v14 Regions are only visible on the Regions layer, so without
@@ -598,9 +603,12 @@ export class GrenadeAction extends RangedAttackAction {
       const hazard = behaviorDoc.system;
       const initialSaveAll = hazard.saveOnEntry || _initialBlast;
       if (initialSaveAll) {
-        for (const tok of affected) {
-          await hazard.resolveForToken(tok.document);
-        }
+        // Parallel: each caught token's save (and its karma declaration
+        // window, when routed to an owning player) runs simultaneously —
+        // serial resolution stacked 10s countdowns per hero. The behavior's
+        // synchronous _resolvedTokenIds guard dedupes against v14's
+        // TOKEN_ENTER race.
+        await Promise.all(affected.map(tok => hazard.resolveForToken(tok.document)));
       }
     }
   }

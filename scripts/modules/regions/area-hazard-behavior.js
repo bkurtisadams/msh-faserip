@@ -1,3 +1,9 @@
+// scripts/modules/regions/area-hazard-behavior.js v1.3.0 - 2026-08-02
+// v1.3.0: Entry saves honor FEAT difficulty vs Intensity (was white-only
+//   fail): green/yellow/red requirement by rank gap via
+//   determineFeatRequirement, automatic at 3+ above, impossible at 2+ below.
+//   Karma offered via resolveResistFeat (owner-client prompt, 10s
+//   auto-decline) — applies to both the initial blast and later walk-ins.
 // scripts/modules/regions/area-hazard-behavior.js v1.2.0 - 2026-07-23
 // v1.2.0: Fix double save on grenade detonation. v14 fires TOKEN_ENTER for
 //   tokens already inside when the behavior is created, racing the manual
@@ -170,15 +176,40 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
     );
     if (existing) return;
 
-    // Roll save: 1d100 on the universal table against the save ability's rank
+    // Save FEAT vs the hazard's Intensity: scaled green/yellow/red requirement
+    // by rank gap (was white-only fail), automatic at 3+ above, impossible at
+    // 2+ below, and karma via resolveResistFeat (owner-client prompt with 10s
+    // auto-decline; this method already runs on the active GM's client, the
+    // right executor for the socket routing).
     const abilityRank = actor.system?.abilities?.[this.saveAbility]?.rank || "Typical";
-    const roll = await (new Roll("1d100")).evaluate();
-    const color = rollUniversalTable(abilityRank, Math.min(100, roll.total));
-    const colorLower = String(color || "white").toLowerCase();
-    const failed = colorLower === "white";
+    const abilLabel = this.saveAbility.charAt(0).toUpperCase() + this.saveAbility.slice(1);
+    const { determineFeatRequirement, checkFeatSuccess } = await import("../actions/ability-feat-dialog.js");
+    const req = determineFeatRequirement(abilityRank, this.intensityRank);
+
+    let failed, rollLine;
+    if (req.automatic) {
+      failed = false;
+      rollLine = `Automatic — ${abilLabel} 3+ ranks above`;
+    } else if (req.impossible) {
+      failed = true;
+      rollLine = `Impossible FEAT — Intensity 2+ ranks above`;
+    } else {
+      const { resolveResistFeat } = await import("../dice/dice-roller.js");
+      const fr = await resolveResistFeat(actor, {
+        sourceName: `Resist ${this.label}`,
+        rank: abilityRank,
+        intensityRank: this.intensityRank,
+        requirement: req.requirement,
+        declareTimeoutMs: 10000
+      });
+      const colorLower = String(rollUniversalTable(abilityRank, Math.min(100, fr.cappedTotal)) || "white").toLowerCase();
+      failed = !checkFeatSuccess(colorLower, req.requirement);
+      rollLine = fr.karmaUsed > 0
+        ? `Roll: ${fr.rollTotal} + ${fr.karmaUsed} Karma = ${fr.cappedTotal} (need ${req.requirement})`
+        : `Roll: ${fr.rollTotal} (need ${req.requirement})`;
+    }
 
     // Chat card — one line per save so players see what happened
-    const abilLabel = this.saveAbility.charAt(0).toUpperCase() + this.saveAbility.slice(1);
     const outcomeLabel = failed
       ? `<span style="color:#c62828;font-weight:bold;">FAIL — ${EFFECT_LABELS[this.intensityEffect] || "Affected"}</span>`
       : `<span style="color:#2e7d32;font-weight:bold;">RESIST</span>`;
@@ -187,7 +218,7 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
       content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;padding:6px 10px;font-size:.9em;">
         <div style="color:#8b0000;font-weight:bold;font-size:.85em;text-transform:uppercase;">Area Hazard — ${this.label}</div>
         <div><strong>${tokenDoc.name}</strong> enters — ${abilLabel} FEAT vs ${this.intensityRank} Intensity</div>
-        <div>Roll: ${roll.total} → ${outcomeLabel}</div>
+        <div>${rollLine} → ${outcomeLabel}</div>
       </div>`
     });
 

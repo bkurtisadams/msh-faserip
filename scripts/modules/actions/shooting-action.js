@@ -1,3 +1,11 @@
+// shooting-action.js v3.9.0 - 2026-08-02
+// v3.9.0: Defender karma + scaled FEAT difficulty on ammo saves. Mercy Shot
+//        KO FEAT and Canister gas/KO saves route through resolveResistFeat
+//        (owner-client prompt, 10s auto-decline) and determineFeatRequirement
+//        (green/yellow/red by rank gap, automatic at 3+, impossible at 2+
+//        below — canister was white-only fail). Canister targets resolve in
+//        PARALLEL so multiple players get their declaration windows
+//        simultaneously instead of stacking 10s waits.
 // shooting-action.js v3.8.0 - 2026-08-02
 // v3.8.0: Weapon dropdown filter widened: weaponType "shooting" and damageType
 //        "Stun" now qualify (previously only damageType "S" / attackType
@@ -946,14 +954,34 @@ export class ShootingAction extends RangedAttackAction {
         weapon?.system?.intensityRank ||
         weapon?.system?.stunIntensity ||
         "Remarkable";
-      const { requiredColorForIntensity } = await import("./breaking-feat.js");
-      const requiredColor = requiredColorForIntensity(endRank, koIntensity);
+      const { determineFeatRequirement, checkFeatSuccess } = await import("./ability-feat-dialog.js");
+      const req = determineFeatRequirement(endRank, koIntensity);
 
-      const r = await (new Roll("1d100")).evaluate();
-      const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
-      const featColorLower = String(featColor || "white").toLowerCase();
-      const _colorOrder = { white: 0, green: 1, yellow: 2, red: 3 };
-      const resisted = (_colorOrder[featColorLower] ?? 0) >= (_colorOrder[requiredColor] ?? 1);
+      let resisted, featLine;
+      if (req.automatic) {
+        resisted = true;
+        featLine = `Endurance (${endRank}) vs ${koIntensity} Intensity \u2014 3+ ranks above: AUTOMATIC resist, no roll`;
+      } else if (req.impossible) {
+        resisted = false;
+        featLine = `Endurance (${endRank}) vs ${koIntensity} Intensity \u2014 2+ ranks below: IMPOSSIBLE FEAT, no roll`;
+      } else {
+        const { resolveResistFeat } = await import("../dice/dice-roller.js");
+        const fr = await resolveResistFeat(targetActor, {
+          sourceName: `Resist ${weapon?.name || "Mercy Shot"} KO drug`,
+          rank: endRank,
+          intensityRank: koIntensity,
+          requirement: req.requirement,
+          declareTimeoutMs: 10000
+        });
+        const featColorLower = String(
+          (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, fr.cappedTotal)) || "white"
+        ).toLowerCase();
+        resisted = checkFeatSuccess(featColorLower, req.requirement);
+        const rollPart = fr.karmaUsed > 0
+          ? `rolled ${fr.rollTotal} + ${fr.karmaUsed} Karma = ${fr.cappedTotal}`
+          : `rolled ${fr.rollTotal}`;
+        featLine = `Endurance FEAT (${endRank}) vs ${koIntensity} Intensity \u2014 need ${req.requirement.toUpperCase()}: ${rollPart} \u2192 <b>${featColorLower.toUpperCase()}</b>`;
+      }
 
       let line = "";
       if (resisted) {
@@ -972,7 +1000,7 @@ export class ShootingAction extends RangedAttackAction {
         speaker: ChatMessage.getSpeaker({ actor }),
         content: `<div style="background:#f3e5f5;border:1px solid #8e24aa;border-radius:3px;padding:6px 8px;margin:4px 0;">
           <div style="font-weight:bold;color:#6a1b9a;margin-bottom:3px;">Mercy Shot \u2014 KO Drug</div>
-          <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs ${koIntensity} Intensity \u2014 need ${requiredColor.toUpperCase()}: rolled ${r.total} \u2192 <b>${featColorLower.toUpperCase()}</b></div>
+          <div style="font-size:.85em;">${featLine}</div>
           ${line}
         </div>`
       });
@@ -1143,51 +1171,78 @@ export class ShootingAction extends RangedAttackAction {
           }
           lines.push(`${affected.length} target${affected.length !== 1 ? "s" : ""} take ${baseDamage} fire damage + burning ${burnRounds} round${burnRounds !== 1 ? "s" : ""}.`);
         } else if (subType === "gas" || subType === "knockout") {
-          // Gas-type: Endurance FEAT vs Intensity per target.
+          // Gas-type: save FEAT vs Intensity per target, with the scaled
+          // green/yellow/red requirement (was white-only fail), automatic/
+          // impossible handling, and the karma routing (resolveResistFeat).
+          // Targets resolve in PARALLEL so multiple owned heroes prompt their
+          // players simultaneously instead of serially stacking 10s windows.
           const intensityRank = subType === "knockout" ? "Remarkable" : "Incredible";
+          const gasLabel = subType === "knockout" ? "KO Gas" : "Tear Gas";
           const { getAbilityInfo } = await import("./action-utils.js");
           const { rollUniversalTable } = await import("../dice/universal-table.js");
+          const { determineFeatRequirement, checkFeatSuccess } = await import("./ability-feat-dialog.js");
+          const { resolveResistFeat } = await import("../dice/dice-roller.js");
           const { applyUnconscious, applyEffect } = await import("../effects/effect-engine.js");
 
-          const resultRows = [];
-          for (const tok of affected) {
+          const rowPromises = affected.map(async (tok) => {
             const a = tok.actor;
-            if (!a) continue;
+            if (!a) return null;
             const endInfo = getAbilityInfo(a, "endurance");
             const endRank = endInfo?.rank || "Typical";
-            const r = await (new Roll("1d100")).evaluate();
-            const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
-            const lc = String(featColor || "white").toLowerCase();
-            if (lc === "white") {
-              if (subType === "knockout") {
-                const rounds = Math.max(1, Math.min(10, Math.floor(Math.random() * 10) + 1));
-                try {
-                  await applyUnconscious(a, { rounds, originUuid: actor?.uuid });
-                } catch (e) { console.error("[FASERIP ERROR] Canister KO failed:", e); }
-                resultRows.push(`<li>${a.name}: KO'd ${rounds} rnd</li>`);
-              } else {
-                // Tear gas: apply -3CS-on-actions effect (approximation of
-                // "no actions other than movement"). Foundry status = "blinded".
-                try {
-                  await applyEffect(a, {
-                    name: "Tear Gas",
-                    img: "icons/svg/blind.svg",
-                    rounds: 2,
-                    originUuid: actor?.uuid,
-                    changes: [
-                      { key: "system.combatMods.attackShift", mode: "add", value: "-3", priority: 20 },
-                      { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
-                    ],
-                    flags: { effectType: "tearGas" },
-                    statuses: ["blinded"]
-                  });
-                } catch (e) { console.error("[FASERIP ERROR] Canister gas failed:", e); }
-                resultRows.push(`<li>${a.name}: incapacitated by tear gas</li>`);
-              }
+            const req = determineFeatRequirement(endRank, intensityRank);
+
+            let resisted, detail;
+            if (req.automatic) {
+              resisted = true;
+              detail = `automatic (End 3+ above)`;
+            } else if (req.impossible) {
+              resisted = false;
+              detail = `impossible (Intensity 2+ above)`;
             } else {
-              resultRows.push(`<li>${a.name}: resists (${lc.toUpperCase()})</li>`);
+              const fr = await resolveResistFeat(a, {
+                sourceName: `Resist ${gasLabel}`,
+                rank: endRank,
+                intensityRank,
+                requirement: req.requirement,
+                declareTimeoutMs: 10000
+              });
+              const lc = String(
+                (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, fr.cappedTotal)) || "white"
+              ).toLowerCase();
+              resisted = checkFeatSuccess(lc, req.requirement);
+              detail = fr.karmaUsed > 0
+                ? `${fr.rollTotal} + ${fr.karmaUsed}K = ${fr.cappedTotal} \u2192 ${lc.toUpperCase()}, need ${req.requirement}`
+                : `${fr.rollTotal} \u2192 ${lc.toUpperCase()}, need ${req.requirement}`;
             }
-          }
+
+            if (resisted) return `<li>${a.name}: resists (${detail})</li>`;
+
+            if (subType === "knockout") {
+              const rounds = Math.max(1, Math.min(10, Math.floor(Math.random() * 10) + 1));
+              try {
+                await applyUnconscious(a, { rounds, originUuid: actor?.uuid });
+              } catch (e) { console.error("[FASERIP ERROR] Canister KO failed:", e); }
+              return `<li>${a.name}: KO'd ${rounds} rnd (${detail})</li>`;
+            }
+            // Tear gas: apply -3CS-on-actions effect (approximation of
+            // "no actions other than movement"). Foundry status = "blinded".
+            try {
+              await applyEffect(a, {
+                name: "Tear Gas",
+                img: "icons/svg/blind.svg",
+                rounds: 2,
+                originUuid: actor?.uuid,
+                changes: [
+                  { key: "system.combatMods.attackShift", mode: "add", value: "-3", priority: 20 },
+                  { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
+                ],
+                flags: { effectType: "tearGas" },
+                statuses: ["blinded"]
+              });
+            } catch (e) { console.error("[FASERIP ERROR] Canister gas failed:", e); }
+            return `<li>${a.name}: incapacitated by tear gas (${detail})</li>`;
+          });
+          const resultRows = (await Promise.all(rowPromises)).filter(Boolean);
           lines.push(`Endurance FEATs vs ${intensityRank}:<ul style="margin:3px 0 0 18px;padding:0;font-size:.85em;">${resultRows.join("")}</ul>`);
         } else if (subType === "smoke") {
           // Smoke: -2CS on all FEATs for those in the area. Applied as a
