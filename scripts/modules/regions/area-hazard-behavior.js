@@ -1,3 +1,9 @@
+// scripts/modules/regions/area-hazard-behavior.js v1.4.0 - 2026-08-02
+// v1.4.0: Cross-source dedupe — a token already suffering the hazard's
+//   effect (from another region or a canister) skips the save entirely.
+//   The per-region-id guard alone let a second grenade re-gas everyone,
+//   creating duplicate status-providing AEs (core warned "already has
+//   'Tear Gas (12s)' providing that status" but the -CS changes stacked).
 // scripts/modules/regions/area-hazard-behavior.js v1.3.0 - 2026-08-02
 // v1.3.0: Entry saves honor FEAT difficulty vs Intensity (was white-only
 //   fail): green/yellow/red requirement by rank gap via
@@ -175,6 +181,29 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
       e.getFlag("msh-faserip", FROM_HAZARD_FLAG) === regionId
     );
     if (existing) return;
+
+    // Cross-source dedupe: already suffering this hazard's effect from ANY
+    // source (another region — second grenade — or a canister shot)? Skip
+    // the save and the karma prompt; being gassed twice doesn't stack.
+    // Status ids match the intensityEffect keys throughout effect-engine,
+    // and actor.statuses is authoritative regardless of CTT renames.
+    // Known tradeoff: in overlapping clouds, exiting the region that
+    // applied the effect removes it even if the token is still inside the
+    // other — GM adjudicates the rare overlap case.
+    if (this.intensityEffect) {
+      const alreadyAffected = actor.statuses?.has?.(this.intensityEffect)
+        || actor.effects.some(e => e.statuses?.has?.(this.intensityEffect));
+      if (alreadyAffected) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ token: tokenDoc }),
+          content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;padding:6px 10px;font-size:.9em;">
+            <div style="color:#8b0000;font-weight:bold;font-size:.85em;text-transform:uppercase;">Area Hazard — ${this.label}</div>
+            <div><strong>${tokenDoc.name}</strong> is already ${EFFECT_LABELS[this.intensityEffect] || "affected"} — no additional save.</div>
+          </div>`
+        });
+        return;
+      }
+    }
 
     // Save FEAT vs the hazard's Intensity: scaled green/yellow/red requirement
     // by rank gap (was white-only fail), automatic at 3+ above, impossible at

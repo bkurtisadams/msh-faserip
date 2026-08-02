@@ -1,3 +1,8 @@
+// shooting-action.js v3.9.2 - 2026-08-02
+// v3.9.2: Tear-gas dedupe matcher hardened — CTT renames managed effects
+//        ("Tear Gas (12s)") so exact-name match missed, and top-level
+//        flags.effectType may not survive v14 flag-scope validation. Now
+//        matches system-scoped flag, legacy flag, or /^Tear Gas\b/ prefix.
 // shooting-action.js v3.9.1 - 2026-08-02
 // v3.9.1: Canister dedupe — targets already tear-gassed refresh the existing
 //        effect's duration instead of stacking a second -3CS/-2CS AE;
@@ -1203,8 +1208,16 @@ export class ShootingAction extends RangedAttackAction {
                 || a.effects.some(e => e.statuses?.has?.("unconscious"));
               if (alreadyKO) return `<li>${a.name}: already unconscious \u2014 no additional effect</li>`;
             } else {
+              // Match is hardened: CTT renames managed effects with a
+              // remaining-duration suffix ("Tear Gas (12s)"), so exact-name
+              // matching misses; and top-level flag keys (flags.effectType)
+              // may not survive v14's flag-scope validation. Check the
+              // system-scoped flag, the legacy top-level flag, and a
+              // name-prefix regex.
               const existingGas = a.effects.find(e =>
-                e.flags?.effectType === "tearGas" || e.name === "Tear Gas"
+                e.flags?.["msh-faserip"]?.effectType === "tearGas"
+                || e.flags?.effectType === "tearGas"
+                || /^Tear Gas\b/.test(e.name || "")
               );
               if (existingGas) {
                 try {
