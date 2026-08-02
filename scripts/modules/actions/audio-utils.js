@@ -1,5 +1,9 @@
 // systems/msh-faserip/scripts/modules/actions/audio-utils.js
 // Modernized SFX utilities with verbose debug logging.
+// 2026-08-02: Item-configured SFX paths are verified via soundFileExists
+// before playing (GM clients; players pass through) — stale paths spammed
+// "Invalid URI / media resource failed" on every shot. Missing files now
+// fall through to the classified defaults instead of erroring silently.
 
 /* ---------------------------------- Core handles ---------------------------------- */
 
@@ -243,11 +247,16 @@ export async function playCombatSFX(...args) {
     // Out of ammo - play empty click and return early
     if (outOfAmmo) {
       const itemEmpty = pickFromItemSfx(opts.item ?? null, { actionType, isHit: false, rollResult, outOfAmmo: true });
-      if (itemEmpty) {
+      // Item-configured paths were played unverified — a stale/mistyped path
+      // spammed "Invalid URI / media resource failed" on every shot. Verify
+      // on GM clients (players can't browse; their check is a pass-through)
+      // and fall through to the default when the file is missing.
+      if (itemEmpty && (await soundFileExists(itemEmpty))) {
         dlog("play: item-empty-sfx", { src: itemEmpty });
         await AudioHelperNS.play({ src: itemEmpty, volume, autoplay: true, loop: false }, true);
         return;
       }
+      if (itemEmpty) dlog("skip: item empty-sfx missing on disk", { src: itemEmpty });
       // Default empty click
       const defaultEmpty = `${BASE_PATH()}/click-empty.mp3`;
       if (await soundFileExists(defaultEmpty)) {
@@ -263,11 +272,12 @@ export async function playCombatSFX(...args) {
     const forcePsychic = lowerDamageType === "mental";
     if (!forcePsychic) {
       const itemChosen = pickFromItemSfx(opts.item ?? null, { actionType, isHit, rollResult });
-      if (itemChosen) {
+      if (itemChosen && (await soundFileExists(itemChosen))) {
         dlog("play: item-sfx", { src: itemChosen });
         await AudioHelperNS.play({ src: itemChosen, volume, autoplay: true, loop: false }, true);
         return;
       }
+      if (itemChosen) dlog("skip: item sfx missing on disk, using defaults", { src: itemChosen });
     } else {
       dlog("force: psychic via damageType");
     }

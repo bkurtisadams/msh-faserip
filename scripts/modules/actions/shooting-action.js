@@ -1,3 +1,9 @@
+// shooting-action.js v3.9.1 - 2026-08-02
+// v3.9.1: Canister dedupe — targets already tear-gassed refresh the existing
+//        effect's duration instead of stacking a second -3CS/-2CS AE;
+//        already-unconscious targets skip the KO save. Both skip the FEAT
+//        and the karma prompt entirely (mirrors area-hazard-behavior's
+//        "already hazarded" guard).
 // shooting-action.js v3.9.0 - 2026-08-02
 // v3.9.0: Defender karma + scaled FEAT difficulty on ammo saves. Mercy Shot
 //        KO FEAT and Canister gas/KO saves route through resolveResistFeat
@@ -1187,6 +1193,28 @@ export class ShootingAction extends RangedAttackAction {
           const rowPromises = affected.map(async (tok) => {
             const a = tok.actor;
             if (!a) return null;
+
+            // Already affected? Skip the save AND the karma prompt — a
+            // gassed target can't get "more gassed" (effects were stacking
+            // -3CS/-2CS per additional canister), and an unconscious one
+            // has no FEAT to make. Mirrors the region hazard's dedupe.
+            if (subType === "knockout") {
+              const alreadyKO = a.statuses?.has?.("unconscious")
+                || a.effects.some(e => e.statuses?.has?.("unconscious"));
+              if (alreadyKO) return `<li>${a.name}: already unconscious \u2014 no additional effect</li>`;
+            } else {
+              const existingGas = a.effects.find(e =>
+                e.flags?.effectType === "tearGas" || e.name === "Tear Gas"
+              );
+              if (existingGas) {
+                try {
+                  const { computeDuration } = await import("../effects/effect-engine.js");
+                  await existingGas.update({ duration: computeDuration({ rounds: 2 }), disabled: false });
+                } catch (e) { console.warn("[FASERIP] Tear Gas refresh failed:", e); }
+                return `<li>${a.name}: still gassed \u2014 duration refreshed, no stacking</li>`;
+              }
+            }
+
             const endInfo = getAbilityInfo(a, "endurance");
             const endRank = endInfo?.rank || "Typical";
             const req = determineFeatRequirement(endRank, intensityRank);
