@@ -458,8 +458,6 @@ export class ShootingAction extends RangedAttackAction {
             $dialog[0].style.height = 'auto';
           }
 
-          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
-
           // ── Wire CS panel from shared utility ──
           // getRangePenalty reads live range from the dialog
           const _getCurrentRangePenalty = () => {

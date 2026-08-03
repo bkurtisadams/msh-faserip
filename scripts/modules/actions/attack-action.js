@@ -241,6 +241,17 @@ const REDESIGNED_ATTACK_FORMS = new Set([
 ]);
 const MELEE_ATTACK_FORMS = new Set(["blunt-attack", "edged-attack"]);
 
+// Parse first numeric in a value (works for "20", "", null, "Burst (3)", etc.)
+const toNum = (v, dflt = NaN) => {
+  if (v == null || v === "") return dflt;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const m = v.match(/-?\d+(\.\d+)?/);
+    return m ? Number(m[0]) : dflt;
+  }
+  return dflt;
+};
+
 function escapeChatText(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -898,14 +909,6 @@ export class AttackAction extends BaseAction {
         String(actionType).toLowerCase() === "shooting";
 
       if (isFirearm) {
-      // Parse first numeric in a value
-      const toNum = (v) => {
-        if (v == null || v === "") return NaN;
-        if (typeof v === "number") return v;
-        const m = String(v).match(/-?\d+(\.\d+)?/);
-        return m ? Number(m[0]) : NaN;
-      };
-
       // Find first valid ammo field
       const current = [
         sys.ammo?.current,
@@ -2286,17 +2289,6 @@ export class AttackAction extends BaseAction {
             String(actionType).toLowerCase() === "shooting";
           if (_isFirearm && weapon?.system) {
             const sys = weapon.system;
-
-            // Parse first numeric in a value (works for "20", "", null, "Burst (3)", etc.)
-            const toNum = (v, dflt = NaN) => {
-              if (v == null || v === "") return dflt;
-              if (typeof v === "number" && Number.isFinite(v)) return v;
-              if (typeof v === "string") {
-                const m = v.match(/-?\d+(\.\d+)?/);
-                return m ? Number(m[0]) : dflt;
-              }
-              return dflt;
-            };
 
             // Decide rounds to spend: prefer HUD/sender opts, then weapon rate of fire, else 1
             const candidates = [
