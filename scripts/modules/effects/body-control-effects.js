@@ -25,6 +25,8 @@
 // attacking bonus vs larger foes (target-relative), Density's Shift-0 immunity
 // (lowest-mass choice), Phasing/Invisibility/Blending.
 
+import { buildBodyArmorAE } from "./defense-effects.js";
+
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 const rv = (r) => Number(game.msh?.getRankValue?.(r)) || Number(CONFIG.FASERIP?.rankValues?.[r]) || 0;
 const bcId = (kind, itemId) => `bc-${kind}-${itemId}`;
@@ -76,23 +78,6 @@ function buildShiftAE(item, ongoingId, label, changes) {
     flags: { [scope]: { effectCategory: "bodyControl", ongoingId, powerItemId: item.id, powerName: item.name } }
   };
 }
-function buildBodyArmorAE(item, ongoingId, physical, energy, rank) {
-  const scope = SCOPE();
-  return {
-    name: `Body Armor: ${item.name} (${rank}: ${physical}/${energy})`,
-    img: "",
-    changes: [],
-    statuses: ["body-armor"],
-    flags: { [scope]: {
-      effectCategory: "defense", defenseType: "bodyArmor", ongoingId,
-      powerItemId: item.id, powerName: item.name,
-      physical, energy,
-      physicalRank: physical ? rank : "", energyRank: energy ? rank : "",
-      isForceField: false
-    } }
-  };
-}
-
 const ADD = (key, value) => ({ key, mode: "add", value: String(value), priority: 20 });
 
 // Status/flag-based state AE (no changes) — for intangibility/concealment states.
@@ -147,7 +132,10 @@ export async function syncBodyControlEffects(actor, item, removing = false) {
     const baId = bcId("density-ba", item.id);
     const shiftId = bcId("density-shift", item.id);
     if (!removing && isKind(item, "density manipulation self", "density manipulation", "density manipulation (self)", "densityself")) {
-      await registerBcAE(actor, baId, buildBodyArmorAE(item, baId, val, val, rank), inactive);
+      await registerBcAE(actor, baId, buildBodyArmorAE(item, {
+        ongoingId: baId, physical: val, energy: val,
+        physicalRank: rank, energyRank: rank, armorNature: "natural"
+      }), inactive);
       const endVal = Number(actor.system?.abilities?.endurance?.value) || 0;
       if (val > endVal) {
         await registerBcAE(actor, shiftId, buildShiftAE(item, shiftId, "Density (high mass: −1CS Fight/Agi)", [
@@ -162,7 +150,10 @@ export async function syncBodyControlEffects(actor, item, removing = false) {
   {
     const id = bcId("plasticity-ba", item.id);
     if (!removing && isKind(item, "plasticity")) {
-      await registerBcAE(actor, id, buildBodyArmorAE(item, id, val, 0, rank), inactive);
+      await registerBcAE(actor, id, buildBodyArmorAE(item, {
+        ongoingId: id, physical: val, energy: 0,
+        physicalRank: rank, energyRank: "", armorNature: "natural"
+      }), inactive);
     } else await removeBcAE(actor, id);
   }
 

@@ -240,7 +240,7 @@ function looksLikeDefensivePower(item) {
 
 // ─── AE builders ─────────────────────────────────────────────────────────────
 
-function buildBodyArmorAE(item, values) {
+export function buildBodyArmorAE(item, values) {
   const scope = SCOPE();
   const label = `Body Armor: ${item.name} (${values.physicalRank}: ${values.physical}/${values.energy})`;
 
@@ -254,7 +254,7 @@ function buildBodyArmorAE(item, values) {
       [scope]: {
         effectCategory: "defense",
         defenseType: "bodyArmor",
-        ongoingId: defenseEffectId("bodyArmor", item.id),
+        ongoingId: values.ongoingId ?? defenseEffectId("bodyArmor", item.id),
         powerItemId: item.id,
         powerName: item.name,
         physical: values.physical,

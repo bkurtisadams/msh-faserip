@@ -62,9 +62,6 @@ import { showFaseripButtonDialog } from "./dialog-shim.js";
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
 /** Small util */
-function rankIndex(r) {
-  return Math.max(0, RANKS.findIndex(x => x.toLowerCase() === String(r||"").toLowerCase()));
-}
 
 export class CheckAction extends BaseAction {
   constructor({ actor, actionType, abilityName, opts = {} }) {
