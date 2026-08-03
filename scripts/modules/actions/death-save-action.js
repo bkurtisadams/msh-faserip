@@ -1,3 +1,14 @@
+// scripts/modules/actions/death-save-action.js v1.10.0 - 2026-08-02
+// v1.10.0: Defender Karma on the Kill/Death Endurance FEAT (RAW two-phase,
+//         routed). Both roll sites (auto fast-path from applyDamageToTargets
+//         and the dialog path) roll through _rollDeathSaveWithKarma →
+//         resolveResistFeat: the owning player's client gets the declaration
+//         prompt with a 30s auto-decline window (highest-stakes roll in the
+//         game — longer than the 10s check saves), Phase-2 amount dialog,
+//         deduction under their ownership; local GM prompts for NPC deaths
+//         countdown 30s too. Card roll box shows "+ N Karma = total". The
+//         50-Karma stabilize / 200-Karma re-roll options remain informational
+//         text pending a ruling on their interactive flow.
 // scripts/modules/actions/death-save-action.js v1.9.6 - 2026-03-20
 // v1.9.6: Pass mshReplacing option when deleting existing unconscious effects in _createStunnedEffect
 //         so rest-system deleteActiveEffect hook doesn't trigger premature consciousness attempt.
@@ -47,8 +58,12 @@ export class DeathSaveAction extends BaseAction {
       const effectiveRank = shiftRank(endRank, featCs);
       const shiftDisplay  = featCs ? ` (${featCs > 0 ? "+" : ""}${featCs}CS)` : "";
 
-      const roll = await (new Roll("1d100")).evaluate();
-      const colorLower = String(game.msh.rollUniversalTable(effectiveRank, Math.min(100, roll.total))).toLowerCase();
+      const kr = await this._rollDeathSaveWithKarma(actor, {
+        rank: effectiveRank,
+        sourceName: fromZeroHealth ? "Death Save (Kill column)" : "Kill Save (Kill column)"
+      });
+      const roll = kr.roll;
+      const colorLower = String(game.msh.rollUniversalTable(effectiveRank, kr.capped)).toLowerCase();
 
       const stunDie = game.settings.get("msh-faserip", "stunDurationDie") || "d10";
       let unconsciousDuration = null;
@@ -68,7 +83,8 @@ export class DeathSaveAction extends BaseAction {
         content: this._buildDeathSaveCard({
           actor, effectiveRank, shiftDisplay, endValue,
           roll, colorLower, killResult, isDying, fromZeroHealth,
-          unconsciousDuration, attackForm, killContext, isRobot
+          unconsciousDuration, attackForm, killContext, isRobot,
+          karmaUsed: kr.karmaUsed, cappedTotal: kr.capped
         })
       });
 
@@ -196,12 +212,16 @@ export class DeathSaveAction extends BaseAction {
     let useConsolidated = false;
     try { useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards"); } catch (_e) {}
 
-    const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
+    const kr = await this._rollDeathSaveWithKarma(actor, {
+      rank: effectiveRank,
+      sourceName: `${dialogTitle} (Kill column)`
+    });
+    const roll = kr.roll;
+    if (!choice.skipDice && !kr.viaKarmaPath) {
       await showDiceAnimation(roll, actor, `${actor.name} ${dialogTitle} (Endurance FEAT)`, useConsolidated);
     }
 
-    const colorLower = String(game.msh.rollUniversalTable(effectiveRank, roll.total) || "").toLowerCase();
+    const colorLower = String(game.msh.rollUniversalTable(effectiveRank, kr.capped) || "").toLowerCase();
 
     const stunDie = game.settings.get("msh-faserip", "stunDurationDie") || "d10";
     let unconsciousDuration = null;
@@ -220,7 +240,8 @@ export class DeathSaveAction extends BaseAction {
       content: this._buildDeathSaveCard({
         actor, effectiveRank, shiftDisplay, endValue: endurance.value,
         roll, colorLower, killResult, isDying, fromZeroHealth,
-        unconsciousDuration, attackForm, killContext, isRobot
+        unconsciousDuration, attackForm, killContext, isRobot,
+        karmaUsed: kr.karmaUsed, cappedTotal: kr.capped
       })
     });
 
@@ -241,7 +262,41 @@ export class DeathSaveAction extends BaseAction {
   // ----------------------------------------------------------------
   // Card builder — matches attack card / check card layout exactly
   // ----------------------------------------------------------------
-  _buildDeathSaveCard({ actor, effectiveRank, shiftDisplay, endValue, roll, colorLower, killResult, isDying, fromZeroHealth, unconsciousDuration, attackForm, killContext, isRobot=false }) {
+  /**
+   * Roll the Kill/Death Endurance FEAT with the Karma offer (RAW two-phase).
+   * Routed to an active owning player with a 30s auto-decline window — the
+   * highest-stakes roll in the game gets more deliberation time than the
+   * 10s Slam/Stun checks. Local GM prompts (NPC deaths) countdown 30s too.
+   * Returns { roll, rollTotal, capped, karmaUsed, viaKarmaPath }.
+   */
+  async _rollDeathSaveWithKarma(actor, { rank, sourceName }) {
+    try {
+      const { getAvailableKarma, resolveResistFeat } = await import("../dice/dice-roller.js");
+      if (getAvailableKarma(actor) > 0) {
+        const fr = await resolveResistFeat(actor, {
+          sourceName,
+          rank,
+          declareTimeoutMs: 30000,
+          localDeclareTimeoutMs: 30000
+        });
+        if (fr && typeof fr.cappedTotal === "number") {
+          return {
+            roll: { total: fr.rollTotal },
+            rollTotal: fr.rollTotal,
+            capped: Math.min(100, fr.cappedTotal),
+            karmaUsed: fr.karmaUsed || 0,
+            viaKarmaPath: true
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("[FASERIP] Death-save karma routing failed; rolling plain:", e);
+    }
+    const roll = await (new Roll("1d100")).evaluate();
+    return { roll, rollTotal: roll.total, capped: Math.min(100, roll.total), karmaUsed: 0, viaKarmaPath: false };
+  }
+
+  _buildDeathSaveCard({ actor, effectiveRank, shiftDisplay, endValue, roll, colorLower, killResult, isDying, fromZeroHealth, unconsciousDuration, attackForm, killContext, isRobot=false, karmaUsed = 0, cappedTotal = null }) {
     const isEdgedOrShooting = (killContext === KILL_CONTEXTS.EDGED_MELEE || killContext === KILL_CONTEXTS.SHOOTING);
     // 0 HP = unconscious regardless of how the kill save was triggered
     const atZeroHealth = (actor?.system?.attributes?.health?.value ?? 1) === 0;
@@ -249,7 +304,10 @@ export class DeathSaveAction extends BaseAction {
     const cardLabel   = isUnconscious ? (isRobot ? "DEACTIVATION SAVE" : "DEATH SAVE") : "KILL SAVE";
     const resultLabel = killResult.label || (isDying ? "Endurance Loss" : "No Effect");
     const { bg, fg }  = bannerColors(colorLower);
-    const rollBox = `<span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const _karmaNote = karmaUsed > 0
+      ? ` <span style="color:#1565c0;font-size:.9em;">+ ${karmaUsed} Karma = ${cappedTotal ?? Math.min(100, roll.total + karmaUsed)}</span>`
+      : "";
+    const rollBox = `<span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>${_karmaNote}`;
 
     let outcomeLines = [];
     if (isDying) {
