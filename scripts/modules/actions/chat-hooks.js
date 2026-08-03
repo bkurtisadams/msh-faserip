@@ -712,6 +712,29 @@ export function installActionChatHandlers() {
     // ongoing-engine tick messages and the death-save card. Handlers
     // re-validate dying state, ownership, and karma on every click so
     // stale buttons on old messages fail gracefully.
+    const _deleteDyingAE = async (dyingActor, dyingAE) => {
+      try {
+        await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id], { mshIntentional: true });
+      } catch (e) {
+        console.warn("[FASERIP] Direct dying AE delete failed, trying GM socket:", e);
+      }
+      if (!dyingActor.effects.get(dyingAE.id)) return true;
+      // Direct delete vetoed or lacked permission — route through GM.
+      try {
+        const { executeAsGM } = await import("../../gm-utils.js");
+        await executeAsGM("deleteActiveEffects", {
+          targetActorUuid: dyingActor.uuid,
+          effectIds: [dyingAE.id]
+        });
+      } catch (e) {
+        console.error("[FASERIP] GM-socket dying AE delete failed:", e);
+      }
+      if (!dyingActor.effects.get(dyingAE.id)) return true;
+      ui.notifications.error(`Failed to remove Dying from ${dyingActor.name} — remove the effect manually.`);
+      console.error(`[FASERIP] Dying AE ${dyingAE.id} on ${dyingActor.name} survived both delete paths`);
+      return false;
+    };
+
     const _resolveDyingContext = async (btn) => {
       const doc = await fromUuid(btn.dataset.actorUuid || "");
       const dyingActor = doc?.actor ?? doc ?? null;
@@ -780,7 +803,7 @@ export function installActionChatHandlers() {
         const colorLower = String(game.msh.rollUniversalTable(curRank, Math.min(100, r.total)) || "white").toLowerCase();
         const success = colorLower !== "white";
         if (success) {
-          await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id], { mshIntentional: true });
+          await _deleteDyingAE(dyingActor, dyingAE);
           const { applyUnconscious } = await import("../effects/effect-engine.js");
           const d = await (new Roll("1d10")).evaluate();
           await applyUnconscious(dyingActor, { rounds: d.total, originUuid: dyingActor.uuid });
@@ -814,7 +837,7 @@ export function installActionChatHandlers() {
         const ctx = await _resolveDyingContext(btn);
         if (!ctx) return;
         const { dyingActor, dyingAE } = ctx;
-        await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id], { mshIntentional: true });
+        await _deleteDyingAE(dyingActor, dyingAE);
         const { applyUnconscious } = await import("../effects/effect-engine.js");
         const hours = await (new Roll("1d10")).evaluate();
         // RAW: unconscious for 1-10 more HOURS. 1 hour = 600 turns.

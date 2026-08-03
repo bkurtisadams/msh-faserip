@@ -340,7 +340,10 @@ async function updateEmbeddedDocsOnActor({ targetActorUuid, collection, updates 
 async function deleteActiveEffects({ targetActorUuid, effectIds }) {
   const actor = await getActorFromUuid(targetActorUuid);
   if (!actor || !Array.isArray(effectIds) || effectIds.length === 0) return false;
-  await actor.deleteEmbeddedDocuments("ActiveEffect", effectIds);
+  // Socket deletions only originate from system code — assert intent so the
+  // preDeleteActiveEffect guard (init.js) does not veto guarded AEs (dying,
+  // defense, impaired endurance, regeneration).
+  await actor.deleteEmbeddedDocuments("ActiveEffect", effectIds, { mshIntentional: true });
   return true;
 }
 
