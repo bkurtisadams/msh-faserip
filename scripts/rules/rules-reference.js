@@ -130,14 +130,24 @@ export function valueToRank(val) {
 }
 
 /** Shift a rank name up/down by delta steps. Class 1000+ ranks cannot be shifted. Clamps to Shift-Z. */
-export function shiftRank(name, delta) {
+export function shiftRank(name, delta, { min, max } = {}) {
   const n = normalizeRank(name);
   const i = RANKS_ORDERED.indexOf(n);
   if (i < 0) return n;
   // Class 1000+ ranks (index 14+) cannot be column-shifted (rule pg. 15)
   if (i >= 14) return n;
   // Clamp between Shift-0 (0) and Shift-Z (13)
-  const newI = Math.min(Math.max(i + delta, 0), 13);
+  let newI = Math.min(Math.max(i + delta, 0), 13);
+  // Optional caller bounds, e.g. chargen's ability-modifier rule: "no ability
+  // may be modified in any fashion below Feeble or above Monstrous"
+  if (min != null) {
+    const mi = RANKS_ORDERED.indexOf(normalizeRank(min));
+    if (mi >= 0) newI = Math.max(newI, mi);
+  }
+  if (max != null) {
+    const ma = RANKS_ORDERED.indexOf(normalizeRank(max));
+    if (ma >= 0) newI = Math.min(newI, ma);
+  }
   return RANKS_ORDERED[newI];
 }
 

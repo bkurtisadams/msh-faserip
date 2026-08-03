@@ -8,6 +8,12 @@
 //   freshly chargen'd actors; without the seed, derive would zero them out.
 
 import { POWER_DATA, TALENT_DATA, CONTACT_DATA } from './chargen-data.js';
+import { shiftRank } from './rules/rules-reference.js';
+
+// Ability Modifier Table rule: "no ability may be modified in any fashion
+// below Feeble or above Monstrous"
+const shiftAbilityRank = (rankName, shifts) =>
+  shiftRank(rankName, shifts, { min: "Feeble", max: "Monstrous" });
 
 export const RANKS = [
   { name: "Shift-0", min: 0, standard: 0 },
@@ -538,13 +544,6 @@ function calcSlotsUsed(chosen) {
   return (chosen || []).reduce((acc, item) => acc + (item.star ? 2 : 1), 0);
 }
 
-function shiftRank(rankName, shifts) {
-  const idx = RANKS.findIndex(r => r.name === rankName);
-  if (idx === -1) return rankName;
-  const newIdx = Math.max(0, Math.min(RANKS.length - 1, idx + shifts));
-  return RANKS[newIdx].name;
-}
-
 function getColumnForOrigin(origin) {
   switch (origin) {
     case "Normal":
@@ -656,14 +655,14 @@ export class CharacterGenerator {
         break;
 
       case "Mutant":
-        abilities.endurance.rank = shiftRank(abilities.endurance.rank, 1);
+        abilities.endurance.rank = shiftAbilityRank(abilities.endurance.rank, 1);
         abilities.endurance.value = rankValue(getRankData(abilities.endurance.rank));
         abilities.endurance.modified = true;
         this.log(`Mutant: Endurance raised to ${abilities.endurance.rank}`);
         break;
 
       case "Hi-Tech":
-        abilities.reason.rank = shiftRank(abilities.reason.rank, 2);
+        abilities.reason.rank = shiftAbilityRank(abilities.reason.rank, 2);
         abilities.reason.value = rankValue(getRankData(abilities.reason.rank));
         abilities.reason.modified = true;
         this.log(`Hi-Tech: Reason raised to ${abilities.reason.rank}`);
@@ -688,7 +687,7 @@ export class CharacterGenerator {
     const ability = this.state.abilities[abilityKey];
     if (!ability) return false;
 
-    ability.rank = shiftRank(ability.rank, 1);
+    ability.rank = shiftAbilityRank(ability.rank, 1);
     ability.value = rankValue(getRankData(ability.rank));
     ability.modified = true;
     this.state.alteredBonusUsed = true;
@@ -715,13 +714,13 @@ export class CharacterGenerator {
     }
 
     const { roll, result } = rollOnTable(ABILITY_MODIFIER);
-    const modifiedRank = shiftRank(resourceRank, result.mod);
+    const modifiedRank = shiftAbilityRank(resourceRank, result.mod);
     this.state.resources.roll = roll;
     this.log(`Resources: ${resourceRank} + modifier roll ${roll} (${result.mod >= 0 ? '+' : ''}${result.mod}) = ${modifiedRank}`);
 
     let finalResourceRank = modifiedRank;
     if (this.state.origin === "Mutant") {
-      finalResourceRank = shiftRank(modifiedRank, -1);
+      finalResourceRank = shiftAbilityRank(modifiedRank, -1);
       this.log(`Mutant: Resources reduced to ${finalResourceRank}`);
     }
 
