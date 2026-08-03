@@ -780,7 +780,7 @@ export function installActionChatHandlers() {
         const colorLower = String(game.msh.rollUniversalTable(curRank, Math.min(100, r.total)) || "white").toLowerCase();
         const success = colorLower !== "white";
         if (success) {
-          await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id]);
+          await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id], { mshIntentional: true });
           const { applyUnconscious } = await import("../effects/effect-engine.js");
           const d = await (new Roll("1d10")).evaluate();
           await applyUnconscious(dyingActor, { rounds: d.total, originUuid: dyingActor.uuid });
@@ -814,7 +814,7 @@ export function installActionChatHandlers() {
         const ctx = await _resolveDyingContext(btn);
         if (!ctx) return;
         const { dyingActor, dyingAE } = ctx;
-        await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id]);
+        await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id], { mshIntentional: true });
         const { applyUnconscious } = await import("../effects/effect-engine.js");
         const hours = await (new Roll("1d10")).evaluate();
         // RAW: unconscious for 1-10 more HOURS. 1 hour = 600 turns.
