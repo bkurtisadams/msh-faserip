@@ -1,3 +1,7 @@
+// scripts/modules/actions/death-save-action.js v1.11.0 - 2026-08-02
+// v1.11.0: Death-save card's stabilize line is now live buttons
+//          (dying-stabilize-50 / dying-refeat-200 / dying-aid), handled in
+//          chat-hooks.js v1.8.0.
 // scripts/modules/actions/death-save-action.js v1.10.0 - 2026-08-02
 // v1.10.0: Defender Karma on the Kill/Death Endurance FEAT (RAW two-phase,
 //         routed). Both roll sites (auto fast-path from applyDamageToTargets
@@ -323,11 +327,17 @@ export class DeathSaveAction extends BaseAction {
         outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Losing 1 Endurance rank per turn until stabilized.</div>`);
       }
       outcomeLines.push(`<div style="margin-top:4px;font-size:.85em;color:#555;">${this._buildEnduranceLadder(effectiveRank)}</div>`);
-      outcomeLines.push(`<div style="margin-top:6px;font-size:.85em;color:#555;">
-        <strong>Stabilize:</strong>
-        50 Karma (1 round) &nbsp;|&nbsp;
-        200 Karma + FEAT (re-roll End) &nbsp;|&nbsp;
-        Any Aid (stops loss)
+      // Live RAW dying options — handlers in chat-hooks.js re-validate
+      // dying state, ownership, and karma on click.
+      const _uuid = actor?.uuid || "";
+      const _btn = (action, label, title) =>
+        `<button type="button" data-action="${action}" data-actor-uuid="${_uuid}" title="${title}"
+           style="font-size:.8em;padding:2px 8px;line-height:1.4;width:auto;cursor:pointer;">${label}</button>`;
+      outcomeLines.push(`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:.85em;color:#555;font-weight:600;">Stabilize:</span>
+        ${_btn("dying-stabilize-50", "50 Karma (1 rd)", "Stabilize Endurance for 1 round (repeatable)")}
+        ${_btn("dying-refeat-200", "200 Karma + FEAT", "Another Endurance FEAT; success stops dying (unconscious)")}
+        ${_btn("dying-aid", "Aid Rendered", "GM: any aid halts the loss; unconscious 1-10 hours")}
       </div>`);
     } else if (fromZeroHealth) {
       outcomeLines.push(`<div style="color:#1565c0;font-weight:700;">UNCONSCIOUS — ${unconsciousDuration} round${unconsciousDuration !== 1 ? "s" : ""}</div>`);

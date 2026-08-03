@@ -25,6 +25,12 @@
 //         a full-heal-then-new-damage cycle no longer requires a
 //         manual AE toggle. User-disabled effects (no flag) untouched.
 // scripts/modules/effects/ongoing-engine.js v1.7.4 - 2026-04-19
+// v1.8.0: Dying tick + Shift-0 warning messages carry the RAW option
+//         buttons (50-Karma stabilize / 200-Karma re-FEAT / Aid) via
+//         _dyingButtonsHtml; handlers in chat-hooks.js v1.8.0. Removed the
+//         half-built reFeatOnSlip flag stub (nothing ever set it; the
+//         button flow replaces it, correctly rolling at the reduced rank
+//         and applying RAW's unconscious-on-success price).
 // v1.7.4: Migrate legacy `icon:` to `img:` on the processDyingRound
 //         Impaired Endurance creation site (line ~731). The sibling
 //         applyDyingOngoing creation site (line ~1124) already used img.
@@ -953,7 +959,8 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
   // ── Chat message ─────────────────────────────────────────────────
   await sendOngoingChat(actor, "Dying", "stat.loss",
     `<strong>${actor.name}</strong> is dying — Endurance: ${curName} → ${nextName}
-     <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>`
+     <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
+     ${_dyingButtonsHtml(actor)}`
   );
 
   // ── Shift-0 warning ──────────────────────────────────────────────
@@ -964,20 +971,35 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
       content: `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
         <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>
         <div style="font-size:0.9em;margin-top:4px;">Will die next round unless stabilized.</div>
+        ${_dyingButtonsHtml(actor)}
       </div>`,
     });
     return "shift0-warning";
   }
 
-  // ── Re-FEAT on slip (200 Karma flag) ─────────────────────────────
-  const reFeat = dyingAE.getFlag(scope, "reFeatOnSlip");
-  if (reFeat) {
-    console.log(`[FASERIP:DYING] ${actor.name} gets re-FEAT on slip`);
-    await dyingAE.setFlag(scope, "reFeatOnSlip", false);
-    game.msh?.actions?.roll("endurance", { actor });
-  }
-
   return "stepped";
+}
+
+/**
+ * Buttons for the RAW dying options ("Life, Death, and Health" p.31):
+ *   50 Karma — stabilize Endurance for one round (stopgap, repeatable)
+ *   200 Karma — another Endurance FEAT on the slip; success = dying stops,
+ *               character is unconscious (RAW's price); failure = karma
+ *               spent, keep dying, may pay again on the next slip
+ *   Aid — any aid halts the loss; unconscious 1-10 more hours
+ * Handlers live in chat-hooks.js; they re-validate dying state, ownership,
+ * and karma on click, so stale buttons on old messages fail gracefully.
+ */
+function _dyingButtonsHtml(actor) {
+  const uuid = actor?.uuid || "";
+  const btn = (action, label, title) =>
+    `<button type="button" data-action="${action}" data-actor-uuid="${uuid}" title="${title}"
+       style="font-size:.8em;padding:2px 8px;line-height:1.4;width:auto;cursor:pointer;">${label}</button>`;
+  return `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+    ${btn("dying-stabilize-50", "Stabilize — 50 Karma", "Stabilize Endurance for 1 round (repeatable)")}
+    ${btn("dying-refeat-200", "Re-FEAT — 200 Karma", "Another Endurance FEAT; success stops dying (unconscious)")}
+    ${btn("dying-aid", "Aid Rendered", "GM: any aid halts the loss; unconscious 1-10 hours")}
+  </div>`;
 }
 
 async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {

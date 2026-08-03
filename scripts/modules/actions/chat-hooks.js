@@ -1,3 +1,12 @@
+// chat-hooks.js v1.8.0 - 2026-08-02
+// v1.8.0: Live dying-option buttons (Life, Death, and Health p.31):
+//         dying-stabilize-50 (owner/GM; 50 Karma, +1 stabilizedRounds,
+//         repeatable), dying-refeat-200 (owner/GM; 200 Karma, Endurance
+//         FEAT at current reduced rank — non-white ends dying and applies
+//         Unconscious 1d10 rounds per RAW "If you succeed, you are
+//         unconscious"; white = karma spent, still dying), dying-aid
+//         (GM; halts loss, Unconscious 1d10 HOURS = d10*600 rounds).
+//         Handlers re-validate dying state/ownership/karma per click.
 // chat-hooks.js v1.7.4 - 2026-08-01
 // v1.7.4: administer-antitoxin chat button handler (3b). Treater = selected
 //         token; poison-engine validates First Aid/Medicine + antitoxin item.
@@ -697,6 +706,127 @@ export function installActionChatHandlers() {
       } catch (e) {
         console.error("[FASERIP] Administer antitoxin handler failed:", e);
       }
+    });
+
+    // 3d) DYING OPTIONS (Life, Death, and Health p.31) — placed by
+    // ongoing-engine tick messages and the death-save card. Handlers
+    // re-validate dying state, ownership, and karma on every click so
+    // stale buttons on old messages fail gracefully.
+    const _resolveDyingContext = async (btn) => {
+      const doc = await fromUuid(btn.dataset.actorUuid || "");
+      const dyingActor = doc?.actor ?? doc ?? null;
+      if (!dyingActor) { ui.notifications.warn("Actor not found."); return null; }
+      const scope = "msh-faserip";
+      const dyingAE = dyingActor.effects.find(e =>
+        e.statuses?.has?.("dying") || e.getFlag(scope, "isDying")
+      );
+      if (!dyingAE) { ui.notifications.warn(`${dyingActor.name} is not dying.`); return null; }
+      return { dyingActor, dyingAE, scope };
+    };
+
+    html.on("click", '[data-action="dying-stabilize-50"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      try {
+        const ctx = await _resolveDyingContext(btn);
+        if (!ctx) return;
+        const { dyingActor, dyingAE, scope } = ctx;
+        if (!game.user.isGM && !dyingActor.isOwner) {
+          ui.notifications.warn("Only the owner or GM can spend this character's Karma.");
+          return;
+        }
+        const { getAvailableKarma, deductKarma } = await import("../dice/dice-roller.js");
+        if (getAvailableKarma(dyingActor) < 50) {
+          ui.notifications.warn(`${dyingActor.name} needs 50 Karma (has ${getAvailableKarma(dyingActor)}).`);
+          return;
+        }
+        await deductKarma(dyingActor, 50, "Stabilize Endurance (1 round)");
+        const cur = Number(dyingAE.getFlag(scope, "stabilizedRounds")) || 0;
+        await dyingAE.setFlag(scope, "stabilizedRounds", cur + 1);
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: dyingActor }),
+          content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:6px 10px;font-size:.9em;">
+            <strong>${dyingActor.name}</strong> spends <b>50 Karma</b> — Endurance stabilized for <b>${cur + 1}</b> round${cur ? "s" : ""} (stopgap; loss resumes after).
+          </div>`
+        });
+      } catch (e) { console.error("[FASERIP] dying-stabilize-50 handler failed:", e); }
+    });
+
+    html.on("click", '[data-action="dying-refeat-200"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      try {
+        const ctx = await _resolveDyingContext(btn);
+        if (!ctx) return;
+        const { dyingActor, dyingAE, scope } = ctx;
+        if (!game.user.isGM && !dyingActor.isOwner) {
+          ui.notifications.warn("Only the owner or GM can spend this character's Karma.");
+          return;
+        }
+        const { getAvailableKarma, deductKarma } = await import("../dice/dice-roller.js");
+        if (getAvailableKarma(dyingActor) < 200) {
+          ui.notifications.warn(`${dyingActor.name} needs 200 Karma (has ${getAvailableKarma(dyingActor)}).`);
+          return;
+        }
+        await deductKarma(dyingActor, 200, "Dying re-FEAT (Endurance)");
+        // RAW: "another Endurance FEAT" at the CURRENT (reduced) rank —
+        // temporary loss counts for further Endurance checks. Non-white
+        // stops the dying; RAW's price: "If you succeed, you are
+        // unconscious." Failure: karma spent, keep dying, may pay again
+        // on the next slip.
+        const curRank = dyingAE.getFlag(scope, "currentTempRank")
+          || dyingActor.system?.abilities?.endurance?.rank || "Typical";
+        const r = await (new Roll("1d100")).evaluate();
+        const colorLower = String(game.msh.rollUniversalTable(curRank, Math.min(100, r.total)) || "white").toLowerCase();
+        const success = colorLower !== "white";
+        if (success) {
+          await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id]);
+          const { applyUnconscious } = await import("../effects/effect-engine.js");
+          const d = await (new Roll("1d10")).evaluate();
+          await applyUnconscious(dyingActor, { rounds: d.total, originUuid: dyingActor.uuid });
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: dyingActor }),
+            content: `<div style="background:#e8f5e9;border:2px solid #4caf50;border-radius:3px;padding:8px 10px;">
+              <div style="font-weight:700;color:#2e7d32;">${dyingActor.name} — 200-Karma Endurance FEAT: <b>${colorLower.toUpperCase()}</b> (${r.total} vs ${curRank})</div>
+              <div style="font-size:.9em;margin-top:3px;">Dying stops. Per RAW the character is <b>unconscious</b> (${d.total} rounds). Impaired Endurance remains until healed.</div>
+            </div>`
+          });
+        } else {
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: dyingActor }),
+            content: `<div style="background:#ffebee;border:2px solid #ef5350;border-radius:3px;padding:8px 10px;">
+              <div style="font-weight:700;color:#c62828;">${dyingActor.name} — 200-Karma Endurance FEAT: <b>WHITE</b> (${r.total} vs ${curRank})</div>
+              <div style="font-size:.9em;margin-top:3px;">Karma spent; still dying. Another attempt may be made on the next slip.</div>
+            </div>`
+          });
+        }
+      } catch (e) { console.error("[FASERIP] dying-refeat-200 handler failed:", e); }
+    });
+
+    html.on("click", '[data-action="dying-aid"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      try {
+        if (!game.user.isGM) {
+          ui.notifications.warn("Aid is adjudicated by the GM (any character rendering aid halts the loss).");
+          return;
+        }
+        const ctx = await _resolveDyingContext(btn);
+        if (!ctx) return;
+        const { dyingActor, dyingAE } = ctx;
+        await dyingActor.deleteEmbeddedDocuments("ActiveEffect", [dyingAE.id]);
+        const { applyUnconscious } = await import("../effects/effect-engine.js");
+        const hours = await (new Roll("1d10")).evaluate();
+        // RAW: unconscious for 1-10 more HOURS. 1 hour = 600 turns.
+        await applyUnconscious(dyingActor, { rounds: hours.total * 600, originUuid: dyingActor.uuid });
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: dyingActor }),
+          content: `<div style="background:#e3f2fd;border:2px solid #1e88e5;border-radius:3px;padding:8px 10px;">
+            <div style="font-weight:700;color:#1565c0;">${dyingActor.name} — Aid rendered</div>
+            <div style="font-size:.9em;margin-top:3px;">Endurance loss halted. Unconscious for <b>${hours.total} hour${hours.total !== 1 ? "s" : ""}</b>. Impaired Endurance remains until healed.</div>
+          </div>`
+        });
+      } catch (e) { console.error("[FASERIP] dying-aid handler failed:", e); }
     });
 
     // 4) Collision Damage Calculator chip
