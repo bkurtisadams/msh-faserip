@@ -130,24 +130,31 @@ export function valueToRank(val) {
 }
 
 /** Shift a rank name up/down by delta steps. Class 1000+ ranks cannot be shifted. Clamps to Shift-Z. */
-export function shiftRank(name, delta, { min, max } = {}) {
+export function shiftRank(name, delta) {
   const n = normalizeRank(name);
   const i = RANKS_ORDERED.indexOf(n);
   if (i < 0) return n;
   // Class 1000+ ranks (index 14+) cannot be column-shifted (rule pg. 15)
   if (i >= 14) return n;
   // Clamp between Shift-0 (0) and Shift-Z (13)
-  let newI = Math.min(Math.max(i + delta, 0), 13);
-  // Optional caller bounds, e.g. chargen's ability-modifier rule: "no ability
-  // may be modified in any fashion below Feeble or above Monstrous"
-  if (min != null) {
-    const mi = RANKS_ORDERED.indexOf(normalizeRank(min));
-    if (mi >= 0) newI = Math.max(newI, mi);
-  }
-  if (max != null) {
-    const ma = RANKS_ORDERED.indexOf(normalizeRank(max));
-    if (ma >= 0) newI = Math.min(newI, ma);
-  }
+  const newI = Math.min(Math.max(i + delta, 0), 13);
+  return RANKS_ORDERED[newI];
+}
+
+/**
+ * Plain rank-ladder movement — NOT a p.15 Universal Table column shift.
+ * For operations that move a rank up or down the ladder itself: chargen
+ * ability raises (Ability Modifier Table caps via min/max), vehicle stat
+ * degradation (Class 1000+ speed CAN step down), etc. Defaults span the
+ * full ladder except Beyond (Infinity is not reachable by stepping).
+ */
+export function stepRank(name, steps, { min = "Shift-0", max = "Class 5000" } = {}) {
+  const n = normalizeRank(name);
+  const i = RANKS_ORDERED.indexOf(n);
+  if (i < 0) return n;
+  const lo = Math.max(0, RANKS_ORDERED.indexOf(normalizeRank(min)));
+  const hi = RANKS_ORDERED.indexOf(normalizeRank(max));
+  const newI = Math.min(Math.max(i + steps, lo), hi >= 0 ? hi : RANKS_ORDERED.length - 1);
   return RANKS_ORDERED[newI];
 }
 

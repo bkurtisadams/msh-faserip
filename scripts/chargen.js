@@ -8,12 +8,12 @@
 //   freshly chargen'd actors; without the seed, derive would zero them out.
 
 import { POWER_DATA, TALENT_DATA, CONTACT_DATA } from './chargen-data.js';
-import { shiftRank } from './rules/rules-reference.js';
+import { stepRank } from './rules/rules-reference.js';
 
 // Ability Modifier Table rule: "no ability may be modified in any fashion
 // below Feeble or above Monstrous"
 const shiftAbilityRank = (rankName, shifts) =>
-  shiftRank(rankName, shifts, { min: "Feeble", max: "Monstrous" });
+  stepRank(rankName, shifts, { min: "Feeble", max: "Monstrous" });
 
 export const RANKS = [
   { name: "Shift-0", min: 0, standard: 0 },
@@ -933,7 +933,7 @@ export class CharacterGenerator {
     const ability = this.state.abilities[abilityName];
     if (!ability) return "Feeble";
     
-    return shiftRank(ability.rank, shift);
+    return stepRank(ability.rank, shift);
   }
 
   acceptBonusPower() {

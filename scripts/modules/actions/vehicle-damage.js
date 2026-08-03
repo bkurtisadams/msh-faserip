@@ -6,34 +6,7 @@
 // Implements: Protection as passenger armor, Body as vehicle HP,
 // Vehicle Damage Table (p.50-51) for CS degradation
 
-import { valueToRank } from "../../rules/rules-reference.js";
-
-const RANK_VALUES = {
-  "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-  "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-  "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-  "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000,
-  "Beyond": 9999, "Shift X": 150, "Shift Y": 200, "Shift Z": 500,
-  "Class1000": 1000, "Class3000": 3000, "Class5000": 5000
-};
-
-const RANK_ORDER = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-];
-
-function rankValue(name) {
-  if (!name) return 0;
-  return RANK_VALUES[name] ?? CONFIG?.FASERIP?.rankValues?.[name] ?? 0;
-}
-
-function shiftRank(name, steps) {
-  const idx = RANK_ORDER.indexOf(name);
-  if (idx < 0) return name;
-  const newIdx = Math.max(0, Math.min(RANK_ORDER.length - 1, idx + steps));
-  return RANK_ORDER[newIdx];
-}
+import { valueToRank, stepRank, rankValue } from "../../rules/rules-reference.js";
 
 // Universal Table color from d100 roll vs rank
 function universalColor(roll, rankName) {
@@ -143,9 +116,9 @@ export async function applyDamageToVehicle({
   }
 
   // Effective ranks after CS losses
-  const effBody = shiftRank(bodyRank, -Math.abs(bodyCSLoss));
-  const effSpeed = shiftRank(sys.speed || "Typical", -Math.abs(speedCSLoss));
-  const effControl = shiftRank(sys.control || "Typical", -Math.abs(controlCSLoss));
+  const effBody = stepRank(bodyRank, -Math.abs(bodyCSLoss));
+  const effSpeed = stepRank(sys.speed || "Typical", -Math.abs(speedCSLoss));
+  const effControl = stepRank(sys.control || "Typical", -Math.abs(controlCSLoss));
 
   // Apply updates
   const canDirect = game.user.isGM || targetActor?.isOwner;

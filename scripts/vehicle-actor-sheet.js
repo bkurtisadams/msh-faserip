@@ -8,15 +8,8 @@
 import { FaseripActorSheet } from "./actorSheet.js";
 import {
   RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
-  shiftRank as _shiftRank, rankValue as rankVal
+  stepRank, rankValue as rankVal
 } from "./rules/rules-reference.js";
-
-function shiftRank(name, steps) {
-  // Vehicle sheet needs unclamped shift (vehicles can have Class 1000+ speed)
-  const idx = RANK_ORDER.indexOf(name);
-  if (idx < 0) return name;
-  return RANK_ORDER[Math.max(0, Math.min(RANK_ORDER.length - 1, idx + steps))];
-}
 
 function lesserRank(a, b) {
   return rankVal(a) <= rankVal(b) ? a : b;
@@ -91,9 +84,9 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
     const speedCSLoss = Math.abs(Number(sys.speedCSLoss) || 0);
     const controlCSLoss = Math.abs(Number(sys.controlCSLoss) || 0);
 
-    const effBody = bodyCSLoss > 0 ? shiftRank(sys.body || "Typical", -bodyCSLoss) : null;
-    const effSpeed = speedCSLoss > 0 ? shiftRank(sys.speed || "Typical", -speedCSLoss) : null;
-    const effControl = controlCSLoss > 0 ? shiftRank(sys.control || "Typical", -controlCSLoss) : null;
+    const effBody = bodyCSLoss > 0 ? stepRank(sys.body || "Typical", -bodyCSLoss) : null;
+    const effSpeed = speedCSLoss > 0 ? stepRank(sys.speed || "Typical", -speedCSLoss) : null;
+    const effControl = controlCSLoss > 0 ? stepRank(sys.control || "Typical", -controlCSLoss) : null;
 
     data.effectiveBody = effBody;
     data.effectiveSpeed = effSpeed;
