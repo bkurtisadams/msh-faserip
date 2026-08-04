@@ -257,7 +257,7 @@ export class ShootingAction extends RangedAttackAction {
       };
     };
 
-    const initialVariant = savedVariantType || initialWeapon?.system?.variantType || "standard";
+    const initialVariant = initialWeapon?.system?.variantType || savedVariantType || "standard";
     const initialVariantOptions = _buildVariantOptions(initialWeapon, initialVariant);
     const initialAPInfo = _getEffectiveAPForVariant(initialWeapon, initialVariant);
     const initialEffArmor = _getEffectiveArmor(targetArmor, initialAPInfo.ap, initialAPInfo.apCS, initialAPInfo.apMode);
@@ -607,6 +607,13 @@ export class ShootingAction extends RangedAttackAction {
             }
 
             await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
+
+            // Persist ammo variant on the weapon — the gun stays loaded with
+            // this ammo until changed. Independent of Remember Settings and
+            // survives reload (reload only refills shotsRemaining).
+            if ((weapon.system?.variantType || "standard") !== variantType) {
+              try { await weapon.update({ "system.variantType": variantType }); } catch (_e) {}
+            }
 
             _resolved = true;
             resolve({
