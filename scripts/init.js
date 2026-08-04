@@ -2217,7 +2217,10 @@ Hooks.once("init", async () => {
       ui.notifications.warn(`${actor.name} has no Regeneration power. Set Regeneration Type on the power's Functions tab.`);
       return null;
     }
-    const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+    // RAW: "recovers the Endurance Rank every 10 turns" — the rank number
+    // (e.g. Remarkable = 30), not the character's raw Endurance value.
+    const endRank = actor.system?.abilities?.endurance?.rank || "";
+    const endValue = _rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
     if (OngoingEngine) {
       return OngoingEngine.applyRegenerationOngoing(actor, {
         healAmount: endValue,
@@ -2960,7 +2963,9 @@ Hooks.once("ready", async () => {
         if (hasAE) continue;
 
         // Create new AE
-        const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+        // RAW: Endurance rank number per 10 turns, not raw Endurance value
+        const endRank = actor.system?.abilities?.endurance?.rank || "";
+        const endValue = _rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
         await Effects.applyRegeneration(actor, {
           healAmount: endValue,
           cycleTurns: 10,
@@ -3189,7 +3194,9 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     // Register resting regeneration (skip if already exists)
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
     if (!hasRegen) {
-      const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+      // RAW: Endurance rank number per 10 turns, not raw Endurance value
+      const endRank = actor.system?.abilities?.endurance?.rank || "";
+      const endValue = _rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
       await OngoingEngine.applyRegenerationOngoing(actor, {
         healAmount: endValue,
         cycleTurns: 10,
@@ -3597,7 +3604,11 @@ Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
             button.style.opacity = '0.6';
             button.innerHTML = '<i class="fas fa-check"></i> Updated!';
           } else {
-            ui.notifications.warn("No active Healing timer found");
+            // No legacy Healing AE — flag still toggled; rest-system honors it.
+            ui.notifications.info(`Medical care ${newCare ? 'enabled' : 'disabled'} for ${actor.name}`);
+            button.disabled = true;
+            button.style.opacity = '0.6';
+            button.innerHTML = '<i class="fas fa-check"></i> Updated!';
           }
         });
       });

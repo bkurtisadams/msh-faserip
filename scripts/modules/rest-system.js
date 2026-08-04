@@ -104,7 +104,7 @@
 
 import { getFlagScope } from "./actions/flags.js";
 import { safeActorSetFlag } from "../gm-utils.js";
-import { RANKS_ORDERED } from "../rules/rules-reference.js";
+import { RANKS_ORDERED, rankValue } from "../rules/rules-reference.js";
 import { getCurrentGameDate } from "./effects/ongoing-engine.js";
 
 const SCOPE = getFlagScope();
@@ -395,7 +395,8 @@ export class RestSystem {
       return { success: false, message: check.reason, healed: 0 };
     }
 
-    const enduranceValue = actor.system?.abilities?.endurance?.value ?? 10;
+    const endRank = actor.system?.abilities?.endurance?.rank || "";
+    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance Rank per day
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const maxHealth = actor.system?.attributes?.health?.max ?? 0;
     
@@ -496,7 +497,8 @@ export class RestSystem {
       return { success: false, message: check.reason, healed: 0 };
     }
 
-    const enduranceValue = actor.system?.abilities?.endurance?.value ?? 10;
+    const endRank = actor.system?.abilities?.endurance?.rank || "";
+    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance Rank per day
     const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
     const multiplier = hasMedicalCare ? 2 : 1;
     
@@ -653,8 +655,9 @@ static async attemptRegainConsciousness(actor) {
     const success = (colorLower !== "white");
     
     if (success) {
-      // Wake up with Health = Endurance rank value
-      const enduranceValue = actor.system?.abilities?.endurance?.value ?? 10;
+      // Wake up with Health = Endurance rank number
+      const endRank = actor.system?.abilities?.endurance?.rank || "";
+      const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
       await actor.update({
         "system.attributes.health.value": enduranceValue
       });
@@ -1223,7 +1226,8 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
 
   const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
   const multiplier = hasMedicalCare ? 2 : 1;
-  const enduranceValue = actor.system?.abilities?.endurance?.value ?? 10;
+  const endRank = actor.system?.abilities?.endurance?.rank || "";
+  const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance Rank per day
 
   const config = {
     type: "heal",
