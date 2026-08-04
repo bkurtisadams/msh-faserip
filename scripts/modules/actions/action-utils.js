@@ -111,6 +111,7 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
+import { inferArmorNature } from "../effects/defense-effects.js";
 import {
   RANKS_ORDERED as RANKS, RANK_VALUES, RANK_RANGES,
   rankValue, valueToRank, shiftRank, normalizeRank
@@ -189,6 +190,25 @@ export function derivePowerDamage(system, actor) {
       || Number(game.msh?.getRankValue?.(ab.rank)) || 0;
   }
   return Number(s.value) || rankVal || 0;
+}
+
+// Effective armor after Armor Piercing: "cs" mode steps the armor's rank
+// value down apCS ranks; flat mode subtracts ap from the armor value.
+export function getEffectiveArmor(base, ap, apCS, apMode) {
+  if (apMode === "cs" && apCS > 0 && base > 0) {
+    const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
+    let _i = _RV.findIndex(v => v >= base);
+    if (_i < 0) _i = _RV.length - 1;
+    if (_i > 0 && _RV[_i] > base) _i--;
+    return _RV[Math.max(0, _i - apCS)];
+  }
+  return Math.max(0, base - ap);
+}
+
+// Roll visibility mode with v13 fallback (messageMode renamed from rollMode).
+export function getRollMode() {
+  try { return game.settings.get("core", "messageMode"); }
+  catch { try { return game.settings.get("core", "rollMode"); } catch { return undefined; } }
 }
 
 export function actorForEffects(target) {
@@ -1258,17 +1278,6 @@ export function bannerColors(colorLower) {
   const fg = (colorLower==='white' || colorLower==='yellow') ? '#333' : '#fff';
   return { bg, fg };
 }
-
-// Simple banner color/fg
-export function resultBannerColors(activeColorLower) {
-  const bg = activeColorLower==='white' ? '#f8f8f8'
-           : activeColorLower==='green'  ? '#4CAF50'
-           : activeColorLower==='yellow' ? '#FFC107'
-           : '#F44336';
-  const fg = (activeColorLower==='white' || activeColorLower==='yellow') ? '#333' : '#fff';
-  return { bg, fg };
-}
-
 // Blunt damage: implements the "bump to next rank minimum" rule per FASERIP Advanced Set.
 // Rule: "A character using a blunt weapon inflicts up to that item's material strength;
 //        if the material strength of the item is greater than the Strength rank of the user,
@@ -2370,13 +2379,6 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
  * @param {string} damageType - Type of damage (e.g., "energy-fire", "physical-blunt")
  * @returns {Object} { physical, energy, applicable }
  */
-function inferArmorNature(sys) {
-  if (sys?.armorNature) return sys.armorNature;
-  if (sys?.grantedByEquipment === true) return "artificial";
-  if (sys?.source === "equipment") return "artificial";
-  return "natural";
-}
-
 export function getBodyArmorValues(targetActor, damageType = "physical-blunt", opts = {}) {
   let dmgTypeLower = String(damageType || "physical-blunt").trim().toLowerCase();
   const _shortToLong = {
@@ -2943,207 +2945,6 @@ export async function confirmPreview({ title = "Preview", contentHtml }) {
     no: () => false,    defaultYes: true
   });
 }
-
-/**
- * Build HTML for the multi-attack section
- * @param {string} actionType - Type of action (e.g., "blunt-attack", "energy", "shooting")
- * @param {number} targetCount - Number of targets selected
- * @param {boolean} multiAttacks - Whether multi-attacks is enabled
- * @param {number} attackCount - Number of attacks (2 or 3)
- * @param {boolean} multiAdjacent - Whether attacking multiple adjacent targets
- * @returns {string} HTML for the multi-attack section
- */
-export function buildMultiAttackSection(actionType, targetCount, multiAttacks = false, attackCount = 2, multiAdjacent = false) {
-  const canUseAdjacent = ["blunt-attack", "energy", "force"].includes(actionType);
-  
-  // Determine background color based on what's active
-  let bgColor = '#e8f5e9'; // Default green
-  if (multiAdjacent) bgColor = '#ffe0b2'; // Light orange for adjacent
-  else if (multiAttacks) bgColor = '#fff3cd'; // Light yellow for multi-attacks
-  
-  return `
-    <div class="multi-attack-section" style="margin:6px 0;padding:6px;background:${bgColor};border:1px solid #4caf50;border-radius:3px;transition:background 0.3s ease;">
-      <div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Targets/Attacks</div>
-      
-      ${canUseAdjacent ? `
-        <div style="margin-bottom:6px;">
-          <label style="font-size:.9em;">
-            <input type="checkbox" name="multiAdjacent" ${multiAdjacent ? 'checked' : ''}>
-            Attack all adjacent targets (-4 CS, single roll)
-          </label>
-          <div style="font-size:.8em;color:#555;font-style:italic;margin-left:20px;">
-            One attack roll affects all adjacent enemies
-          </div>
-        </div>
-      ` : ''}
-      
-      <div style="margin-bottom:4px;${canUseAdjacent ? 'border-top:1px solid #c8e6c9;padding-top:6px;' : ''}">
-        <label style="font-size:.9em;">
-          <input type="checkbox" name="multiAttacks" ${multiAttacks ? 'checked' : ''}>
-          Multiple attacks: 2 or 3 separate attacks (-1 CS each)
-        </label>
-      </div>
-      
-      <div id="multi-attack-options" style="display:${multiAttacks ? 'block' : 'none'};margin-left:20px;padding:4px 0;">
-      <div style="margin-bottom:4px;">
-        <label style="font-size:.9em;display:block;margin-bottom:2px;">Number of Attacks:</label>
-        <label style="font-size:.85em;margin-right:12px;">
-          <input type="radio" name="attackCount" value="2" ${attackCount === 2 ? 'checked' : ''}>
-          2 attacks (Remarkable FEAT)
-        </label>
-        <label style="font-size:.85em;">
-          <input type="radio" name="attackCount" value="3" ${attackCount === 3 ? 'checked' : ''}>
-          3 attacks (Amazing FEAT)
-        </label>
-      </div>
-      
-      <div style="margin-top:6px;border-top:1px solid #c8e6c9;padding-top:4px;">
-        <span class="multi-attack-info-toggle" style="font-size:.8em;color:#2e7d32;cursor:pointer;user-select:none;">
-          ℹ️ How are attacks distributed? <span style="font-size:.7em;">(click)</span>
-        </span>
-        <div class="multi-attack-info" style="display:none;margin-top:4px;padding:6px;background:#f1f8e9;border-radius:3px;font-size:.75em;color:#555;">
-          <div style="font-weight:600;margin-bottom:3px;">Attack Distribution:</div>
-          <div>• 1 target: All attacks hit that target</div>
-          <div>• Multiple targets: Attacks distributed round-robin</div>
-          <div style="margin-top:3px;font-style:italic;">
-            Examples: 3 attacks/2 targets = 2+1 hits, 3 attacks/3 targets = 1+1+1 hits
-          </div>
-        </div>
-      </div>
-      
-      <div style="font-size:.8em;color:#555;font-style:italic;margin-top:4px;">
-        Requires Fighting FEAT. If failed: 1 attack at -3CS
-      </div>
-    </div>
-  </div>`;
-}
-
-/**
- * Setup event handlers for multi-attack checkboxes
- * @param {jQuery} html - The jQuery-wrapped HTML element
- */
-export function setupMultiAttackHandlers(html) {
-  const $multiAttacks = html.find('[name="multiAttacks"]');
-  const $multiAdjacent = html.find('[name="multiAdjacent"]');
-  const $multiOptions = html.find('#multi-attack-options');
-  const $section = html.find('.multi-attack-section');
-
-  // Toggle multi-attack options visibility and background color
-  if ($multiAttacks.length && $multiOptions.length) {
-    $multiAttacks.on('change', function() {
-      const isChecked = $(this).is(':checked');
-      $multiOptions.toggle(isChecked);
-      // Only change background if adjacent isn't checked
-      if (!$multiAdjacent.is(':checked')) {
-        $section.css('background', isChecked ? '#fff3cd' : '#e8f5e9');
-      }
-    });
-  }
-
-  // Make adjacent mutually exclusive with multi-attacks
-  if ($multiAdjacent.length && $multiAttacks.length) {
-    $multiAdjacent.on('change', function() {
-      const isChecked = $(this).is(':checked');
-      if (isChecked) {
-        $multiAttacks.prop('checked', false);
-        $multiOptions.hide();
-        $section.css('background', '#ffe0b2'); // Light orange
-      } else {
-        $section.css('background', '#e8f5e9'); // Back to green
-      }
-    });
-  }
-
-  html.find('.multi-attack-info-toggle').on('click', function(e) {
-    e.preventDefault();
-    html.find('.multi-attack-info').slideToggle(200);
-  });
-}
-
-// ============================================
-// REMEMBER SETTINGS UTILITIES
-// ============================================
-
-/**
- * Get a localStorage value with fallback
- */
-export function getLocalStorage(key, defaultValue = null) {
-  try {
-    const value = localStorage.getItem(key);
-    return value === null ? defaultValue : value;
-  } catch {
-    return defaultValue;
-  }
-}
-
-/**
- * Set a localStorage value safely
- */
-export function setLocalStorage(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {}
-}
-
-/**
- * Generate HTML for remember/skip-dice controls
- * @param {string} prefix - localStorage key prefix (e.g., "msh.ba" for blunt attack)
- * @returns {string} HTML string
- */
-export function generateRememberControlsHTML(prefix) {
-  const rememberKey = `${prefix}.remember`;
-  const skipKey = `${prefix}.skipDice`;
-  const remembered = getLocalStorage(rememberKey, "1") === "1";
-  const skipDice = getLocalStorage(skipKey, "0") === "1";
-  
-  return `
-    <div style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
-      <label><input type="checkbox" name="remember" ${remembered ? 'checked' : ''}> Remember settings</label>
-      <label><input type="checkbox" name="skipDice" ${skipDice ? 'checked' : ''}> Skip dice animation</label>
-    </div>
-  `;
-}
-
-/**
- * Setup handlers for remember/skip-dice controls and persist state
- * @param {jQuery} html - Dialog HTML
- * @param {string} prefix - localStorage key prefix
- */
-export function setupRememberControlHandlers(html, prefix) {
-  const rememberKey = `${prefix}.remember`;
-  const skipKey = `${prefix}.skipDice`;
-  
-  // Persist remember checkbox changes immediately
-  html.find('[name="remember"]').on('change', function() {
-    setLocalStorage(rememberKey, this.checked ? "1" : "0");
-  });
-  
-  // Persist skip dice changes only if remember is checked
-  html.find('[name="skipDice"]').on('change', function() {
-    if (html.find('[name="remember"]').is(':checked')) {
-      setLocalStorage(skipKey, this.checked ? "1" : "0");
-    }
-  });
-}
-
-/**
- * Extract remember/skip values from dialog
- * @param {jQuery} html - Dialog HTML
- * @returns {{remember: boolean, skipDice: boolean}}
- */
-export function extractRememberSettings(html) {
-  const $rememberNew = html.find('[name="rememberSettings"]');
-  const $rememberOld = html.find('[name="remember"]');
-  const $skipNew = html.find('[name="skipDiceRoll"]');
-  const $skipOld = html.find('[name="skipDice"]');
-
-  const remember = ($rememberNew.length ? $rememberNew : $rememberOld).is(':checked');
-  const skipDice = ($skipNew.length ? $skipNew : $skipOld).is(':checked');
-
-  // Maintain legacy property names for existing call sites
-  return { remember, skipDice };
-}
-
 // ── Chat-card FEAT color pills ───────────────────────────────
 
 function normalizeFeatColor(color) {

@@ -133,7 +133,8 @@ import {
   setupModeSelector,
   applyCapabilitiesToDialog,
   shiftRank,
-  buildInlineFeatDisplay
+  buildInlineFeatDisplay,
+  getEffectiveArmor as _getEffectiveArmor
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { AreaTemplate } from "./area-template.js";
@@ -254,16 +255,6 @@ export class ShootingAction extends RangedAttackAction {
         apMode: weapon?.system?.apMode || "value",
         bypassFF: !!weapon?.system?.bypassForceField
       };
-    };
-    const _getEffectiveArmor = (base, ap, apCS, apMode) => {
-      if (apMode === "cs" && apCS > 0 && base > 0) {
-        const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
-        let _i = _RV.findIndex(v => v >= base);
-        if (_i < 0) _i = _RV.length - 1;
-        if (_i > 0 && _RV[_i] > base) _i--;
-        return _RV[Math.max(0, _i - apCS)];
-      }
-      return Math.max(0, base - ap);
     };
 
     const initialVariant = savedVariantType || initialWeapon?.system?.variantType || "standard";

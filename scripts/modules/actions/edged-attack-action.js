@@ -63,7 +63,8 @@ import {
   debugLog,
   buildActionsBox,
   getTargetData,
-  getBodyArmorValues
+  getBodyArmorValues,
+  getEffectiveArmor as _getEffectiveArmor
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
@@ -143,16 +144,6 @@ export class EdgedAttackAction extends AttackAction {
     };
 
     // Effective armor after AP reduction (flat or CS-based)
-    const _getEffectiveArmor = (base, ap, apCS, apMode) => {
-      if (apMode === "cs" && apCS > 0 && base > 0) {
-        const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
-        let _i = _RV.findIndex(v => v >= base);
-        if (_i < 0) _i = _RV.length - 1;
-        if (_i > 0 && _RV[_i] > base) _i--;
-        return _RV[Math.max(0, _i - apCS)];
-      }
-      return Math.max(0, base - ap);
-    };
 
     let attackItems = actor.items.filter(isEdgedCapable);
 

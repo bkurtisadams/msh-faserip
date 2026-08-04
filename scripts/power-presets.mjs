@@ -377,20 +377,6 @@ export const POWER_NAME_ALIASES = {
   "Animal Transformation — Self": "Animal Transformation Self",
   "Animal Transformation - Self": "Animal Transformation Self"
 };
-
-export function normalizePowerTypeName(name = "") {
-  const trimmed = String(name || "").replace(/\s+/g, " ").trim();
-  return POWER_NAME_ALIASES[trimmed] || trimmed;
-}
-
-export function getPowerCategoryForType(type = "") {
-  const normalized = normalizePowerTypeName(type);
-  for (const [category, types] of Object.entries(POWER_TYPES_BY_CATEGORY)) {
-    if (types.includes(normalized)) return category;
-  }
-  return "";
-}
-
 const POWER_ICON_OVERRIDES = {
   "Resistance to Fire/Heat": "resistance-fire",
   "Resistance to Fire and Heat": "resistance-fire",
@@ -462,9 +448,3 @@ const CATEGORY_ICON_NAMES = {
   bodyAlterationsOffensive: "category-offensive-body",
   bodyAlterationsDefensive: "category-defensive-body"
 };
-
-export function getPowerIconPath(type = "", category = "") {
-  const normalized = normalizePowerTypeName(type);
-  const iconName = POWER_ICON_OVERRIDES[normalized] || CATEGORY_ICON_NAMES[category] || "category-power";
-  return `systems/msh-faserip/assets/icons/powers/${iconName}.svg`;
-}

@@ -23,6 +23,7 @@
 // v1.0.0: Initial. Save-or-KO touch dialog.
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import { getRollMode } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 import { applyParalyzed } from "../effects/effect-engine.js";
@@ -40,10 +41,6 @@ const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faseri
 
 // v14 renamed core.rollMode to core.messageMode. Try v14 first, fall back
 // for older worlds. Avoids the per-call deprecation warning.
-function getRollMode() {
-  try { return game.settings.get("core", "messageMode"); }
-  catch { try { return game.settings.get("core", "rollMode"); } catch { return undefined; } }
-}
 
 function colorBg(c) {
   switch ((c || '').toLowerCase()) {

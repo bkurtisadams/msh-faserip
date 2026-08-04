@@ -20,6 +20,7 @@
 //       If they do so, the attack has no further effect."
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import { getRollMode } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import {
   generateKarmaControlsHTML,
@@ -33,10 +34,6 @@ import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/ef
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
-function getRollMode() {
-  try { return game.settings.get("core", "messageMode"); }
-  catch { try { return game.settings.get("core", "rollMode"); } catch { return undefined; } }
-}
 
 function colorBg(c) {
   switch ((c || '').toLowerCase()) {

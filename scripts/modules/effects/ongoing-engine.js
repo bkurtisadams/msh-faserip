@@ -105,7 +105,7 @@
 
 import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect, safeActorUpdateEffect } from "../../gm-utils.js";
-import { RANKS_ORDERED } from "../../rules/rules-reference.js";
+import { RANKS_ORDERED, stepRank } from "../../rules/rules-reference.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -583,13 +583,6 @@ async function executeHealthDamage(actor, ae, effectId, config, dmgPerCycle, cyc
 
 // ─── Continuing damage (schedule-driven, e.g. corrosive) ──────────────────────
 
-function shiftRankByCS(rankName, deltaCS) {
-  const idx = RANKS_ORDERED.indexOf(rankName);
-  if (idx < 0) return rankName;
-  const newIdx = Math.max(0, Math.min(RANKS_ORDERED.length - 1, idx + deltaCS));
-  return RANKS_ORDERED[newIdx];
-}
-
 function rankToValue(rankName) {
   return game.msh?.getRankValue?.(rankName) ?? 0;
 }
@@ -615,7 +608,7 @@ export function computeDamageSchedule({ pattern = "constant", rounds = 1, initia
   if (stepCS === 0) return [initial];
   const out = [];
   for (let i = 0; i < rounds; i++) {
-    out.push(rankToValue(shiftRankByCS(initialRank, stepCS * i)));
+    out.push(rankToValue(stepRank(initialRank, stepCS * i)));
   }
   return out;
 }

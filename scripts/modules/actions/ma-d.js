@@ -49,17 +49,6 @@ export function getStudyEffect(actor, targetUuid) {
     e.flags?.[SCOPE]?.[STUDY_FLAG]?.targetUuid === targetUuid
   ) || null;
 }
-
-export function getAllStudies(actor) {
-  if (!actor) return [];
-  return actor.effects
-    .filter(e => e.flags?.[SCOPE]?.[STUDY_FLAG])
-    .map(e => ({
-      effect: e,
-      ...e.flags[SCOPE][STUDY_FLAG]
-    }));
-}
-
 // Status snapshot for a single target relative to current combat.
 // Returns { studying, rounds, complete, stale, effect? }
 //   - studying: there is an effect in the active combat for this target

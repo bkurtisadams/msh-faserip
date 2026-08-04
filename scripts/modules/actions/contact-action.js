@@ -3,16 +3,11 @@
 // Standalone contact popularity FEAT dialog.
 
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { shiftRank } from "../../rules/rules-reference.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 
 // ── Constants ──────────────────────────────────────────────
-
-const RANKS = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-];
 
 const CONTACT_RESOURCE_LEVELS = {
   "Professional":  "Remarkable",
@@ -48,14 +43,6 @@ const TYPE_OBLIGATION = {
 };
 
 // ── Helpers ────────────────────────────────────────────────
-
-function shiftRankByCS(rankName, cs) {
-  if (cs === 0) return rankName;
-  const idx = RANKS.indexOf(rankName);
-  if (idx < 0) return rankName;
-  const newIdx = Math.min(Math.max(idx + cs, 0), RANKS.length - 1);
-  return RANKS[newIdx];
-}
 
 function getDisposition(storedDisposition, heroPopularity) {
   const storedIdx = DISP_ORDER.indexOf(storedDisposition);
@@ -134,8 +121,8 @@ export async function rollContact(actor, contact) {
 
   // Initial preview of effective rank (CS + mutant penalty)
   let effRank0 = heroPopularityRank;
-  if (savedColumnShift !== 0) effRank0 = shiftRankByCS(effRank0, savedColumnShift);
-  if (isMutantPenaltyActive) effRank0 = shiftRankByCS(effRank0, -1);
+  if (savedColumnShift !== 0) effRank0 = shiftRank(effRank0, savedColumnShift);
+  if (isMutantPenaltyActive) effRank0 = shiftRank(effRank0, -1);
 
   const dialogContent = `
   <div class="frp-dlg" style="font-family:'Barlow Condensed',Arial,sans-serif;">
@@ -228,8 +215,8 @@ export async function rollContact(actor, contact) {
 
           // Effective rank: CS + mutant penalty
           let effectiveRank = heroPopularityRank;
-          if (columnShift !== 0) effectiveRank = shiftRankByCS(effectiveRank, columnShift);
-          if (isMutantPenaltyActive) effectiveRank = shiftRankByCS(effectiveRank, -1);
+          if (columnShift !== 0) effectiveRank = shiftRank(effectiveRank, columnShift);
+          if (isMutantPenaltyActive) effectiveRank = shiftRank(effectiveRank, -1);
 
           // Roll
           const roll = new Roll("1d100");
@@ -336,8 +323,8 @@ export async function rollContact(actor, contact) {
 
         const cs = parseInt($shift.val()) || 0;
         let er = heroPopularityRank;
-        if (cs !== 0) er = shiftRankByCS(er, cs);
-        if (isMutantPenaltyActive) er = shiftRankByCS(er, -1);
+        if (cs !== 0) er = shiftRank(er, cs);
+        if (isMutantPenaltyActive) er = shiftRank(er, -1);
         $effRank.text(er);
       }
 

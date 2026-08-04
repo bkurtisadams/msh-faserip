@@ -75,12 +75,6 @@ function getClosestRankName(value) {
 function defenseEffectId(type, itemId) {
   return `defense.${type}.${itemId}`;
 }
-
-function isDefenseEffect(ae) {
-  const scope = SCOPE();
-  return ae.flags?.[scope]?.effectCategory === "defense";
-}
-
 function getDefenseFlags(ae) {
   const scope = SCOPE();
   return ae.flags?.[scope] || {};
@@ -107,7 +101,7 @@ function matchesDefenseAEForItem(ae, effectId, defenseType = "", itemId = "") {
 
 // ─── Resolve protection values from a power item ─────────────────────────────
 
-function inferArmorNature(sys) {
+export function inferArmorNature(sys) {
   if (sys?.armorNature) return sys.armorNature;
   if (sys?.grantedByEquipment === true) return "artificial";
   if (sys?.source === "equipment") return "artificial";

@@ -174,11 +174,6 @@ function getUnambiguousActionCode(talent) {
   }
   return null;
 }
-
-function isNonCombatTalent(talent) {
-  return ["Professional Skill", "Scientific Skill", "Mystic/Mental Skill"].includes(talent.system.type || "");
-}
-
 function buildMultiTargetHTML(actionCode) {
   const validMulti = MULTI_ADJACENT_CODES.includes(actionCode);
   const validAttack = MULTI_ATTACK_CODES.includes(actionCode);

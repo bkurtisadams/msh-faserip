@@ -134,17 +134,6 @@ const ABILITY_FOR_ACTION = {
   "charging":        "endurance",
   "mental-power":    undefined  // mental-power uses its own ability resolution
 };
-// Everything else (energy, force, shooting, throwing-*) defaults to agility.
-
-// ── Helpers ────────────────────────────────────────────────
-
-function matchesList(powerTypeLower, list) {
-  for (const entry of list) {
-    if (powerTypeLower.includes(entry)) return true;
-  }
-  return false;
-}
-
 function detectFromList(powerTypeLower, list) {
   for (const entry of list) {
     if (powerTypeLower.includes(entry)) return true;

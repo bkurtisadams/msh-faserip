@@ -42,7 +42,7 @@
 // v1.6.2: Fix _getNewRank thresholds to use book Rank Ranges.
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
-import { RANKS_ORDERED } from "./rules/rules-reference.js";
+import { RANKS_ORDERED, RANK_ABBR } from "./rules/rules-reference.js";
 import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
 import { computeKarmaTotals } from "./karma-rules.js";
 
@@ -825,15 +825,7 @@ export class KarmaSheet extends DocumentSheet {
     const abilityKeys = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
 
     // Abbreviate rank for compact display
-    const abbrevRank = (rank) => {
-      const map = {
-        "Shift-0":"Sh0","Feeble":"Fe","Poor":"Pr","Typical":"Ty","Good":"Gd","Excellent":"Ex",
-        "Remarkable":"Rm","Incredible":"In","Amazing":"Am","Monstrous":"Mn","Unearthly":"Un",
-        "Shift-X":"ShX","Shift-Y":"ShY","Shift-Z":"ShZ",
-        "Class 1000":"C1k","Class 3000":"C3k","Class 5000":"C5k","Beyond":"Bey"
-      };
-      return map[rank] || rank;
-    };
+    const abbrevRank = (rank) => RANK_ABBR[rank] || rank;
 
     const calcAdvancementCost = (startValue, targetValue) => {
       const points = targetValue - startValue;

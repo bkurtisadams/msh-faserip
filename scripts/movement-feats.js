@@ -18,6 +18,7 @@
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
 import { RANKS_ORDERED as RANKS, RANK_ABBR } from './rules/rules-reference.js';
+import { checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 
 // Exhaustion-immune ranks
 const EXHAUSTION_IMMUNE_RANKS = [
@@ -46,17 +47,6 @@ function applyColumnShift(rank, shift) {
 /**
  * Check if a FEAT result meets the requirement
  */
-function checkFeatSuccess(resultColor, requirement) {
-  const color = resultColor.toLowerCase();
-  switch (requirement) {
-    case "Green": return ["green", "yellow", "red"].includes(color);
-    case "Yellow": return ["yellow", "red"].includes(color);
-    case "Red": return color === "red";
-    case "Automatic": return true;
-    default: return true;
-  }
-}
-
 /**
  * Color styling for chat output
  */
