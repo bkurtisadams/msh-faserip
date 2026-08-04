@@ -1392,16 +1392,6 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
             ui.notifications.info(`${actor.name} stabilized for 1 round`);
           }
         },
-        karma200: {
-          label: "200 Karma + FEAT",
-          callback: async () => {
-            const ok = await _spendKarma(200, "Endurance re-FEAT on next rank slip");
-            if (!ok) return;
-            await dyingEffect.setFlag(scope, "reFeatOnSlip", true);
-            ChatMessage.create({ content: `<p style="color:#2196f3;"><strong>${actor.name}</strong> will re-FEAT on next Endurance slip (200 Karma spent).</p>` });
-            ui.notifications.info(`${actor.name} will re-FEAT on next slip`);
-          }
-        },
         aid: {
           label: "Aid/First Aid (permanent)",
           callback: async () => { await game.msh.rest.stabilizeDying(actor); }
