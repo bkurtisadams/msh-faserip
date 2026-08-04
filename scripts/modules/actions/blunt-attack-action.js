@@ -68,7 +68,6 @@ import {
   applyCapabilitiesToDialog, buildInlineFeatDisplay
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
-import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { buildColorOutcome } from "../dice/color-results.js";
 import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";

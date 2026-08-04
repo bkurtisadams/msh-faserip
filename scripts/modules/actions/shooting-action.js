@@ -138,7 +138,6 @@ import {
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { AreaTemplate } from "./area-template.js";
-import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";

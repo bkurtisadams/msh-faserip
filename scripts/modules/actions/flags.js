@@ -9,7 +9,3 @@ export function getFlagScope() {
     "msh-faserip"
   );
 }
-
-// Convenience constant (evaluated now). If your scope can change at runtime,
-// prefer calling getFlagScope() at the use site.
-export const SCOPE = getFlagScope();
