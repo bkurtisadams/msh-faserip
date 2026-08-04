@@ -801,9 +801,9 @@ export class ShootingAction extends RangedAttackAction {
       // Clone blunt-attack config and downgrade yellow Slam → Hit;
       // green Hit and red Stun stand.
       const { ACTION_EFFECTS } = await import("./action-config.js");
-      const blunt = ACTION_EFFECTS["blunt-attack"];
-      const bluntArr = blunt.effects;
-      effectiveEffects = { ...blunt, effects: [bluntArr[0], bluntArr[1], "Hit", bluntArr[3]] };
+      // ACTION_EFFECTS entries are color-keyed maps; downgrade yellow Slam → Hit,
+      // green Hit and red Stun stand.
+      effectiveEffects = { ...ACTION_EFFECTS["blunt-attack"], yellow: "Hit" };
       effectiveAttackForm = "blunt";
       effectiveDamageType = "physical-blunt";
       variantNote = "Rubber Shot — blunt damage, ignore Slam";
