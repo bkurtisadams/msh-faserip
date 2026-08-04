@@ -1,0 +1,23 @@
+{
+  "_id": "1NznZmdXWHoKykKE",
+  "_key": "!items!1NznZmdXWHoKykKE",
+  "name": "Leadership",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent has the brains and understanding of a cohesive group, such that he is a benefit to the team. Any Karma Pool to which the character belongs receives a 50-point bonus, provided the character with this Talent is recognized as the \"team leader.\" A Karma Pool may only have one recognized leader, though more than one character with Leadership may belong to one group. When the \"Leader\" of a group leaves, the 50 points are deducted from the Karma Pool, but the leader does not receive them for personal use (the bonus points only exist as a part of the pool).",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Other",
+    "specialty": "Leadership",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

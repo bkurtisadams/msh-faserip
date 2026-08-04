@@ -1,0 +1,25 @@
+{
+  "_id": "CjqlViTeanSVRqvg",
+  "_key": "!items!CjqlViTeanSVRqvg",
+  "name": "Guns",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "Individuals without this Talent fire guns (all handguns, rifles, and submachine guns, including laser, stun, and concussion varieties) at their Agility rank. Those with this Talent fire such weapons at +1CS.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Weapon Skill",
+    "specialty": "Guns",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "shooting"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

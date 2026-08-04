@@ -2514,6 +2514,35 @@ Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
       console.error("[FASERIP ERROR] Failed to restore nullified powers:", e);
     }
   }
+
+  // Equipment battery timer removed (CTT expiry or manual) — switch the item off
+  const bScope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+  const bat = effect.flags?.[bScope];
+  if (bat?.equipmentBatteryTimer && bat.itemUuid) {
+    try {
+      const srcItem = await fromUuid(bat.itemUuid);
+      const live = srcItem?.effects?.filter?.(e => e.transfer && !e.disabled) ?? [];
+      if (live.length) {
+        await srcItem.updateEmbeddedDocuments("ActiveEffect",
+          live.map(e => ({ _id: e.id, disabled: true })));
+        const label = bat.rechargeLabel || "Recharge";
+        await ChatMessage.create({
+          content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+            <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+              <strong style="color:#8b0000;">EQUIPMENT</strong>
+            </div>
+            <div style="padding:6px 10px;">
+              <div><strong>${srcItem.parent?.name ?? ""}</strong>'s <strong>${srcItem.name}</strong> runs out of power.</div>
+              <div style="font-size:.85em;color:#666;">${label} to use again.</div>
+            </div>
+          </div>`,
+          speaker: srcItem.parent ? ChatMessage.getSpeaker({ actor: srcItem.parent }) : undefined
+        });
+      }
+    } catch (e) {
+      console.error("[FASERIP ERROR] battery timer expiry handling failed:", e);
+    }
+  }
 });
 
 // Item added/removed from actor (carries effects with it)

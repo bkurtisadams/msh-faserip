@@ -1,0 +1,30 @@
+{
+  "_id": "CQOL9MiZ01sbTzOt",
+  "_key": "!items!CQOL9MiZ01sbTzOt",
+  "name": "Martial Arts D",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This meditative form of martial arts searches out the weak spots of the opponent's defenses and strikes against them. The practitioner of this form of attack may ignore the effects of Body Armor (though not force fields) for determining Stun and Slam results. The attack by the character with this Talent does not have to inflict damage to force a check for possible Stun and Slam. The disadvantage is that the target of this attack must be studied for two rounds before the effects may be brought into play. The character with this Talent does not have to attack the character, only watch him in battle for two rounds previous to attacking.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Fighting Skill",
+    "specialty": "Martial Arts D",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "blunt-attack",
+      "edged-attack"
+    ],
+    "flags": [
+      "ignore-armor-fx",
+      "no-damage-needed",
+      "study-required"
+    ],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

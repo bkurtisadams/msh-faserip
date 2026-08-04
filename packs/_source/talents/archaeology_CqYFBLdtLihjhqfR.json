@@ -1,0 +1,23 @@
+{
+  "_id": "CqYFBLdtLihjhqfR",
+  "_key": "!items!CqYFBLdtLihjhqfR",
+  "name": "Archaeology",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters involving the past, including paleontology, historical records, and ancient myths and legends.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Archaeology",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

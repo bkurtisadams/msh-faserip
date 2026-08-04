@@ -1,0 +1,252 @@
+{
+  "_id": "j7QyZwaDEpeUf95M",
+  "name": "Plasticity",
+  "type": "power",
+  "img": "systems/msh-faserip/assets/icons/powers/category-transformation.svg",
+  "system": {
+    "isActive": true,
+    "activationType": "activated",
+    "isStarred": false,
+    "source": "natural",
+    "replacesAbility": "",
+    "depoweredRank": "",
+    "category": "bodyControl",
+    "isBonus": false,
+    "bonusFrom": "",
+    "initialRoll": "",
+    "initialRank": "",
+    "initialValue": "",
+    "categoryRoll": "",
+    "limitationRequired": false,
+    "limitationDetail": "",
+    "preLimitationRank": "",
+    "range": "",
+    "customRange": "",
+    "area": 0,
+    "duration": "",
+    "customDuration": "",
+    "isAttackPower": false,
+    "battleEffectsColumn": "",
+    "damageSource": "rank",
+    "damage": 0,
+    "canPullPunch": false,
+    "canReduceEffect": false,
+    "armorPiercing": false,
+    "ignoresNaturalArmor": false,
+    "ignoresArtificialArmor": false,
+    "bypassForceField": false,
+    "continuingDamage": false,
+    "continuingDamageRounds": 3,
+    "ensnaringStrength": "",
+    "requiresSave": false,
+    "save": {
+      "ability": "endurance",
+      "intensity": "power-rank",
+      "fixedRank": "",
+      "onFail": {
+        "effect": "stunned",
+        "duration": "1-10",
+        "notes": ""
+      },
+      "rerollOnKarmaLoss": false,
+      "rerollOnLifeThreat": false
+    },
+    "isDefensePower": true,
+    "defenseType": "bodyArmor",
+    "armorNature": "natural",
+    "bodyArmorType": "both",
+    "protectionValue": 0,
+    "forceFieldPersonal": false,
+    "forceFieldCoverage": 0,
+    "resistanceType": "",
+    "resistanceIsInvulnerability": false,
+    "isLimited": false,
+    "limitation": {
+      "usesPerDay": 0,
+      "usesPerScene": 0,
+      "rankBonus": 0,
+      "maxRank": ""
+    },
+    "limitations": "",
+    "countsAsTwoPowers": false,
+    "grantedByEquipment": false,
+    "damageType": "",
+    "extraAttacks": false,
+    "extraBodyParts": [],
+    "specialStrengthType": "",
+    "clawMaterialStrength": "",
+    "telekinesisStrength": "",
+    "isBodyArmor": true,
+    "armorPhysical": 6,
+    "armorEnergy": 0,
+    "armorEnergyCustom": false,
+    "isForceField": false,
+    "forceFieldType": "personal",
+    "isResistance": false,
+    "resistanceEffect": "damageReduction",
+    "resistanceIsConductive": false,
+    "resistanceMinRank": "",
+    "isEnergyReflection": false,
+    "energyReflectionType": "",
+    "energyReflectionRank": "full",
+    "isSensePower": false,
+    "isAbilitySubstitution": false,
+    "isMovementPower": false,
+    "isControlPower": false,
+    "isMentalPower": false,
+    "isTransformPower": true,
+    "detection": {
+      "enhancedSense": "",
+      "protectedSense": "",
+      "detectionType": "",
+      "infravisionRange": 0,
+      "combatSense": false,
+      "cosmicAwareness": false,
+      "computerLinks": false,
+      "canTrack": false
+    },
+    "abilitySubstitution": {
+      "fighting": {
+        "enabled": false,
+        "context": ""
+      },
+      "agility": {
+        "enabled": false,
+        "context": ""
+      },
+      "strength": {
+        "enabled": false,
+        "context": ""
+      },
+      "endurance": {
+        "enabled": false,
+        "context": ""
+      },
+      "reason": {
+        "enabled": false,
+        "context": ""
+      },
+      "intuition": {
+        "enabled": false,
+        "context": ""
+      },
+      "psyche": {
+        "enabled": false,
+        "context": ""
+      }
+    },
+    "movement": {
+      "type": "",
+      "areasPerRound": 0,
+      "useRankSpeed": false,
+      "leavesTunnel": false
+    },
+    "control": {
+      "controlType": "",
+      "controlSpecific": "",
+      "manipulateExisting": false,
+      "generateNew": false,
+      "useAsShield": false,
+      "useAsWeapon": false,
+      "createConstructs": false,
+      "animateObjects": false
+    },
+    "mental": {
+      "telepathy": false,
+      "mentalProbe": false,
+      "mindControl": false,
+      "emotionControl": false,
+      "empathy": false,
+      "psiScreen": false,
+      "imageGeneration": false,
+      "possession": false,
+      "astralProjection": false,
+      "psionicAttack": false,
+      "transferral": false,
+      "animateDrawings": false,
+      "precognition": false,
+      "postcognition": false,
+      "mechanicalIntuition": false,
+      "emotionType": "",
+      "singleEmotionBonus": false
+    },
+    "bodyDefensive": {
+      "pheromones": false
+    },
+    "isWaterBreathing": false,
+    "transformation": {
+      "affects": "self",
+      "transformType": "plasticity",
+      "targetMaterial": "",
+      "targetResistsWith": "",
+      "duration": "concentration",
+      "touchRequired": false,
+      "retainsMental": true,
+      "retainsPowers": false
+    },
+    "healingType": "",
+    "regenerationType": "",
+    "absorptionType": "",
+    "absorptionSpecific": "",
+    "hasRecoveryPower": false,
+    "isDamageTransfer": false,
+    "isHealingPower": false,
+    "isHealthDrain": false,
+    "isParalyzingTouch": false,
+    "isBlindingTouch": false,
+    "isImmortality": false,
+    "absorptionConvertsToHealth": false,
+    "absorptionCanRedirect": false,
+    "isLifeSupport": false,
+    "isMagic": false,
+    "magic": {
+      "energyType": "",
+      "castCost": 0,
+      "successAbility": "psyche",
+      "chant": false,
+      "gesture": false,
+      "usesCeremony": false,
+      "sourceEntity": ""
+    },
+    "hasBonusPowers": true,
+    "bonusPowers": [
+      {
+        "name": "Elongation",
+        "rankMod": "same"
+      }
+    ],
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "hitVolume": 80,
+      "missVolume": 80
+    },
+    "vfx": {
+      "enabled": true,
+      "preset": "",
+      "color": "",
+      "asset": "",
+      "impact": "",
+      "scale": 1,
+      "duration": 1000
+    },
+    "specialMechanics": "",
+    "description": "The body of the hero with this Power is slightly elastic and malleable, and the hero manipulates his body as he sees fit. The hero with this Power may also choose Elongation as a bonus Power, placing that Power in the next slot without a random roll. The plasticity of the body serves as Power rank Body Armor. In addition, the hero with this Power may develop Power Stunts:\n• Using the Power rank instead of Agility for catching tailing items and individuals. The character with this Power takes no damage from a falling character landing on him.\n• Limited imitation and disguise abilities at -2CS for detection. Plasticity will alter appearance, but not skin color or voice (Mr. Fantastic would make a very pale Skrull).\n• Bouncing: similar to the Leaping Power, with the hero able to fall a number of floors equal to his Power rank number without damage, and to leap as if possessing that Power at -1CS.",
+    "rank": "Typical",
+    "value": 6,
+    "limitRankMax": "",
+    "limitationColumnShift": 0,
+    "stunts": [],
+    "type": "Plasticity",
+    "subtype": "Plasticity",
+    "armorPhysicalCustom": false
+  },
+  "effects": [],
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!j7QyZwaDEpeUf95M"
+}

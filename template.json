@@ -28,7 +28,11 @@
         "legalStatus": "",
         "occupation": "",
         "maritalStatus": "",
-        "history": ""
+        "history": "",
+        "details": {
+          "isDead": false,
+          "isDeactivated": false
+        }
       },
       "abilities": {
         "abilities": {

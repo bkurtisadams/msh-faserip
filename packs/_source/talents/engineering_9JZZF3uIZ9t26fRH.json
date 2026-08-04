@@ -1,0 +1,23 @@
+{
+  "_id": "9JZZF3uIZ9t26fRH",
+  "_key": "!items!9JZZF3uIZ9t26fRH",
+  "name": "Engineering",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "Engineering includes all the varied types of that profession dedicated to the design of functional items: civil, chemical, mechanical, etc. A character with Engineering Talent gains a +1CS to all FEATs involving building things, including the Resource FEAT to determine if an object can be built.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Professional Skill",
+    "specialty": "Engineering",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

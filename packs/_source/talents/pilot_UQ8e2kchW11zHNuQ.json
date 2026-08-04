@@ -1,0 +1,23 @@
+{
+  "_id": "UQ8e2kchW11zHNuQ",
+  "_key": "!items!UQ8e2kchW11zHNuQ",
+  "name": "Pilot",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent has a working knowledge of most aircraft, and receives a +1CS for all FEAT rolls involving an aircraft that character is controlling (including Control FEATs, Agility FEATs, and Reason FEATs involving aircraft handling and design). A character with a background that would permit it (a hero who is an alien) may extend this Talent to spacecraft as well.",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Pilot",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

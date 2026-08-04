@@ -1,0 +1,25 @@
+{
+  "_id": "lVHYZipsp2gIGKRd",
+  "_key": "!items!lVHYZipsp2gIGKRd",
+  "name": "Bows",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "Bows are tricky items to operate, such that those who have not been trained fire them at -1CS to their Agility. Those with this Talent gain a +1CS to hit with all bows, including crossbows, and may fire and reload in a single round. They may fire multiple arrows on a successful Agility FEAT.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Weapon Skill",
+    "specialty": "Bows",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "shooting"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

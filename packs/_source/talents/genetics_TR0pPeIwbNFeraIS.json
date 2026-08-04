@@ -1,0 +1,23 @@
+{
+  "_id": "TR0pPeIwbNFeraIS",
+  "_key": "!items!TR0pPeIwbNFeraIS",
+  "name": "Genetics",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters involving the genes, including creating new life forms, understanding mutants, and researching diseases.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Genetics",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

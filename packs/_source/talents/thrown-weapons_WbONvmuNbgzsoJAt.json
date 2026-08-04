@@ -1,0 +1,26 @@
+{
+  "_id": "WbONvmuNbgzsoJAt",
+  "_key": "!items!WbONvmuNbgzsoJAt",
+  "name": "Thrown Weapons",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "Characters with this Talent toss weapons designed to be thrown (including spears, daggers, shuriken, disks, and snowballs) at +1CS to their Agility.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Weapon Skill",
+    "specialty": "Thrown Weapons",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "throwing-blunt",
+      "throwing-edged"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

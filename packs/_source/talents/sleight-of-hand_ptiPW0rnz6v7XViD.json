@@ -1,0 +1,23 @@
+{
+  "_id": "ptiPW0rnz6v7XViD",
+  "_key": "!items!ptiPW0rnz6v7XViD",
+  "name": "Sleight of Hand",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This is a Talent developed by stage magicians which causes items to appear and disappear by a combination of misdirection and swift, fluid gestures. The character with this Talent may palm small items, making them appear or disappear with Agility +1CS ability.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Mystic/Mental Skill",
+    "specialty": "Sleight of Hand",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Mystic and Mental Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

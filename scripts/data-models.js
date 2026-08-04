@@ -109,7 +109,7 @@ class FaseripPowerData extends PermissiveDataModel {
     "effectColor", "effectNotes", "effectVariant", "energyReflectionRank",
     "energyReflectionType", "ensnaringStrength", "extraAttacks", "extraBodyParts",
     "forceFieldCoverage", "forceFieldPersonal", "forceFieldType", "gmNotes",
-    "grantedByEquipment", "hasBonusPowers", "hasRecoveryPower", "healingMaxPerDay",
+    "grantedByEquipment", "hardware", "hasBonusPowers", "hasRecoveryPower", "healingMaxPerDay",
     "healingType", "ignoresArtificialArmor", "ignoresNaturalArmor", "initialRank",
     "initialRoll", "initialValue", "isAbilitySubstitution", "isActive", "isAttackPower",
     "isBluntAttack", "isBodyArmor", "isBonus", "isChargingAttack", "isControlPower",

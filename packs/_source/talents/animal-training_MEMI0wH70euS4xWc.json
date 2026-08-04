@@ -1,0 +1,23 @@
+{
+  "_id": "MEMI0wH70euS4xWc",
+  "_key": "!items!MEMI0wH70euS4xWc",
+  "name": "Animal Training",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent has the ability to train animals to perform certain stunts. The individual does not have Animal Empathy or Communications and Control, but may teach an animal a trick based on the Reason FEAT roll. If the hero with this Talent does have Animal Empathy or Animal Communications and Control as Powers, these Powers are raised by +1CS.",
+    "bonus": "Special",
+    "abilityModified": "reason",
+    "type": "Other",
+    "specialty": "Animal Training",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

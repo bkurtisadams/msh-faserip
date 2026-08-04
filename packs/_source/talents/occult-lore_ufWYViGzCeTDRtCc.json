@@ -1,0 +1,23 @@
+{
+  "_id": "ufWYViGzCeTDRtCc",
+  "_key": "!items!ufWYViGzCeTDRtCc",
+  "name": "Occult Lore",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent has a knowledge of magical societies, antiquities, runes, and a general understanding of forgotten lore. The character gains a +1CS to Reason FEATs involving items of a magical nature.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Mystic/Mental Skill",
+    "specialty": "Occult Lore",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Mystic and Mental Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

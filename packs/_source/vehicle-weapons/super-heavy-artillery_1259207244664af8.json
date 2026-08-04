@@ -1,0 +1,99 @@
+{
+  "_id": "1259207244664af8",
+  "name": "Super Heavy Artillery",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Battleship main battery. 16-inch naval guns. 40 area range.",
+    "rank": "Amazing",
+    "value": 50,
+    "category": "weapon",
+    "materialStrength": "Incredible",
+    "notes": "Requires full gun crew. Ship must be relatively stable. Indirect fire possible with spotter.",
+    "price": "Monstrous",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "shooting",
+    "range": "40 areas",
+    "damage": "Amazing (50)",
+    "damageType": "Physical-Ranged",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "1",
+    "shots": "20",
+    "shotsRemaining": "20",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Direct Fire",
+        "actionType": "shooting",
+        "damageType": "Shooting",
+        "damage": 50,
+        "ability": "agility",
+        "description": "Direct fire broadside",
+        "allowedVariants": [
+          "standard",
+          "ap",
+          "explosive"
+        ]
+      },
+      {
+        "name": "Bombardment",
+        "actionType": "grenade",
+        "damageType": "Shooting",
+        "damage": 40,
+        "ability": "agility",
+        "description": "Explosive bombardment, 3 area blast radius",
+        "allowedVariants": [
+          "standard",
+          "explosive"
+        ]
+      }
+    ],
+    "isGrenade": false,
+    "grenadeType": "",
+    "grenadeRadius": 1,
+    "isMissile": false,
+    "missileType": "Standard",
+    "missileBody": "",
+    "missileControl": "",
+    "missileSpeed": "",
+    "stunIntensity": "",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": true,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!1259207244664af8"
+}

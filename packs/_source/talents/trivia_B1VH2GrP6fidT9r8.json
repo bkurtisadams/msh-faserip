@@ -1,0 +1,23 @@
+{
+  "_id": "B1VH2GrP6fidT9r8",
+  "_key": "!items!B1VH2GrP6fidT9r8",
+  "name": "Trivia",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This is a general category that covers any one subject desired by the character. On that subject, the character gains +1CS to all Reason FEATs. (Say, the character is into collecting spores and fungus. A Trivia Talent would be: Trivia/Spores and Fungus). Trivia categories should be specific (old movies, military history, sports, rock music, comic books) as opposed to general (all knowledge) or covered by other Talents.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Other",
+    "specialty": "Trivia",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

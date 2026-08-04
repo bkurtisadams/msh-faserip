@@ -1,0 +1,27 @@
+{
+  "_id": "hQ1lKM9cXUlTgdvD",
+  "_key": "!items!hQ1lKM9cXUlTgdvD",
+  "name": "Martial Arts B",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This form of martial arts is keyed on offense and inflicting damage in short, quick bursts, and includes such disciplines as boxing. The practitioner of this form of martial arts gains a +1CS to Fighting ability when engaged in unarmed combat.",
+    "bonus": "+1CS",
+    "abilityModified": "fighting",
+    "type": "Fighting Skill",
+    "specialty": "Martial Arts B",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "blunt-attack",
+      "edged-attack",
+      "grappling"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

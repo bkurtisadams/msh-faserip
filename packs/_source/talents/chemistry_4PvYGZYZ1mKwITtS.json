@@ -1,0 +1,23 @@
+{
+  "_id": "4PvYGZYZ1mKwITtS",
+  "_key": "!items!4PvYGZYZ1mKwITtS",
+  "name": "Chemistry",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters of chemistry, including developing new formulas, finding cures for inorganic poisons, and identifying chemicals by smell, touch, or taste.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Chemistry",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

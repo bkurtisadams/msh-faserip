@@ -1,0 +1,25 @@
+{
+  "_id": "4ihgFoQauMautnPI",
+  "_key": "!items!4ihgFoQauMautnPI",
+  "name": "Wrestling",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent is proficient in applying holds. It includes familiar types of wrestling as well as the sumo forms of the art. The hero with this Talent gains a +2CS when making Grappling attacks, but gains no benefit in damage. (A hero with Martial Arts B and this Talent gains a +3CS to hit in a Grappling attack, and a +1CS for damage.)",
+    "bonus": "+2CS",
+    "abilityModified": "strength",
+    "type": "Fighting Skill",
+    "specialty": "Wrestling",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "grappling"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

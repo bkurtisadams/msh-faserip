@@ -1,0 +1,25 @@
+{
+  "_id": "5soSdyj7LmVonuTn",
+  "_key": "!items!5soSdyj7LmVonuTn",
+  "name": "Law Enforcement",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent has a background with law-enforcement authorities. This Talent includes both Gun and Law Talents, and the character, if still a member of a law-enforcement agency, may legally carry a gun and make arrests.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Law Enforcement",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "shooting"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

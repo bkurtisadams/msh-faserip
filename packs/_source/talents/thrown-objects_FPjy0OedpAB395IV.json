@@ -1,0 +1,26 @@
+{
+  "_id": "FPjy0OedpAB395IV",
+  "_key": "!items!FPjy0OedpAB395IV",
+  "name": "Thrown Objects",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent gains a +1CS with all Throwing attacks (both Edged and Blunt), and +1CS on Catching. This applies to both thrown weapons and normal items. If the hero has the Thrown Weapons Talent as well, the modification is +2CS when using thrown weapons.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Fighting Skill",
+    "specialty": "Thrown Objects",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "throwing-blunt",
+      "throwing-edged"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

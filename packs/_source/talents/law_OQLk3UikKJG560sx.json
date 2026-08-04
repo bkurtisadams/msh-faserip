@@ -1,0 +1,23 @@
+{
+  "_id": "OQLk3UikKJG560sx",
+  "_key": "!items!OQLk3UikKJG560sx",
+  "name": "Law",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent has an extensive background in law (the assumption being US Law, but this may vary according to the Judge's campaign). The hero may be a lawyer or capable of applying to pass the bar (Reason FEAT of Good Intensity). A character with Law as a Talent gains a +1CS to all FEAT rolls involving the law, including correct legal procedure. A character without Law gains no benefit to Reason FEATs, and in addition, will have to make Reason FEATs more often than a character with Law Talent.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Professional Skill",
+    "specialty": "Law",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

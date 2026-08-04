@@ -1,0 +1,23 @@
+{
+  "_id": "SjzGWYclxDMfqROD",
+  "_key": "!items!SjzGWYclxDMfqROD",
+  "name": "Electronics",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters involving electronic devices, including their creation and repair.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Electronics",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

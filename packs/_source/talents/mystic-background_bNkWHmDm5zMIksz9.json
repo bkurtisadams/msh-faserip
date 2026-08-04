@@ -1,0 +1,23 @@
+{
+  "_id": "bNkWHmDm5zMIksz9",
+  "_key": "!items!bNkWHmDm5zMIksz9",
+  "name": "Mystic Background",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "In the Marvel Universe, all humankind has the potential for developing magical Powers. This \"Talent\" shows that the character has some background with magical forces. Heroes may have derived their powers from these forces if they choose this Talent. A character with this Talent may have Magical Powers, with the approval of the Judge. If the Judge allows magical player characters, then any of the initial Powers created may be spells, and should be noted as deriving from Personal, Universal, or Dimensional energies.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Mystic/Mental Skill",
+    "specialty": "Mystic Background",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Mystic and Mental Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

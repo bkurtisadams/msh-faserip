@@ -1,0 +1,26 @@
+{
+  "_id": "USHl19bAFDpY7OBH",
+  "_key": "!items!USHl19bAFDpY7OBH",
+  "name": "Acrobatics",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent is very limber and as such gains advantages when under attack. The hero has a +1CS when dodging, evading, and escaping.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Fighting Skill",
+    "specialty": "Acrobatics",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "dodging",
+      "escaping"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

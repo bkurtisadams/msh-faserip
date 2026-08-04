@@ -1,0 +1,23 @@
+{
+  "_id": "rqMLGSFCx9R2Dasj",
+  "_key": "!items!rqMLGSFCx9R2Dasj",
+  "name": "Languages",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent has a natural understanding of languages. The character gains 1 additional language at start, and may add other languages at half the cost of a Talent (500 points regardless of who teaches it). Characters without Languages Talent must gain this Talent first to learn other languages. The gaining of additional languages assumes someone is available to teach these languages. A player character with this Talent does not have to assign a language at start, but may fill one in later as need be.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Other",
+    "specialty": "Languages",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

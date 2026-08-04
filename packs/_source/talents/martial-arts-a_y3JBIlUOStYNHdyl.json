@@ -1,0 +1,27 @@
+{
+  "_id": "y3JBIlUOStYNHdyl",
+  "_key": "!items!y3JBIlUOStYNHdyl",
+  "name": "Martial Arts A",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This form of martial arts concentrates on using an opponent's strength against him, and is typical of oriental-American forms such as judo and karate. The practitioner of this type of martial arts can Stun or Slam an opponent regardless of their comparative Strengths and Endurances.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Fighting Skill",
+    "specialty": "Martial Arts A",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "blunt-attack"
+    ],
+    "flags": [
+      "ignore-str-end"
+    ],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

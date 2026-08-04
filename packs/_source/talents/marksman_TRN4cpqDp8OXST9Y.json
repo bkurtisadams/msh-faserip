@@ -1,0 +1,29 @@
+{
+  "_id": "TRN4cpqDp8OXST9Y",
+  "_key": "!items!TRN4cpqDp8OXST9Y",
+  "name": "Marksman",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent gains a +1CS to hit with any distance weapon that requires line of sight to hit (the character could benefit when firing heavy artillery, but not when controlling a tele-guided missile). Such a weapon in the hands of a marksman does not suffer penalties to hit from range.",
+    "bonus": "+1CS",
+    "abilityModified": "agility",
+    "type": "Weapon Skill",
+    "specialty": "Marksman",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "shooting",
+      "energy",
+      "force"
+    ],
+    "flags": [
+      "no-range-penalty"
+    ],
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

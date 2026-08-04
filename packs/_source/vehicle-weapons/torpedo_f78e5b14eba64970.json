@@ -1,0 +1,85 @@
+{
+  "_id": "f78e5b14eba64970",
+  "name": "Torpedo",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Standard WWII torpedo. Undersea missile. Amazing (50) damage on impact. Single use.",
+    "rank": "Amazing",
+    "value": 50,
+    "category": "weapon",
+    "materialStrength": "Good",
+    "notes": "Travels underwater. Must be aimed at waterline or below. Subs carry ~20 torpedoes.",
+    "price": "Remarkable",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "shooting",
+    "range": "15 areas",
+    "damage": "Amazing (50)",
+    "damageType": "Physical-Ranged",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "1",
+    "shots": "1",
+    "shotsRemaining": "1",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Launch",
+        "actionType": "shooting",
+        "damageType": "Shooting",
+        "damage": 50,
+        "ability": "agility",
+        "description": "Launch torpedo at target vessel",
+        "allowedVariants": [
+          "standard"
+        ]
+      }
+    ],
+    "isGrenade": false,
+    "grenadeType": "",
+    "grenadeRadius": 1,
+    "isMissile": true,
+    "missileType": "Torpedo",
+    "missileBody": "Good",
+    "missileControl": "Typical",
+    "missileSpeed": "Remarkable",
+    "stunIntensity": "",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": false,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!f78e5b14eba64970"
+}

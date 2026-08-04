@@ -1,0 +1,23 @@
+{
+  "_id": "Gim8k31Kn0ifUnRS",
+  "_key": "!items!Gim8k31Kn0ifUnRS",
+  "name": "Journalism",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent gains an additional 2 Contacts to those already generated. The Contacts should be connected with the media in some fashion, such as at local newspapers, radio or TV stations, or has sources in law enforcement, political circles, or snitches of the criminal underworld.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Journalism",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "_id": "E9sVedlxiKW844iv",
+  "_key": "!items!E9sVedlxiKW844iv",
+  "name": "Military",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero has had some dealings with one of the armed services. In military matters, the hero gets a +1CS to all FEAT rolls, and in addition may take a member of the armed services as a Contact.",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Military",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "shooting"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "_id": "6df5581724b04518",
+  "name": "Heavy Artillery",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Heavy cannon. SPG main gun, destroyer deck gun, or battleship secondary battery. 20 area range.",
+    "rank": "Incredible",
+    "value": 40,
+    "category": "weapon",
+    "materialStrength": "Incredible",
+    "notes": "Requires two operators. Vehicle must be stationary for aimed fire. -2CS while moving.",
+    "price": "Monstrous",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "shooting",
+    "range": "20 areas",
+    "damage": "Incredible (40)",
+    "damageType": "Physical-Ranged",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "1",
+    "shots": "30",
+    "shotsRemaining": "30",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Direct Fire",
+        "actionType": "shooting",
+        "damageType": "Shooting",
+        "damage": 40,
+        "ability": "agility",
+        "description": "Direct fire at target",
+        "allowedVariants": [
+          "standard",
+          "ap",
+          "explosive"
+        ]
+      },
+      {
+        "name": "HE Shell",
+        "actionType": "grenade",
+        "damageType": "Shooting",
+        "damage": 30,
+        "ability": "agility",
+        "description": "High explosive shell, 2 area blast radius",
+        "allowedVariants": [
+          "standard",
+          "explosive"
+        ]
+      }
+    ],
+    "isGrenade": false,
+    "grenadeType": "",
+    "grenadeRadius": 1,
+    "isMissile": false,
+    "missileType": "Standard",
+    "missileBody": "",
+    "missileControl": "",
+    "missileSpeed": "",
+    "stunIntensity": "",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": true,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!6df5581724b04518"
+}

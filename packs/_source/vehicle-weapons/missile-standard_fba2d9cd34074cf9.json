@@ -1,0 +1,85 @@
+{
+  "_id": "fba2d9cd34074cf9",
+  "name": "Missile (Standard)",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Standard air-to-air or air-to-ground missile. Incredible (40) damage. Single use per launcher.",
+    "rank": "Incredible",
+    "value": 40,
+    "category": "weapon",
+    "materialStrength": "Good",
+    "notes": "Guided missile. Military jets carry 4, VTOL jets carry 4, carriers have missile batteries.",
+    "price": "Remarkable",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "shooting",
+    "range": "20 areas",
+    "damage": "Incredible (40)",
+    "damageType": "Physical-Ranged",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "1",
+    "shots": "1",
+    "shotsRemaining": "1",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Launch",
+        "actionType": "shooting",
+        "damageType": "Shooting",
+        "damage": 40,
+        "ability": "agility",
+        "description": "Launch missile at target",
+        "allowedVariants": [
+          "standard"
+        ]
+      }
+    ],
+    "isGrenade": false,
+    "grenadeType": "",
+    "grenadeRadius": 1,
+    "isMissile": true,
+    "missileType": "Standard",
+    "missileBody": "Good",
+    "missileControl": "Excellent",
+    "missileSpeed": "Amazing",
+    "stunIntensity": "",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": false,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!fba2d9cd34074cf9"
+}

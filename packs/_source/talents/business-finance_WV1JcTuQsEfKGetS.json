@@ -1,0 +1,23 @@
+{
+  "_id": "WV1JcTuQsEfKGetS",
+  "_key": "!items!WV1JcTuQsEfKGetS",
+  "name": "Business/Finance",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero is familiar with the world of business, corporate finance, and how money works. Initial Resources are a minimum of Good, and the hero gains a +1CS for FEAT rolls dealing with money. The hero gains a Contact in the Professional category.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Professional Skill",
+    "specialty": "Business/Finance",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

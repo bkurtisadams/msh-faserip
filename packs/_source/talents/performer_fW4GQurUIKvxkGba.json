@@ -1,0 +1,23 @@
+{
+  "_id": "fW4GQurUIKvxkGba",
+  "_key": "!items!fW4GQurUIKvxkGba",
+  "name": "Performer",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character is someone who acts, sings, dances, mimes, or otherwise uses his Talents to entertain (this is related to the Artist, the key difference being that the Artist may leave the scene of creation; the Performer is identified with that creation directly). A Performer receives 10 Karma points for a week's worth of performance, whether in a play, doing a nightclub routine, or working for a movie.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Other",
+    "specialty": "Performer",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

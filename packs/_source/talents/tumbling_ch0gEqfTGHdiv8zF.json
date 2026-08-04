@@ -1,0 +1,25 @@
+{
+  "_id": "ch0gEqfTGHdiv8zF",
+  "_key": "!items!ch0gEqfTGHdiv8zF",
+  "name": "Tumbling",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent knows how to fall and land without undue injury. Individuals with this Talent may make an Agility FEAT to land feet-first after any fall that does not inflict damage.",
+    "bonus": "Special",
+    "abilityModified": "agility",
+    "type": "Fighting Skill",
+    "specialty": "Tumbling",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [
+      "tumbling-land"
+    ],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

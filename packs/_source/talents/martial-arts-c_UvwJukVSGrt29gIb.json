@@ -1,0 +1,27 @@
+{
+  "_id": "UvwJukVSGrt29gIb",
+  "_key": "!items!UvwJukVSGrt29gIb",
+  "name": "Martial Arts C",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This form of martial arts concentrates on holds and escapes. The practitioner of this form gains a +1CS to his Strength for Grappling attacks (including damage), a +1CS to Strength for Escaping, and a +1CS to Agility for purposes of Dodging.",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Fighting Skill",
+    "specialty": "Martial Arts C",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "grappling",
+      "escaping",
+      "dodging"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

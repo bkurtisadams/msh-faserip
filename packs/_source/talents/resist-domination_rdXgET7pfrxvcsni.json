@@ -1,0 +1,23 @@
+{
+  "_id": "rdXgET7pfrxvcsni",
+  "_key": "!items!rdXgET7pfrxvcsni",
+  "name": "Resist Domination",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This is a Psi-Screen that may be developed by individuals without that Power. This permits the character to resist mental attacks as if the character had a mental power of Psyche +1CS. The Talent is passive in nature, and does not grant any other particular benefit. A character with Mental Probe may be able to discern where the character gained this Talent, but nothing else.",
+    "bonus": "+1CS",
+    "abilityModified": "psyche",
+    "type": "Mystic/Mental Skill",
+    "specialty": "Resist Domination",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Mystic and Mental Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

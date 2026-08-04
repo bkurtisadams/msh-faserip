@@ -1,0 +1,23 @@
+{
+  "_id": "jgUqzztACP4SCR7M",
+  "_key": "!items!jgUqzztACP4SCR7M",
+  "name": "Geology",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters involving the Earth, including volcanic activity, the geology of the surrounding land, types of rocks and their powers, and mineral identification.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Geology",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

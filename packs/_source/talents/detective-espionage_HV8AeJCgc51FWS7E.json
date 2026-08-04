@@ -1,0 +1,23 @@
+{
+  "_id": "HV8AeJCgc51FWS7E",
+  "_key": "!items!HV8AeJCgc51FWS7E",
+  "name": "Detective/Espionage",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent has been trained to notice small clues in solving crimes. The character with this Talent gains a +1CS to discover clues to a crime, and in addition gains a Contact in either crime, law enforcement, law, or espionage.",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Detective/Espionage",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

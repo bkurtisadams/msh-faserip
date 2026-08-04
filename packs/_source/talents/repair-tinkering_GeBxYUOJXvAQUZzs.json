@@ -1,0 +1,23 @@
+{
+  "_id": "GeBxYUOJXvAQUZzs",
+  "_key": "!items!GeBxYUOJXvAQUZzs",
+  "name": "Repair/Tinkering",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent gains a +1CS to any Reason FEATs involving the repair and modification of existing items, but not the building of new items. This +1CS may be added to any other bonuses gained from other Talents, so that an Engineer with Tinkering Talent would gain a +2CS on repair.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Other",
+    "specialty": "Repair/Tinkering",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

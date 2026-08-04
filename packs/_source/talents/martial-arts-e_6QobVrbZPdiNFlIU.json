@@ -1,0 +1,35 @@
+{
+  "_id": "6QobVrbZPdiNFlIU",
+  "_key": "!items!6QobVrbZPdiNFlIU",
+  "name": "Martial Arts E",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This form of martial arts encourages quick striking to catch the opponent off-guard. Heroes with this form of Martial Arts are at a +1 to initiative rolls in unarmed combat.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Fighting Skill",
+    "specialty": "Martial Arts E",
+    "rankOverride": "",
+    "isCumulative": true,
+    "isWeaponTalent": false,
+    "appliesTo": [
+      "blunt-attack",
+      "edged-attack",
+      "shooting",
+      "energy",
+      "force",
+      "throwing-blunt",
+      "throwing-edged",
+      "grappling",
+      "charging"
+    ],
+    "flags": [
+      "initiative"
+    ],
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

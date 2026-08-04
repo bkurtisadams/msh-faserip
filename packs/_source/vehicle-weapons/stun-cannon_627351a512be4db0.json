@@ -1,0 +1,85 @@
+{
+  "_id": "627351a512be4db0",
+  "name": "Stun Cannon",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Vehicle-mounted stun weapon. Remarkable (30) force damage. Non-lethal. Used on Walker vehicles and SHIELD craft.",
+    "rank": "Remarkable",
+    "value": 30,
+    "category": "weapon",
+    "materialStrength": "Remarkable",
+    "notes": "Force attack (Stun on red, not Kill). No recoil \u2014 safe for Walker vehicles.",
+    "price": "Amazing",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "energy",
+    "range": "5 areas",
+    "damage": "Remarkable (30)",
+    "damageType": "Energy",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "1",
+    "shots": "20",
+    "shotsRemaining": "20",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Stun Blast",
+        "actionType": "force",
+        "damageType": "Force",
+        "damage": 30,
+        "ability": "agility",
+        "description": "Non-lethal stun blast",
+        "allowedVariants": [
+          "standard"
+        ]
+      }
+    ],
+    "isGrenade": false,
+    "grenadeType": "",
+    "grenadeRadius": 1,
+    "isMissile": false,
+    "missileType": "Standard",
+    "missileBody": "",
+    "missileControl": "",
+    "missileSpeed": "",
+    "stunIntensity": "Remarkable",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": false,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!627351a512be4db0"
+}

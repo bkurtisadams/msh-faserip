@@ -1,0 +1,23 @@
+{
+  "_id": "3DaOLxuPUFcFyCWv",
+  "_key": "!items!3DaOLxuPUFcFyCWv",
+  "name": "Mesmerism and Hypnosis",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This Talent is a primitive form of Mind Control at the Power rank number equal to the Reason of the character with this Talent. Information can be gained as per a Mental Probe, and post-hypnotic suggestions may be implanted within the victim's mind. Any attempt to force an individual to do something that he would not normally do, or divulge information that he would not normally reveal, will cause the hypnotism to break. A hypnotic command fades in 1-10 hours after it is given.",
+    "bonus": "Special",
+    "abilityModified": "reason",
+    "type": "Mystic/Mental Skill",
+    "specialty": "Mesmerism and Hypnosis",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Mystic and Mental Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

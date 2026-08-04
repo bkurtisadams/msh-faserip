@@ -1,0 +1,23 @@
+{
+  "_id": "z35W2iBNtkfC8t98",
+  "_key": "!items!z35W2iBNtkfC8t98",
+  "name": "Student",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "Similar to Heir to Fortune, this Talent may only be chosen at the start of play, and may not be gained through experience. The Student character has no other initial Talents, but may gain other Talents at a discounted price. New Talents cost 1000 Karma points if learned from another player character, 800 if learned from outside. Students may maintain Advancement Totals for a Talent along with other forms of Advancement funds.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Other",
+    "specialty": "Student",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

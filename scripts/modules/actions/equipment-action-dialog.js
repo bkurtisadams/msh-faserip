@@ -757,6 +757,32 @@ async function _executeAction(actionId, actor, item, dataset) {
       const anyActive = transferEffects.some(e => !e.disabled);
       const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
       await item.updateEmbeddedDocuments("ActiveEffect", updates);
+
+      // Battery timer: actor-embedded timed AE so CTT can track it and
+      // expiry can switch the item back off (see init.js deleteActiveEffect).
+      const staleTimers = actor.effects.filter(e =>
+        e.flags?.[SCOPE]?.equipmentBatteryTimer && e.flags?.[SCOPE]?.itemUuid === item.uuid);
+      if (staleTimers.length) {
+        await actor.deleteEmbeddedDocuments("ActiveEffect", staleTimers.map(e => e.id));
+      }
+      if (!anyActive && dur > 0) {
+        const UNIT_SECONDS = { second: 1, turn: 6, minute: 60, hour: 3600, day: 86400, week: 604800 };
+        const seconds = dur * (UNIT_SECONDS[unit] ?? 3600);
+        const { computeDuration } = await import("../effects/effect-engine.js");
+        await actor.createEmbeddedDocuments("ActiveEffect", [{
+          name: `${item.name} (Battery)`,
+          img: item.img || "icons/svg/aura.svg",
+          origin: item.uuid,
+          duration: computeDuration({ seconds }),
+          flags: {
+            [SCOPE]: {
+              equipmentBatteryTimer: true,
+              itemUuid: item.uuid,
+              rechargeLabel: sys.rechargeLabel || "Recharge"
+            }
+          }
+        }]);
+      }
       const state = anyActive ? "OFF" : "ON";
       const stateColor = anyActive ? "#c62828" : "#2e7d32";
       let durationLine = "";

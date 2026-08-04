@@ -1,7 +1,7 @@
-# Ignore Foundry-generated compendium data
-packs/
+# Ignore Foundry-generated compendium data, keep hand-curated sources
+packs/*
+!packs/_source/
 compendiums/
-*.db
 *.db
 
 # Temporary files

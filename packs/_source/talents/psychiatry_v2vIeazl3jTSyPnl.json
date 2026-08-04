@@ -1,0 +1,23 @@
+{
+  "_id": "v2vIeazl3jTSyPnl",
+  "_key": "!items!v2vIeazl3jTSyPnl",
+  "name": "Psychiatry",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent has a background in studies of the mind, and as such gains a +1CS on all FEATs involving the mind. This is a popular Talent with those heroes and villains with Mental Powers, and the character with these Talents gains a +1CS on FEATs involving Mental Control, Domination, Hypnosis, Emotion Control, and Mental Probe Powers.",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Psychiatry",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

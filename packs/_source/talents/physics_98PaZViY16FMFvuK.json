@@ -1,0 +1,23 @@
+{
+  "_id": "98PaZViY16FMFvuK",
+  "_key": "!items!98PaZViY16FMFvuK",
+  "name": "Physics",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters involving physics and astrophysics, including motion, flight, and the planets and stars.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Physics",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

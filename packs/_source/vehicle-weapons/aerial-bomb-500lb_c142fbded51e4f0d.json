@@ -1,0 +1,86 @@
+{
+  "_id": "c142fbded51e4f0d",
+  "name": "Aerial Bomb (500lb)",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Standard 500lb aerial bomb. Incredible (40) damage, 2 area blast radius. Dropped from aircraft.",
+    "rank": "Incredible",
+    "value": 40,
+    "category": "weapon",
+    "materialStrength": "Good",
+    "notes": "Must be dropped from aircraft. -2CS to hit specific targets from altitude. Bombers carry up to 100.",
+    "price": "Excellent",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "shooting",
+    "range": "0 (drop)",
+    "damage": "Incredible (40)",
+    "damageType": "Physical-Ranged",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "1",
+    "shots": "1",
+    "shotsRemaining": "1",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Drop",
+        "actionType": "grenade",
+        "damageType": "Shooting",
+        "damage": 40,
+        "ability": "agility",
+        "description": "Drop bomb on target area",
+        "allowedVariants": [
+          "standard",
+          "explosive"
+        ]
+      }
+    ],
+    "isGrenade": true,
+    "grenadeType": "explosive",
+    "grenadeRadius": 2,
+    "isMissile": false,
+    "missileType": "Standard",
+    "missileBody": "",
+    "missileControl": "",
+    "missileSpeed": "",
+    "stunIntensity": "",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": false,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!c142fbded51e4f0d"
+}

@@ -1,0 +1,23 @@
+{
+  "_id": "KNL3ZwplXNUDCv2o",
+  "_key": "!items!KNL3ZwplXNUDCv2o",
+  "name": "Artist",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with an artist background creates works of art, either for himself or for sale to others. This includes painting, sculpting, and writing. A single work takes 1-10 weeks, and upon completion grants the artist Karma points equal to 10 times the number of weeks. The character must allocate some time daily at his work.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Other",
+    "specialty": "Artist",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

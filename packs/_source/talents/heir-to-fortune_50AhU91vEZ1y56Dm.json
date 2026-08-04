@@ -1,0 +1,23 @@
+{
+  "_id": "50AhU91vEZ1y56Dm",
+  "_key": "!items!50AhU91vEZ1y56Dm",
+  "name": "Heir to Fortune",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This is not a Talent, but a situation which brings the character into a lot of money. The minimum Resources of a character with this Talent is Remarkable (if your character is making Excellent Resources or less, do not take this Talent). This \"Talent\" may not be gained by a character after the generation process is finished, and may only be chosen by characters being generated.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Other",
+    "specialty": "Heir to Fortune",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Other Talents",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

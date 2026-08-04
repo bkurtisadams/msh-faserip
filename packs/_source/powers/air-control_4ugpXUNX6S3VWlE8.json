@@ -1,0 +1,251 @@
+{
+  "_id": "4ugpXUNX6S3VWlE8",
+  "name": "Air Control",
+  "type": "power",
+  "img": "systems/msh-faserip/assets/icons/powers/category-control.svg",
+  "system": {
+    "isActive": true,
+    "activationType": "activated",
+    "isStarred": false,
+    "source": "natural",
+    "replacesAbility": "",
+    "depoweredRank": "",
+    "category": "matterControl",
+    "isBonus": false,
+    "bonusFrom": "",
+    "initialRoll": "",
+    "initialRank": "",
+    "initialValue": "",
+    "categoryRoll": "",
+    "limitationRequired": false,
+    "limitationDetail": "",
+    "preLimitationRank": "",
+    "range": "rank",
+    "customRange": "",
+    "area": 0,
+    "duration": "",
+    "customDuration": "",
+    "isAttackPower": true,
+    "battleEffectsColumn": "Fo",
+    "damageSource": "rank",
+    "damage": 0,
+    "canPullPunch": false,
+    "canReduceEffect": false,
+    "armorPiercing": false,
+    "ignoresNaturalArmor": false,
+    "ignoresArtificialArmor": false,
+    "bypassForceField": false,
+    "continuingDamage": false,
+    "continuingDamageRounds": 3,
+    "ensnaringStrength": "",
+    "requiresSave": false,
+    "save": {
+      "ability": "endurance",
+      "intensity": "power-rank",
+      "fixedRank": "",
+      "onFail": {
+        "effect": "stunned",
+        "duration": "1-10",
+        "notes": ""
+      },
+      "rerollOnKarmaLoss": false,
+      "rerollOnLifeThreat": false
+    },
+    "isDefensePower": false,
+    "defenseType": "bodyArmor",
+    "armorNature": "natural",
+    "bodyArmorType": "both",
+    "protectionValue": 0,
+    "forceFieldPersonal": false,
+    "forceFieldCoverage": 0,
+    "resistanceType": "",
+    "resistanceIsInvulnerability": false,
+    "isLimited": false,
+    "limitation": {
+      "usesPerDay": 0,
+      "usesPerScene": 0,
+      "rankBonus": 0,
+      "maxRank": ""
+    },
+    "limitations": "",
+    "countsAsTwoPowers": false,
+    "grantedByEquipment": false,
+    "damageType": "energy-force",
+    "extraAttacks": false,
+    "extraBodyParts": [],
+    "specialStrengthType": "",
+    "clawMaterialStrength": "",
+    "telekinesisStrength": "",
+    "isBodyArmor": false,
+    "armorPhysical": 0,
+    "armorEnergy": 0,
+    "armorEnergyCustom": false,
+    "isForceField": false,
+    "forceFieldType": "personal",
+    "isResistance": false,
+    "resistanceEffect": "damageReduction",
+    "resistanceIsConductive": false,
+    "resistanceMinRank": "",
+    "isEnergyReflection": false,
+    "energyReflectionType": "",
+    "energyReflectionRank": "full",
+    "isSensePower": false,
+    "isAbilitySubstitution": false,
+    "isMovementPower": false,
+    "isControlPower": true,
+    "isMentalPower": false,
+    "isTransformPower": false,
+    "detection": {
+      "enhancedSense": "",
+      "protectedSense": "",
+      "detectionType": "",
+      "infravisionRange": 0,
+      "combatSense": false,
+      "cosmicAwareness": false,
+      "computerLinks": false,
+      "canTrack": false
+    },
+    "abilitySubstitution": {
+      "fighting": {
+        "enabled": false,
+        "context": ""
+      },
+      "agility": {
+        "enabled": false,
+        "context": ""
+      },
+      "strength": {
+        "enabled": false,
+        "context": ""
+      },
+      "endurance": {
+        "enabled": false,
+        "context": ""
+      },
+      "reason": {
+        "enabled": false,
+        "context": ""
+      },
+      "intuition": {
+        "enabled": false,
+        "context": ""
+      },
+      "psyche": {
+        "enabled": false,
+        "context": ""
+      }
+    },
+    "movement": {
+      "type": "",
+      "areasPerRound": 0,
+      "useRankSpeed": false,
+      "leavesTunnel": false
+    },
+    "control": {
+      "controlType": "air",
+      "controlSpecific": "",
+      "manipulateExisting": true,
+      "generateNew": false,
+      "useAsShield": true,
+      "useAsWeapon": true,
+      "createConstructs": false,
+      "animateObjects": false
+    },
+    "mental": {
+      "telepathy": false,
+      "mentalProbe": false,
+      "mindControl": false,
+      "emotionControl": false,
+      "empathy": false,
+      "psiScreen": false,
+      "imageGeneration": false,
+      "possession": false,
+      "astralProjection": false,
+      "psionicAttack": false,
+      "transferral": false,
+      "animateDrawings": false,
+      "precognition": false,
+      "postcognition": false,
+      "mechanicalIntuition": false,
+      "emotionType": "",
+      "singleEmotionBonus": false
+    },
+    "bodyDefensive": {
+      "pheromones": false
+    },
+    "isWaterBreathing": false,
+    "transformation": {
+      "affects": "self",
+      "transformType": "",
+      "targetMaterial": "",
+      "targetResistsWith": "",
+      "duration": "concentration",
+      "touchRequired": false,
+      "retainsMental": true,
+      "retainsPowers": false
+    },
+    "healingType": "",
+    "regenerationType": "",
+    "absorptionType": "",
+    "absorptionSpecific": "",
+    "hasRecoveryPower": false,
+    "isDamageTransfer": false,
+    "isHealingPower": false,
+    "isHealthDrain": false,
+    "isParalyzingTouch": false,
+    "isBlindingTouch": false,
+    "isImmortality": false,
+    "absorptionConvertsToHealth": false,
+    "absorptionCanRedirect": false,
+    "isLifeSupport": false,
+    "isMagic": false,
+    "magic": {
+      "energyType": "",
+      "castCost": 0,
+      "successAbility": "psyche",
+      "chant": false,
+      "gesture": false,
+      "usesCeremony": false,
+      "sourceEntity": ""
+    },
+    "hasBonusPowers": true,
+    "bonusPowers": [
+      {
+        "name": "Flight",
+        "rankMod": "same"
+      }
+    ],
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "hitVolume": 80,
+      "missVolume": 80
+    },
+    "vfx": {
+      "enabled": true,
+      "preset": "",
+      "color": "",
+      "asset": "",
+      "impact": "",
+      "scale": 1,
+      "duration": 1000
+    },
+    "specialMechanics": "",
+    "description": "The hero with this Power has the ability to manipulate air, winds, and (potentially) weather. The hero can create shields of wind up to Power rank damage that are effective against all physical missile attacks of that rank or lower. The hero can also use air as a distance weapon, inflicting up to the Power rank of damage, but repelled by any form of Force Field, including shields made of air. The hero can also generate winds of Power rank Intensity. The hero with Air Control may also develop Power stunts for this Power. A character with Air Control begins with one Power stunt. which may be:\n• Flight: at Power rank speed.\n• Limited Weather Control: Tornadoes of Power rank Intensity and damage, controlled by Power rank FEAT.\n• Limited Weather Control: Summon Storm.\n• Limited Weather Control: Summon Fog.\n• Lightning of Power rank range and damage.\n• Reduce existing Weather Conditions with Power rank ability, as for each type of weather.",
+    "rank": "Typical",
+    "value": 6,
+    "limitRankMax": "",
+    "limitationColumnShift": 0,
+    "stunts": [],
+    "type": "Air Control",
+    "subtype": "Air Control"
+  },
+  "effects": [],
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!4ugpXUNX6S3VWlE8"
+}

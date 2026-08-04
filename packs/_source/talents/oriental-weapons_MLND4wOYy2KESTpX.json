@@ -1,0 +1,27 @@
+{
+  "_id": "MLND4wOYy2KESTpX",
+  "_key": "!items!MLND4wOYy2KESTpX",
+  "name": "Oriental Weapons",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "This is a special category that grants the character a +1CS to Fighting or Agility when using the following weapons: shuriken, crossbows, sais (treat as swords), and oriental swords and daggers (including the katana and the kris).",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Weapon Skill",
+    "specialty": "Oriental Weapons",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "shooting",
+      "blunt-attack",
+      "edged-attack"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

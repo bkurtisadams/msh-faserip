@@ -1,0 +1,85 @@
+{
+  "_id": "fccbedfc0a744b50",
+  "name": "Laser Cannon",
+  "type": "equipment",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Vehicle-mounted laser weapon. Remarkable (30) energy damage. Modern replacement for machine guns.",
+    "rank": "Remarkable",
+    "value": 30,
+    "category": "weapon",
+    "materialStrength": "Remarkable",
+    "notes": "Energy attack. Body Armor -20 vs energy applies. No ammunition \u2014 uses vehicle power.",
+    "price": "Amazing",
+    "legality": "military",
+    "weaponType": "Ranged",
+    "attackType": "energy",
+    "range": "10 areas",
+    "damage": "Remarkable (30)",
+    "damageType": "Energy",
+    "armorPiercing": 0,
+    "armorPiercingCS": 0,
+    "apMode": "value",
+    "bypassForceField": false,
+    "rate": "2",
+    "shots": "50",
+    "shotsRemaining": "50",
+    "noRangePenalty": false,
+    "oneHandedUse": "none",
+    "throwable": false,
+    "entangling": false,
+    "attackModes": [
+      {
+        "name": "Fire",
+        "actionType": "energy",
+        "damageType": "Energy",
+        "damage": 30,
+        "ability": "agility",
+        "description": "Laser blast",
+        "allowedVariants": [
+          "standard"
+        ]
+      }
+    ],
+    "isGrenade": false,
+    "grenadeType": "",
+    "grenadeRadius": 1,
+    "isMissile": false,
+    "missileType": "Standard",
+    "missileBody": "",
+    "missileControl": "",
+    "missileSpeed": "",
+    "stunIntensity": "",
+    "continuingDamage": "",
+    "continuingDamageRounds": "",
+    "requiresTwoOperators": false,
+    "variantType": "standard",
+    "burstScatter": "none",
+    "sfx": {
+      "hit": "",
+      "miss": "",
+      "empty": "",
+      "reload": "",
+      "hitVolume": 80,
+      "missVolume": 80,
+      "emptyVolume": 80,
+      "reloadVolume": 80
+    },
+    "specialAmmo": {
+      "mercy": false,
+      "ap": false,
+      "rubber": false,
+      "explosive": false,
+      "canister": false,
+      "heatSeeker": false
+    }
+  },
+  "effects": [],
+  "flags": {},
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!fccbedfc0a744b50"
+}

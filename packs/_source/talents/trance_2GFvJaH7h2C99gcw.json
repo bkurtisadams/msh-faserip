@@ -1,0 +1,23 @@
+{
+  "_id": "2GFvJaH7h2C99gcw",
+  "_key": "!items!2GFvJaH7h2C99gcw",
+  "name": "Trance",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character may place himself into a trance. While in a trance the character slows his body functions to such a level that he may be assumed to be deceased (Intuition FEAT for the character checking). A character in a trance reduces needs for food and water to a minimal level, and may regain Endurance ranks at one rank per day.",
+    "bonus": "Special",
+    "abilityModified": "",
+    "type": "Mystic/Mental Skill",
+    "specialty": "Trance",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Mystic and Mental Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "_id": "0HroEYTAq646Jh3f",
+  "_key": "!items!0HroEYTAq646Jh3f",
+  "name": "Weapons Master",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The character with this Talent gains a +1CS to hit with any weapon that requires a Fighting FEAT to hit.",
+    "bonus": "+1CS",
+    "abilityModified": "fighting",
+    "type": "Weapon Skill",
+    "specialty": "Weapons Master",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": true,
+    "appliesTo": [
+      "blunt-attack",
+      "edged-attack"
+    ],
+    "flags": [],
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

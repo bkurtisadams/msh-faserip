@@ -1,0 +1,23 @@
+{
+  "_id": "RTXoSAxqVgjbDbW0",
+  "_key": "!items!RTXoSAxqVgjbDbW0",
+  "name": "Criminology",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "The hero with this Talent has an understanding of the criminal mind and behavior, either from studies or first-hand observation. The character with this Talent gains a +1CS on all Reason and Intuition FEATs involving criminal practices (\"If I were a crook, where would I hide?\"). The hero also gains a Contact in either the police or crime areas.",
+    "bonus": "+1CS",
+    "abilityModified": "",
+    "type": "Professional Skill",
+    "specialty": "Criminology",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Professional Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

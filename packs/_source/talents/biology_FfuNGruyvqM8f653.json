@@ -1,0 +1,23 @@
+{
+  "_id": "FfuNGruyvqM8f653",
+  "_key": "!items!FfuNGruyvqM8f653",
+  "name": "Biology",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters of biology, including animal and plant identification, finding cures for organic poisons, and researching diseases and their cures.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Biology",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_id": "5RZqLZDLmTZN7Ya5",
+  "_key": "!items!5RZqLZDLmTZN7Ya5",
+  "name": "Computers",
+  "type": "talent",
+  "img": "icons/svg/item-bag.svg",
+  "system": {
+    "description": "A +1CS on matters involving computers, computer-controlled equipment, and artificial intelligences.",
+    "bonus": "+1CS",
+    "abilityModified": "reason",
+    "type": "Scientific Skill",
+    "specialty": "Computers",
+    "rankOverride": "",
+    "isCumulative": false,
+    "isWeaponTalent": false,
+    "appliesTo": [],
+    "flags": [],
+    "notes": "",
+    "category": "Scientific Skills",
+    "categoryRoll": "",
+    "grantsContact": ""
+  }
+}
