@@ -420,7 +420,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           const _getCurrentRangePenalty = () => {
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             if (rangeVal > maxThrowRange) return 0;
-            return rangeVal > 0 ? -rangeVal : 0;
+            return rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
           };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
@@ -461,7 +461,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
               _csState.setRange(0);
             } else {
-              const penalty = rangeVal > 0 ? -rangeVal : 0;
+              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
               _csState.setRange(penalty);
             }

@@ -285,7 +285,7 @@ export class ShootingAction extends RangedAttackAction {
     }).join('');
 
     // === Build CS row via shared utility (manual input + range + ? reference) ===
-    const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
+    const initialRangePenalty = (initialVariant === "heatSeeker") ? 0 : (savedRange > 1 ? -(savedRange - 1) : 0);
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
@@ -452,12 +452,15 @@ export class ShootingAction extends RangedAttackAction {
           // ── Wire CS panel from shared utility ──
           // getRangePenalty reads live range from the dialog
           const _getCurrentRangePenalty = () => {
+            // Heat-seeker ammo: no range penalty (tracks hottest source)
+            const vt = html.find('[name="variantType"]').val() || "standard";
+            if (vt === "heatSeeker") return 0;
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const weaponId = html.find('#damage-source-select').val() || "";
             const weapon = shootingWeapons.find(i => i.id === weaponId);
             const maxRange = weapon?.system?.range || 15;
             if (rangeVal > maxRange) return 0; // out of range — handled separately
-            return rangeVal > 0 ? -rangeVal : 0;
+            return rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
           };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
@@ -522,7 +525,7 @@ export class ShootingAction extends RangedAttackAction {
               $rangePenalty.text('Heat-Seeker (no penalty)').css('color', '#1565c0');
               _csState.setRange(0);
             } else {
-              const penalty = rangeVal > 0 ? -rangeVal : 0;
+              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
               _csState.setRange(penalty);
             }
