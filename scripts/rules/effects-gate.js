@@ -36,7 +36,3 @@ export function canEffectsApply(damageThrough, options = {}) {
   
   return effectGateOpen;
 }
-
-export function shouldSuppressEffects(damageThrough, options = {}) {
-  return !canEffectsApply(damageThrough, options);
-}

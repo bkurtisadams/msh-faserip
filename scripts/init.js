@@ -873,14 +873,6 @@ Hooks.once("init", async () => {
     makeDefault: true,
     label: "Vehicle Sheet"
   });
-
-  function shouldConvertToSecondsByPolicy() {
-    const policy = game.settings?.get?.("msh-faserip", "effects.durationPolicy") || "rounds-in-combat";
-    if (policy === "seconds-only") return true;
-    if (game.combat && (policy === "rounds-in-combat" || policy === "auto")) return false;
-    return true; // out of combat â†’ convert
-  }
-
   // preCreateActiveEffect: duplicate-status guard + icon→img remap.
   // (Legacy v13 rounds→seconds conversion removed for v14 — see note below.)
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {

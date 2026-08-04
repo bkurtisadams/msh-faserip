@@ -2826,45 +2826,6 @@ export function getResistanceModifiers(targetActor, damageType = "physical-blunt
     baseType: baseType
   };
 }
-
-/**
- * Check if target is immune to damage type based on resistance powers
- * @param {Actor} targetActor - The actor being hit
- * @param {string} damageType - Type of damage
- * @param {number} attackRank - Rank value of the attack
- * @returns {boolean} True if immune
- */
-export function checkImmunity(targetActor, damageType, attackRank) {
-  const resistance = getResistanceModifiers(targetActor, damageType);
-  
-  if (!resistance.hasImmunity) return false;
-  
-  // Check if any immunity power has rank >= attack rank
-  for (const resPower of resistance.resistancePowers) {
-    if (resPower.system.resistanceEffect === "immunity") {
-      const resRank = typeof resPower.system.value === 'number'
-        ? resPower.system.value
-        : (CONFIG.FASERIP?.rankValues?.[resPower.system.rank] || 0);
-      
-      if (resRank >= attackRank) {
-        return true; // Immune!
-      }
-    }
-  }
-  
-  return false;
-}
-
-/**
- * Apply the Nullified status to a single target via your effects system.
- * Duration: RAW 1–10 rounds unless the attacker is maintaining a Nullify aura.
- */
-export async function applyNullifyToTarget(targetActor, attacker, { originUuid = null, rounds = null } = {}) {
-  if (!targetActor) return;
-  const maintained = isAuraMaintained(attacker);
-  await applyNullifiedEffect(targetActor, { maintained, originUuid, rounds });
-}
-
 // === [PREVIEW CONFIRM HELPERS] =============================================
 //
 // Centralized helpers for the optional post-roll "Preview → Confirm" gate.

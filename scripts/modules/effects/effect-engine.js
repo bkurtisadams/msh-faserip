@@ -1137,20 +1137,6 @@ export async function applyRegeneration(target, {
     return null;
   }
 }
-
-/**
- * Process Regeneration for all actors (backward-compatible wrapper).
- * Now delegates to processOngoingEffects.
- */
-export async function processRegeneration(worldTime, dt = 0) {
-  try {
-    const { processOngoingEffects } = await import("./ongoing-engine.js");
-    await processOngoingEffects(worldTime, dt);
-  } catch (e) {
-    console.error("[FASERIP ERROR] Failed to delegate to ongoing engine:", e);
-  }
-}
-
 /**
  * Apply Nullified effect — suppresses all inborn (source === "natural") powers.
  * Stores suppressed power IDs in effect flags for restoration on removal.

@@ -5,6 +5,7 @@
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
+import { getInitiativeModifier } from "./rules/rules-reference.js";
 
 export class FaseripInitiative {
   static initialized = false;
@@ -391,13 +392,7 @@ export class FaseripInitiative {
   // --- Intuition modifier table ---
 
   static _getModifierForIntuition(intuition) {
-    if (intuition >= 76) return 6;
-    if (intuition >= 51) return 5;
-    if (intuition >= 41) return 4;
-    if (intuition >= 31) return 3;
-    if (intuition >= 21) return 2;
-    if (intuition >= 11) return 1;
-    return 0;
+    return getInitiativeModifier(Number(intuition) || 0);
   }
 
   // --- UI: Combat Tracker bar & coloring ---

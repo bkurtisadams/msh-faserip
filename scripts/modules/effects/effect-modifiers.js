@@ -89,40 +89,6 @@ export function canActorAct(actor) {
   
   return { canAct: true, reason: null };
 }
-
-/**
- * Check if actor can move
- * @param {Actor} actor 
- * @returns {object} { canMove, movementMult, reason }
- */
-export function canActorMove(actor) {
-  const mods = getActiveModifiers(actor);
-  
-  if (!mods.canMove) {
-    // Find effects preventing movement
-    const blocking = actor.effects
-      ?.filter(e => !e.disabled)
-      ?.filter(e => {
-        const changes = e.changes || [];
-        return changes.some(c => c.key === "system.combatMods.canMove" && c.value === "false");
-      })
-      ?.map(e => e.name)
-      ?.join(", ") || "active effects";
-    
-    return {
-      canMove: false,
-      movementMult: 0,
-      reason: `Cannot move due to: ${blocking}`
-    };
-  }
-  
-  return {
-    canMove: true,
-    movementMult: mods.movementMult,
-    reason: mods.movementMult < 1 ? `Movement reduced to ${Math.round(mods.movementMult * 100)}%` : null
-  };
-}
-
 /**
  * Get total attack column shift for an actor
  * @param {Actor} actor 

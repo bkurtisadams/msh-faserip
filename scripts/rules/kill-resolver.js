@@ -86,12 +86,6 @@ export function resolveKillFeat(color, context) {
     description: "Unknown result - treating as No Effect"
   };
 }
-
-export function isKillResultLethal(color, context) {
-  const result = resolveKillFeat(color, context);
-  return result.outcome === KILL_OUTCOMES.ENDURANCE_LOSS;
-}
-
 /**
  * Returns true if the attack form is inherently lethal (edged, shooting, thrown edged, energy).
  * Used by four-color rule: these attack forms always trigger death saves at 0 HP.

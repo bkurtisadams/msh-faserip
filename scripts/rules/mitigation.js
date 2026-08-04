@@ -1155,15 +1155,3 @@ function isResistanceApplicable(damageType, resistanceType) {
   
   return dmgLower.includes(resLower);
 }
-
-export function getMitigationSummary(mitigationResult) {
-  if (mitigationResult.layers.length === 0) return "No defenses applied";
-  
-  return mitigationResult.layers
-    .filter(layer => layer.absorbed > 0 || layer.immune)
-    .map(layer => {
-      if (layer.immune) return `${layer.type}: IMMUNE (${layer.reason})`;
-      return `${layer.type} absorbed ${layer.absorbed} damage`;
-    })
-    .join("; ");
-}
