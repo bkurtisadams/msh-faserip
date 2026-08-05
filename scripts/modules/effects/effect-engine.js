@@ -16,6 +16,10 @@
 //          applyPoisonExposure with a console warning; callers should branch
 //          to the poison engine before rolling the generic save.
 // scripts/modules/effects/effect-engine.js v1.14.0 - 2026-06-12
+// v1.15.0: v14 badge fix — applyEntangled/applyDying/applyNullified set
+//          duration.expiry="roundEnd" when no finite rounds so indefinite
+//          effects register as isTemporary and token badges render
+//          (matches applyGrappled/applyHeld v14 pattern).
 // v1.14.0: Add exported applyIntensityEffect(target, effect, {rounds,originUuid,desc})
 //          — shared effect dispatcher used by both the Intensity action and the
 //          on-hit intensity hook in attack-action.
@@ -969,9 +973,11 @@ export async function applyUnconscious(actor, { rounds = 1, originUuid = null } 
 
 /** Create/refresh Dying state (no timer; update handled by updateCombat) */
 export async function applyDying(actor, { enduranceValue = null } = {}) {
+  // v14 expiry-for-isTemporary: see applyGrappled note above.
   return applyEffect(actor, {
     name: "Dying",
     img: "icons/svg/skull.svg",
+    duration: { expiry: "roundEnd" },
     changes: [
       { key: "system.combatMods.defenseShift", mode: "add", value: "-4", priority: 20 },
       { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-4", priority: 20 }
@@ -1153,6 +1159,10 @@ export async function applyRegeneration(target, {
 export async function applyNullified(actor, { rounds = 10, originUuid = null, selfNullify = false, auraCasterId = null } = {}, opts = {}) {
   const resolvedActor = actor?.actor ?? actor;
   if (!resolvedActor) return null;
+
+  // v14 expiry-for-isTemporary: see applyGrappled note above.
+  const hasRounds = Number.isFinite(rounds) && rounds > 0;
+  const durationOverride = hasRounds ? undefined : { expiry: "roundEnd" };
 
   // Find all inborn powers to suppress
   const powersToSuppress = resolvedActor.items.filter(i => {
