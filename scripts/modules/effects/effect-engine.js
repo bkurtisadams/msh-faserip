@@ -891,10 +891,14 @@ export async function applyReversed(actor, opts = {}) {
 
 /** Apply entangled effect */
 export async function applyEntangled(actor, { materialRank = "Good", rounds = null } = {}, opts = {}) {
+  // v14 expiry-for-isTemporary: see applyGrappled note above.
+  const hasRounds = Number.isFinite(rounds) && rounds > 0;
+  const durationOverride = hasRounds ? undefined : { expiry: "roundEnd" };
   return applyEffect(actor, {
     name: `Entangled (${materialRank})`,
     img: "icons/svg/net.svg",
     rounds,
+    duration: durationOverride,
     changes: [
       { key: "system.combatMods.attackShift", mode: "add", value: "-2", priority: 20 },
       { key: "system.combatMods.defenseShift", mode: "add", value: "-1", priority: 20 },
