@@ -2,6 +2,9 @@
 // Two-phase karma system per FASERIP rules:
 // Phase 1: Declare intent to spend karma BEFORE rolling
 // Phase 2: After seeing roll, decide amount (minimum 10 or all remaining)
+// 2026-08-04: karmaPromptAllowed() — world setting karmaPromptActorTypes
+// gates the declaration prompt by actor type in resolveResistFeat (default
+// villainsOnly: heroes+villains prompt, NPCs roll plain). Vehicles never.
 // 2026-08-02: promptKarmaDeclaration() — Phase 1 as a standalone two-button
 // prompt for reactive/defensive FEATs (intensity resists) that are rolled by
 // the pipeline rather than from a roll dialog. Gate on ownership at call site.
@@ -125,7 +128,7 @@ export async function resolveResistFeat(targetActor, opts = {}) {
   // full-auto) pass localDeclareTimeoutMs so NPC saves auto-decline instead
   // of parking combat on an unattended dialog.
   const localDeclareTimeoutMs = opts.localDeclareTimeoutMs ?? 0;
-  const hasKarma = getAvailableKarma(targetActor) > 0;
+  const hasKarma = getAvailableKarma(targetActor) > 0 && karmaPromptAllowed(targetActor);
 
   if (hasKarma) {
     const owner = game.users.find(u =>
@@ -154,6 +157,21 @@ export async function resolveResistFeat(targetActor, opts = {}) {
     }
   }
   return resolveResistFeatSequence(targetActor, { ...opts, skipPrompt: true });
+}
+
+/**
+ * World-setting gate for the karma declaration prompt by actor type.
+ * "all" → everyone; "villainsOnly" → skip npc; "heroesOnly" → skip npc
+ * and villain. Heroes always prompt. Unknown types (vehicle) never prompt.
+ */
+export function karmaPromptAllowed(actor) {
+  const type = actor?.type;
+  if (type === "hero") return true;
+  let mode = "villainsOnly";
+  try { mode = game.settings.get("msh-faserip", "karmaPromptActorTypes"); } catch (_) {}
+  if (type === "villain") return mode === "all" || mode === "villainsOnly";
+  if (type === "npc") return mode === "all";
+  return false;
 }
 
 /**

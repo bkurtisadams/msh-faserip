@@ -675,6 +675,25 @@ Hooks.once("init", async () => {
     requiresReload: false
   });
 
+  // Karma prompt gate by actor type. Checked in resolveResistFeat
+  // (dice-roller.js) before any declaration prompt/routing; gated actors
+  // roll plain with no karma. RAW: villains maintain karma pools, nameless
+  // NPCs generally do not — hence villainsOnly default.
+  game.settings.register("msh-faserip", "karmaPromptActorTypes", {
+    name: "Karma Prompts for Non-Hero Actors",
+    hint: "Which actor types are offered the Karma declaration prompt on resist FEATs (Slam/Stun/Kill checks, intensity saves, KO saves, death saves). Gated actors roll without Karma. Heroes are always prompted. Default skips NPCs but keeps villains (RAW: villains spend Karma, nameless NPCs don't).",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      "all": "All Actors (Heroes, Villains, NPCs)",
+      "villainsOnly": "Heroes and Villains (skip NPCs)",
+      "heroesOnly": "Heroes Only (skip Villains and NPCs)"
+    },
+    default: "villainsOnly",
+    requiresReload: false
+  });
+
   // Register consolidated chat cards setting
   game.settings.register("msh-faserip", "consolidatedChatCards", {
     name: "Consolidated Chat Cards",
