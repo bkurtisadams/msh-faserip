@@ -1,3 +1,8 @@
+// scripts/modules/actions/grappling-action.js v3.3.2 - 2026-08-04
+// v3.3.2: Warn on silent hold-apply skips: Partial/Full result with no
+//         targetUuid (untargeted token, name typed in dialog) or an
+//         unresolvable target uuid now raises ui.notifications.warn
+//         instead of applying nothing without feedback.
 // scripts/modules/actions/grappling-action.js v3.3.1 - 2026-05-24
 // v3.3.1: Drop the STR-contest third cell (grappling is a one-roll FEAT, not
 //         an opposed contest). Third cell reverts to DAMAGE (the Full-Hold
@@ -174,10 +179,16 @@ export class GrapplingAction extends AttackAction {
 
     // Show escape button for Partial Hold and Hold results
     const showEscape = (colorLower === "yellow" || colorLower === "red");
+    if (showEscape && !choice?.targetUuid) {
+      ui.notifications?.warn?.(`Grapple ${effect} not applied — no targeted token (card name came from the dialog field).`);
+    }
     if (showEscape && choice?.targetUuid) {
       try {
         const tDoc = await fromUuid(choice.targetUuid);
         const tActor = tDoc?.actor ?? (tDoc?.documentName === "Actor" ? tDoc : null);
+        if (!tActor) {
+          ui.notifications?.warn?.(`Grapple ${effect} not applied — target could not be resolved from ${choice.targetUuid}.`);
+        }
         if (tActor) {
           // Remove any existing hold effects
           const existingHolds = tActor.effects?.filter(e => 
