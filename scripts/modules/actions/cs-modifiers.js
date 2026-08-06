@@ -58,8 +58,8 @@ export const CS_REFERENCE = {
     items: [
       { label: "Blindside",        cs: "+2CS", note: "Target unaware / from behind" },
       { label: "Ambush",           cs: "+1CS", note: "Pre-set position, specific spot" },
-      { label: "Double Team",      cs: "+1CS", note: "Ally has Hold on target" },
-      { label: "Combined Attack",  cs: "+1CS", note: "Two attackers, close damage ranks" },
+      { label: "Double Team",      cs: "+1CS", note: "Ally has Hold on target; miss may hit holder" },
+      { label: "Combined Attack",  cs: "dmg\u2191", note: "2 dmgs within 10 pts: higher \u2192 next rank min, lower makes Agility FEAT" },
       { label: "Higher Ground",    cs: "+1CS", note: "Elevated / terrain advantage" },
       { label: "Aiming (+1 turn)", cs: "+1CS", note: "Spend turn not attacking (ranged)" },
       { label: "Point Blank",      cs: "+3CS", note: "Adjacent, not in Slugfest/Wrestling" },

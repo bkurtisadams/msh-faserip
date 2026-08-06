@@ -494,7 +494,7 @@ export const TACTICS = {
     allowedTypes: ["Slugfest", "Shooting"]
   },
   entangling: "Agility FEAT to hit, target Agility FEAT vs material strength or enmeshed",
-  combinedAttack: "2+ attackers within 1 rank dmg, higher raised to next rank min if lower makes Agility FEAT",
+  combinedAttack: "2+ attackers, damages within 10 points of each other; higher raised to next rank minimum if lower makes Agility FEAT (higher scores normal hit)",
   doubleTeam: "Hold + attack, +1CS but miss may hit holder",
   groundstrike: "Energy power vs ground, dmg on Force table, target takes material strength dmg",
   shockwave: "Str 2+ ranks above material, Charge at Str, no dmg but Stun/Slam possible, 2 areas",
@@ -2960,7 +2960,7 @@ export const COMBAT_TACTICS = {
   groundstrike: "Energy vs ground. Damage on Force table. Target takes material strength damage. May open hole (Agi FEAT to avoid).",
   shootToNeutralize: "Requires Bullseye result. Kill treated as Bullseye. Only for disarming.",
   shootToStun: "Bullseye result treated as Stun. Kill is still Kill.",
-  combinedAttack: "2+ attackers within 1 rank damage of each other. Higher raised to next rank minimum if lower makes Agi FEAT. Slugfest, Charging, Energy, Force.",
+  combinedAttack: "2+ attackers, damages within 10 points of each other. Higher raised to next rank minimum (e.g. 88 for Un) if lower makes Agi FEAT; higher scores normal hit. Slugfest, Charging, Energy, Force.",
   doubleTeam: "Hold/Partial Hold + second attacker at +1CS. Miss may hit holder (second roll).",
   fastballSpecial: "Strong character throws weaker as missile. Thrower Agi or thrown Fighting to hit. Damage = thrown's Endurance or Slugfest + Charging speed bonuses.",
   shockwave: "Str 2+ ranks above ground material. Strike ground. 2 areas. Charge at Str. No damage but Stun/Slam possible.",

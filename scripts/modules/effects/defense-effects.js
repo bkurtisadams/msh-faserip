@@ -1,3 +1,8 @@
+// scripts/modules/effects/defense-effects.js v1.7.1 - 2026-08-05
+// v1.7.1: resolveForceFieldValues honors armorPhysical/armorEnergy overrides
+//         (nonzero wins over the generic full/-10 split) so split-value stat
+//         blocks like MODOK (Mn energy / Gd physical) reach the AE flags the
+//         mitigation path reads. fullValue (breach capacity) stays Power rank.
 // scripts/modules/effects/defense-effects.js v1.7.0 - 2026-07-31
 // v1.7.0: registerDefenseAE — skip the update when nothing changed (auto-sync
 //         was rewriting ~100 identical AEs every load); strip statuses another
@@ -143,13 +148,20 @@ function resolveForceFieldValues(item) {
   const rankValue = getRankValue(sys.rank);
   const value = typeof sys.value === "number" ? sys.value : rankValue;
 
-  // Force Field: full vs Energy, -10 vs physical
+  // Force Field: full vs Energy, -10 vs physical — unless the power carries
+  // explicit split values (armorPhysical/armorEnergy > 0), which win. Stat
+  // blocks override the generic rule (e.g. MODOK: Mn energy / Gd physical).
+  // Mirrors the legacy getBodyArmorValues override semantics. fullValue
+  // (breach capacity) stays the Power rank per RAW regardless of overrides.
+  const physical = sys.armorPhysical > 0 ? sys.armorPhysical : Math.max(0, value - 10);
+  const energy = sys.armorEnergy > 0 ? sys.armorEnergy : value;
+
   return {
-    physical: Math.max(0, value - 10),
-    energy: value,
+    physical,
+    energy,
     fullValue: value,
-    physicalRank: getClosestRankName(Math.max(0, value - 10)),
-    energyRank: sys.rank || getClosestRankName(value),
+    physicalRank: getClosestRankName(physical),
+    energyRank: sys.armorEnergy > 0 ? getClosestRankName(energy) : (sys.rank || getClosestRankName(value)),
     forceFieldType: sys.forceFieldType || "personal",
     forceFieldPersonal: sys.forceFieldPersonal ?? true,
     forceFieldCoverage: sys.forceFieldCoverage || 0,
