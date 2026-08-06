@@ -1,3 +1,10 @@
+// actorSheet.js v2.9.1 - 2026-08-04
+// v2.9.1: Portrait click fix. appv1's base img[data-edit] click binding does
+//         not survive core 14.364 (same failure class as sheet-level drops),
+//         so sheets on the v1 class had unclickable portraits. activateListeners
+//         now strips any surviving jQuery binding and owns the click natively
+//         with the same remove-then-add per-render pattern as the drop handler,
+//         delegating to the existing _onEditImage override.
 // actorSheet.js v2.9.0 - 2026-08-01
 // v2.9.0: Remove core-rank confirmation dialogs, synchronize rank/value
 //         fields before submit, restore focus across submitOnChange renders,
@@ -2400,6 +2407,27 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       this._mshDropHandler = ev => this._onDrop(ev);
       dropEl.addEventListener("dragover", this._mshDragoverHandler);
       dropEl.addEventListener("drop", this._mshDropHandler);
+
+      // V14 (core 14.364): appv1's base img[data-edit] click binding is as
+      // unreliable as its DragDrop delivery — the portrait was unclickable
+      // on sheets served by this v1 class (villains/NPCs on default sheet
+      // assignment). Same treatment as drops: strip any surviving jQuery
+      // binding, then own the click natively with a per-render re-bind.
+      // Selector stays narrowed to img so editor-content divs (which also
+      // carry data-edit) never open the FilePicker.
+      if (this.isEditable) {
+        html.find("img[data-edit]").off("click");
+        if (this._mshEditImgHandler) {
+          dropEl.removeEventListener("click", this._mshEditImgHandler);
+        }
+        this._mshEditImgHandler = ev => {
+          const el = ev.target.closest("img[data-edit]");
+          if (!el || !dropEl.contains(el)) return;
+          ev.preventDefault();
+          this._onEditImage(el);
+        };
+        dropEl.addEventListener("click", this._mshEditImgHandler);
+      }
     }
 
     this._mshBindItemTabDropZones(html);
