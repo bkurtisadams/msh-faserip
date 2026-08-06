@@ -1,3 +1,8 @@
+// actorSheet.js v2.9.2 - 2026-08-04
+// v2.9.2: Restore Actor-drop routing lost in the V14 _onDrop port. The
+//         override returned false for data.type "Actor", so the vehicle
+//         sheet's _onDropActor (driver/passenger crew zones) never fired.
+//         Actor drops now route to this._onDropActor as appv1 did.
 // actorSheet.js v2.9.1 - 2026-08-04
 // v2.9.1: Portrait click fix. appv1's base img[data-edit] click binding does
 //         not survive core 14.364 (same failure class as sheet-level drops),
@@ -1217,7 +1222,10 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     switch (data.type) {
       case "ActiveEffect": return this._onDropActiveEffect(event, data);
       case "Folder":       return this._onDropFolder(event, data);
-      case "Actor":        return false;
+      // Route to _onDropActor as appv1's _onDrop did — the vehicle sheet
+      // (crew drop zones) overrides it. Plain character sheets fall through
+      // to the appv1 base no-op; optional call guards shim removal.
+      case "Actor":        return this._onDropActor?.(event, data) ?? false;
     }
   }
 
