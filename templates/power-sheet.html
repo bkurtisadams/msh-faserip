@@ -377,6 +377,18 @@
                 <input type="number" name="system.forceFieldCoverage" value="{{system.forceFieldCoverage}}" min="0" data-dtype="Number" />
               </div>
             </div>
+            {{#unless system.isBodyArmor}}
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Physical Override:</label>
+                <input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" min="0" data-dtype="Number" title="0 = RAW default (rank − 10 vs physical). Nonzero overrides." />
+              </div>
+              <div class="form-group half">
+                <label>Energy Override:</label>
+                <input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" min="0" data-dtype="Number" title="0 = RAW default (full rank vs energy). Nonzero overrides." />
+              </div>
+            </div>
+            {{/unless}}
           </div>
           {{/if}}
         </div>

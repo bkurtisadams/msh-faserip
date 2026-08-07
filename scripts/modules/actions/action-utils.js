@@ -1,3 +1,13 @@
+// action-utils.js v1.8.15 - 2026-08-06
+// v1.8.15: getBodyArmorValues — applicable (upstream pre-subtraction) is now
+//          Body-Armor-only via baPhysicalArmor/baEnergyArmor accumulators.
+//          FF protection was folded into applicable when the FF was the
+//          best/only defense, so attacks pre-subtracted it AND mitigation's
+//          FF layer absorbed it again (double count: 50 − 10 − 10 = 30
+//          instead of 40 vs MODOK). Mitigation owns the FF exclusively
+//          (round tracking, overload, Psyche FEAT). Return object gains
+//          baPhysical/baEnergy; physical/energy/isForceField unchanged for
+//          the legacy mitigation path and displays.
 // action-utils.js v1.8.14 - 2026-07-09
 // v1.8.14: derivePowerDamage now preserves authored equipment weapon damage
 //          before using power rank/value derivation. Fixes Energy/Force weapons
@@ -2412,6 +2422,13 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
   let physicalRank = "";
   let energyRank = "";
   let isForceField = false;
+  // Body-armor-only accumulators. `applicable` (the value attack actions
+  // pre-subtract upstream) must NEVER include Force Field protection —
+  // mitigation owns the FF layer (cumulative round tracking, overload,
+  // Psyche FEAT) and applies it after bypassArmor. Folding FF into the
+  // upstream subtraction double-counts it (50 − 10 FF-as-armor − 10 FF-AE).
+  let baPhysicalArmor = 0;
+  let baEnergyArmor = 0;
 
   // Check equipment armor. Equipment-source armor has no armorNature field
   // and is treated as artificial by convention (suits, vests, plate). Skip
@@ -2472,6 +2489,8 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
       // Body armor equipment: full vs Physical, -20 vs Energy
       physicalArmor = hasPhysOverride ? sys.armorPhysical : armorValue;
       energyArmor = hasEnergyOverride ? sys.armorEnergy : Math.max(0, armorValue - 20);
+      baPhysicalArmor = physicalArmor;
+      baEnergyArmor = energyArmor;
     }
   }
 
@@ -2547,9 +2566,11 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     
     if (type === "physical" || type === "both") {
       physicalArmor = Math.max(physicalArmor, physVal);
+      if (!powerIsFF) baPhysicalArmor = Math.max(baPhysicalArmor, physVal);
     }
     if (type === "energy" || type === "both") {
       energyArmor = Math.max(energyArmor, energyVal);
+      if (!powerIsFF) baEnergyArmor = Math.max(baEnergyArmor, energyVal);
     }
   });
 
@@ -2589,6 +2610,9 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
           // Regular armor stacks: use whichever is higher
           physicalArmor = Math.max(physicalArmor, blockingArmor);
         }
+        // Blocking is Strength-as-Body-Armor: always eligible for upstream
+        // pre-subtraction (BA-only path excludes FF by construction).
+        baPhysicalArmor = Math.max(baPhysicalArmor, blockingArmor);
         
         if (blockingArmor >= physicalArmor && blockingRank) {
           physicalRank = blockingRank;
@@ -2605,7 +2629,10 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     }
   }
 
-  const applicable = isEnergy ? energyArmor : physicalArmor;
+  // applicable is the upstream pre-subtraction value: Body Armor ONLY.
+  // Force Field protection is applied downstream in calculateMitigation
+  // (which runs even with bypassArmor: true — see mitigation.js bypass path).
+  const applicable = isEnergy ? baEnergyArmor : baPhysicalArmor;
 
   console.log("FASERIP DEBUG | getBodyArmorValues result:", {
     targetName: targetActor.name,
@@ -2632,6 +2659,8 @@ if (!energyRank && energyArmor > 0) {
 return {
   physical: physicalArmor,
   energy: energyArmor,
+  baPhysical: baPhysicalArmor,
+  baEnergy: baEnergyArmor,
   physicalRank: physicalRank,
   energyRank: energyRank,
   applicable: applicable,

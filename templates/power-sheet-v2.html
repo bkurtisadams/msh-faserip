@@ -309,6 +309,10 @@
                 </select>
               </div>
             </div>
+            {{#if system.isBodyArmor}}
+            {{! Render-time gate, not CSS: this sub-body stays in the DOM when
+                unchecked (display:none) and its inputs would submit 0 over the
+                Force Field subsection's copies of the same field names. }}
             <div class="ps2-grid-2col" style="margin-top:4px;">
               <div class="ps2-field" style="position:relative;">
                 <label>Physical {{#if system.armorPhysicalCustom}}<span class="ps2-armor-custom-badge" title="Non-standard physical value (click to reset)" data-action="reset-armor-physical" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;cursor:pointer;vertical-align:middle;margin-left:3px;"></span>{{/if}}</label>
@@ -319,6 +323,7 @@
                 <input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" data-dtype="Number" id="ps2-armor-energy" />
               </div>
             </div>
+            {{/if}}
           </div>
         </div>
 
@@ -339,6 +344,22 @@
                 <input type="number" name="system.forceFieldCoverage" value="{{system.forceFieldCoverage}}" min="0" data-dtype="Number" />
               </div>
             </div>
+            {{#unless system.isBodyArmor}}
+            {{! The Body Armor sub-body stays in the DOM when unchecked (display:none)
+                and would submit armorPhysical/armorEnergy = 0 over these — render the
+                FF copies only when the BA subsection's inputs aren't present. For
+                BA+FF hybrids, edit the shared fields in the Body Armor subsection. }}
+            <div class="ps2-grid-2col" style="margin-top:4px;">
+              <div class="ps2-field">
+                <label>Physical Override</label>
+                <input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" min="0" data-dtype="Number" title="0 = RAW default (rank − 10 vs physical). Nonzero overrides, e.g. MODOK 10." />
+              </div>
+              <div class="ps2-field">
+                <label>Energy Override</label>
+                <input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" min="0" data-dtype="Number" title="0 = RAW default (full rank vs energy). Nonzero overrides." />
+              </div>
+            </div>
+            {{/unless}}
           </div>
         </div>
 
