@@ -1,3 +1,8 @@
+// scripts/modules/actions/check-action.js v1.12.1 - 2026-08-07
+// v1.12.1: Psionic Attack failed-save KO routes through
+//          Effects.applyUnconscious (statuses, canAct:false, defense
+//          shifts) instead of a cosmetic generic AE that the
+//          status-based dedup/refresh logic could not see.
 // scripts/modules/actions/check-action.js v1.12.0 - 2026-08-02
 // v1.12.0: Defender Karma on Slam/Stun/Kill checks (RAW two-phase, routed).
 //          Both roll sites (full-auto fast-path and the manual/semi dialog)
@@ -481,6 +486,14 @@ export class CheckAction extends BaseAction {
                 rounds: duration,
                 originUuid: actor.uuid,
                 selfNullify: false
+              });
+            } else if (customEffectName.toLowerCase() === "unconscious") {
+              // Psionic Attack KO: use the real unconscious effect (statuses,
+              // canAct:false, defense shifts) — the generic path below created
+              // a cosmetic AE the status-based dedup/refresh logic can't see.
+              await Effects.applyUnconscious(saveActor, {
+                rounds: duration,
+                originUuid: actor.uuid
               });
             } else {
               // Create custom effect (Unconscious, Controlled, etc.)
