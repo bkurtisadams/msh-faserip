@@ -1,4 +1,6 @@
-// attack-action.js v1.9.52 - 2026-08-02
+// attack-action.js v1.9.53 - 2026-08-14
+// v1.9.53: Surface Combined Attack participants and promoted damage on the
+//          final attack chat card.
 // v1.9.52: Resist FEAT routed through resolveResistFeat (dice-roller): the
 //          whole karma sequence runs on an active owning player's client via
 //          socketlib executeAsUser with a 10s auto-decline countdown; local
@@ -1481,6 +1483,21 @@ export class AttackAction extends BaseAction {
         ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#0F6E56;"><i class="fas fa-bullseye"></i> MA-D engaged — armor bypass for Stun/Slam <span style="color:#888;font-size:.85em;">(mechanic next slice)</span></div>`
         : "";
 
+      // Combined Attack badge — the coordination roll is posted separately;
+      // this badge keeps the actual attack card self-contained and identifies
+      // the promoted damage being resolved.
+      const combinedInfo = choice?.combinedAttackInfo || null;
+      const combinedNames = Array.isArray(combinedInfo?.attackers)
+        ? combinedInfo.attackers.map((n) => escapeChatText(n)).join(" + ")
+        : "";
+      const combinedRankText = escapeChatText(combinedInfo?.combinedRankAbbr || combinedInfo?.combinedRank || "");
+      const combinedDamageText = Number.isFinite(Number(combinedInfo?.combinedDamage))
+        ? Number(combinedInfo.combinedDamage)
+        : "";
+      const combinedBadge = combinedInfo
+        ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#6a1b9a;"><i class="fas fa-link"></i> Combined${combinedNames ? `: ${combinedNames}` : ""}${combinedRankText || combinedDamageText !== "" ? ` → ${combinedRankText}${combinedRankText && combinedDamageText !== "" ? " " : ""}${combinedDamageText}` : ""}</div>`
+        : "";
+
       // Kill result karma warning for attack card
       const targetIsRobot = targetActor?.system?.origin === "Robot";
       const killWarning = (showKill && !targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;text-align:center;">Kill result — hero loses ALL Karma if target dies</div>` : (showKill && targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;font-size:.85em;color:#1565c0;text-align:center;">Kill result — target is a Robot/construct. No Karma loss for attacker.</div>` : "";
@@ -1736,6 +1753,7 @@ export class AttackAction extends BaseAction {
           ${aimBadge}
           ${talentBadge}
           ${maDBadge}
+          ${combinedBadge}
           
           <!-- Ability + Roll + Result -->
           <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
@@ -1888,7 +1906,7 @@ export class AttackAction extends BaseAction {
           hasTarget: !!targetActor,
           targetName,
           rangeText: cardRangeText,
-          badgesHtml: `${multiAttackFeatHtml}${variantBadge}${aimBadge}${talentBadge}${maDBadge}`,
+          badgesHtml: `${multiAttackFeatHtml}${variantBadge}${aimBadge}${talentBadge}${maDBadge}${combinedBadge}`,
           resultBg: targetBg,
           resultFg: targetFg,
           resultText: `${String(targetEffectColor).toUpperCase()} — ${String(targetEffectResult).toUpperCase()}`,

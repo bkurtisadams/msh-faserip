@@ -924,6 +924,7 @@
 .frp-dlg .frp-opt-row .frp-opt-label.green { color: #2e7d32; }
 .frp-dlg .frp-opt-row .frp-opt-label.blue { color: #1565c0; }
 .frp-dlg .frp-opt-row .frp-opt-label.red { color: #c62828; }
+.frp-dlg .frp-opt-row .frp-opt-label.purple { color: #6a1b9a; }
 
 .frp-dlg .frp-pull-input {
   width: 36px;
@@ -958,6 +959,44 @@
 .frp-dlg .frp-karma-pool strong {
   font-family: 'Oswald', sans-serif;
   font-size: 14px;
+}
+
+/* Blunt Combined Attack shares the existing Karma option row. Keep every
+   element on one line and collapse partner metadata before widening the dialog. */
+.frp-dlg .frp-combined-karma-row {
+  gap: 5px;
+  min-width: 0;
+}
+.frp-dlg .frp-combined-inline,
+.frp-dlg .frp-karma-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.frp-dlg .frp-combined-inline {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.frp-dlg .frp-karma-inline {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.frp-dlg .frp-combined-inline.inactive,
+.frp-dlg .frp-karma-inline.inactive { opacity: .55; }
+.frp-dlg .frp-combined-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--txt-s);
+  font-size: 10.5px;
+  line-height: 1;
+}
+.frp-dlg .frp-karma-inline .frp-karma-pool {
+  margin-left: 0;
+  white-space: nowrap;
+  font-size: 11px;
 }
 
 /* ── Effect preview grid (W/G/Y/R) ──────────────────────────────────── */

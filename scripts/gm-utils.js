@@ -1,4 +1,6 @@
-// gm-utils.js v1.2.1 - 2026-04-03
+// gm-utils.js v1.3.0 - 2026-08-14
+// v1.3.0: Add player-routed Combined Blunt Attack resolver so the higher-damage
+//         attacker keeps control of their own attack/Karma sequence.
 // v1.2.1: Replace local RANKS array with import from rules-reference.js
 // v1.2.0: Add updateActiveEffect and renameEffectWithRemaining GM socket handlers
 //         for player-initiated effect updates on unowned actors
@@ -178,6 +180,18 @@ export function registerSocket() {
         return await resolveResistFeatSequence(actor, payload);
       } catch (e) {
         console.error("[FASERIP] resolveResistFeat handler failed:", e);
+        return null;
+      }
+    });
+
+    // Player-side handler for the higher-damage half of a Combined Blunt
+    // Attack. Dynamic import avoids a static gm-utils ↔ action module cycle.
+    socket.register("executeCombinedBluntAttack", async (payload) => {
+      try {
+        const { executeCombinedBluntPayload } = await import("./modules/actions/blunt-attack-action.js");
+        return await executeCombinedBluntPayload(payload);
+      } catch (e) {
+        console.error("[FASERIP] executeCombinedBluntAttack handler failed:", e);
         return null;
       }
     });
