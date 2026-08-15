@@ -1,3 +1,11 @@
+// blunt-attack-action.js v3.7.0 - 2026-08-14
+// v3.7.0: Combined Attack assist consumer. Blunt dialog adds one compact
+//         Combined [+damage] input on the Karma row. A successful Agility
+//         Combined FEAT auto-fills the exact bonus needed to raise the
+//         selected blunt damage to the minimum of the next rank; changing
+//         damage source revalidates the helper's stored damage. Manual entry
+//         remains available for GM adjudication. Assist is one-shot and
+//         consumed when the primary attacker commits the attack.
 // blunt-attack-action.js v3.6.1 - 2026-05-23
 // v3.6.1: CS Reason field now persists across reopens (lastBluntReason flag,
 //         gated by Remember). Replaces the unused csNotes flag read.
@@ -73,11 +81,57 @@ import { buildColorOutcome } from "../dice/color-results.js";
 import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { RANK_ABBR, RANK_RANGES, RANKS_ORDERED, rankValue, valueToRank } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
 
+function getCombinedPromotion(damage) {
+  const n = Number(damage) || 0;
+  if (n <= 0) return null;
+  const currentRank = valueToRank(n);
+  const idx = RANKS_ORDERED.indexOf(currentRank);
+  if (idx < 0 || idx >= RANKS_ORDERED.length - 1) return null;
+  const nextRank = RANKS_ORDERED[idx + 1];
+  const nextMin = RANK_RANGES[nextRank]?.[0] ?? rankValue(nextRank);
+  if (!Number.isFinite(nextMin) || nextMin <= n) return null;
+  return { currentRank, nextRank, nextMin, bonus: nextMin - n };
+}
+
+function isCombinedAssistCurrent(assist) {
+  if (!assist || assist.type !== "blunt") return false;
+  if (assist.combatId) {
+    return !!game.combat
+      && game.combat.id === assist.combatId
+      && Number(game.combat.round ?? 0) === Number(assist.round ?? 0);
+  }
+  const createdAt = Number(assist.createdAt) || 0;
+  return createdAt > 0 && (Date.now() - createdAt) <= 5 * 60 * 1000;
+}
+
+function getCombinedAssistBonus(assist, primaryDamage) {
+  const helperDamage = Number(assist?.helperDamage) || 0;
+  const baseDamage = Number(primaryDamage) || 0;
+  if (helperDamage <= 0 || baseDamage <= 0) return { valid: false, bonus: 0 };
+  if (helperDamage > baseDamage) {
+    return { valid: false, bonus: 0, reason: `Helper damage ${helperDamage} exceeds primary damage ${baseDamage}` };
+  }
+  const difference = baseDamage - helperDamage;
+  if (difference > 10) {
+    return { valid: false, bonus: 0, reason: `Damage difference ${difference} exceeds 10` };
+  }
+  const promoted = getCombinedPromotion(baseDamage);
+  if (!promoted) return { valid: false, bonus: 0, reason: "No higher damage rank available" };
+  return { valid: true, helperDamage, difference, ...promoted };
+}
+
+function attrEscape(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
 
 export class BluntAttackAction extends AttackAction {
   async execute() {
@@ -151,6 +205,21 @@ export class BluntAttackAction extends AttackAction {
       const res = computeBluntDamage(strength.rank, strength.value, savedObjectRank, 0, RANKS);
       initialMaxDamage = res.damage;
     }
+
+    // One-shot Combined Assist earned by another character's Agility FEAT.
+    // Stale assists are discarded here so they never leak into a later round.
+    let combinedAssist = await actor.getFlag("msh-faserip", "combinedAssist");
+    if (combinedAssist && !isCombinedAssistCurrent(combinedAssist)) {
+      try { await actor.unsetFlag("msh-faserip", "combinedAssist"); } catch (_) {}
+      combinedAssist = null;
+    }
+    const initialCombinedCalc = getCombinedAssistBonus(combinedAssist, initialMaxDamage);
+    const initialCombinedBonus = initialCombinedCalc.valid ? initialCombinedCalc.bonus : 0;
+    const combinedTitle = combinedAssist
+      ? (initialCombinedCalc.valid
+          ? `Auto-filled from ${combinedAssist.helperName || "helper"}: ${combinedAssist.helperDamage} vs ${initialMaxDamage} → +${initialCombinedBonus}`
+          : `${combinedAssist.helperName || "Helper"} assist does not qualify for this damage source`)
+      : "Extra damage from a successful Combined Agility FEAT (manual override allowed)";
 
     // Get target info
     const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
@@ -354,7 +423,7 @@ export class BluntAttackAction extends AttackAction {
         </div>
       </div>
 
-      <!-- Options: Pull / Multi / Karma (greyed when unchecked) -->
+      <!-- Options: Pull / Multi / Combined + Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!savedPullEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}> <span class="frp-opt-label orange">Pull</span></label>
@@ -379,11 +448,16 @@ export class BluntAttackAction extends AttackAction {
           <div id="feat-result-bar" style="padding:4px 8px;border-radius:3px;font-size:12px;font-weight:600;text-align:center;"></div>
         </div>
 
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
+        <div class="frp-opt-row" style="gap:5px;">
+          <span class="frp-opt-label green" style="flex-shrink:0;">Combined</span>
+          <input type="number" class="frp-pull-input" id="combined-bonus" name="combinedBonus" value="${initialCombinedBonus}" min="0" step="1" title="${attrEscape(combinedTitle)}" style="width:42px;flex:0 0 42px;">
+          ${combinedAssist ? `<span id="combined-helper" title="${attrEscape(combinedTitle)}" style="font-size:11px;color:#555;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${attrEscape(combinedAssist.helperName || 'Helper')}</span>` : `<span id="combined-helper" style="display:none;"></span>`}
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;min-width:0;">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
+            <span class="frp-karma-pool"><strong>${availableKarma}</strong> (${minKarma} min)</span>
+          ` : `<span style="font-size:11px;color:#999;">No karma</span>`}
+          </span>
         </div>
       </div>
 
@@ -526,6 +600,12 @@ export class BluntAttackAction extends AttackAction {
             const multiAttacks  = multiEnabled && !multiAdjacent;
             const attackCount   = multiCountVal === "3" ? 3 : 2;
 
+            const combinedBonus = Math.max(0, parseInt($dlg('[name="combinedBonus"]').val() || 0, 10));
+            if (combinedBonus > 0 && multiEnabled) {
+              ui.notifications.warn("Combined Attack assistance applies to one attack only. Turn off Multi to use the Combined bonus.");
+              return;
+            }
+
             // MA-D bypass — only meaningful when the engage checkbox
             // exists in the dialog (State 3, study complete). Defaults
             // to false if the zone is in States 1/2 or absent entirely.
@@ -557,6 +637,12 @@ export class BluntAttackAction extends AttackAction {
             } else {
               damage = strength.value;
               note   = "Bare Hands = Strength";
+            }
+
+            const combinedAssistUsed = !!combinedAssist && combinedBonus > 0;
+            const combinedSource = combinedAssistUsed ? (combinedAssist.helperName || "Helper") : "Manual";
+            if (combinedBonus > 0) {
+              note += `${note ? "; " : ""}Combined +${combinedBonus}${combinedAssistUsed ? ` from ${combinedSource}` : ""}`;
             }
 
             // Save settings
@@ -593,6 +679,7 @@ export class BluntAttackAction extends AttackAction {
               src, itemId, objectName, objectRank, objectValue,
               shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
+              combinedBonus, combinedAssistUsed, combinedHelperName: combinedAssist?.helperName || "",
               multiAttacks, attackCount, multiAdjacent,
               maDEngaged,
               csNotes: cs.csNotes,
@@ -615,6 +702,7 @@ export class BluntAttackAction extends AttackAction {
             const $val  = html.find('#dmg-val');
             const $afterArmor = html.find('#after-armor-display');
             const $pulledDamage = html.find('[name="pulledDamage"]');
+            const $combinedBonus = html.find('[name="combinedBonus"]');
 
             $objectRow.hide();
 
@@ -651,20 +739,36 @@ export class BluntAttackAction extends AttackAction {
               currentDamage = res.damage;
             }
 
-            $val.text(currentDamage);
+            // Auto-fill Combined bonus from the helper FEAT until the user
+            // manually edits the field. Revalidate against the selected source.
+            if (combinedAssist && !update.combinedManual) {
+              const calc = getCombinedAssistBonus(combinedAssist, currentDamage);
+              $combinedBonus.val(calc.valid ? calc.bonus : 0);
+              const helper = combinedAssist.helperName || "Helper";
+              const title = calc.valid
+                ? `${helper}: ${calc.helperDamage} vs ${currentDamage} → ${calc.nextMin} (+${calc.bonus})`
+                : `${helper} assist unavailable: ${calc.reason || "damage values do not qualify"}`;
+              $combinedBonus.attr('title', title);
+              html.find('#combined-helper').attr('title', title);
+            }
 
-            const afterArmorDmg = Math.max(0, currentDamage - targetArmor);
+            const combinedBonusNow = Math.max(0, Number($combinedBonus.val()) || 0);
+            const totalDamage = currentDamage + combinedBonusNow;
+            $val.text(totalDamage);
+
+            const afterArmorDmg = Math.max(0, totalDamage - targetArmor);
             if (primaryTarget) {
               $afterArmor.text(`${afterArmorDmg} after armor`);
             } else {
-              $afterArmor.text(`${currentDamage} damage`);
+              $afterArmor.text(`${totalDamage} damage`);
             }
 
             // Pull punch max update
             const oldMax = Number($pulledDamage.attr('max')) || 0;
-            $pulledDamage.attr('max', maxDamage);
-            if (oldMax !== maxDamage) {
-              $pulledDamage.val(maxDamage);
+            const combinedMax = maxDamage + combinedBonusNow;
+            $pulledDamage.attr('max', combinedMax);
+            if (oldMax !== combinedMax) {
+              $pulledDamage.val(combinedMax);
             }
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
@@ -682,6 +786,10 @@ export class BluntAttackAction extends AttackAction {
           });
           html.find('[name="objectValue"]').on('input change', update);
           html.find('[name="objectName"]').on('input', update);
+          html.find('[name="combinedBonus"]').on('input change', function() {
+            update.combinedManual = true;
+            update();
+          });
 
           // Pull punch toggle
           html.find('#pull-punch-enabled').on('change', function() {
@@ -769,6 +877,13 @@ export class BluntAttackAction extends AttackAction {
     
     if (!choice) return;
 
+    // The helper spent their action on the Combined FEAT; once the primary
+    // commits an attack using that assist, consume it even if the attack misses.
+    if (choice.combinedAssistUsed) {
+      try { await actor.unsetFlag("msh-faserip", "combinedAssist"); }
+      catch (err) { console.warn("[FASERIP] Could not clear Combined Assist", err); }
+    }
+
     // Track shift breakdown
     const shiftBreakdown = {
       manual: choice.shift || 0,
@@ -848,6 +963,7 @@ export class BluntAttackAction extends AttackAction {
     }
 
     choice.shiftBreakdown = shiftBreakdown;
+    const finalBluntDamage = Number(choice.damage || 0) + Number(choice.combinedBonus || 0);
 
     // Execute attacks
     const targetCount = game.user.targets.size || 1;
@@ -858,7 +974,7 @@ export class BluntAttackAction extends AttackAction {
         actor, ability,
         actionType, actionName, effects,
         damageType: "physical-blunt",
-        rawDamage: choice.damage,
+        rawDamage: finalBluntDamage,
         damageNote: choice.note,
         sourceName: choice.weaponName || "Bare Hands",
         attackForm: "blunt",
@@ -889,7 +1005,7 @@ export class BluntAttackAction extends AttackAction {
           actor, ability,
           actionType, actionName, effects,
           damageType: "physical-blunt",
-          rawDamage: choice.damage,
+          rawDamage: finalBluntDamage,
           damageNote: choice.note,
           sourceName: choice.weaponName || "Bare Hands",
           attackForm: "blunt",

@@ -1,3 +1,10 @@
+// ability-feat-dialog.js v1.9.0 - 2026-08-14
+// v1.9.0: Add Agility Combined FEAT for blunt teamwork. Helper targets the
+//         primary attacker; helper/primary bare-hand damage must be within
+//         10 points and helper may not exceed primary. A Green+ Agility FEAT
+//         banks a one-round Combined Assist flag on the primary attacker,
+//         storing helper damage so the Blunt dialog can auto-fill the exact
+//         next-rank-minimum bonus. Uses GM socket update for cross-owner help.
 // ability-feat-dialog.js v1.8.2 - 2026-07-05
 // v1.8.2: Fix ability-FEAT card crash on core 14+. Same applyMode() fix as
 //         generic-feat-dialog v1.5.4 — read core.messageMode (not the legacy
@@ -66,7 +73,8 @@
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
 import { applyColumnShifts } from '../dice/column-shifts.js';
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
-import { RANK_ABBR, rankValue } from "../../rules/rules-reference.js";
+import { executeAsGM } from "../../gm-utils.js";
+import { RANK_ABBR, rankValue, RANK_RANGES, RANKS_ORDERED, valueToRank } from "../../rules/rules-reference.js";
 
 const RANKS = [
   "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -151,6 +159,79 @@ function applyCS(rank, shift) {
   const idx = RANKS.indexOf(rank);
   if (idx === -1) return rank;
   return RANKS[Math.min(Math.max(idx + shift, 0), RANKS.length - 1)];
+}
+
+function getCombinedNextRank(damage) {
+  const n = Number(damage) || 0;
+  if (n <= 0) return null;
+  const currentRank = valueToRank(n);
+  const idx = RANKS_ORDERED.indexOf(currentRank);
+  if (idx < 0 || idx >= RANKS_ORDERED.length - 1) return null;
+  const nextRank = RANKS_ORDERED[idx + 1];
+  const nextMin = RANK_RANGES[nextRank]?.[0] ?? rankValue(nextRank);
+  if (!Number.isFinite(nextMin) || nextMin <= n) return null;
+  return { currentRank, nextRank, nextMin, bonus: nextMin - n };
+}
+
+function getCombinedFeatContext(actor) {
+  const selected = Array.from(game.user?.targets ?? []);
+  if (selected.length !== 1) {
+    return { ok: false, message: "Combined FEAT requires exactly one targeted primary attacker." };
+  }
+
+  const target = selected[0];
+  const primaryActor = target?.actor;
+  if (!primaryActor) {
+    return { ok: false, message: "Combined FEAT target has no actor." };
+  }
+  if (primaryActor.id === actor.id || primaryActor.uuid === actor.uuid) {
+    return { ok: false, message: "Combined FEAT: target the primary attacker, not yourself." };
+  }
+
+  const helperStrength = actor.system?.abilities?.strength;
+  const primaryStrength = primaryActor.system?.abilities?.strength;
+  const helperDamage = Number(helperStrength?.value ?? rankValue(helperStrength?.rank)) || 0;
+  const primaryDamage = Number(primaryStrength?.value ?? rankValue(primaryStrength?.rank)) || 0;
+
+  if (helperDamage <= 0 || primaryDamage <= 0) {
+    return { ok: false, message: "Combined FEAT could not determine both characters' blunt damage." };
+  }
+  if (helperDamage > primaryDamage) {
+    return {
+      ok: false,
+      message: `${primaryActor.name} is not the higher-damage attacker (${primaryDamage} vs ${helperDamage}). Target the primary attacker with equal or greater damage.`,
+      target, primaryActor, helperDamage, primaryDamage
+    };
+  }
+
+  const difference = primaryDamage - helperDamage;
+  if (difference > 10) {
+    return {
+      ok: false,
+      message: `${primaryActor.name} is too strong for this Combined Attack (${primaryDamage} vs ${helperDamage}; difference ${difference}, maximum 10).`,
+      target, primaryActor, helperDamage, primaryDamage, difference
+    };
+  }
+
+  const promoted = getCombinedNextRank(primaryDamage);
+  if (!promoted) {
+    return {
+      ok: false,
+      message: `${primaryActor.name}'s ${primaryDamage} damage cannot be raised to a higher rank.`,
+      target, primaryActor, helperDamage, primaryDamage, difference
+    };
+  }
+
+  return {
+    ok: true,
+    target,
+    primaryActor,
+    primaryActorUuid: target?.document?.uuid || primaryActor.uuid,
+    helperDamage,
+    primaryDamage,
+    difference,
+    ...promoted
+  };
 }
 
 // ── Color utilities ──────────────────────────────────────────
@@ -256,6 +337,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const abilityValue = ability.value;
   const isStrength = key === "strength";
   const isFighting = key === "fighting";
+  const isAgility = key === "agility";
 
   // Saved settings
   const gf = (flag) => actor.getFlag("msh-faserip", flag);
@@ -305,7 +387,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
     }
   }
   const hasSubs = subOptions.length > 0;
-  const initialFeatType = subOptions.some(o => o.value === savedFeatType) ? savedFeatType : "standard";
+  const initialFeatType = (isAgility && savedFeatType === "combined")
+    ? "combined"
+    : (subOptions.some(o => o.value === savedFeatType) ? savedFeatType : "standard");
   const resolveRollRank = (ft) => (subOptions.find(o => o.value === ft)?.rank) || abilityRank;
 
   // Build dropdown HTML
@@ -352,6 +436,14 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
         <label><input type="radio" name="featType" value="multiattack" ${savedFeatType === 'multiattack' ? 'checked' : ''}> Multi-Attack</label>`;
     }
+    if (isAgility) {
+      const std = `<label><input type="radio" name="featType" value="standard" ${initialFeatType === 'standard' ? 'checked' : ''}> Standard</label>`;
+      const combined = `<label><input type="radio" name="featType" value="combined" ${initialFeatType === 'combined' ? 'checked' : ''}> Combined</label>`;
+      const subs = subOptions.map(o =>
+        `<label><input type="radio" name="featType" value="${o.value}" ${initialFeatType === o.value ? 'checked' : ''}> ${o.label}</label>`
+      ).join('');
+      return std + combined + subs;
+    }
     if (hasSubs) {
       const std = `<label><input type="radio" name="featType" value="standard" ${initialFeatType === 'standard' ? 'checked' : ''}> Standard</label>`;
       const subs = subOptions.map(o =>
@@ -377,7 +469,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
 
       <input type="hidden" name="abilityRank" value="${abilityRank}">
 
-      ${(isStrength || isFighting || hasSubs) ? `
+      ${(isStrength || isFighting || isAgility || hasSubs) ? `
       <!-- FEAT Type — compact horizontal radios -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row" style="gap:10px;">
@@ -437,6 +529,17 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         </div>
         <div style="font-size:11px;color:#1a1a1a;font-style:italic;line-height:1.35;">
           Success: all attacks &minus;1CS &middot; Failure: 1 attack at &minus;3CS
+        </div>
+      </div>
+      ` : ''}
+
+      ${isAgility ? `
+      <!-- Combined Attack helper sub-panel -->
+      <div id="combined-section" class="frp-box" style="display:none;padding:4px 8px;">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">COMBINED</span>
+          <span id="combined-summary" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;">Target one primary attacker</span>
+          <span style="display:inline-flex;align-items:center;flex-shrink:0;">${buildNeedPill('combined-need-text', 'GREEN')}</span>
         </div>
       </div>
       ` : ''}
@@ -508,7 +611,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             multiAttackCount = html.find('[name="multiAttackCount"]:checked').val() || '2';
           }
 
-          if (hasSubs) {
+          if (isAgility) {
+            featType = html.find('[name="featType"]:checked').val() || 'standard';
+          } else if (hasSubs) {
             featType = html.find('[name="featType"]:checked').val() || 'standard';
           }
 
@@ -530,7 +635,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
               await actor.setFlag("msh-faserip", `last${fullName}FeatType`, featType);
               await actor.setFlag("msh-faserip", `last${fullName}MultiAttackCount`, multiAttackCount);
             }
-            if (hasSubs) {
+            if (isAgility || hasSubs) {
               await actor.setFlag("msh-faserip", `last${fullName}FeatType`, featType);
             }
           }
@@ -551,6 +656,16 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             }
           }
 
+          // Combined Attack helper context: the lower-damage character makes
+          // the Agility FEAT while targeting the primary (higher-damage) attacker.
+          const combinedContext = (isAgility && featType === 'combined')
+            ? getCombinedFeatContext(actor)
+            : null;
+          if (combinedContext && !combinedContext.ok) {
+            ui.notifications.warn(combinedContext.message);
+            return;
+          }
+
           // Apply column shifts
           const effectiveRank = applyCS(baseRankName, columnShift);
 
@@ -561,12 +676,15 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           }
           const effectiveIntensity = (isFighting && featType === 'multiattack') ? multiAttackIntensity : intensity;
 
-          // Determine FEAT requirement
+          // Determine FEAT requirement. Combined is an ordinary Agility FEAT:
+          // Green or better succeeds; it does not use an intensity comparison.
           let featRequirement = "Any Color";
           let isImpossible = false;
           let isAutomatic = false;
 
-          if (effectiveIntensity !== "None") {
+          if (isAgility && featType === 'combined') {
+            featRequirement = "Green";
+          } else if (effectiveIntensity !== "None") {
             const req = determineFeatRequirement(effectiveRank, effectiveIntensity);
             featRequirement = req.requirement;
             isImpossible = req.impossible;
@@ -597,6 +715,14 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           if (isFighting && featType === 'multiattack') {
             const atkCount = parseInt(multiAttackCount);
             fightingContext = `<div>Multiple Attacks: ${atkCount} (Intensity: ${multiAttackIntensity})</div>`;
+          }
+
+          let combinedFeatContext = '';
+          if (combinedContext?.ok) {
+            const primaryAbbr = RANK_ABBR[combinedContext.currentRank] || combinedContext.currentRank;
+            const nextAbbr = RANK_ABBR[combinedContext.nextRank] || combinedContext.nextRank;
+            combinedFeatContext = `<div>Combined: ${actor.name} (${combinedContext.helperDamage}) helps ${combinedContext.primaryActor.name} (${combinedContext.primaryDamage})</div>`
+              + `<div>On success: ${primaryAbbr} ${combinedContext.primaryDamage} → ${nextAbbr} ${combinedContext.nextMin} (+${combinedContext.bonus})</div>`;
           }
 
           // Automatic success
@@ -649,8 +775,42 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
           let featSuccess = true;
-          if (effectiveIntensity !== "None") {
+          if (isAgility && featType === 'combined') {
+            featSuccess = checkFeatSuccess(resultColor, "Green");
+          } else if (effectiveIntensity !== "None") {
             featSuccess = checkFeatSuccess(resultColor, featRequirement);
+          }
+
+          let combinedAttackResult = '';
+          if (combinedContext?.ok) {
+            if (featSuccess) {
+              const combat = game.combat;
+              const assist = {
+                type: "blunt",
+                helperActorUuid: actor.uuid,
+                helperName: actor.name,
+                helperDamage: combinedContext.helperDamage,
+                primaryDamageAtFeat: combinedContext.primaryDamage,
+                promotedDamageAtFeat: combinedContext.nextMin,
+                bonusAtFeat: combinedContext.bonus,
+                createdAt: Date.now(),
+                combatId: combat?.id || null,
+                round: combat?.round ?? null
+              };
+              await executeAsGM("updateActor", {
+                targetActorUuid: combinedContext.primaryActorUuid,
+                updateData: { "flags.msh-faserip.combinedAssist": assist }
+              });
+              combinedAttackResult = `
+                <div style="padding:5px 10px;font-size:.95em;background:#e8f5e9;border-top:1px solid #c0c0c0;">
+                  Combined Assist ready for ${combinedContext.primaryActor.name}: +${combinedContext.bonus} blunt damage (${combinedContext.nextMin} total).
+                </div>`;
+            } else {
+              combinedAttackResult = `
+                <div style="padding:5px 10px;font-size:.95em;background:#ffebee;border-top:1px solid #c0c0c0;">
+                  Combined Assist failed. No bonus was granted.
+                </div>`;
+            }
           }
 
           // Multi-attack consequence text
@@ -676,7 +836,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             content: `
               <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
                 <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                  <strong>${actor.name} - ${fullName} FEAT Roll${effectiveIntensity !== "None" ? ` vs ${effectiveIntensity}` : ""}</strong>
+                  <strong>${actor.name} - ${fullName} FEAT Roll${combinedContext?.ok ? ' — Combined' : (effectiveIntensity !== "None" ? ` vs ${effectiveIntensity}` : "")}</strong>
                 </div>
                 <div style="padding: 5px 10px; font-size: 0.9em;">
                   <div>Base Rank: ${baseRankName} (${baseRankValue})</div>
@@ -684,7 +844,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                   ${strengthContext}
                   ${fightingContext}
-                  ${effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Req: ${buildChatNeedPill(featRequirement)})</div>` : ''}
+                  ${combinedFeatContext}
+                  ${combinedContext?.ok ? `<div>Required: ${buildChatNeedPill('Green')}</div>` : (effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Req: ${buildChatNeedPill(featRequirement)})</div>` : '')}
                   <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -692,11 +853,12 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   color: ${colorFg(resultColor)};">
                   ${resultColor.toUpperCase()} RESULT
                 </div>
-                ${effectiveIntensity !== "None" ? `
+                ${(combinedContext?.ok || effectiveIntensity !== "None") ? `
                   <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#00a94e' : '#ee1e25'};">
                     ${featSuccess ? 'FEAT SUCCEEDED' : 'FEAT FAILED'}
                   </div>
                 ` : ''}
+                ${combinedAttackResult}
                 ${multiAttackResult}
               </div>`
           };
@@ -717,19 +879,58 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         const intensity = html.find('#intensity').val();
         const reqText = html.find(NEED_TARGETS);
         const cs = parseInt(html.find('[name="shift"]').val()) || 0;
+        const ft = html.find('[name="featType"]:checked').val() || 'standard';
+
+        if (ft === 'combined') {
+          reqText.each((_, el) => setNeedPill($(el), 'Green'));
+          setNeedPill(html.find('#combined-need-text'), 'Green');
+          return;
+        }
 
         if (intensity === "None") {
           reqText.each((_, el) => setNeedPill($(el), 'Any Color'));
           return;
         }
 
-        const ft = html.find('[name="featType"]:checked').val() || 'standard';
         const effectiveRank = applyCS(resolveRollRank(ft), cs);
         const { requirement, impossible, automatic } = determineFeatRequirement(effectiveRank, intensity);
         reqText.each((_, el) => setNeedPill($(el), requirement, { impossible, automatic }));
       };
 
-      if (!isStrength && !isFighting) {
+      if (isAgility) {
+        const updateCombinedSummary = () => {
+          const ctx = getCombinedFeatContext(actor);
+          const $summary = html.find('#combined-summary');
+          if (!$summary.length) return;
+          if (!ctx.ok) {
+            $summary.text(ctx.message).css('color', '#a80000').attr('title', ctx.message);
+            return;
+          }
+          const nextAbbr = RANK_ABBR[ctx.nextRank] || ctx.nextRank;
+          const text = `${ctx.primaryActor.name}: ${ctx.helperDamage} + ${ctx.primaryDamage} → ${nextAbbr} ${ctx.nextMin} (+${ctx.bonus})`;
+          $summary.text(text).css('color', '#1a1a1a').attr('title', text);
+        };
+
+        const updateAgilityFeatType = () => {
+          const ft = html.find('[name="featType"]:checked').val() || 'standard';
+          const combinedSec = html.find('#combined-section');
+          const intensityRow = html.find('#intensity-row');
+          if (ft === 'combined') {
+            combinedSec.show();
+            intensityRow.hide();
+            updateCombinedSummary();
+          } else {
+            combinedSec.hide();
+            intensityRow.show();
+          }
+          updateFeatRequirement();
+          if ($dialog.length) $dialog[0].style.height = 'auto';
+        };
+
+        html.find('[name="featType"]').on('change', updateAgilityFeatType);
+        html.find('#intensity, [name="shift"]').on('change keyup', updateFeatRequirement);
+        updateAgilityFeatType();
+      } else if (!isStrength && !isFighting) {
         html.find('#intensity, [name="shift"]').on('change keyup', updateFeatRequirement);
         updateFeatRequirement();
       } else if (isFighting) {
@@ -835,7 +1036,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         if ($dialog.length) $dialog[0].style.height = 'auto';
       };
       $csInput.on('change keyup', recalcCS);
-      if (hasSubs) html.find('[name="featType"]').on('change', recalcCS);
+      if (hasSubs || isAgility) html.find('[name="featType"]').on('change', recalcCS);
 
       // ──── Roll / Cancel button wiring + Enter-to-roll ────
       html.find('#frp-roll').off('click.frp').on('click.frp', async () => {
