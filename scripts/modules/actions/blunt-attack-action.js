@@ -1,10 +1,4 @@
-// blunt-attack-action.js v3.7.0 - 2026-08-14
-// v3.7.0: Add compact Combined Attack option for Blunt Attack. A first attacker
-//         declares against one target; a second blunt attacker can join from the
-//         same compact row. Pending declarations are chat-flagged per target/round.
-//         The lower-damage attacker makes the Agility FEAT on their owning client;
-//         the higher-damage attack resolves on its owning client at next-rank-min
-//         damage. Multi and Combined are mutually exclusive.
+// blunt-attack-action.js v3.6.1 - 2026-05-23
 // v3.6.1: CS Reason field now persists across reopens (lastBluntReason flag,
 //         gated by Remember). Replaces the unused csNotes flag read.
 // blunt-attack-action.js v3.6.0 - 2026-05-16
@@ -62,11 +56,10 @@ import {
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
   getAvailableKarma,
-  getMinimumKarmaCommitment,
-  resolveResistFeatSequence
+  getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
 import {
-  RANKS, shiftRank, getAbilityInfo, getStrengthInfo, valueToRank,
+  RANKS, shiftRank, getAbilityInfo, getStrengthInfo,
   effectsFor, labelFor,
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
@@ -80,253 +73,10 @@ import { buildColorOutcome } from "../dice/color-results.js";
 import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { RANK_ABBR, RANK_RANGES, RANK_VALUES } from "../../rules/rules-reference.js";
+import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
-
-const COMBINED_SCOPE = "msh-faserip";
-const COMBINED_PENDING_FLAG = "combinedAttack";
-const COMBINED_RESOLUTION_FLAG = "combinedAttackResolution";
-const COMBINED_MAX_AGE_MS = 5 * 60 * 1000;
-
-function esc(value) {
-  const text = String(value ?? "");
-  try {
-    return foundry?.utils?.escapeHTML ? foundry.utils.escapeHTML(text) : text
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  } catch (_) {
-    return text
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  }
-}
-
-function actorFromUuidDocument(doc) {
-  if (!doc) return null;
-  if (doc.documentName === "Token") return doc.actor ?? null;
-  if (doc.documentName === "Actor") return doc;
-  return doc.actor ?? null;
-}
-
-async function resolveActorUuid(uuid) {
-  if (!uuid) return null;
-  try {
-    return actorFromUuidDocument(await fromUuid(uuid));
-  } catch (err) {
-    console.warn("[FASERIP] Combined Attack: could not resolve actor", uuid, err);
-    return null;
-  }
-}
-
-async function resolveTargetUuid(uuid) {
-  if (!uuid) return null;
-  try {
-    const doc = await fromUuid(uuid);
-    if (!doc) return null;
-    if (doc.documentName === "Token") {
-      return doc.object
-        ?? canvas?.tokens?.get?.(doc.id)
-        ?? { document: doc, actor: doc.actor, name: doc.name, id: doc.id };
-    }
-    if (doc.documentName === "Actor") {
-      return doc.getActiveTokens?.()?.[0]
-        ?? { document: null, actor: doc, name: doc.name, id: doc.id };
-    }
-    return null;
-  } catch (err) {
-    console.warn("[FASERIP] Combined Attack: could not resolve target", uuid, err);
-    return null;
-  }
-}
-
-function targetUuidOf(target) {
-  return target?.document?.uuid ?? target?.actor?.uuid ?? null;
-}
-
-function getCombinedDamageInfo(damageA, damageB) {
-  const a = Math.max(0, Number(damageA) || 0);
-  const b = Math.max(0, Number(damageB) || 0);
-  const higherDamage = Math.max(a, b);
-  const difference = Math.abs(a - b);
-  const higherRank = valueToRank(higherDamage);
-  const idx = RANKS.indexOf(higherRank);
-  const nextRank = idx >= 0 && idx < RANKS.length - 1 ? RANKS[idx + 1] : higherRank;
-  const nextMin = RANK_RANGES[nextRank]?.[0] ?? RANK_VALUES[nextRank] ?? higherDamage;
-  const combinedDamage = Number.isFinite(nextMin) ? Number(nextMin) : higherDamage;
-  return {
-    valid: difference <= 10,
-    difference,
-    higherDamage,
-    higherRank,
-    combinedRank: nextRank,
-    combinedDamage
-  };
-}
-
-function declaredCombinedDamage(choice) {
-  const base = Math.max(0, Number(choice?.damage) || 0);
-  const pulled = Math.max(0, Number(choice?.pulledDamage) || 0);
-  return pulled > 0 ? Math.min(base, pulled) : base;
-}
-
-function resolvedPendingIds() {
-  const ids = new Set();
-  for (const msg of (game.messages?.contents ?? [])) {
-    const r = msg.getFlag?.(COMBINED_SCOPE, COMBINED_RESOLUTION_FLAG)
-      ?? msg.flags?.[COMBINED_SCOPE]?.[COMBINED_RESOLUTION_FLAG];
-    if (r?.pendingMessageId) ids.add(r.pendingMessageId);
-  }
-  return ids;
-}
-
-function pendingIsCurrent(data) {
-  if (!data) return false;
-  const combat = game.combat;
-  if (combat) {
-    return data.combatId === combat.id && Number(data.round) === Number(combat.round);
-  }
-  if (data.combatId) return false;
-  const createdAt = Number(data.createdAt) || 0;
-  return createdAt > 0 && (Date.now() - createdAt) <= COMBINED_MAX_AGE_MS;
-}
-
-function findPendingCombinedAttack(targetUuid, actorUuid) {
-  if (!targetUuid) return null;
-  const resolved = resolvedPendingIds();
-  const messages = [...(game.messages?.contents ?? [])].reverse();
-  for (const message of messages) {
-    if (resolved.has(message.id)) continue;
-    const data = message.getFlag?.(COMBINED_SCOPE, COMBINED_PENDING_FLAG)
-      ?? message.flags?.[COMBINED_SCOPE]?.[COMBINED_PENDING_FLAG];
-    if (!data || data.kind !== "blunt" || data.state !== "pending") continue;
-    if (!pendingIsCurrent(data)) continue;
-    if (data.targetUuid !== targetUuid) continue;
-    if (data.attackerActorUuid === actorUuid) continue;
-    return { message, data };
-  }
-  return null;
-}
-
-function serializeCombinedChoice(choice) {
-  return {
-    src: choice?.src || "hands",
-    itemId: choice?.itemId || "",
-    objectName: choice?.objectName || "",
-    objectRank: choice?.objectRank || "Excellent",
-    objectValue: Number(choice?.objectValue) || 0,
-    shift: Number(choice?.shift) || 0,
-    karma: Number(choice?.karma) || 0,
-    spendKarma: !!choice?.spendKarma,
-    pulledDamage: Number(choice?.pulledDamage) || 0,
-    resultCap: choice?.resultCap || "none",
-    skipDice: !!choice?.skipDice,
-    weaponMat: choice?.weaponMat || "",
-    weaponName: choice?.weaponName || "",
-    damage: Number(choice?.damage) || 0,
-    note: choice?.note || "",
-    maDEngaged: !!choice?.maDEngaged,
-    csNotes: choice?.csNotes || "",
-    effectiveFightingRank: choice?.effectiveFightingRank || "",
-    shiftBreakdown: choice?.shiftBreakdown ? { ...choice.shiftBreakdown } : null
-  };
-}
-
-function serializeCombinedOpts(opts = {}) {
-  return {
-    mode: opts?.mode || "semi",
-    autoApply: opts?.autoApply === true,
-    showConfirm: opts?.showConfirm !== false,
-    shift: Number(opts?.shift) || 0,
-    featCs: Number(opts?.featCs) || 0,
-    fromTalent: opts?.fromTalent === true,
-    talentName: opts?.talentName || "",
-    deviceAbility: opts?.deviceAbility && typeof opts.deviceAbility === "object"
-      ? { rank: opts.deviceAbility.rank || "", value: Number(opts.deviceAbility.value) || 0 }
-      : null
-  };
-}
-
-async function markCombinedResolved(pendingMessageId, status, content, extra = {}) {
-  return ChatMessage.create({
-    content,
-    flags: {
-      [COMBINED_SCOPE]: {
-        [COMBINED_RESOLUTION_FLAG]: {
-          pendingMessageId,
-          status,
-          resolvedAt: Date.now(),
-          ...extra
-        }
-      }
-    }
-  });
-}
-
-async function rollCombinedAgilityFeat(actor) {
-  const agility = getAbilityInfo(actor, "agility");
-  const payload = {
-    actorUuid: actor.uuid,
-    sourceName: "Combined Attack — Agility FEAT",
-    rank: agility.rank,
-    requirement: "green",
-    declareTimeoutMs: 10000
-  };
-
-  let result = null;
-  const remoteOwner = game.users?.find?.(u =>
-    u.active && !u.isGM && u.id !== game.user.id && actor.testUserPermission?.(u, "OWNER")
-  );
-
-  try {
-    if (remoteOwner && game.msh?.socket) {
-      ui.notifications?.info?.(`Waiting for ${remoteOwner.name}: Combined Attack Agility FEAT...`);
-      result = await game.msh.socket.executeAsUser("resolveResistFeat", remoteOwner.id, payload);
-    } else if (game.user.isGM || actor.isOwner) {
-      result = await resolveResistFeatSequence(actor, { ...payload, declareTimeoutMs: 0 });
-    } else if (game.msh?.socket) {
-      result = await game.msh.socket.executeAsGM("resolveResistFeat", payload);
-    } else {
-      result = await resolveResistFeatSequence(actor, { ...payload, skipPrompt: true });
-    }
-  } catch (err) {
-    console.error("[FASERIP] Combined Attack Agility FEAT failed", err);
-    return { success: false, error: true, rank: agility.rank, color: "white", rollTotal: null, cappedTotal: null, karmaUsed: 0 };
-  }
-
-  const cappedTotal = Number(result?.cappedTotal ?? result?.rollTotal ?? 0);
-  const color = String(rollUniversalTable(agility.rank, cappedTotal) || "white").toLowerCase();
-  return {
-    success: ["green", "yellow", "red"].includes(color),
-    rank: agility.rank,
-    color,
-    rollTotal: Number(result?.rollTotal ?? cappedTotal),
-    cappedTotal,
-    karmaUsed: Number(result?.karmaUsed || 0)
-  };
-}
-
-async function routeCombinedBluntAttack(payload) {
-  const actor = await resolveActorUuid(payload?.actorUuid);
-  if (!actor) throw new Error("Combined Attack: higher-damage actor could not be resolved.");
-
-  const remoteOwner = game.users?.find?.(u =>
-    u.active && !u.isGM && u.id !== game.user.id && actor.testUserPermission?.(u, "OWNER")
-  );
-
-  if (remoteOwner && game.msh?.socket) {
-    ui.notifications?.info?.(`Waiting for ${remoteOwner.name}: Combined Attack roll...`);
-    return game.msh.socket.executeAsUser("executeCombinedBluntAttack", remoteOwner.id, payload);
-  }
-  if (game.user.isGM || actor.isOwner) return executeCombinedBluntPayload(payload);
-  if (game.msh?.socket) return game.msh.socket.executeAsGM("executeCombinedBluntAttack", payload);
-  return executeCombinedBluntPayload(payload);
-}
 
 
 export class BluntAttackAction extends AttackAction {
@@ -404,11 +154,6 @@ export class BluntAttackAction extends AttackAction {
 
     // Get target info
     const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
-    const combinedTargetUuid = targetUuidOf(primaryTarget);
-    const combinedEligible = targets.length === 1 && !!combinedTargetUuid;
-    const pendingCombinedAtOpen = combinedEligible
-      ? findPendingCombinedAttack(combinedTargetUuid, actor.uuid)
-      : null;
     
     const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "physical-blunt") : null;
     const targetArmor = targetArmorInfo?.applicable ?? 0;
@@ -563,19 +308,6 @@ export class BluntAttackAction extends AttackAction {
 
     // ── Dialog HTML — v3 Ultra Compact Layout ──
     const multiEnabled = savedMultiAttacks || savedMultiAdjacent;
-    let combinedMetaText = "";
-    let combinedMetaTitle = combinedEligible ? "Start a Combined Attack" : "Combined Attack requires exactly one target";
-    if (pendingCombinedAtOpen) {
-      const p = pendingCombinedAtOpen.data;
-      const ci = getCombinedDamageInfo(initialMaxDamage, p.declaredDamage);
-      const cAbbr = RANK_ABBR[ci.combinedRank] || ci.combinedRank;
-      combinedMetaText = ci.valid
-        ? `${p.attackerName} ${p.declaredDamage}→${cAbbr}${ci.combinedDamage}`
-        : `${p.attackerName} ${p.declaredDamage} · Δ${ci.difference}`;
-      combinedMetaTitle = ci.valid
-        ? `Join ${p.attackerName}: ${p.declaredDamage} + ${initialMaxDamage} → ${ci.combinedRank} ${ci.combinedDamage}`
-        : `${p.attackerName} is ${ci.difference} damage away; attacks must be within 10 points`;
-    }
     const dialogHtml = `
     <div class="frp-dlg">
 
@@ -622,7 +354,7 @@ export class BluntAttackAction extends AttackAction {
         </div>
       </div>
 
-      <!-- Options: Pull / Multi / Combined + Karma (Combined adds no extra row) -->
+      <!-- Options: Pull / Multi / Karma (greyed when unchecked) -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!savedPullEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}> <span class="frp-opt-label orange">Pull</span></label>
@@ -647,17 +379,11 @@ export class BluntAttackAction extends AttackAction {
           <div id="feat-result-bar" style="padding:4px 8px;border-radius:3px;font-size:12px;font-weight:600;text-align:center;"></div>
         </div>
 
-        <div class="frp-opt-row frp-combined-karma-row">
-          <span class="frp-combined-inline${combinedEligible ? '' : ' inactive'}" title="${esc(combinedMetaTitle)}">
-            <label><input type="checkbox" id="combined-enabled" ${combinedEligible ? '' : 'disabled'}> <span class="frp-opt-label purple">Combined</span></label>
-            <span class="frp-combined-meta" id="combined-meta">${esc(combinedMetaText)}</span>
-          </span>
-          <span class="frp-karma-inline inactive">
-            ${hasKarma ? `
-              <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-              <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail</span>
-            ` : `<span style="font-size:11px;color:#999;">No karma</span>`}
-          </span>
+        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
+          ${hasKarma ? `
+            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
+            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
+          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
         </div>
       </div>
 
@@ -712,7 +438,6 @@ export class BluntAttackAction extends AttackAction {
 
           // ── Wire CS panel from shared utility ──
           let _updateFeatPanel = () => {};  // forward ref, set below
-          let _updateCombinedUI = () => {}; // forward ref, set below
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
             onUpdate: () => {
@@ -795,17 +520,11 @@ export class BluntAttackAction extends AttackAction {
             const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
             const resultCap    = pullEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
 
-            const combinedAttack = $dlg('#combined-enabled').is(':checked');
-            const multiEnabled = !combinedAttack && $dlg('#multi-enabled').is(':checked');
+            const multiEnabled = $dlg('#multi-enabled').is(':checked');
             const multiCountVal = $dlg('[name="multiCount"]:checked').val() || "2";
             const multiAdjacent = multiEnabled && multiCountVal === "adjacent";
             const multiAttacks  = multiEnabled && !multiAdjacent;
             const attackCount   = multiCountVal === "3" ? 3 : 2;
-
-            if (combinedAttack && !combinedEligible) {
-              ui.notifications.warn("Combined Attack requires exactly one target.");
-              return;
-            }
 
             // MA-D bypass — only meaningful when the engage checkbox
             // exists in the dialog (State 3, study complete). Defaults
@@ -838,20 +557,6 @@ export class BluntAttackAction extends AttackAction {
             } else {
               damage = strength.value;
               note   = "Bare Hands = Strength";
-            }
-
-            // If a partner is already waiting, keep the dialog open when the
-            // damages are too far apart so Pull can be adjusted to qualify.
-            if (combinedAttack) {
-              const pendingNow = findPendingCombinedAttack(combinedTargetUuid, actor.uuid);
-              if (pendingNow) {
-                const currentDeclared = pulledDamage > 0 ? Math.min(damage, pulledDamage) : damage;
-                const ci = getCombinedDamageInfo(currentDeclared, pendingNow.data.declaredDamage);
-                if (!ci.valid) {
-                  ui.notifications.warn(`Combined Attack requires damage within 10 points (${currentDeclared} vs ${pendingNow.data.declaredDamage}; difference ${ci.difference}).`);
-                  return;
-                }
-              }
             }
 
             // Save settings
@@ -888,7 +593,7 @@ export class BluntAttackAction extends AttackAction {
               src, itemId, objectName, objectRank, objectValue,
               shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
-              multiAttacks, attackCount, multiAdjacent, combinedAttack,
+              multiAttacks, attackCount, multiAdjacent,
               maDEngaged,
               csNotes: cs.csNotes,
               effectiveFightingRank: effFightRank
@@ -962,7 +667,6 @@ export class BluntAttackAction extends AttackAction {
               $pulledDamage.val(maxDamage);
             }
 
-            _updateCombinedUI();
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
           
@@ -993,9 +697,7 @@ export class BluntAttackAction extends AttackAction {
               $resultCap.val('none').prop('disabled', true);
               $pulledDamage.val($pulledDamage.attr('max')).prop('disabled', true);
             }
-            _updateCombinedUI();
           });
-          html.find('[name="pulledDamage"]').on('input change', _updateCombinedUI);
 
           // ── Multi-attack FEAT panel update ──
           _updateFeatPanel = () => {
@@ -1034,69 +736,19 @@ export class BluntAttackAction extends AttackAction {
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
-          // Combined Attack stays on the existing Karma row to preserve the
-          // three-line options box. Multi and Combined are mutually exclusive.
-          _updateCombinedUI = () => {
-            const $combined = html.find('#combined-enabled');
-            const $meta = html.find('#combined-meta');
-            const $wrap = html.find('.frp-combined-inline');
-            const $roll = html.find('#frp-roll');
-            if (!$combined.length) return;
-
-            if (!combinedEligible) {
-              $combined.prop('checked', false).prop('disabled', true);
-              $wrap.addClass('inactive').attr('title', 'Combined Attack requires exactly one target');
-              $meta.text('');
-              $roll.text('Roll');
-              return;
-            }
-
-            const currentBase = Math.max(0, Number(html.find('#dmg-val').text()) || 0);
-            const pullOn = html.find('#pull-punch-enabled').is(':checked');
-            const pullVal = Math.max(0, Number(html.find('[name="pulledDamage"]').val()) || 0);
-            const currentDeclared = (pullOn && pullVal > 0) ? Math.min(currentBase, pullVal) : currentBase;
-            const pending = findPendingCombinedAttack(combinedTargetUuid, actor.uuid);
-
-            if (pending) {
-              const p = pending.data;
-              const ci = getCombinedDamageInfo(currentDeclared, p.declaredDamage);
-              const cAbbr = RANK_ABBR[ci.combinedRank] || ci.combinedRank;
-              $meta.text(ci.valid ? `${p.attackerName} ${p.declaredDamage}→${cAbbr}${ci.combinedDamage}` : `${p.attackerName} ${p.declaredDamage} · Δ${ci.difference}`);
-              $wrap.attr('title', ci.valid
-                ? `Join ${p.attackerName}: ${p.declaredDamage} + ${currentDeclared} → ${ci.combinedRank} ${ci.combinedDamage}`
-                : `${p.attackerName} is ${ci.difference} damage away; attacks must be within 10 points`);
-            } else {
-              $meta.text('');
-              $wrap.attr('title', 'Start a Combined Attack');
-            }
-
-            $wrap.toggleClass('active', $combined.is(':checked'));
-            $roll.text($combined.is(':checked') ? (pending ? 'Join' : 'Declare') : 'Roll');
-          };
-
           // Multi-attack toggle
           html.find('#multi-enabled').on('change', function() {
             const $row = $(this).closest('.frp-opt-row');
-            if (this.checked) html.find('#combined-enabled').prop('checked', false);
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
             _updateFeatPanel();
-            _updateCombinedUI();
           });
           html.find('[name="multiCount"]').on('change', _updateFeatPanel);
           _updateFeatPanel();
 
-          html.find('#combined-enabled').on('change', function() {
-            if (this.checked && html.find('#multi-enabled').is(':checked')) {
-              html.find('#multi-enabled').prop('checked', false).trigger('change');
-            }
-            _updateCombinedUI();
-          });
-          _updateCombinedUI();
-
-          // Karma toggle — only the Karma half fades; Combined remains readable.
+          // Karma toggle
           html.find('#spend-karma').on('change', function() {
-            html.find('.frp-karma-inline').toggleClass('inactive', !this.checked);
+            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
           });
           
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });
@@ -1124,15 +776,6 @@ export class BluntAttackAction extends AttackAction {
       adjacent: 0,
       csNotes: choice.csNotes || ""
     };
-
-    // Combined Attack is a declaration/join workflow, not an ordinary attack
-    // roll on this click. It consumes this action path here and later routes the
-    // higher attack + lower Agility FEAT to the appropriate owning clients.
-    if (choice.combinedAttack) {
-      choice.shiftBreakdown = shiftBreakdown;
-      await this._handleCombinedBluntAttack({ choice, actor, primaryTarget });
-      return;
-    }
 
     // Handle multiple adjacent targets (-4 CS)
     if (choice.multiAdjacent) {
@@ -1263,248 +906,4 @@ export class BluntAttackAction extends AttackAction {
     }
 
   }
-
-  async _handleCombinedBluntAttack({ choice, actor, primaryTarget }) {
-    const targetUuid = targetUuidOf(primaryTarget);
-    if (!targetUuid) {
-      ui.notifications.warn("Combined Attack requires exactly one target.");
-      return;
-    }
-
-    const currentDamage = declaredCombinedDamage(choice);
-    if (currentDamage <= 0) {
-      ui.notifications.warn("Combined Attack requires a damaging attack.");
-      return;
-    }
-
-    const pending = findPendingCombinedAttack(targetUuid, actor.uuid);
-    const targetName = primaryTarget?.name || primaryTarget?.actor?.name || "target";
-
-    if (!pending) {
-      const combat = game.combat;
-      const rank = valueToRank(currentDamage);
-      const abbr = RANK_ABBR[rank] || rank;
-      const pendingData = {
-        kind: "blunt",
-        state: "pending",
-        attackerActorUuid: actor.uuid,
-        attackerName: actor.name,
-        targetUuid,
-        targetName,
-        declaredDamage: currentDamage,
-        choice: serializeCombinedChoice(choice),
-        opts: serializeCombinedOpts(this.opts),
-        combatId: combat?.id || null,
-        round: combat?.round ?? null,
-        turn: combat?.turn ?? null,
-        createdAt: Date.now()
-      };
-
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `<div style="background:#f5f1fb;border:1px solid #8e6bb8;border-radius:3px;padding:6px 8px;margin:4px 0;">
-          <strong style="color:#5b2c83;">Combined Attack — declared</strong>
-          <div><b>${esc(actor.name)}</b> → <b>${esc(targetName)}</b> · ${esc(abbr)} ${currentDamage} damage</div>
-          <div style="font-size:.85em;color:#666;">Waiting for a second Blunt Attack against the same target${combat ? " this round" : ""}.</div>
-        </div>`,
-        flags: { [COMBINED_SCOPE]: { [COMBINED_PENDING_FLAG]: pendingData } }
-      });
-      ui.notifications.info(`${actor.name} declared a Combined Attack against ${targetName}.`);
-      return;
-    }
-
-    const pdata = pending.data;
-    const partnerActor = await resolveActorUuid(pdata.attackerActorUuid);
-    if (!partnerActor) {
-      await markCombinedResolved(
-        pending.message.id,
-        "invalid",
-        `<div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:6px 8px;"><b>Combined Attack cancelled:</b> ${esc(pdata.attackerName)} could not be resolved.</div>`
-      );
-      ui.notifications.warn("Combined Attack partner could not be resolved.");
-      return;
-    }
-
-    const partnerDamage = Math.max(0, Number(pdata.declaredDamage) || 0);
-    const combined = getCombinedDamageInfo(currentDamage, partnerDamage);
-    if (!combined.valid) {
-      ui.notifications.warn(`Combined Attack requires damage within 10 points (${currentDamage} vs ${partnerDamage}).`);
-      return;
-    }
-
-    const currentRec = {
-      actor,
-      name: actor.name,
-      damage: currentDamage,
-      choice: serializeCombinedChoice(choice),
-      opts: serializeCombinedOpts(this.opts)
-    };
-    const partnerRec = {
-      actor: partnerActor,
-      name: pdata.attackerName || partnerActor.name,
-      damage: partnerDamage,
-      choice: pdata.choice || {},
-      opts: pdata.opts || { mode: "semi", autoApply: false, showConfirm: true }
-    };
-
-    // Equal damage: first declarer is the primary attacker; the joiner coordinates.
-    let higher = partnerRec;
-    let lower = currentRec;
-    if (currentRec.damage > partnerRec.damage) {
-      higher = currentRec;
-      lower = partnerRec;
-    } else if (currentRec.damage < partnerRec.damage) {
-      higher = partnerRec;
-      lower = currentRec;
-    }
-
-    const agilityResult = await rollCombinedAgilityFeat(lower.actor);
-    const agiAbbr = RANK_ABBR[agilityResult.rank] || agilityResult.rank;
-    const rollText = agilityResult.rollTotal == null
-      ? "roll unavailable"
-      : `${agilityResult.rollTotal}${agilityResult.karmaUsed ? ` + ${agilityResult.karmaUsed} Karma = ${agilityResult.cappedTotal}` : ""}`;
-
-    if (!agilityResult.success) {
-      await markCombinedResolved(
-        pending.message.id,
-        "coordination-failed",
-        `<div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:6px 8px;margin:4px 0;">
-          <strong style="color:#b71c1c;">Combined Attack — failed</strong>
-          <div>${esc(lower.name)} Agility ${esc(agiAbbr)}: ${esc(rollText)} · <b>${esc(String(agilityResult.color).toUpperCase())}</b></div>
-          <div style="font-size:.85em;color:#666;">Coordination FEAT failed; no combined damage is inflicted.</div>
-        </div>`,
-        { lowerActorUuid: lower.actor.uuid, higherActorUuid: higher.actor.uuid }
-      );
-      ui.notifications.warn("Combined Attack failed: coordination Agility FEAT failed.");
-      return;
-    }
-
-    const combinedAbbr = RANK_ABBR[combined.combinedRank] || combined.combinedRank;
-    const attackers = [partnerRec.name, currentRec.name];
-    const combinedAttackInfo = {
-      pendingMessageId: pending.message.id,
-      attackers,
-      higherName: higher.name,
-      lowerName: lower.name,
-      higherDamage: higher.damage,
-      lowerDamage: lower.damage,
-      combinedRank: combined.combinedRank,
-      combinedRankAbbr: combinedAbbr,
-      combinedDamage: combined.combinedDamage,
-      agilityRank: agilityResult.rank,
-      agilityColor: agilityResult.color,
-      agilityRoll: agilityResult.rollTotal,
-      agilityTotal: agilityResult.cappedTotal,
-      agilityKarma: agilityResult.karmaUsed
-    };
-
-    // Consume pending before the higher attack so a miss/abort cannot leave a stale join.
-    await markCombinedResolved(
-      pending.message.id,
-      "coordinated",
-      `<div style="background:#eef7ee;border:1px solid #81c784;border-radius:3px;padding:6px 8px;margin:4px 0;">
-        <strong style="color:#2e7d32;">Combined Attack — coordinated</strong>
-        <div>${esc(lower.name)} Agility ${esc(agiAbbr)}: ${esc(rollText)} · <b>${esc(String(agilityResult.color).toUpperCase())}</b></div>
-        <div style="font-size:.9em;">${esc(higher.name)} makes the attack at <b>${esc(combinedAbbr)} ${combined.combinedDamage}</b> damage.</div>
-      </div>`,
-      { lowerActorUuid: lower.actor.uuid, higherActorUuid: higher.actor.uuid, combinedDamage: combined.combinedDamage }
-    );
-
-    const highChoice = {
-      ...higher.choice,
-      // Pull may establish the qualifying declared value; do not re-cap the
-      // resulting combined damage back down inside _executeSingleAttack.
-      pulledDamage: 0,
-      multiAttacks: false,
-      multiAdjacent: false,
-      combinedAttack: false,
-      combinedAttackInfo
-    };
-
-    const payload = {
-      actorUuid: higher.actor.uuid,
-      targetUuid,
-      choice: highChoice,
-      opts: higher.opts,
-      combinedDamage: combined.combinedDamage,
-      combinedRank: combined.combinedRank,
-      combinedAttackInfo
-    };
-
-    try {
-      await routeCombinedBluntAttack(payload);
-    } catch (err) {
-      console.error("[FASERIP] Combined Attack higher attack failed", err);
-      ui.notifications.error("Combined Attack could not resolve the higher-damage attack; see console.");
-    }
-  }
-}
-
-/**
- * Socket-safe executor for the higher-damage half of a Blunt Combined Attack.
- * The attack, including post-roll Karma amount selection, runs on its owner's client.
- */
-export async function executeCombinedBluntPayload(payload = {}) {
-  const actor = await resolveActorUuid(payload.actorUuid);
-  const target = await resolveTargetUuid(payload.targetUuid);
-  if (!actor || !target) throw new Error("Combined Attack actor or target could not be resolved.");
-
-  const storedChoice = payload.choice || {};
-  const item = storedChoice.itemId ? actor.items?.get?.(storedChoice.itemId) : null;
-  const opts = { ...(payload.opts || {}), ...(item ? { item } : {}) };
-  const action = new BluntAttackAction({
-    actor,
-    actionType: "blunt-attack",
-    abilityName: "fighting",
-    opts
-  });
-
-  const ability = getAbilityInfo(actor, "fighting");
-  const effects = effectsFor("blunt-attack");
-  const choice = {
-    ...storedChoice,
-    specificTarget: target,
-    pulledDamage: 0,
-    multiAttacks: false,
-    multiAdjacent: false,
-    combinedAttack: false,
-    combinedAttackInfo: payload.combinedAttackInfo || storedChoice.combinedAttackInfo || null
-  };
-
-  if (!choice.shiftBreakdown) {
-    choice.shiftBreakdown = {
-      manual: Number(choice.shift) || 0,
-      multiAttack: 0,
-      adjacent: 0,
-      csNotes: choice.csNotes || ""
-    };
-  }
-
-  const combinedDamage = Math.max(0, Number(payload.combinedDamage) || 0);
-  const info = choice.combinedAttackInfo;
-  const damageNote = info
-    ? `Combined Attack: higher ${info.higherDamage}, partner ${info.lowerDamage} → ${info.combinedRank} ${combinedDamage}`
-    : `Combined Attack → ${payload.combinedRank || valueToRank(combinedDamage)} ${combinedDamage}`;
-
-  return action._executeSingleAttack({
-    choice,
-    actor,
-    ability,
-    actionType: "blunt-attack",
-    actionName: labelFor("blunt-attack"),
-    effects,
-    damageType: "physical-blunt",
-    rawDamage: combinedDamage,
-    damageNote,
-    sourceName: choice.weaponName || "Bare Hands",
-    attackForm: "blunt",
-    breakingFeat: (choice.src === "weapon" || choice.src === "object") ? {
-      weaponMat: choice.weaponMat,
-      weaponName: choice.weaponName,
-      itemUuid: choice.src === "weapon" ? actor.items?.get?.(choice.itemId)?.uuid : null
-    } : null,
-    targetCount: 1,
-    attackNumber: 1,
-    totalAttacks: 1
-  });
 }
