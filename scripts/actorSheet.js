@@ -2741,8 +2741,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           <div class="faserip-recovery-dialog" style="padding:8px;">
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
               <button type="button" class="recovery-btn${recoveryUsedToday ? ' used-today' : ''}" data-action="recovery" ${recoveryUsedToday ? 'disabled' : ''}
-                      title="Attempt Recovery (10 rounds)\nRegain Health equal to Endurance rank${recoveryUsedToday ? '\nAlready used today' : ''}">
-                <i class="fas ${recoveryUsedToday ? 'fa-check' : 'fa-clock'}"></i> ${recoveryUsedToday ? 'Recovered' : 'Recovery (10 rnd)'}
+                      title="Attempt Recovery (10 turns)\nRegain Health equal to Endurance rank${recoveryUsedToday ? '\nAlready used today' : ''}">
+                <i class="fas ${recoveryUsedToday ? 'fa-check' : 'fa-clock'}"></i> ${recoveryUsedToday ? 'Recovered' : 'Recovery (10 turns)'}
               </button>
               <button type="button" class="recovery-btn" data-action="healing" ${healingUnavailable ? 'disabled' : ''}
                       title="${healingTitle}">

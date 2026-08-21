@@ -424,6 +424,51 @@ export class FaseripInitiative {
     }
   }
 
+
+  static _getHealthStatusBadgeData(actor) {
+    if (!actor) return null;
+    if (actor.system?.details?.isDead) return { label: "DEAD", cls: "dead", title: "Dead" };
+
+    const effects = Array.from(actor.effects ?? []);
+    const dying = effects.find(e => !e.disabled && (
+      e.getFlag?.("msh-faserip", "isDying") ||
+      e.flags?.["msh-faserip"]?.ongoingId === "dying" ||
+      e.statuses?.has?.("dying")
+    ));
+    if (dying) {
+      const rank = actor.system?.abilities?.endurance?.rank || "?";
+      const original = dying.getFlag?.("msh-faserip", "originalEndurance") || actor.getFlag?.("msh-faserip", "originalEndurance") || rank;
+      return {
+        label: `DYING · ${rank}`,
+        cls: rank === "Shift-0" ? "shift0" : "dying",
+        title: `Dying: Endurance ${rank}${original !== rank ? ` of ${original}` : ""}. Loses another rank next FASERIP round unless stabilized.`
+      };
+    }
+
+    const unconscious = effects.find(e => {
+      if (e.disabled) return false;
+      const n = (e.name || "").toLowerCase();
+      return n.includes("unconscious") || n.includes("stunned") || e.statuses?.has?.("unconscious");
+    });
+    if (unconscious) {
+      const d = unconscious.duration ?? {};
+      let remain = null;
+      if (Number.isFinite(d.remaining)) {
+        const units = String(d.units || "").toLowerCase();
+        remain = units === "seconds" ? Math.max(0, Math.ceil(d.remaining / 6)) : Math.max(0, Math.ceil(d.remaining));
+      }
+      return {
+        label: remain != null ? `KO · ${remain}r` : "KO",
+        cls: "unconscious",
+        title: remain != null ? `Unconscious: ${remain} FASERIP round(s) remaining` : unconscious.name
+      };
+    }
+
+    const hp = actor.system?.attributes?.health?.value ?? 1;
+    if (hp <= 0) return { label: "STABLE · 0 HP", cls: "stable", title: "At 0 Health but not currently dying" };
+    return null;
+  }
+
   static _modifyCombatantDisplay_native(root, combat) {
     const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
     const phase = this._getPhase(combat);
@@ -517,6 +562,21 @@ export class FaseripInitiative {
 
       const side = this._getCombatantSide(c);
       el.classList.add(`${side}-side`);
+
+      // Compact medical-state badge: current state lives in the tracker; chat
+      // is reserved for meaningful transitions rather than every recovery tick.
+      if (!el.querySelector(".faserip-health-status")) {
+        const healthStatus = this._getHealthStatusBadgeData(c.actor);
+        if (healthStatus) {
+          const badge = document.createElement("span");
+          badge.className = `faserip-health-status ${healthStatus.cls}`;
+          badge.textContent = healthStatus.label;
+          badge.title = healthStatus.title;
+          const statusAnchor = el.querySelector(".token-name") || el.querySelector(".combatant-name");
+          if (statusAnchor) statusAnchor.after(badge);
+          else el.appendChild(badge);
+        }
+      }
 
       // Skip button injection if not RAW, no active phase, or already injected
       if (!rawPhases || !phase || !c.actor?.id || el.querySelector(".faserip-tracker-actions")) continue;

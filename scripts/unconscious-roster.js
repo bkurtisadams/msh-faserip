@@ -1,9 +1,13 @@
+// scripts/unconscious-roster.js v1.1.0 - 2026-08-20
+// v1.1.0: Show KO timers, Dying Endurance state/next tick, and GM Aid action.
 // scripts/unconscious-roster.js v1.0.0 - 2026-04-24
 // GM dialog: list all KO'd/dying actors grouped by scene.
 // Wired into scene controls (token layer) as "Unconscious Roster" button.
 // Rationale: off-scene recovery is now silent by default (see rest-system.js
 // postRecoveryCard routing). GM needs a one-click view of which NPCs are still
 // down and on which scene, without console commands or macro bookkeeping.
+
+import { getRemaining } from "./modules/effects/effect-engine.js";
 
 const SCOPE = "msh-faserip";
 
@@ -39,6 +43,46 @@ function classifyKOState(actor) {
  * Handles linked (actor.id match) and unlinked (token === actor) both.
  * @returns {Scene[]}
  */
+
+
+function getDyingEffect(actor) {
+  return Array.from(actor?.effects ?? []).find(e =>
+    !e.disabled && (e.getFlag(SCOPE, "isDying") || e.flags?.[SCOPE]?.ongoingId === "dying" || e.statuses?.has?.("dying"))
+  ) || null;
+}
+
+function getUnconsciousEffect(actor) {
+  return Array.from(actor?.effects ?? []).find(e => {
+    if (e.disabled) return false;
+    const n = (e.name || "").toLowerCase();
+    return n.includes("unconscious") || n.includes("stunned") || e.statuses?.has?.("unconscious");
+  }) || null;
+}
+
+function buildStateDetail(actor, state) {
+  if (state === "dying") {
+    const dying = getDyingEffect(actor);
+    const current = actor.system?.abilities?.endurance?.rank || "?";
+    const original = dying?.getFlag?.(SCOPE, "originalEndurance") || actor.getFlag(SCOPE, "originalEndurance") || current;
+    const combatant = game.combat?.combatants?.find?.(c => c.actor?.id === actor.id);
+    const next = combatant && game.combat?.active
+      ? `next loss: Round ${(game.combat.round ?? 0) + 1}`
+      : "next loss: next 6s turn";
+    return { text: `END ${current}${original !== current ? ` / ${original}` : ""} · ${next}`, canAid: true };
+  }
+
+  if (state === "unconscious") {
+    const effect = getUnconsciousEffect(actor);
+    const remaining = effect ? getRemaining(effect) : null;
+    const text = remaining?.text ? `KO ${remaining.text} remaining` : (effect?.name || "Unconscious");
+    return { text, canAid: false };
+  }
+
+  if (state === "stable-at-0") return { text: "Stable at 0 Health", canAid: false };
+  if (state === "dead") return { text: "Dead", canAid: false };
+  return { text: "", canAid: false };
+}
+
 function findScenesForActor(actor) {
   const scenes = [];
   for (const scene of game.scenes ?? []) {
@@ -110,6 +154,7 @@ function buildRoster({ includeDead = false } = {}) {
     const wakeFails = (actor.getFlag(SCOPE, "recoveryLog") || [])
       .filter(e => e.event === "wake-fail").length;
 
+    const stateDetail = buildStateDetail(actor, state);
     const row = {
       actorId: actor.id,
       name: actor.name,
@@ -129,6 +174,8 @@ function buildRoster({ includeDead = false } = {}) {
       }[state] || "#555",
       timeDroppedStr,
       wakeFails,
+      statusDetail: stateDetail.text,
+      canAid: stateDetail.canAid,
       hp: actor.system?.attributes?.health?.value ?? 0,
       hpMax: actor.system?.attributes?.health?.max ?? 0
     };
@@ -186,7 +233,9 @@ function buildDialogHTML({ includeDead }) {
           ${row.timeDroppedStr ? ` · dropped ${row.timeDroppedStr}` : ''}
           ${row.wakeFails > 0 ? ` · ${row.wakeFails} wake fail${row.wakeFails > 1 ? 's' : ''}` : ''}
         </div>
+        ${row.statusDetail ? `<div style="font-size:11px;color:${row.stateColor};font-weight:600;margin-top:2px;">${row.statusDetail}</div>` : ''}
       </div>
+      ${row.canAid ? `<button type="button" class="ur-aid" data-actor-id="${row.actorId}" title="Aid / stabilize this dying character" style="padding:3px 7px;font-size:10px;flex-shrink:0;"><i class="fas fa-hand-holding-medical"></i> Aid</button>` : ''}
       <div style="padding:3px 8px;border-radius:3px;background:${row.stateColor};color:#fff;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">
         ${row.stateLabel}
       </div>
@@ -299,6 +348,16 @@ function attachHandlers(html, dlg, getIncludeDead, setIncludeDead) {
     const container = $root.find(".faserip-unconscious-roster").parent();
     container.html(buildDialogHTML({ includeDead: getIncludeDead() }));
     attachHandlers($root, dlg, getIncludeDead, setIncludeDead);
+  });
+
+  $root.find(".ur-aid").off("click").on("click", async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const actorId = ev.currentTarget.dataset.actorId;
+    const actor = game.actors.get(actorId);
+    if (!actor) return ui.notifications.warn("Actor not found.");
+    const result = await game.msh?.rest?.stabilizeDying?.(actor);
+    if (!result?.success) ui.notifications.warn(result?.message || `${actor.name} could not be stabilized.`);
   });
 
   $root.find(".ur-row").off("click").on("click", (ev) => {

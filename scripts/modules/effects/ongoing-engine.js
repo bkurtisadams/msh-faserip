@@ -301,11 +301,11 @@ async function sendOngoingChat(actor, effectName, type, detail) {
     const isPC = !!(actor?.hasPlayerOwner) ||
                  (actor?.system?.characterType === "player");
     if (!isPC) {
-      let mode = "gm-whisper-npcs";
-      try { mode = game.settings?.get?.("msh-faserip", "autoHealChatMode") || mode; }
+      let policy = "critical";
+      try { policy = game.settings?.get?.("msh-faserip", "npcRecoveryOutput") || policy; }
       catch (_e) { /* setting not registered yet */ }
-      if (mode === "silent-npcs") return;
-      if (mode === "gm-whisper-npcs") {
+      if (policy === "critical" || policy === "silent") return;
+      if (policy === "gm-detailed") {
         messageData.whisper = ChatMessage.getWhisperRecipients("GM").map(u => u.id);
       }
     }
@@ -530,6 +530,12 @@ async function executeHealthHeal(actor, ae, effectId, config, healPerCycle, cycl
   };
   if (config.oncePerDay) updates.lastTriggeredDate = _getGameDate();
   await actor.setFlag(scope, `ongoing.${effectId}`, { ...config, ...updates });
+  if (effectId === "healing") {
+    // Keep the sheet's manual Healing eligibility on the same clock as the
+    // automatic ongoing effect, preventing a manual double-heal immediately
+    // after an automatic hourly tick.
+    await actor.setFlag(scope, "lastHealingWorldTime", newStartedAt);
+  }
 
   // Auto-disable at cap
   if (newHP >= cap && config.autoDisable !== false) {
@@ -755,7 +761,7 @@ async function executeEnduranceLoss(actor, ae, effectId, config, rawAmount, cycl
  * @param {Actor} actor
  * @returns {string} "stepped" | "dead" | "stabilized" | "shift0-warning" | "none"
  */
-export async function processDyingRound(actor) {
+export async function processDyingRound(actor, { effectiveWorldTime = null } = {}) {
   if (!actor) return "none";
   const scope = SCOPE();
 
@@ -782,13 +788,14 @@ export async function processDyingRound(actor) {
   _dyingLocks.add(lockKey);
 
   try {
-    return await _processDyingRoundInner(actor, dyingAE, scope);
+    return await _processDyingRoundInner(actor, dyingAE, scope, effectiveWorldTime);
   } finally {
     _dyingLocks.delete(lockKey);
   }
 }
 
-async function _processDyingRoundInner(actor, dyingAE, scope) {
+async function _processDyingRoundInner(actor, dyingAE, scope, effectiveWorldTime = null) {
+  const dyingNow = Number.isFinite(Number(effectiveWorldTime)) ? Number(effectiveWorldTime) : game.time.worldTime;
 
   console.log(`[FASERIP:DYING] Processing dying for ${actor.name}`, {
     effectName: dyingAE.name,
@@ -830,17 +837,18 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
     // Apply dead overlay
     await actor.toggleStatusEffect("dead", { active: true, overlay: true });
 
-    await sendOngoingChat(actor, "Dying", "stat.loss",
-      `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
-    );
-
-    // Ledger: terminal event — if off-scene thug dies, this closes the episode
-    // and the Recovery Summary card emits via postRecoveryCard's terminal path
-    // on the next rest-system routing call. Here we only log; no summary emit.
-    try { await game.msh?.rest?.appendRecoveryLog?.(actor, {
-      event: "dying-death",
-      detail: null
-    }); } catch (_e) { /* best-effort */ }
+    const deathContent = `<div style="background:#ffebee;border:2px solid #b71c1c;padding:10px;border-radius:5px;">
+      <strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>
+    </div>`;
+    if (game.msh?.rest?.postRecoveryCard) {
+      await game.msh.rest.postRecoveryCard(actor, {
+        eventType: "dying-death",
+        detail: null,
+        content: deathContent
+      });
+    } else {
+      await ChatMessage.create({ content: deathContent, speaker: ChatMessage.getSpeaker({ actor }) });
+    }
 
     return "dead";
   }
@@ -854,7 +862,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
   const rankLossStamp = actor.getFlag(scope, "endRankLoss");
   if (rankLossStamp?.source === "poison") {
     const turnSecs = Number(game.settings.get("msh-faserip", "turnSeconds")) || 6;
-    const elapsed = game.time.worldTime - rankLossStamp.at;
+    const elapsed = dyingNow - rankLossStamp.at;
     if (elapsed >= 0 && elapsed < turnSecs) {
       console.log(`[FASERIP:DYING] ${actor.name}: poison took this turn's rank loss — dying step deferred`);
       return "none";
@@ -918,7 +926,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
           isImpairedEndurance: true,
           originalEndurance: originalRank,
           currentEndurance: nextName,
-          lastHealed: game.time.worldTime,
+          lastHealed: dyingNow,
           medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
         },
       },
@@ -949,24 +957,44 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
     console.error(`[FASERIP ERROR] Failed to update Dying effect label:`, err);
   }
 
-  // ── Chat message ─────────────────────────────────────────────────
-  await sendOngoingChat(actor, "Dying", "stat.loss",
-    `<strong>${actor.name}</strong> is dying — Endurance: ${curName} → ${nextName}
-     <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
-     ${_dyingButtonsHtml(actor)}`
-  );
+  // ── Recovery ledger / routed output ──────────────────────────────
+  const tickContent = `<div style="background:#fff3e0;border:2px solid #ff9800;padding:10px;border-radius:5px;">
+    <div style="font-size:1.05em;font-weight:bold;color:#e65100;margin-bottom:4px;"><i class="fas fa-arrow-down"></i> Dying</div>
+    <strong>${actor.name}</strong> is dying — Endurance: ${curName} → ${nextName}
+    <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
+    ${_dyingButtonsHtml(actor)}
+  </div>`;
+  if (game.msh?.rest?.postRecoveryCard) {
+    await game.msh.rest.postRecoveryCard(actor, {
+      eventType: "endurance-loss",
+      detail: `${curName} → ${nextName}, Health ${currentHealth} → ${newHealth}`,
+      content: tickContent
+    });
+  } else {
+    await sendOngoingChat(actor, "Dying", "stat.loss",
+      `<strong>${actor.name}</strong> is dying — Endurance: ${curName} → ${nextName}`);
+  }
 
   // ── Shift-0 warning ──────────────────────────────────────────────
   if (nextName === "Shift-0") {
     console.warn(`[FASERIP WARN] ${actor.name} has reached Shift-0 Endurance (will die next round if not stabilized)`);
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
-        <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>
-        <div style="font-size:0.9em;margin-top:4px;">Will die next round unless stabilized.</div>
-        ${_dyingButtonsHtml(actor)}
-      </div>`,
-    });
+    const warningContent = `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
+      <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>
+      <div style="font-size:0.9em;margin-top:4px;">Will die next round unless stabilized.</div>
+      ${_dyingButtonsHtml(actor)}
+    </div>`;
+    if (game.msh?.rest?.postRecoveryCard) {
+      await game.msh.rest.postRecoveryCard(actor, {
+        eventType: "shift0-warning",
+        detail: "Will die next round unless stabilized",
+        content: warningContent
+      });
+      if (game.msh.rest.shouldNotifyRecoveryEvent?.(actor, "shift0-warning")) {
+        ui.notifications.warn(`${actor.name} has reached Shift-0 Endurance — stabilize before next round.`);
+      }
+    } else {
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: warningContent });
+    }
     return "shift0-warning";
   }
 
@@ -1354,19 +1382,24 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
       }]);
     }
 
-    // Chat message about immediate first loss
-    await sendOngoingChat(actor, "Dying", "stat.loss",
-      `<strong>${actor.name}</strong> begins dying — immediate Endurance loss: ${currentEndurance} → ${nextRank}
-       <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
-       <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will lose 1 Endurance rank per turn until stabilized.</div>
-       <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>`
-    );
-
-    // Ledger: episode-start event (feeds Recovery Summary on terminal resolution)
-    try { await game.msh?.rest?.appendRecoveryLog?.(actor, {
-      event: "dying-start",
-      detail: `${currentEndurance} → ${nextRank}, HP ${currentHealth}→${newHealth}`
-    }); } catch (_e) { /* ledger is best-effort */ }
+    // Tactical transition: beginning to die is worth showing on the active
+    // scene, but subsequent rank ticks are routine ledger/roster bookkeeping.
+    const startContent = `<div style="background:#fff3e0;border:2px solid #ff9800;padding:10px;border-radius:5px;">
+      <div style="font-size:1.05em;font-weight:bold;color:#e65100;margin-bottom:4px;"><i class="fas fa-heart-crack"></i> Dying</div>
+      <strong>${actor.name}</strong> begins dying — immediate Endurance loss: ${currentEndurance} → ${nextRank}
+      <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
+      <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will lose 1 Endurance rank per turn until stabilized.</div>
+      <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>
+    </div>`;
+    if (game.msh?.rest?.postRecoveryCard) {
+      await game.msh.rest.postRecoveryCard(actor, {
+        eventType: "dying-start",
+        detail: `${currentEndurance} → ${nextRank}, HP ${currentHealth}→${newHealth}`,
+        content: startContent
+      });
+    } else {
+      await ChatMessage.create({ content: startContent, speaker: ChatMessage.getSpeaker({ actor }) });
+    }
 
     console.log(`[FASERIP:DYING] ${actor.name} immediate Endurance loss: ${currentEndurance} (${currentEnduranceValue}) → ${nextRank} (${nextValue})`);
   }

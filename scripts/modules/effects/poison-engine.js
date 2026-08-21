@@ -85,9 +85,9 @@ export function endRankLossThisTurn(actor, now = game.time.worldTime) {
   return null;
 }
 
-async function stampEndRankLoss(actor, source) {
+async function stampEndRankLoss(actor, source, at = game.time.worldTime) {
   await safeActorSetFlag(actor, SCOPE(), "endRankLoss", {
-    at: game.time.worldTime,
+    at,
     source,
   });
 }
@@ -211,7 +211,7 @@ export async function applyPoisonExposure(actor, opts = {}) {
     lossNote = `<div style="margin-top:4px;font-size:.9em;color:#7a3d00;">Endurance rank already lost this turn — poison loss deferred to next FEAT window (max 1 rank/round).</div>`;
   } else {
     const loss = await loseOneEnduranceRank(actor, { source: `Poison: ${toxin.name}` });
-    if (loss.lost) await stampEndRankLoss(actor, "poison");
+    if (loss.lost) await stampEndRankLoss(actor, "poison", effectiveNow);
     if (loss.belowFeeble || loss.newRank === "Shift-0") {
       // Shift-0 from the initial loss: death handled on next process tick per
       // RAW "reaches Shift 0 ... dies" — process immediately for clarity.
@@ -275,7 +275,7 @@ export async function applyPoisonExposure(actor, opts = {}) {
  * @param {object} opts { pendingSeconds }
  * @returns {string} "halted" | "stepped" | "dead" | "waiting" | "none"
  */
-export async function processPoisonRound(actor, { pendingSeconds = 0 } = {}) {
+export async function processPoisonRound(actor, { pendingSeconds = 0, effectiveWorldTime = null } = {}) {
   if (!actor) return "none";
   const scope = SCOPE();
 
@@ -294,14 +294,16 @@ export async function processPoisonRound(actor, { pendingSeconds = 0 } = {}) {
   if (_poisonLocks.has(lockKey)) return "none";
   _poisonLocks.add(lockKey);
   try {
-    return await _processPoisonInner(actor, poisonAE, scope, pendingSeconds);
+    return await _processPoisonInner(actor, poisonAE, scope, pendingSeconds, effectiveWorldTime);
   } finally {
     _poisonLocks.delete(lockKey);
   }
 }
 
-async function _processPoisonInner(actor, poisonAE, scope, pendingSeconds = 0) {
-  const effectiveNow = game.time.worldTime + Math.max(0, pendingSeconds);
+async function _processPoisonInner(actor, poisonAE, scope, pendingSeconds = 0, effectiveWorldTime = null) {
+  const effectiveNow = Number.isFinite(Number(effectiveWorldTime))
+    ? Number(effectiveWorldTime)
+    : game.time.worldTime + Math.max(0, pendingSeconds);
 
   // ── Shift-0 from a prior tick: death ──────────────────────────────────────
   const curRank = actor.system?.abilities?.endurance?.rank;
@@ -344,7 +346,7 @@ async function _processPoisonInner(actor, poisonAE, scope, pendingSeconds = 0) {
   }
 
   const loss = await loseOneEnduranceRank(actor, { source: `Poison: ${toxinName}` });
-  if (loss.lost) await stampEndRankLoss(actor, "poison");
+  if (loss.lost) await stampEndRankLoss(actor, "poison", effectiveNow);
 
   if (loss.newRank === "Shift-0") {
     return _poisonDeath(actor, poisonAE, scope);

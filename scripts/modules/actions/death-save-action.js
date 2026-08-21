@@ -427,6 +427,12 @@ export class DeathSaveAction extends BaseAction {
     };
 
     await safeActorCreateEffect(actor, [effectData]);
+    try {
+      await game.msh?.rest?.appendRecoveryLog?.(actor, {
+        event: "unconscious-start",
+        detail: `0 Health, ${unconsciousRounds} rounds`
+      });
+    } catch (_e) {}
     console.log(`[FASERIP] Unconscious effect created for ${actor.name} (${unconsciousRounds} rounds)`);
   }
 

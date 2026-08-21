@@ -1,4 +1,7 @@
-﻿// init.js v1.13.2 - 2026-08-20
+﻿// init.js v1.14.0 - 2026-08-20
+// v1.14.0: Dying/poison time jumps now process every elapsed 6-second FASERIP turn;
+//          add unified quiet-by-default NPC recovery/dying output policy.
+// init.js v1.13.2 - 2026-08-20
 // v1.13.2: Fix FASERIP/CTT combat timing boundary. RAW combat effects are
 //          round-bound even when CTT is active; phase/initiative cursor changes
 //          can suppress clock advance; CTT timeAdvanced no longer processes
@@ -25,7 +28,7 @@
 //          cleared).
 // v1.12.4: syncPowerOngoingEffects now removes any existing generic
 //          "healing" ongoing when a Regen-rest or Regen-solar power is
-//          registered on an actor. Per RAW the standard End-rank/day
+//          registered on an actor. Per RAW the standard End-rank/hour
 //          healing is replaced, not stacked, while Regen is active.
 //          Pairs with rest-system.js ensureHealingEffect which now
 //          short-circuits while a Regen ongoing exists.
@@ -130,6 +133,7 @@ import * as Effects from "./modules/effects/effect-engine.js";
 import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
 import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
+import { countElapsedTurns, normalizeTurnSeconds } from "./modules/recovery-timing.js";
 import { registerDataModels } from "./data-models.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
@@ -143,6 +147,59 @@ import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
 const FASERIP_PROTOTYPE_TOKEN_DEFAULTS_VERSION = 1;
+
+
+/**
+ * Resolve every complete FASERIP turn represented by an out-of-combat time jump.
+ * The virtual timestamp matters for poison/dying's "max one Endurance rank per
+ * turn" governor; large CTT advances must not collapse a minute into one tick.
+ */
+async function processElapsedCriticalTurns({ elapsedSeconds, startWorldTime } = {}) {
+  const turnSeconds = normalizeTurnSeconds(game.settings?.get?.("msh-faserip", "turnSeconds"), 6);
+  const turns = countElapsedTurns(elapsedSeconds, turnSeconds);
+  if (turns <= 0) return 0;
+
+  const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+  const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+  const actors = Array.from(Effects.getAllTokenActors());
+  const start = Number.isFinite(Number(startWorldTime))
+    ? Number(startWorldTime)
+    : (game.time?.worldTime ?? 0) - Number(elapsedSeconds || 0);
+
+  let processedTurns = 0;
+  for (let i = 0; i < turns; i++) {
+    const effectiveWorldTime = start + ((i + 1) * turnSeconds);
+    let anyActive = false;
+
+    for (const actor of actors) {
+      if (!actor?.effects?.size) continue;
+
+      const poisonAE = actor.effects.find(e =>
+        e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
+      );
+      if (poisonAE) {
+        anyActive = true;
+        await processPoisonRound(actor, { effectiveWorldTime });
+      }
+
+      // Re-read after poison: a poison result may have killed or otherwise
+      // changed the actor before dying gets its turn-priority check.
+      const dyingAE = actor.effects.find(e =>
+        (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
+        !e.disabled
+      );
+      if (dyingAE) {
+        anyActive = true;
+        await processDyingRound(actor, { effectiveWorldTime });
+      }
+    }
+
+    if (!anyActive) break;
+    processedTurns++;
+  }
+  return processedTurns;
+}
 
 function _tokenDisplayMode(key, fallback) {
   return globalThis.CONST?.TOKEN_DISPLAY_MODES?.[key] ?? fallback;
@@ -453,39 +510,24 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
     }
   }
 
-  // Dying out-of-combat: process 1 rank loss per turn elapsed.
-  // combatRound hook owns this during active combat.
-  // timeTracker.timeAdvanced hook owns this when CTT is active (avoids race condition,
-  // since CTT calls game.time.advance() internally which also fires this hook).
+  // Dying/poison out of combat: resolve EVERY complete FASERIP turn in a
+  // time jump. A 60-second advance is ten turns, not one bookkeeping tick.
+  // CTT's own timeAdvanced hook owns this path when that module is active.
   const cttActiveForDying = game.modules.get("calendar-time-tracker")?.active;
-  if (!game.combat?.active && !cttActiveForDying && !game.msh._dyingInProgress) {
-    if (dt >= 6) {
-      try {
-        const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
-        const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        for (const actor of Effects.getAllTokenActors()) {
-          if (!actor?.effects?.size) continue;
-          // Poison BEFORE dying (priority + governor stamp)
-          const poisonAE = actor.effects.find(e =>
-            e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
-          );
-          if (poisonAE) {
-            console.log(`[FASERIP:POISON] worldTime advance: processing poison for ${actor.name} (dt=${dt}s)`);
-            await processPoisonRound(actor);
-          }
-          const dyingAE = actor.effects.find(e =>
-            (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
-            !e.disabled
-          );
-          if (!dyingAE) continue;
-          console.log(`[FASERIP:DYING] worldTime advance: processing 1 dying round for ${actor.name} (dt=${dt}s)`);
-          const result = await processDyingRound(actor);
-          console.log(`[FASERIP:DYING] worldTime: ${actor.name} â†’ ${result}`);
-        }
-      } catch (e) {
-        console.error("[FASERIP ERROR] worldTime dying round processing failed:", e);
+  if (!game.combat?.active && !cttActiveForDying && !game.msh._dyingInProgress && dt > 0) {
+    game.msh._dyingInProgress = true;
+    try {
+      const processed = await processElapsedCriticalTurns({
+        elapsedSeconds: dt,
+        startWorldTime: worldTime - dt
+      });
+      if (processed && game.settings.get("msh-faserip", "debugMode")) {
+        console.log(`[FASERIP] worldTime resolved ${processed} elapsed FASERIP turn(s) across dying/poison states.`);
       }
+    } catch (e) {
+      console.error("[FASERIP ERROR] worldTime dying/poison processing failed:", e);
+    } finally {
+      game.msh._dyingInProgress = false;
     }
   }});
 
@@ -863,11 +905,28 @@ Hooks.once("init", async () => {
     default: true
   });
 
-  game.settings.register('msh-faserip', 'autoHealChatMode', {
-    name: "Auto-Heal Chat Output",
-    hint: "Controls chat messages when ongoing heal / Endurance-rank-gain effects tick. Applies only to NPCs (player characters always post public chat). Default: whisper to GM so scenes full of bruised NPCs don't spam the log.",
+
+  game.settings.register('msh-faserip', 'npcRecoveryOutput', {
+    name: "NPC Recovery & Dying Output",
+    hint: "Controls automatic NPC dying, unconsciousness, Recovery, Healing, and Endurance-rehabilitation messages. Critical Only keeps routine bookkeeping in the Unconscious Roster/ledger while still surfacing important active-scene transitions and Shift-0 warnings.",
     scope: "world",
     config: true,
+    type: String,
+    choices: {
+      "critical":        "Critical Only — important active-scene transitions; routine ticks silent (recommended)",
+      "gm-detailed":     "GM Detailed — whisper every NPC recovery/dying event",
+      "public-detailed": "Public Detailed — everyone sees every NPC recovery/dying event",
+      "silent":          "Silent — ledger/roster only"
+    },
+    default: "critical"
+  });
+  // Legacy settings retained for compatibility with existing worlds. The
+  // unified npcRecoveryOutput policy above now owns the UI behavior.
+  game.settings.register('msh-faserip', 'autoHealChatMode', {
+    name: "Auto-Heal Chat Output (Legacy)",
+    hint: "Controls chat messages when ongoing heal / Endurance-rank-gain effects tick. Applies only to NPCs (player characters always post public chat). Default: whisper to GM so scenes full of bruised NPCs don't spam the log.",
+    scope: "world",
+    config: false,
     type: String,
     choices: {
       "public":         "Public â€” everyone sees every NPC heal tick",
@@ -878,10 +937,10 @@ Hooks.once("init", async () => {
   });
 
   game.settings.register('msh-faserip', 'offSceneRecoveryChat', {
-    name: "Off-Scene Recovery Chat Output",
+    name: "Off-Scene Recovery Chat Output (Legacy)",
     hint: "Controls wake/stabilize/recovery chat cards for NPCs NOT on the active scene (typical: leftover thugs from earlier combats auto-rolling their wake attempts). Player characters always post public regardless. A per-actor ledger is always written; 'summary' mode emits one consolidated card on terminal events (wake-success, death, full recovery).",
     scope: "world",
-    config: true,
+    config: false,
     type: String,
     choices: {
       "public":        "Public — full chat for every off-scene recovery event",
@@ -1384,10 +1443,10 @@ Hooks.once("init", async () => {
 
     // Suppress auto Recovery/Healing timers (and their chat cards) when damage is taken
     game.settings.register("msh-faserip", "effects.autoDamageTimers", {
-      name: "Auto Recovery/Healing Timers on Damage",
+      name: "Auto Recovery/Healing Timers on Damage (Legacy)",
       hint: "If OFF, taking damage will not auto-create Recovery/Healing timers or post timer chat cards. You can still create timers manually.",
       scope: "world",
-      config: true,
+      config: false,
       type: Boolean,
       default: false
     });
@@ -1545,37 +1604,21 @@ Hooks.once("init", async () => {
         deltaSeconds = Number(amount) * 6;
       }
 
-      if (!combatOwnsRoundTicks && !game.msh._cttDyingInProgress && !game.msh._dyingInProgress) {
+      if (!combatOwnsRoundTicks && deltaSeconds > 0 && !game.msh._cttDyingInProgress && !game.msh._dyingInProgress) {
         game.msh._cttDyingInProgress = true;
         try {
-          const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
-          const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
-          const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-
-          // Outside combat, a manual CTT advance may represent elapsed FASERIP
-          // time. Process the ongoing states once for that explicit advance.
-          for (const actor of Effects.getAllTokenActors()) {
-            if (!actor?.effects?.size) continue;
-            // Poison BEFORE dying (priority + governor stamp)
-            const poisonAE = actor.effects.find(e =>
-              e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
-            );
-            if (poisonAE) {
-              console.log(`[FASERIP:POISON] CTT timeAdvanced: processing poison for ${actor.name} (pending ${deltaSeconds}s)`);
-              await processPoisonRound(actor, { pendingSeconds: deltaSeconds });
-            }
-            const dyingAE = actor.effects.find(e =>
-              (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
-              !e.disabled
-            );
-            if (!dyingAE) continue;
-
-            console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s â€” processing 1 dying round for ${actor.name}`);
-            const result = await processDyingRound(actor);
-            console.log(`[FASERIP:DYING] CTT: ${actor.name} â†’ ${result}`);
+          // CTT emits timeAdvanced before game.time.worldTime moves, so the
+          // current worldTime is the start of the elapsed interval. Resolve one
+          // virtual 6-second turn at a time using effective timestamps.
+          const processed = await processElapsedCriticalTurns({
+            elapsedSeconds: deltaSeconds,
+            startWorldTime: game.time?.worldTime ?? 0
+          });
+          if (processed && game.settings.get("msh-faserip", "debugMode")) {
+            console.log(`[FASERIP] CTT resolved ${processed} elapsed FASERIP turn(s) across dying/poison states.`);
           }
         } catch (e) {
-          console.error("[FASERIP ERROR] CTT dying processing failed:", e);
+          console.error("[FASERIP ERROR] CTT dying/poison processing failed:", e);
         } finally {
           game.msh._cttDyingInProgress = false;
         }
@@ -3248,7 +3291,7 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     if (hasSolar) await OngoingEngine.removeOngoingEffect(actor, "solarRegeneration");
 
     // Remove generic hourly Healing ongoing — per RAW, Regen replaces the
-    // normal "End rank# HP per day" rate, not stacks on top. The standard
+    // normal "End rank# HP per hour" rate, not stacks on top. The standard
     // healer comes back via ensureHealingEffect when Regen is removed.
     const hasGenericHealRest = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "healing");
     if (hasGenericHealRest) {

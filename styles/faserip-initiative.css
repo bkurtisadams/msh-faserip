@@ -512,3 +512,33 @@
   font-weight: bold;
   font-size: 1em;
 }
+
+/* =====================
+   KO / DYING STATUS BADGES
+   ===================== */
+.faserip-health-status {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .35px;
+  line-height: 1.35;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+.faserip-health-status.dying { color: #b71c1c; background: rgba(183,28,28,.08); }
+.faserip-health-status.shift0 { color: #fff; background: #b71c1c; border-color: #7f0000; }
+.faserip-health-status.unconscious { color: #e65100; background: rgba(230,81,0,.08); }
+.faserip-health-status.stable { color: #8d6e00; background: rgba(249,168,37,.12); }
+.faserip-health-status.dead { color: #555; background: rgba(0,0,0,.08); }
+
+.combatant:has(.faserip-health-status) .token-name,
+.combatant:has(.faserip-health-status) .combatant-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

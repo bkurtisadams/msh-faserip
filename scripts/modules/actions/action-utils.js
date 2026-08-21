@@ -2196,6 +2196,12 @@ export async function _applyFourColorKnockout(actor, rounds) {
     duration: computeDuration({ rounds: Math.max(1, Number(rounds)), forceCombatRounds: true })
   };
   await safeActorCreateEffect(actor, [effectData]);
+  try {
+    await game.msh?.rest?.appendRecoveryLog?.(actor, {
+      event: "unconscious-start",
+      detail: `Four-Color KO, ${rounds} rounds`
+    });
+  } catch (_e) {}
   console.log(`[FASERIP] Four-Color knockout: ${actor.name} unconscious for ${rounds} rounds`);
 }
 

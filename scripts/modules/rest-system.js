@@ -1,3 +1,8 @@
+// scripts/modules/rest-system.js v1.5.0 - 2026-08-20
+// v1.5.0: Centralize NPC recovery/dying output policy, quiet routine NPC bookkeeping,
+//         fix repeatable manual hourly Healing, and correct Recovery wording.
+//         Manual Healing now keys from max(last damage, last manual heal) instead of
+//         deleting the damage timestamp after the first heal.
 // scripts/modules/rest-system.js v1.4.8 - 2026-08-20
 // v1.4.8: Failed wake-up retry timers use shared round-aware duration logic;
 //         active combat no longer turns N RAW rounds into CTT wall-clock seconds.
@@ -5,7 +10,7 @@
 // v1.4.7: ensureHealingEffect now short-circuits when Regen-rest or
 //         Regen-solar is configured on the actor. The generic hourly
 //         Healing ongoing must not co-exist with a Regeneration power
-//         per RAW — Regen replaces the End-rank/day baseline, doesn't
+//         per RAW — Regen replaces the End-rank/hour baseline, doesn't
 //         stack with it. Paired with init.js syncPowerOngoingEffects
 //         which removes any pre-existing Healing when Regen registers.
 // scripts/modules/rest-system.js v1.4.6 - 2026-04-19
@@ -110,19 +115,20 @@ import { safeActorSetFlag } from "../gm-utils.js";
 import { RANKS_ORDERED, rankValue } from "../rules/rules-reference.js";
 import { getCurrentGameDate } from "./effects/ongoing-engine.js";
 import { computeDuration } from "./effects/effect-engine.js";
+import { healingSecondsRemaining } from "./recovery-timing.js";
 
 const SCOPE = getFlagScope();
 
 /**
  * FASERIP Rest System
  * 
- * Recovery: Regain Endurance rank number in Health after 10 turns of rest
+ * Recovery: Regain Endurance rank number in Health 10 turns after damage
  *   - Once per day
  *   - Must be conscious (Health > 0)
- *   - Cannot be interrupted by damage
+ *   - Further damage restarts the 10-turn clock
  * 
- * Healing: Heal Endurance rank number after 600 turns (1 hour) since last damage
- *   - Can be used multiple times
+ * Healing: Heal Endurance rank number each 600 turns (1 hour) after last damage
+ *   - Can be used multiple times, once per elapsed hour
  *   - Works even if unconscious
  *   - Doubled with medical care
  *   - Timer resets if damaged again
@@ -132,10 +138,9 @@ const SCOPE = getFlagScope();
 // Rationale: Unconscious AE expiry fires scene-agnostically, so actors on other
 // scenes emit wake-fail/wake-success chat cards during unrelated combat. Route
 // all recovery-related cards through postRecoveryCard() which decides public /
-// GM-whisper / ledger-only per (isPC × onScene × offSceneRecoveryChat setting).
-// Terminal events (wake-success, dying-death, fully-recovered) emit a
-// consolidated summary card in "summary" mode so the Jimmy-the-thug narrative
-// ("dropped Mar 14, 3 wake attempts, woke Mar 16") survives without spam.
+// GM-whisper / ledger-only according to the unified npcRecoveryOutput policy.
+// Routine NPC bookkeeping stays in the ledger/roster; only tactically meaningful
+// transitions are surfaced during normal play.
 
 function isOnActiveScene(actor) {
   if (!actor) return false;
@@ -235,6 +240,9 @@ async function emitRecoverySummary(actor) {
     "wake-success":     "Woke up",
     "dying-death":      "Died",
     "endurance-healed": "Endurance rank healed",
+    "recovery-heal":    "Recovered Health",
+    "healing-tick":     "Hourly Healing",
+    "shift0-warning":   "Reached Shift-0 Endurance",
     "fully-recovered":  "Endurance fully restored"
   };
   const lines = episode.map(e => {
@@ -278,46 +286,66 @@ async function emitRecoverySummary(actor) {
  * @param {string} [opts.detail]  - short detail string for ledger/summary
  */
 export async function postRecoveryCard(actor, { content, eventType, detail, flags } = {}) {
-  if (!actor) return;
+  if (!actor) return { posted: false, mode: "none" };
   await appendRecoveryLog(actor, { event: eventType, detail });
 
-  const isPC = !!actor?.hasPlayerOwner;
+  const isPC = !!actor?.hasPlayerOwner || actor?.system?.characterType === "player";
   const onScene = isOnActiveScene(actor);
 
-  // PCs always public + ledger (preserves player visibility regardless of
-  // which scene is loaded — split-party safe).
-  // NPCs on-scene: public + ledger (current behavior).
-  // NPCs off-scene: respect offSceneRecoveryChat setting.
-  let mode = "public";
-  if (!isPC && !onScene) {
-    try { mode = game.settings.get(SCOPE, "offSceneRecoveryChat") || "summary"; }
-    catch (_e) { mode = "summary"; }
+  // One policy now governs NPC dying/recovery chatter. Routine bookkeeping
+  // (dying rank ticks, failed wake checks, hourly healing, Endurance rehab)
+  // belongs in the ledger/roster, not the chat log.
+  let policy = "critical";
+  try { policy = game.settings.get(SCOPE, "npcRecoveryOutput") || "critical"; }
+  catch (_e) { /* setting may not exist during early init */ }
+
+  const activeSceneCritical = new Set([
+    "dying-start", "unconscious-start", "stabilized", "wake-success", "dying-death"
+  ]);
+
+  let mode = "none";
+  if (isPC) {
+    mode = "public";
+  } else if (policy === "public-detailed") {
+    mode = "public";
+  } else if (policy === "gm-detailed") {
+    mode = "gm";
+  } else if (policy === "critical") {
+    if (eventType === "shift0-warning") mode = "gm";
+    else if (onScene && activeSceneCritical.has(eventType)) mode = "public";
   }
 
   if (mode === "public") {
     await ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor }), flags });
-    return;
+    return { posted: true, mode };
   }
-  if (mode === "whisper-each") {
+  if (mode === "gm") {
     await ChatMessage.create({
       content,
       speaker: ChatMessage.getSpeaker({ actor }),
       whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
       flags
     });
-    return;
+    return { posted: true, mode };
   }
-  // "summary" (default) — emit consolidated card only on terminal events.
-  // "silent" — never emit, ledger is the sole record.
-  if (mode === "summary" && _TERMINAL_RECOVERY_EVENTS.has(eventType)) {
-    await emitRecoverySummary(actor);
-  }
+
+  // silent/critical-routine: ledger + roster are the record.
+  return { posted: false, mode: "ledger" };
+}
+
+/** True only for automated events that deserve an immediate toast. */
+export function shouldNotifyRecoveryEvent(actor, eventType) {
+  if (!actor) return false;
+  if (actor?.hasPlayerOwner || actor?.system?.characterType === "player") return true;
+  // NPC automation is deliberately quiet except for the one state that needs
+  // immediate GM intervention before the next round.
+  return eventType === "shift0-warning" && isOnActiveScene(actor);
 }
 
 export class RestSystem {
   
   /**
-   * Check if actor can attempt Recovery (10 turns rest)
+   * Check if actor can attempt Recovery (10 turns after damage)
    * @param {Actor} actor - The actor to check
    * @returns {Object} {canRest: boolean, reason: string}
    */
@@ -400,7 +428,7 @@ export class RestSystem {
     }
 
     const endRank = actor.system?.abilities?.endurance?.rank || "";
-    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance Rank per day
+    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance rank number
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const maxHealth = actor.system?.attributes?.health?.max ?? 0;
     
@@ -416,19 +444,21 @@ export class RestSystem {
     const today = getCurrentGameDate();
     await actor.setFlag(SCOPE, "lastRecoveryDate", today);
 
-    const message = `${actor.name} recovered ${healAmount} Health (10 turns of rest)`;
-    
-    // Chat message
-    await ChatMessage.create({
+    const message = `${actor.name} recovered ${healAmount} Health (10 turns without further damage)`;
+
+    await postRecoveryCard(actor, {
+      eventType: "recovery-heal",
+      detail: `Health ${currentHealth} → ${newHealth}`,
       content: `<div style="background:#e8f5e9;border:1px solid #4CAF50;padding:8px;border-radius:3px;">
-        <strong>${actor.name}</strong> recovered <strong>${healAmount} Health</strong> after 10 turns of rest.
+        <strong>${actor.name}</strong> recovered <strong>${healAmount} Health</strong> 10 turns after the last damage.
         <div style="margin-top:4px;font-size:0.9em;color:#555;">
           Health: ${currentHealth} → ${newHealth}
         </div>
-      </div>`,
-      speaker: ChatMessage.getSpeaker({ actor })
+      </div>`
     });
 
+    // This method is invoked directly from the sheet, so a small confirmation
+    // toast is useful even when NPC automatic bookkeeping is otherwise quiet.
     ui.notifications.info(message);
     
     if (game.settings.get(SCOPE, "debugMode")) {
@@ -474,14 +504,22 @@ export class RestSystem {
     }
 
     const worldNow = game.time?.worldTime ?? 0;
-    const timeSinceDamage = worldNow - lastDamageWorldTime;
-    const oneHour = 3600; // 1 hour in world seconds
+    const lastHealingWorldTime = actor.getFlag(SCOPE, "lastHealingWorldTime");
+    const remainingSeconds = healingSecondsRemaining({
+      worldNow,
+      lastDamageWorldTime,
+      lastHealingWorldTime,
+      intervalSeconds: 3600
+    });
 
-    if (timeSinceDamage < oneHour) {
-      const remaining = Math.ceil((oneHour - timeSinceDamage) / 60); // minutes
-      return { 
-        canHeal: false, 
-        reason: `Must wait ${remaining} more minutes since last damage (1 hour total)` 
+    if (remainingSeconds == null) {
+      return { canHeal: false, reason: "No healing clock is active" };
+    }
+    if (remainingSeconds > 0) {
+      const remaining = Math.ceil(remainingSeconds / 60);
+      return {
+        canHeal: false,
+        reason: `Must wait ${remaining} more minute(s) before the next hourly Healing`
       };
     }
 
@@ -502,7 +540,7 @@ export class RestSystem {
     }
 
     const endRank = actor.system?.abilities?.endurance?.rank || "";
-    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance Rank per day
+    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance rank number
     const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
     const multiplier = hasMedicalCare ? 2 : 1;
     
@@ -517,22 +555,30 @@ export class RestSystem {
       "system.attributes.health.value": newHealth
     });
 
-    // Clear damage timer
-    await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
-    await actor.unsetFlag(SCOPE, "lastDamageTime"); // legacy cleanup
+    // Healing is repeatable hourly. Preserve the original damage timestamp and
+    // remember this heal as the anchor for the next hour instead of deleting
+    // the clock after the first use.
+    const worldNow = game.time?.worldTime ?? 0;
+    await actor.setFlag(SCOPE, "lastHealingWorldTime", worldNow);
+    try {
+      const autoEnabled = game.settings?.get?.(SCOPE, "autoHealingEnabled") ?? true;
+      if (autoEnabled && newHealth < maxHealth) await ensureHealingEffect(actor, worldNow);
+    } catch (e) {
+      console.warn("[FASERIP WARN] Could not rebase automatic Healing after manual heal:", e);
+    }
 
     const medicalNote = hasMedicalCare ? " (with medical care)" : "";
     const message = `${actor.name} healed ${healAmount} Health${medicalNote}`;
-    
-    // Chat message
-    await ChatMessage.create({
+
+    await postRecoveryCard(actor, {
+      eventType: "healing-tick",
+      detail: `Health ${currentHealth} → ${newHealth}${medicalNote}`,
       content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-        <strong>${actor.name}</strong> healed <strong>${healAmount} Health</strong> after 1 hour${medicalNote}.
+        <strong>${actor.name}</strong> healed <strong>${healAmount} Health</strong> after another hour${medicalNote}.
         <div style="margin-top:4px;font-size:0.9em;color:#555;">
           Health: ${currentHealth} → ${newHealth}
         </div>
-      </div>`,
-      speaker: ChatMessage.getSpeaker({ actor })
+      </div>`
     });
 
     ui.notifications.info(message);
@@ -666,8 +712,11 @@ static async attemptRegainConsciousness(actor) {
         "system.attributes.health.value": enduranceValue
       });
 
-      // Clear damage timer - healing already granted by wake-up, no immediate re-heal
-      await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
+      // Rebase the hourly Healing clock at wake-up. This prevents an immediate
+      // stacked heal while still allowing manual Healing one hour later.
+      const wakeWorldTime = game.time?.worldTime ?? 0;
+      await actor.setFlag(SCOPE, "lastDamageWorldTime", wakeWorldTime);
+      await actor.unsetFlag(SCOPE, "lastHealingWorldTime");
       await actor.unsetFlag(SCOPE, "lastDamageTime"); // legacy cleanup
 
       const message = `${actor.name} regained consciousness with ${enduranceValue} Health!`;
@@ -693,7 +742,7 @@ static async attemptRegainConsciousness(actor) {
         flags: { "msh-faserip": { wakeSuccess: { roll, color } } }
       });
 
-      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
+      if (shouldNotifyRecoveryEvent(actor, "wake-success")) ui.notifications.info(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Consciousness regained:", {
@@ -786,7 +835,7 @@ static async attemptRegainConsciousness(actor) {
         flags: { "msh-faserip": { wakeFail: { rounds, roll, color } } }
       });
 
-      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.warn(message);
+      if (shouldNotifyRecoveryEvent(actor, "wake-fail")) ui.notifications.warn(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Consciousness attempt failed:", {
@@ -960,7 +1009,7 @@ static async attemptRegainConsciousness(actor) {
       </div>`
     });
     
-    if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
+    ui.notifications.info(message);
     
     return { success: true, message };
   }
@@ -1006,11 +1055,9 @@ static async attemptRegainConsciousness(actor) {
       };
     }
 
-    // Get rank names for display
-    const rankNames = [
-      "Shift 0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
-      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-    ];
+    // Use the canonical rank ladder so Shift-0 spelling and Shift-X+ ranks
+    // heal correctly. (An older inline list used "Shift 0" and stopped at UN.)
+    const rankNames = RANKS_ORDERED;
     
     const currentRankIndex = rankNames.indexOf(currentEndurance);
     const originalRankIndex = rankNames.indexOf(originalEndurance);
@@ -1058,7 +1105,7 @@ static async attemptRegainConsciousness(actor) {
         </div>`
       });
       
-      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
+      if (shouldNotifyRecoveryEvent(actor, "fully-recovered")) ui.notifications.info(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Endurance fully restored:", {
@@ -1093,7 +1140,7 @@ static async attemptRegainConsciousness(actor) {
         </div>`
       });
       
-      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
+      if (shouldNotifyRecoveryEvent(actor, "endurance-healed")) ui.notifications.info(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Endurance rank healed:", {
@@ -1122,6 +1169,7 @@ export async function recordDamage(actor) {
   const worldNow = game.time?.worldTime ?? 0;
   await safeActorSetFlag(actor, SCOPE, "lastDamageTime", now);
   await safeActorSetFlag(actor, SCOPE, "lastDamageWorldTime", worldNow);
+  try { await actor.unsetFlag(SCOPE, "lastHealingWorldTime"); } catch (_e) {}
 
   // Interrupt all ongoing effects that are damage-sensitive (Regeneration etc.)
   try {
@@ -1213,7 +1261,7 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   }
 
   // Skip if a Regeneration power supersedes normal healing. Regen-rest and
-  // Regen-solar replace the End-rank/day baseline rather than stacking
+  // Regen-solar replace the End-rank/hour baseline rather than stacking
   // on top, so the generic hourly healer must not co-exist with them.
   const hasRegenRest  = !!actor.getFlag(SCOPE, "ongoing.regeneration");
   const hasRegenSolar = !!actor.getFlag(SCOPE, "ongoing.solarRegeneration");
@@ -1228,7 +1276,7 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
   const multiplier = hasMedicalCare ? 2 : 1;
   const endRank = actor.system?.abilities?.endurance?.rank || "";
-  const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance Rank per day
+  const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance rank number
 
   const config = {
     type: "heal",
@@ -1292,6 +1340,7 @@ export function initRestSystem() {
   // Expose ledger helpers for ongoing-engine and external callers
   game.msh.rest.appendRecoveryLog = appendRecoveryLog;
   game.msh.rest.postRecoveryCard = postRecoveryCard;
+  game.msh.rest.shouldNotifyRecoveryEvent = shouldNotifyRecoveryEvent;
   game.msh.rest.isOnActiveScene = isOnActiveScene;
   
   console.log("FASERIP | Rest system initialized");
