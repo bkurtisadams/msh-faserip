@@ -1,3 +1,6 @@
+// scripts/modules/actions/death-save-action.js v1.11.1 - 2026-08-20
+// v1.11.1: Unconscious duration now uses shared computeDuration so active
+//          combat always counts RAW rounds, even when CTT is enabled.
 // scripts/modules/actions/death-save-action.js v1.11.0 - 2026-08-02
 // v1.11.0: Death-save card's stabilize line is now live buttons
 //          (dying-stabilize-50 / dying-refeat-200 / dying-aid), handled in
@@ -37,6 +40,7 @@ import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "..
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { computeDuration } from "../effects/effect-engine.js";
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {
@@ -391,8 +395,6 @@ export class DeathSaveAction extends BaseAction {
   /** Create an UNCONSCIOUS effect (N rounds) */
   async _createStunnedEffect(actor, unconsciousRounds = 1) {
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-    const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
-    const usesCTT = (cttSyncMode !== "off" && game.modules.get("calendar-time-tracker")?.active === true);
 
     try {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
@@ -421,9 +423,7 @@ export class DeathSaveAction extends BaseAction {
         { key: "system.combatMods.canAct", mode: "override", value: "false" }
       ],
       statuses: ["unconscious"],
-      duration: usesCTT
-        ? { value: Math.max(1, Number(unconsciousRounds)) * 6, units: "seconds" }
-        : { value: Math.max(1, Number(unconsciousRounds)), units: "rounds", expiry: "roundEnd" }
+      duration: computeDuration({ rounds: Math.max(1, Number(unconsciousRounds)), forceCombatRounds: true })
     };
 
     await safeActorCreateEffect(actor, [effectData]);

@@ -1,3 +1,7 @@
+// scripts/modules/effects/effect-engine.js v1.15.1 - 2026-08-20
+// v1.15.1: Combat round durations stay round-based even when CTT is active;
+//          CTT calendar advances must not shorten RAW combat effects. Rules-
+//          critical callers may force round timing even under seconds-only.
 // scripts/modules/effects/effect-engine.js v1.15.0 - 2026-08-02
 // v1.15.0: applyIntensityEffect incapacitated/immobilized/nullified cases
 //          wrote flags at TOP LEVEL (flags.effectType = "..."). v14's
@@ -134,7 +138,7 @@ export function toSeconds(turns = 1) {
  * Falls back to v13 schema ({ seconds, startTime } or { rounds, startRound })
  * if game.release.generation is < 14.
  */
-export function computeDuration({ rounds = null, seconds = null } = {}) {
+export function computeDuration({ rounds = null, seconds = null, forceCombatRounds = false } = {}) {
   const v14 = (game.release?.generation ?? 13) >= 14;
 
   // If explicit seconds provided, honor it (reject Infinity/NaN/<=0)
@@ -149,17 +153,16 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
   if (Number.isFinite(rounds) && rounds > 0) {
     const policy = durationPolicy();
     const inCombat = !!game.combat?.active;
-    const cttActive = !!getCTT();
 
-    // Preferred: keep rounds in combat, seconds out of combat —
-    // BUT only when time is actually advancing via combatRound events.
-    // When CTT is active with sync enabled, time flows through worldTime
-    // advances (CTT's advanceTime), which does NOT tick combat rounds. A
-    // rounds-based duration in that setup has no countdown source and the
-    // AE persists indefinitely. Symptom: Slammed/Stunned/Grabbed and the
-    // like stuck on tokens after combat ends. Convert to seconds under
-    // CTT regardless of combat state so the tracker can decrement them.
-    if (inCombat && !cttActive && (policy === "rounds-in-combat" || policy === "auto")) {
+    // FASERIP's rules unit is the round/turn, not Foundry's combatant turn.
+    // Keep round-limited combat effects attached to Foundry rounds even when
+    // CTT is active. CTT is allowed to mirror calendar time, but its worldTime
+    // advances must not consume Stun/KO/other round durations multiple times
+    // inside one FASERIP round. The explicit seconds-only policy remains an
+    // opt-in escape hatch for worlds that truly want wall-clock durations.
+    // Callers with rules-critical round timers (e.g. 0-Health knockout) pass
+    // forceCombatRounds so even that policy cannot alter RAW combat timing.
+    if (inCombat && (forceCombatRounds || policy !== "seconds-only")) {
       if (v14) {
         return { value: rounds, units: "rounds", expiry: "roundEnd" };
       }
@@ -169,7 +172,7 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
       };
     }
 
-    // Outside combat OR CTT-active: convert to real time
+    // Outside combat (or explicit seconds-only policy): convert to real time.
     const s = toSeconds(rounds);
     if (s <= 0) return {}; // toSeconds couldn't produce a valid count
     if (v14) {

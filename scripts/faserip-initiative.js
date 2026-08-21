@@ -1,3 +1,6 @@
+// faserip-initiative.js v2.3.2 - 2026-08-20
+// v2.3.2: Initiative cursor positioning is marked mshNoTimeAdvance so CTT
+//         Per Combatant Turn mode does not treat phase setup as elapsed time.
 // faserip-initiative.js v2.3.1 - 2026-06-25
 // v2.3.1: Set a speaker on all initiative chat cards (side/individual/tie). Speaker-less
 //         messages left the header sender empty, collapsing the metadata column and
@@ -688,7 +691,7 @@ export class FaseripInitiative {
       // Set turn to first winner
       await combat.setupTurns();
       const turnIndex = this._findFirstWinnerTurn(combat, goesFirst);
-      await combat.update({ turn: turnIndex });
+      await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
 
       // Highlight
       setTimeout(() => {
@@ -771,7 +774,7 @@ export class FaseripInitiative {
       await combat.setupTurns();
       const turnIndex = combat.turns.length ? 0 : -1;
       if (turnIndex >= 0) {
-        await combat.update({ turn: turnIndex });
+        await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
         setTimeout(() => {
           try {
             ui.combat?.scrollToTurn?.();

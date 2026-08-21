@@ -1,3 +1,6 @@
+// scripts/modules/rest-system.js v1.4.8 - 2026-08-20
+// v1.4.8: Failed wake-up retry timers use shared round-aware duration logic;
+//         active combat no longer turns N RAW rounds into CTT wall-clock seconds.
 // scripts/modules/rest-system.js v1.4.7 - 2026-05-14
 // v1.4.7: ensureHealingEffect now short-circuits when Regen-rest or
 //         Regen-solar is configured on the actor. The generic hourly
@@ -106,6 +109,7 @@ import { getFlagScope } from "./actions/flags.js";
 import { safeActorSetFlag } from "../gm-utils.js";
 import { RANKS_ORDERED, rankValue } from "../rules/rules-reference.js";
 import { getCurrentGameDate } from "./effects/ongoing-engine.js";
+import { computeDuration } from "./effects/effect-engine.js";
 
 const SCOPE = getFlagScope();
 
@@ -736,13 +740,10 @@ static async attemptRegainConsciousness(actor) {
       // Failed - remain unconscious for 1-10 more rounds
       const rounds = Math.floor(Math.random() * 10) + 1;
 
-      // Create new Unconscious effect. Always use seconds-based duration
-      // regardless of game.combat state — rounds-based durations only decrement
-      // on combatRound events, but time advancement in this system routes
-      // primarily through CTT's worldTime-based advanceTime, which won't tick
-      // a rounds duration. The parallel path at death-save-action.js:361 uses
-      // seconds unconditionally for the same reason; the "N rounds" label is
-      // purely display. rounds * 6 gives the correct wallclock equivalent.
+      // Create a new Unconscious effect. During active combat this is a RAW
+      // round duration; outside combat the shared duration helper converts the
+      // same number of FASERIP turns to elapsed seconds. CTT must never make a
+      // combat knockout expire merely because the combatant cursor changed.
       const effectData = {
         name: `Unconscious (${rounds} rounds)`,
         img: "icons/svg/unconscious.svg",
@@ -757,7 +758,7 @@ static async attemptRegainConsciousness(actor) {
           { key: "system.combatMods.canAct", mode: "override", value: "false" }
         ],
         statuses: ["unconscious"],
-        duration: { value: Math.max(1, rounds) * 6, units: "seconds", expiry: "turnStart" }
+        duration: computeDuration({ rounds: Math.max(1, rounds), forceCombatRounds: true })
       };
       
       await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);

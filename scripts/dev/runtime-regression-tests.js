@@ -364,6 +364,32 @@ async function testCttIntegration(recorder, combat) {
         { calls: [...calls], combatRound: combat.round, combatTurn: combat.turn }
       );
 
+      // RAW phase/initiative code may reposition Foundry's combatant cursor
+      // without any game time elapsing. That update must not advance CTT.
+      calls.length = 0;
+      const internalTurn = combat.turn === 0 && (combat.turns?.length ?? 0) > 1 ? 1 : 0;
+      await combat.update({ turn: internalTurn }, { mshNoTimeAdvance: true });
+      await sleep(100);
+      recorder.assert(
+        calls.length === 0,
+        "CTT ignores internal initiative/phase cursor positioning",
+        { calls: [...calls], combatRound: combat.round, combatTurn: combat.turn }
+      );
+
+      // RAW Turn Phases subdivide a single FASERIP round. Even if the world
+      // setting still says Per Combatant Turn, a cursor move must not tick CTT.
+      await game.settings.set(SYSTEM_ID, "useRawTurnPhases", true);
+      calls.length = 0;
+      const rawPhaseTurn = combat.turn === 0 ? 1 : 0;
+      await combat.update({ turn: rawPhaseTurn });
+      await sleep(100);
+      recorder.assert(
+        calls.length === 0,
+        "RAW Turn Phases normalize CTT sync to per-round timing",
+        { calls: [...calls], combatRound: combat.round, combatTurn: combat.turn }
+      );
+      await game.settings.set(SYSTEM_ID, "useRawTurnPhases", false);
+
       // Per Round: the system and CTT's compatibility bridge must not both advance.
       await game.settings.set(SYSTEM_ID, "ctt.syncMode", "round");
       calls.length = 0;
@@ -576,6 +602,7 @@ export async function runBootstrapRuntimeTests({ keepArtifacts = false, postChat
     await preserveSetting(SYSTEM_ID, "combatSyncEnabled", state.settings, false);
     await preserveSetting(SYSTEM_ID, "ctt.syncMode", state.settings, "off");
     await preserveSetting(SYSTEM_ID, "ctt.timeAuthority", state.settings, false);
+    await preserveSetting(SYSTEM_ID, "useRawTurnPhases", state.settings, false);
     await preserveSetting(SYSTEM_ID, "turnSeconds", state.settings, 11);
 
     const schemaActor = await testRuntimeSchema(recorder, state);

@@ -1,3 +1,6 @@
+// action-utils.js v1.8.16 - 2026-08-20
+// v1.8.16: Four-Color knockout uses shared round-aware duration handling so
+//          active CTT time cannot shorten a combat KO.
 // action-utils.js v1.8.15 - 2026-08-06
 // v1.8.15: getBodyArmorValues — applicable (upstream pre-subtraction) is now
 //          Body-Armor-only via baPhysicalArmor/baEnergyArmor accumulators.
@@ -2180,7 +2183,7 @@ export async function _applyFourColorKnockout(actor, rounds) {
       await safeActorDeleteEffects(actor, existing.map(e => e.id), { mshReplacing: true });
     }
   } catch (_e) {}
-  const inCombat = !!game.combat;
+  const { computeDuration } = await import("../effects/effect-engine.js");
   const effectData = {
     name: `Unconscious (${rounds} rounds)`,
     icon: "icons/svg/unconscious.svg",
@@ -2190,9 +2193,7 @@ export async function _applyFourColorKnockout(actor, rounds) {
       { key: "system.combatMods.canAct", mode: "override", value: "false" }
     ],
     statuses: ["unconscious"],
-    duration: inCombat
-      ? { value: Math.max(1, Number(rounds)), units: "rounds", expiry: "roundEnd" }
-      : { value: Math.max(1, Number(rounds)) * 6, units: "seconds" }
+    duration: computeDuration({ rounds: Math.max(1, Number(rounds)), forceCombatRounds: true })
   };
   await safeActorCreateEffect(actor, [effectData]);
   console.log(`[FASERIP] Four-Color knockout: ${actor.name} unconscious for ${rounds} rounds`);

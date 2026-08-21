@@ -1,4 +1,9 @@
-﻿// init.js v1.13.1 - 2026-08-01
+﻿// init.js v1.13.2 - 2026-08-20
+// v1.13.2: Fix FASERIP/CTT combat timing boundary. RAW combat effects are
+//          round-bound even when CTT is active; phase/initiative cursor changes
+//          can suppress clock advance; CTT timeAdvanced no longer processes
+//          dying/poison during active combat (combatRound is authoritative).
+// init.js v1.13.1 - 2026-08-01
 // v1.13.1: CTT timeAdvanced site passes deltaSeconds as pendingSeconds to
 //          processPoisonRound (CTT fires pre-worldTime-advance).
 // init.js v1.13.0 - 2026-08-01
@@ -1389,7 +1394,7 @@ Hooks.once("init", async () => {
 
     game.settings.register("msh-faserip", "ctt.syncMode", {
       name: "CTT Sync Mode",
-      hint: "Advance Calendar Time Tracker when combat advances.",
+      hint: "Advance Calendar Time Tracker when combat advances. RAW Turn Phases always use one CTT tick per FASERIP round; Per Combatant Turn applies only when RAW phases are disabled.",
       scope: "world", config: true, type: String,
       choices: {
         "off": "Off",
@@ -1520,15 +1525,13 @@ Hooks.once("init", async () => {
     Hooks.on("timeTracker.timeAdvanced", async (amount, unitId) => {
       Hooks.callAll("msh-faserip.timeUpdated");
 
-      // Process dying whenever CTT manually advances time (in OR out of combat).
-      // If ctt.syncMode also fires this after a combatRound hook, the dedup stamp
-      // in processDyingRound (lastProcessedWorldTime) blocks the duplicate.
+      // CTT is a calendar clock, not the combat-round authority. During an active
+      // combat, processDyingRound/processPoisonRound are owned exclusively by the
+      // combatRound hook (one Foundry round = one FASERIP turn). CTT may still
+      // advance world time for display/calendar purposes, but that must not create
+      // extra combat-effect ticks when the combatant cursor or RAW phase changes.
       if (!game.user.isGM) return;
-
-      // Guard against re-entrant calls while an async processDyingRound is in flight
-      // Also skip if combatRound hook is already processing dying (race condition fix)
-      if (game.msh._cttDyingInProgress || game.msh._dyingInProgress) return;
-      game.msh._cttDyingInProgress = true;
+      const combatOwnsRoundTicks = !!game.combat?.active;
 
       // Convert the CTT advancement directly to seconds (hoisted so healing block can read it)
       const cttModule = game.modules.get("calendar-time-tracker");
@@ -1542,38 +1545,40 @@ Hooks.once("init", async () => {
         deltaSeconds = Number(amount) * 6;
       }
 
-      try {
-        const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
-        const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+      if (!combatOwnsRoundTicks && !game.msh._cttDyingInProgress && !game.msh._dyingInProgress) {
+        game.msh._cttDyingInProgress = true;
+        try {
+          const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+          const { processPoisonRound } = await import("./modules/effects/poison-engine.js");
+          const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
 
-        // Process 1 dying round per character per CTT advance.
-        // During combat, combatRound hook handles dying (1 per round).
-        // Out of combat, each manual CTT advance ticks dying once â€” GM controls pacing.
-        for (const actor of Effects.getAllTokenActors()) {
-          if (!actor?.effects?.size) continue;
-          // Poison BEFORE dying (priority + governor stamp)
-          const poisonAE = actor.effects.find(e =>
-            e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
-          );
-          if (poisonAE) {
-            console.log(`[FASERIP:POISON] CTT timeAdvanced: processing poison for ${actor.name} (pending ${deltaSeconds}s)`);
-            await processPoisonRound(actor, { pendingSeconds: deltaSeconds });
+          // Outside combat, a manual CTT advance may represent elapsed FASERIP
+          // time. Process the ongoing states once for that explicit advance.
+          for (const actor of Effects.getAllTokenActors()) {
+            if (!actor?.effects?.size) continue;
+            // Poison BEFORE dying (priority + governor stamp)
+            const poisonAE = actor.effects.find(e =>
+              e.flags?.[scope]?.ongoingId === "poison" && !e.disabled
+            );
+            if (poisonAE) {
+              console.log(`[FASERIP:POISON] CTT timeAdvanced: processing poison for ${actor.name} (pending ${deltaSeconds}s)`);
+              await processPoisonRound(actor, { pendingSeconds: deltaSeconds });
+            }
+            const dyingAE = actor.effects.find(e =>
+              (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
+              !e.disabled
+            );
+            if (!dyingAE) continue;
+
+            console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s â€” processing 1 dying round for ${actor.name}`);
+            const result = await processDyingRound(actor);
+            console.log(`[FASERIP:DYING] CTT: ${actor.name} â†’ ${result}`);
           }
-          const dyingAE = actor.effects.find(e =>
-            (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
-            !e.disabled
-          );
-          if (!dyingAE) continue;
-
-          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s â€” processing 1 dying round for ${actor.name}`);
-          const result = await processDyingRound(actor);
-          console.log(`[FASERIP:DYING] CTT: ${actor.name} â†’ ${result}`);
+        } catch (e) {
+          console.error("[FASERIP ERROR] CTT dying processing failed:", e);
+        } finally {
+          game.msh._cttDyingInProgress = false;
         }
-      } catch (e) {
-        console.error("[FASERIP ERROR] CTT dying processing failed:", e);
-      } finally {
-        game.msh._cttDyingInProgress = false;
       }
 
       // Process impaired Endurance healing on any forward advance.
@@ -3151,6 +3156,18 @@ Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
   // Allow intentional deletions (from our own code)
   if (options?.mshIntentional) return;
 
+  // Protect RAW round-bound knockout timers from external clock expiry while
+  // combat is active. CTT/worldTime may advance for UI/calendar reasons, but
+  // an Unconscious duration written in rounds is allowed to disappear only
+  // when Foundry's combat-round countdown has actually reached zero.
+  const wakeTimer = effect.flags?.[scope]?.fromDeathSave || effect.flags?.[scope]?.fromConsciousnessFail;
+  const duration = effect.duration ?? {};
+  const roundUnits = duration.units === "rounds" || duration.units === "turns";
+  if (wakeTimer && game.combat?.active && roundUnits && Number.isFinite(duration.remaining) && duration.remaining > 0) {
+    console.log(`[FASERIP] Blocked premature knockout expiry for ${effect.parent?.name}: ${duration.remaining} round(s) remain`);
+    return false;
+  }
+
   // Protect regeneration AEs
   if (ongoingId === "regeneration") {
     console.log(`[FASERIP] Blocked auto-expiration of Regeneration AE on ${effect.parent?.name}`);
@@ -3662,7 +3679,7 @@ Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
       });
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
-Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
+Hooks.on("updateCombat", async (combat, changed, options, userId) => {
   // GM-only â€“ players don't mutate actors/effects here
   if (!game.user.isGM) return;
 
@@ -3691,7 +3708,12 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   // the same unit in MSH). Labels below are Foundry's: "Per Round" is RAW
   // (6s per Foundry round); "Per Turn" is the house-rule faster clock
   // (6s per combatant turn). Combatant count is not a rules quantity.
-  const syncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+  const configuredSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+  const rawTurnPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+  // RAW FASERIP phases are subdivisions of ONE six-second round. A Foundry
+  // combatant cursor change inside those phases cannot represent additional
+  // elapsed time, so RAW phase mode always normalizes CTT sync to per-round.
+  const syncMode = (rawTurnPhases && configuredSyncMode === "turn") ? "round" : configuredSyncMode;
   if (syncMode === "round" && "round" in changed) {
     try {
       const lastSynced = combat.getFlag("msh-faserip", "cttSyncedRound") ?? (combat.round - 1);
@@ -3701,9 +3723,10 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         Effects.advanceCTTByTurns(roundsPassed);
       }
     } catch (e) { console.warn("[FASERIP WARN] CTT combat sync failed:", e); }
-  } else if (syncMode === "turn" && ("turn" in changed || "round" in changed)) {
-    // Dedup guard above already keys on `${round}-${turn}`, so this fires
-    // exactly once per combatant turn.
+  } else if (syncMode === "turn" && "turn" in changed && !options?.mshNoTimeAdvance) {
+    // House rule only: advance for a genuine combatant-turn change. Internal
+    // initiative/phase cursor positioning passes mshNoTimeAdvance so selecting
+    // the first actor for a side is not mistaken for elapsed game time.
     try {
       Effects.advanceCTTByTurns(1);
     } catch (e) { console.warn("[FASERIP WARN] CTT combat sync failed:", e); }
