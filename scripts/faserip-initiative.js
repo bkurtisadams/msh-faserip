@@ -1,3 +1,6 @@
+// faserip-initiative.js v2.5.2 - 2026-08-21
+// v2.5.2: Remove dead chat pre-action button wiring, dead _positionTurnToSide,
+//         and duplicate _findFirstWinnerTurn (folded into _firstEligibleTurnIndexForSide).
 // faserip-initiative.js v2.5.1 - 2026-08-21
 // v2.5.1: Make Pre-Action close an atomic phase+cursor update and carry unchanged
 //         declarations forward between rounds so Initiative itself confirms them.
@@ -315,13 +318,9 @@ export class FaseripInitiative {
       return false;
     });
 
-    // Chat card button handlers
+    // Chat card handlers
     Hooks.on("renderChatMessageHTML", (msg, html) => {
       const root = html instanceof HTMLElement ? html : html[0] ?? html;
-      const buttons = root.querySelectorAll(".faserip-preaction-btn, .faserip-change-action-btn");
-      for (const btn of buttons) {
-        btn.addEventListener("click", (ev) => this._onPreActionButton(ev));
-      }
       // Collapsible step list toggle
       const toggle = root.querySelector(".faserip-steps-toggle");
       if (toggle) {
@@ -691,11 +690,6 @@ export class FaseripInitiative {
   static _firstEligibleTurnIndex(combat) {
     if (!combat?.turns?.length) return -1;
     return combat.turns.findIndex(t => this._isInitiativeEligible(combat.combatants.get(t.id) ?? t));
-  }
-
-  static async _positionTurnToSide(combat, side) {
-    const idx = this._firstEligibleTurnIndexForSide(combat, side);
-    if (idx >= 0) await combat.update({ turn: idx }, { mshNoTimeAdvance: true });
   }
 
   static async _positionTurnToFirstEligible(combat) {
@@ -1184,7 +1178,7 @@ export class FaseripInitiative {
       if (rawPhases) {
         await this._setPhase(combat, this.PHASE_PREACTION);
       } else {
-        const turnIndex = this._findFirstWinnerTurn(combat, goesFirst);
+        const turnIndex = this._firstEligibleTurnIndexForSide(combat, goesFirst);
         if (turnIndex >= 0) await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
       }
 
@@ -1303,16 +1297,6 @@ export class FaseripInitiative {
     return best;
   }
 
-  static _findFirstWinnerTurn(combat, goesFirst) {
-    const candidates = combat.turns
-      .map((t, index) => ({ t, index, c: combat.combatants.get(t.id) ?? t }))
-      .filter(x => this._isInitiativeEligible(x.c) && this._getCombatantSide(x.c) === goesFirst);
-    if (!candidates.length) return -1;
-    const toNum = v => Number(v ?? -Infinity);
-    const maxInit = Math.max(...candidates.map(x => toNum(x.t.initiative)));
-    return candidates.find(x => toNum(x.t.initiative) === maxInit)?.index ?? candidates[0].index;
-  }
-
   static async _ensureSideFlags(combat) {
     const updates = [];
     for (const c of this._trackedCombatants(combat)) {
@@ -1387,11 +1371,6 @@ export class FaseripInitiative {
       }
     });
     ui.combat?.render(true);
-  }
-
-  // Legacy chat card handler — delegates to tracker handler.
-  static async _onPreActionButton(ev) {
-    return this._onTrackerActionButton(ev);
   }
 
   static async _rollMultipleAttacksPreAction(actor, combatant, requirement) {

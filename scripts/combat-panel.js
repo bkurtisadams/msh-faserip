@@ -1,3 +1,7 @@
+// combat-panel.js v1.7.1 - 2026-08-21
+// v1.7.1: Fix hook unregistration (Hooks.off needs hook name + id; ids alone were
+//         silently ignored, leaking render hooks after close). Pip side coloring
+//         now uses the initiative side flag. Status durations read v14 remaining.
 // combat-panel.js v1.7.0 - 2026-03-06
 // v1.7.0: Separate active (gold) vs selected (cyan) pip states. Click selects/inspects
 //         without changing turn. Turn buttons advance active. Context menu "Set as Active Turn".
@@ -100,7 +104,11 @@ function getStatuses(actor) {
     else if (/grappl|held|restrain/i.test(name)) cls = "grappled";
     let dur = "";
     const d = ef.duration;
-    if (d?.rounds) {
+    if (Number.isFinite(d?.remaining) && d.remaining > 0) {
+      const units = String(d.units || "").toLowerCase();
+      const remaining = units === "seconds" ? Math.ceil(d.remaining / 6) : Math.ceil(d.remaining);
+      if (remaining > 0) dur = ` ${remaining}`;
+    } else if (d?.rounds) {
       const elapsed = (game.combat?.round || 0) - (d.startRound || 0);
       const remaining = d.rounds - elapsed;
       if (remaining > 0) dur = ` ${remaining}`;
@@ -229,6 +237,7 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
       const hpMax = a?.system?.attributes?.health?.max ?? 1;
       const hpPct = Math.round((hp / hpMax) * 100);
       const disposition = c.token?.disposition ?? 0;
+      const side = c.getFlag?.("msh-faserip", "side") ?? (disposition === -1 ? "npc" : "pc");
       return {
         id: c.id,
         idx,
@@ -239,8 +248,8 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
         defeated,
         hidden,
         hpPct,
-        hostile: disposition === -1,
-        friendly: disposition >= 0,
+        hostile: side === "npc",
+        friendly: side === "pc",
         initiative: c.initiative ?? "—",
         tokenId: c.token?.id || "",
       };
@@ -262,35 +271,36 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
   _registerHooks() {
     if (this._hooksRegistered) return;
     this._hooksRegistered = true;
+    const on = (hook, fn) => [hook, Hooks.on(hook, fn)];
     this._hookIds = [
-      Hooks.on("updateCombat", () => this.render(false)),
-      Hooks.on("combatTurn", () => this.render(false)),
-      Hooks.on("combatRound", () => this.render(false)),
-      Hooks.on("deleteCombat", () => this.render(false)),
-      Hooks.on("createCombat", () => this.render(false)),
-      Hooks.on("updateActor", (a) => {
+      on("updateCombat", () => this.render(false)),
+      on("combatTurn", () => this.render(false)),
+      on("combatRound", () => this.render(false)),
+      on("deleteCombat", () => this.render(false)),
+      on("createCombat", () => this.render(false)),
+      on("updateActor", (a) => {
         const id = this._actorId;
         if (id && (a.id === id || a.token?.id === this.token?.id)) this.render(false);
       }),
-      Hooks.on("createActiveEffect", (e) => {
+      on("createActiveEffect", (e) => {
         const parent = e.parent;
         const id = this._actorId;
         if (id && (parent?.id === id || parent?.actor?.id === id)) this.render(false);
       }),
-      Hooks.on("deleteActiveEffect", (e) => {
+      on("deleteActiveEffect", (e) => {
         const parent = e.parent;
         const id = this._actorId;
         if (id && (parent?.id === id || parent?.actor?.id === id)) this.render(false);
       }),
-      Hooks.on("targetToken", () => this.render(false)),
-      Hooks.on("updateToken", () => this.render(false)),
-      Hooks.on("updateCombatant", () => this.render(false)),
+      on("targetToken", () => this.render(false)),
+      on("updateToken", () => this.render(false)),
+      on("updateCombatant", () => this.render(false)),
     ];
   }
 
   _unregisterHooks() {
     if (!this._hooksRegistered) return;
-    for (const id of this._hookIds || []) Hooks.off(id);
+    for (const [hook, id] of this._hookIds || []) Hooks.off(hook, id);
     this._hookIds = [];
     this._hooksRegistered = false;
   }
