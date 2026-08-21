@@ -49,4 +49,11 @@ ok(/faserip-declaration-chip private/.test(initiative), 'NPC declaration details
 ok(/player declarations/.test(initiative) && /rollBtn\.disabled = !prog\.complete/.test(initiative), 'initiative waits for eligible player declarations by default');
 ok(/sideMode \? this\.PHASE_ACTIONS_WINNER : this\.PHASE_ACTIONS/.test(initiative), 'individual initiative gets a generic action phase instead of side winner/loser phases');
 
+
+ok(/static _trackedCombatants\(combat\)/.test(initiative) && /Array\.from\(combat\.turns \?\? \[\]\)/.test(initiative), 'declaration roster is scoped to Foundry combat.turns');
+ok(/const all = this\._eligibleCombatants\(combat\)/.test(initiative), 'declaration progress derives only from tracked eligible combatants');
+ok(/for \(const c of this\._trackedCombatants\(combat\)\)/.test(initiative), 'side initiative ignores stale/non-tracker combatant documents');
+ok(/const trackedIds = new Set\(this\._trackedCombatants\(combat\)/.test(initiative), 'individual initiative ignores stale/non-tracker combatant documents');
+ok(/_resolveCombatForCombatant\(combatantId\)/.test(initiative) && /ui\.combat\?\.viewed/.test(initiative), 'tracker controls resolve the viewed combat instead of blindly using game.combat');
+
 console.log(`initiative/declaration workflow tests passed (${n} assertions)`);

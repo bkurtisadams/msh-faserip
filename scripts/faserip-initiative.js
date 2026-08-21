@@ -248,7 +248,7 @@ export class FaseripInitiative {
         // Clear round-scoped declaration/pre-action state. Last declaration
         // memory is intentionally retained as a convenience for the next round.
         const clearOps = [];
-        for (const c of combat.combatants) {
+        for (const c of this._trackedCombatants(combat)) {
           const op = { _id: c.id };
           let changed = false;
           for (const flag of ["declaredAction", "preActionResolved", "changeActionAttempted"]) {
@@ -513,8 +513,29 @@ export class FaseripInitiative {
     return !blocked;
   }
 
+  // Combat.turns is the authoritative roster represented by Foundry's combat
+  // tracker. Combat.combatants may transiently contain stale/non-turn documents
+  // (for example after token/scene changes), which must never gate declarations
+  // or contribute initiative.
+  static _trackedCombatants(combat) {
+    if (!combat) return [];
+    const turns = Array.from(combat.turns ?? []);
+    if (turns.length || combat.started) return turns.filter(c => c?.id && c?.actor);
+    // Before a combat has started Foundry may not have built turns yet. Keep the
+    // fallback conservative: only documents with a usable actor/token identity.
+    return Array.from(combat.combatants ?? []).filter(c => c?.id && c?.actor && (!c.tokenId || c.token));
+  }
+
   static _eligibleCombatants(combat) {
-    return Array.from(combat?.combatants ?? []).filter(c => this._isInitiativeEligible(c));
+    return this._trackedCombatants(combat).filter(c => this._isInitiativeEligible(c));
+  }
+
+  static _resolveCombatForCombatant(combatantId) {
+    if (!combatantId) return game.combat ?? null;
+    const viewed = ui.combat?.viewed;
+    if (viewed?.combatants?.has?.(combatantId)) return viewed;
+    if (game.combat?.combatants?.has?.(combatantId)) return game.combat;
+    return game.combats?.find?.(c => c.combatants?.has?.(combatantId)) ?? null;
   }
 
   static _getPlayerDeclarationProgress(combat) {
@@ -925,7 +946,7 @@ export class FaseripInitiative {
       // Intuition or Talent initiative bonuses.
       const pcCombatants = [];
       const npcCombatants = [];
-      for (const c of combat.combatants) {
+      for (const c of this._trackedCombatants(combat)) {
         if (!this._isInitiativeEligible(c)) continue;
         const side = this._getCombatantSide(c);
         (side === "pc" ? pcCombatants : npcCombatants).push(c);
@@ -1073,7 +1094,8 @@ export class FaseripInitiative {
 
     try {
       // If no ids specified, roll for all combatants
-      const combatantIds = (ids?.length ? ids : combat.combatants.map(c => c.id))
+      const trackedIds = new Set(this._trackedCombatants(combat).map(c => c.id));
+      const combatantIds = (ids?.length ? ids.filter(id => trackedIds.has(id)) : Array.from(trackedIds))
         .filter(id => this._isInitiativeEligible(combat.combatants.get(id)));
       const results = [];
 
@@ -1181,7 +1203,7 @@ export class FaseripInitiative {
 
   static async _ensureSideFlags(combat) {
     const updates = [];
-    for (const c of combat.combatants) {
+    for (const c of this._trackedCombatants(combat)) {
       const correct = this._determineSide(c);
       if (c.getFlag("msh-faserip", "side") !== correct) {
         updates.push({ _id: c.id, "flags.msh-faserip.side": correct });
@@ -1200,9 +1222,9 @@ export class FaseripInitiative {
     const action = btn.dataset.action;
     const actorId = btn.dataset.actorId;
     const combatantId = btn.dataset.combatantId;
-    const combat = game.combat;
+    const combat = this._resolveCombatForCombatant(combatantId);
     const combatant = combat?.combatants?.get(combatantId);
-    const actor = game.actors.get(actorId) ?? combatant?.actor;
+    const actor = combatant?.actor ?? game.actors.get(actorId);
     if (!actor || !combatant) return ui.notifications.warn("Combatant not found");
     if (!actor.isOwner && !game.user.isGM) return ui.notifications.warn("You don't have permission to act for this character");
 
@@ -1272,7 +1294,7 @@ export class FaseripInitiative {
         onResult: async result => {
           await this._setCombatantFlags(combatant, {
             preActionResolved: {
-              round: game.combat?.round ?? null,
+              round: combatant.parent?.round ?? this._resolveCombatForCombatant(combatant.id)?.round ?? null,
               action: "multiattack",
               result: result.resultColor,
               success: !!result.success,
@@ -1291,7 +1313,7 @@ export class FaseripInitiative {
   // Declaration dialog. RAW declarations are represented in the combat tracker,
   // not posted as public chat spam. NPC details are rendered GM-only.
   static async _showDeclarationDialog(actor, combatantId, { isChange = false } = {}) {
-    const combat = game.combat;
+    const combat = this._resolveCombatForCombatant(combatantId);
     if (!combat) return null;
     const combatant = combat.combatants.get(combatantId);
     if (!combatant) return null;
@@ -1405,7 +1427,7 @@ export class FaseripInitiative {
   // RAW Change Action: Yellow Agility FEAT. Success permits a replacement
   // declaration and applies -1CS to every subsequent FEAT this round.
   static async _rollChangeAction(actor, combatantId) {
-    const combat = game.combat;
+    const combat = this._resolveCombatForCombatant(combatantId);
     const combatant = combat?.combatants?.get(combatantId);
     if (!combatant || this._getPhase(combat) !== this.PHASE_PREACTION) return;
     const attempted = combatant.getFlag("msh-faserip", "changeActionAttempted");
