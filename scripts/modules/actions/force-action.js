@@ -630,7 +630,7 @@ export class ForceAction extends RangedAttackAction {
       });
     });
 
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Handle adjacent multi
     if (choice.multiAdjacent) {

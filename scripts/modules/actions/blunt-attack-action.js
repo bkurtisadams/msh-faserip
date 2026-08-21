@@ -888,7 +888,7 @@ export class BluntAttackAction extends AttackAction {
       });
     });
     
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // The helper spent their action on the Combined FEAT; once the primary
     // commits an attack using that assist, consume it even if the attack misses.

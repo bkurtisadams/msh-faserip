@@ -537,7 +537,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
       });
     });
 
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Mode already set by setupModeSelector during dialog render
     const mode = this.opts.mode;

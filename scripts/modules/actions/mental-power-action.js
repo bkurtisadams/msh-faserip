@@ -375,7 +375,7 @@ export class MentalPowerAction extends BaseAction {
         });
       });
 
-      if (!choice) return;
+      if (!choice) return { rawActionCancelled: true };
 
       let required, requiredReason;
       if (outOfRange) {

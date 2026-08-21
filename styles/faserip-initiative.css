@@ -716,3 +716,94 @@
 }
 .faserip-declare-field > span { font-weight: 600; }
 .faserip-declare-field input { width: 100%; }
+
+/* =====================
+   RAW STATE MACHINE — v2.5
+   ===================== */
+.faserip-action-used {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+  border: 1px solid rgba(23,107,44,.35);
+  border-radius: 3px;
+  font-size: 9px;
+  line-height: 14px;
+  color: #176b2c;
+  background: rgba(23,107,44,.08);
+  white-space: nowrap;
+}
+
+.faserip-preaction-progress.complete { color: #d9ffd9; }
+
+.faserip-npc-plan-btn {
+  width: auto;
+  padding-inline: 6px;
+  gap: 3px;
+  font-size: .82em;
+  font-weight: 600;
+}
+
+.faserip-npc-plan-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.faserip-npc-plan-dialog .hint {
+  margin: 0;
+  color: #666;
+  font-size: .9em;
+}
+.faserip-npc-plan-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 8px;
+  max-height: 250px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: rgba(0,0,0,.025);
+}
+.faserip-npc-plan-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 5px;
+  align-items: center;
+  padding: 2px 3px;
+}
+.faserip-npc-plan-row input { grid-row: 1 / 3; }
+.faserip-npc-plan-row small {
+  color: #777;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.faserip-npc-plan-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.faserip-npc-plan-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: .9em;
+}
+.faserip-npc-plan-fields label:last-child { grid-column: 1 / -1; }
+.faserip-npc-plan-fields .faserip-npc-plan-check { grid-column: 1 / -1; }
+.faserip-npc-plan-fields .faserip-npc-plan-check > span:last-child { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+/* Foundry still has an internal turn cursor during Declaration/Pre-Action; mute
+   its visual emphasis because RAW has no acting combatant yet. */
+.faserip-raw-nonaction .combatant.active {
+  font-weight: inherit;
+  box-shadow: none;
+}
+.faserip-raw-nonaction .combatant.pc-side.active {
+  background: rgba(0,100,0,.06);
+  border-left-color: rgba(0,100,0,.5);
+}
+.faserip-raw-nonaction .combatant.npc-side.active {
+  background: rgba(139,0,0,.06);
+  border-left-color: rgba(139,0,0,.5);
+}

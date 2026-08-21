@@ -18,6 +18,7 @@ import { debugLog } from "./action-utils.js";
 import { MentalPowerAction } from "./mental-power-action.js";
 import { GrenadeAction } from "./grenade-action.js";
 import { IntensityAction } from "./intensity-action.js";
+import { authorizeRawAction, RAW_VOLUNTARY_TYPES } from "../../rules/raw-combat-state.js";
 
 // Anchor: mode resolver (safe even if settings not registered yet)
 export function resolveCombatMode(actor) {
@@ -152,133 +153,49 @@ async function rawDeclarationGate(actor, type, opts = {}) {
     initiativeMode = game.settings.get("msh-faserip", "initiativeMode") || "side";
   } catch { enabled = false; }
   const combat = game.combat;
-  // Standard Foundry initiative intentionally does not use the FASERIP
-  // declaration-phase controller even if an old world left the RAW toggle on.
-  if (!enabled || initiativeMode === "foundry" || !combat?.started || !actor) return { ok: true };
-  const voluntary = new Set([
-    "blunt-attack", "edged-attack", "shooting", "throwing-edged", "throwing-blunt",
-    "energy", "force", "mental-power", "grenade", "grappling", "grabbing", "charging",
-    "dodging", "evading", "blocking"
-  ]);
-  if (!voluntary.has(type)) return { ok: true };
+  if (!enabled || initiativeMode === "foundry" || !combat?.started || !actor) return { ok: true, consumesCombatAction: false };
+  if (!RAW_VOLUNTARY_TYPES.has(type)) return { ok: true, consumesCombatAction: false };
 
-  const combatant = combat.combatants.find(c => c.actor?.id === actor.id || c.actor?.uuid === actor.uuid);
-  if (!combatant) return { ok: true };
-  let phase = combat.getFlag("msh-faserip", "turnPhase") || "declare";
-  const decl = combatant.getFlag("msh-faserip", "declaredAction");
-  if (!decl?.type) return { ok: false, message: `${actor.name} has not declared an action this round.` };
+  // Scope strictly to the actual turn roster shown by Foundry. A stale Combatant
+  // document that is not in combat.turns must not gate or consume an action.
+  const combatant = Array.from(combat.turns ?? []).find(c => c.actor?.id === actor.id || c.actor?.uuid === actor.uuid);
+  if (!combatant) return { ok: true, consumesCombatAction: false };
 
-  const defenseMap = { dodging: "dodge", blocking: "block", evading: "evade" };
-  const attackTypes = new Set(["blunt-attack", "edged-attack", "shooting", "throwing-edged", "throwing-blunt", "energy", "force", "mental-power", "grenade", "grappling", "grabbing", "charging"]);
-  if (phase === "declare") {
-    return { ok: false, message: "RAW Declaration phase: record the intended action first; actions are resolved after initiative." };
-  }
-  if (phase === "preaction" && attackTypes.has(type)) {
-    // Starting the first attack implicitly closes an *empty* Pre-Action phase.
-    // This keeps RAW Change Action available after initiative, but avoids forcing
-    // the GM to click a redundant "Begin Actions" button when nobody has a
-    // required Dodge/Block/Evade/Multiple-Attack FEAT to resolve.
-    const tracked = Array.from(combat.turns ?? []);
-    const pending = tracked.filter(c => {
-      if (!c?.actor || c.defeated) return false;
-      const hp = Number(c.actor.system?.attributes?.health?.value ?? 1);
-      if (hp <= 0 || c.actor.system?.details?.isDead || c.actor.system?.combatMods?.canAct === false) return false;
-      const d = c.getFlag?.("msh-faserip", "declaredAction");
-      if (!d?.type) return false;
-      let expected = null;
-      if (d.type === "dodge") expected = "dodging";
-      else if (d.type === "block" || d.type === "defend") expected = "blocking";
-      else if (d.type === "evade") expected = "evading";
-      else if (d.type === "multi") expected = "multiattack";
-      if (!expected) return false;
-      const resolved = c.getFlag?.("msh-faserip", "preActionResolved");
-      return !(resolved?.round === combat.round && resolved.action === expected);
-    });
+  const sideFlag = combatant.getFlag("msh-faserip", "side");
+  const disposition = combatant.token?.disposition ?? combatant.actor?.prototypeToken?.disposition;
+  const side = sideFlag || (combatant.actor?.type === "hero" ? "pc"
+    : combatant.actor?.type === "villain" ? "npc"
+    : disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "pc"
+    : disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE ? "npc"
+    : combatant.actor?.hasPlayerOwner ? "pc" : "npc");
 
-    if (pending.length) {
-      const names = pending.slice(0, 4).map(c => c.name).join(", ");
-      const more = pending.length > 4 ? ` +${pending.length - 4} more` : "";
-      return {
-        ok: false,
-        message: `Pre-Action is not complete: ${pending.length} required FEAT${pending.length === 1 ? "" : "s"} remain (${names}${more}). Resolve ${pending.length === 1 ? "it" : "them"} in the combat tracker first.`
-      };
-    }
-
-    const nextPhase = initiativeMode === "side" ? "actions-winner" : "actions";
-    try {
-      if (game.user.isGM) {
-        await combat.setFlag("msh-faserip", "turnPhase", nextPhase);
-      } else if (game.msh?.runAsGM) {
-        await game.msh.runAsGM({
-          operation: "setCombatPhase",
-          combatId: combat.id,
-          phase: nextPhase
-        });
-      } else {
-        return { ok: false, message: "Pre-Action is complete, but the combat phase could not be advanced because no GM connection is available." };
-      }
-      phase = nextPhase;
-      ui.combat?.render?.(true);
-    } catch (err) {
-      console.error("[FASERIP] Could not advance empty Pre-Action phase", err);
-      return { ok: false, message: "Pre-Action is complete, but the combat tracker could not advance to the action phase." };
-    }
-  }
-  if (phase === "preaction" && defenseMap[type]) {
-    const declaredDefense = decl.type === "defend" ? "block" : decl.type;
-    if (declaredDefense !== defenseMap[type]) {
-      return { ok: false, message: `${actor.name} declared ${decl.label || decl.type}, not ${defenseMap[type]}. Use Change Action first.` };
-    }
-    // Required defensive FEATs are owned by the tracker workflow so a sheet
-    // button cannot produce an untracked result and then be rerolled from the
-    // tracker. The tracker marks its dispatch explicitly.
-    if (!opts?.rawPreAction) {
-      return { ok: false, message: `Use ${actor.name}'s Pre-Action Roll button in the combat tracker so the result can be locked.` };
-    }
-  }
-
-  if (phase === "actions-winner" || phase === "actions-loser" || phase === "actions") {
-    // Side-Based RAW: only the side whose action phase is active may resolve
-    // voluntary combat actions. Individual initiative uses the generic
-    // "actions" phase and therefore follows Foundry's initiative cursor.
-    if (initiativeMode === "side" && (phase === "actions-winner" || phase === "actions-loser")) {
-      const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
-      const sideFlag = combatant.getFlag("msh-faserip", "side");
-      const disposition = combatant.token?.disposition ?? combatant.actor?.prototypeToken?.disposition;
-      const side = sideFlag || (combatant.actor?.type === "hero" ? "pc"
-        : combatant.actor?.type === "villain" ? "npc"
-        : disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "pc"
-        : disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE ? "npc"
-        : combatant.actor?.hasPlayerOwner ? "pc" : "npc");
-      const activeSide = phase === "actions-winner" ? goesFirst : (goesFirst === "pc" ? "npc" : "pc");
-      if (goesFirst && side !== activeSide) {
-        return { ok: false, message: `${actor.name}'s side is not acting yet.` };
-      }
-    }
-
-    if (["dodge", "block", "evade", "multi", "defend"].includes(decl.type)) {
-      const pre = combatant.getFlag("msh-faserip", "preActionResolved");
-      const expected = decl.type === "dodge" ? "dodging" : (["block", "defend"].includes(decl.type) ? "blocking" : decl.type === "evade" ? "evading" : "multiattack");
-      if (!(pre?.round === combat.round && pre.action === expected)) {
-        return { ok: false, message: `${actor.name}'s required Pre-Action FEAT has not been resolved.` };
-      }
-    }
-    if (defenseMap[type]) return { ok: false, message: "Defensive Pre-Action FEATs are already locked for this round." };
-    // Evade explicitly permits no attacks that round; Block permits no other
-    // action. Dodge is different: it may be followed by one other action, with
-    // its Active Effect supplying the RAW -2CS penalty.
-    if (["block", "defend", "evade"].includes(decl.type) && attackTypes.has(type)) {
-      return { ok: false, message: `${actor.name} declared ${decl.label || decl.type} and cannot make an attack this round.` };
-    }
-    if (decl.type === "move" && attackTypes.has(type)) return { ok: false, message: `${actor.name} declared Move Only. Use Change Action before attacking.` };
-    if (decl.type === "charge" && attackTypes.has(type) && type !== "charging") return { ok: false, message: `${actor.name} declared a Charge. Use the Charging action or Change Action.` };
-    if (type === "charging" && decl.type !== "charge") return { ok: false, message: `${actor.name} did not declare a Charge.` };
-    if (decl.type === "multi" && attackTypes.has(type) && !["blunt-attack", "edged-attack", "shooting"].includes(type)) {
-      return { ok: false, message: "RAW Multiple Attacks apply to Slugfest and Shooting attacks only." };
-    }
-  }
-  return { ok: true };
+  const verdict = authorizeRawAction({
+    phase: combat.getFlag("msh-faserip", "turnPhase") || "declare",
+    initiativeMode,
+    side,
+    goesFirst: combat.getFlag("msh-faserip", "goesFirst"),
+    declaration: combatant.getFlag("msh-faserip", "declaredAction"),
+    preActionResolved: combatant.getFlag("msh-faserip", "preActionResolved"),
+    actionState: combatant.getFlag("msh-faserip", "actionState"),
+    round: combat.round,
+    actionType: type,
+    rawPreAction: !!opts?.rawPreAction,
+    actorName: actor.name
+  });
+  return { ...verdict, combat, combatant };
 }
+
+async function markRawCombatActionUsed(gate, actor, type) {
+  if (!gate?.consumesCombatAction || !gate?.combatant || !gate?.combat) return;
+  const value = { round: gate.combat.round, combatActionUsed: true, actionType: type, usedAt: Date.now() };
+  if (game.user.isGM) {
+    await gate.combatant.setFlag("msh-faserip", "actionState", value);
+  } else if (game.msh?.runAsGM) {
+    await game.msh.runAsGM({ operation: "setCombatantFlags", combatId: gate.combat.id, combatantId: gate.combatant.id, flags: { actionState: value } });
+  }
+  ui.combat?.render?.(true);
+}
+
 export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
     debugLog("ActionDispatcher.roll()", { actionType, actor, abilityName, opts });
@@ -340,6 +257,11 @@ export class ActionDispatcher {
     handler.opts = { ...(handler.opts ?? {}), ...modeFlags };
     debugLog("ActionDispatcher merged mode flags", handler.opts);
 
-    return await handler.execute();
+    const result = await handler.execute();
+    // A cancelled action dialog does not spend the declared combat action. Once
+    // the player commits to the action, it is consumed even if the attack later
+    // misses or otherwise fails.
+    if (!result?.rawActionCancelled) await markRawCombatActionUsed(declarationGate, actor, type);
+    return result;
   }
 }

@@ -740,7 +740,7 @@ export class EnergyAction extends RangedAttackAction {
       });
     });
 
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Nullify RAW guard
     try {

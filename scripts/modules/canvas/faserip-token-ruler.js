@@ -46,6 +46,11 @@ export class FaseripTokenRuler extends TokenRuler {
     const actor = this.token?.actor;
     if (!actor?.system) return null;
 
+    const movementAuth = FaseripInitiative.authorizeTokenMovement?.(this.token.document);
+    if (movementAuth && movementAuth.ok === false) {
+      return { normal: 0, feat: 0, movementMult: 1, action: this.token.document?.movementAction || "walk", modeLabel: "", declHalved: false, rawPhaseDenied: true };
+    }
+
     const movement = actor.system.movement || {};
     const action = this.token.document?.movementAction || "walk";
     const speedField = ACTION_SPEED_MAP[action] || "run";

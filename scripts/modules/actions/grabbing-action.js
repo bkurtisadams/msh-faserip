@@ -84,7 +84,7 @@ export class GrabbingAction extends AttackAction {
 
     // Build dialog with auto-filled target + strength if exactly one token targeted
     const choice = await this._prompt(actor, strength, { isWeaponGrab, weaponName: isWeaponGrab ? passedItem.name : null, strengthSource });
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Effective rank after CS + effect modifiers
     const attackerEffects = getAttackShiftBreakdown(actor);

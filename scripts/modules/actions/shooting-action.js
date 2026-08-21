@@ -728,7 +728,7 @@ export class ShootingAction extends RangedAttackAction {
       });
     });
 
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Mode already set by setupModeSelector during dialog render (respects global lock + ceiling)
     const mode = this.opts.mode;

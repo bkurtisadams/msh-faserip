@@ -652,7 +652,7 @@ export class ChargingAction extends AttackAction {
     });
   });
 
-  if (!choice) return;
+  if (!choice) return { rawActionCancelled: true };
 
   // ================================================================
   // POST-DIALOG RESOLUTION

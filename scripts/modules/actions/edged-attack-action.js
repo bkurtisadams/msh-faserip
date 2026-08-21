@@ -608,7 +608,7 @@ export class EdgedAttackAction extends AttackAction {
       });
     });
     
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Track shift breakdown
     const shiftBreakdown = {

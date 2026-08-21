@@ -1086,7 +1086,7 @@ export class GMToolsApp extends Application {
     if (!sourceToken) return;
     const center = this._viewportCenter();
     if (sceneId === canvas?.scene?.id) {
-      await sourceToken.update({ x: center.x, y: center.y });
+      await sourceToken.update({ x: center.x, y: center.y }, { mshRawMovementBypass: true });
       ui.notifications.info(`${sourceToken.name} brought to viewport center`);
       return;
     }
@@ -1116,7 +1116,7 @@ export class GMToolsApp extends Application {
     const gridSize = scene.grid?.size || 100;
     const halfW = ((tok.width || 1) * gridSize) / 2;
     const halfH = ((tok.height || 1) * gridSize) / 2;
-    await tok.update({ x: c.x - halfW, y: c.y - halfH });
+    await tok.update({ x: c.x - halfW, y: c.y - halfH }, { mshRawMovementBypass: true });
     ui.notifications.info(`${tok.name} centered on ${scene.name}`);
   }
 
@@ -1170,7 +1170,7 @@ export class GMToolsApp extends Application {
       }
     }
     if (!updates.length) return ui.notifications.info("No off-canvas tokens on this scene.");
-    await scene.updateEmbeddedDocuments("Token", updates);
+    await scene.updateEmbeddedDocuments("Token", updates, { mshRawMovementBypass: true });
     ui.notifications.info(`Rescued ${updates.length} token(s)`);
   }
 

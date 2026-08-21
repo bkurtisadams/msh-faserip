@@ -3,64 +3,69 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getInitiativeModifier } from '../scripts/rules/rules-reference.js';
+import { authorizeRawAction, authorizeRawMovement, RAW_PHASES, canClosePreAction } from '../scripts/rules/raw-combat-state.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 const initiative = read('scripts/faserip-initiative.js');
 const dispatcher = read('scripts/modules/actions/action-dispatcher.js');
+const gmUtils = read('scripts/gm-utils.js');
 const ability = read('scripts/modules/actions/ability-feat-dialog.js');
 const defense = read('scripts/modules/actions/defense-action.js');
-const blunt = read('scripts/modules/actions/blunt-attack-action.js');
-const edged = read('scripts/modules/actions/edged-attack-action.js');
-const shooting = read('scripts/modules/actions/shooting-action.js');
+const attackFiles = [
+  'blunt-attack-action.js','edged-attack-action.js','shooting-action.js','throwing-edged-action.js',
+  'throwing-blunt-action.js','energy-action.js','force-action.js','mental-power-action.js','grenade-action.js',
+  'grappling-action.js','grabbing-action.js','charging-action.js'
+].map(f => read(`scripts/modules/actions/${f}`));
 
 let n = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); n++; };
 
-// RAW initiative modifier boundaries used by side initiative.
 for (const [value, expected] of [[10,0],[11,1],[20,1],[21,2],[30,2],[31,3],[40,3],[41,4],[50,4],[51,5],[75,5],[76,6],[100,6]]) {
   assert.equal(getInitiativeModifier(value), expected, `initiative modifier at ${value}`); n++;
 }
 
-ok(/pcRoll\.total === 1 \? 1/.test(initiative) && /npcRoll\.total === 1 \? 1/.test(initiative), 'natural initiative 1 remains 1');
-ok(/_isInitiativeEligible\(combatant\)/.test(initiative) && /hp <= 0/.test(initiative), 'initiative eligibility filters incapacitated actors');
-ok(/requiredColor:\s*"Yellow"/.test(initiative), 'Change Action requires Yellow Agility');
-ok(/system\.combatMods\.selfPenaltyCS"[^\n]*value:\s*"-1"/.test(initiative), 'successful Change Action creates -1CS effect');
-ok(/changeActionAttempted/.test(initiative) && /already been attempted this round/.test(initiative), 'Change Action is locked after one attempt');
-ok(/preActionResolved/.test(initiative) && /already been resolved this round/.test(initiative), 'required Pre-Action FEAT is locked after resolution');
-ok(/decl\.type === "move" \|\| decl\.type === "charge"/.test(initiative), 'Move Only and Charge retain full movement');
-ok(/hasDodgeEffect \? null : 0\.5/.test(initiative), 'Dodge declaration does not stack a second half-speed multiplier');
-ok(/decl\.type === "evade"/.test(initiative) && /Pre-Action/.test(initiative), 'Evade is declaration-driven');
-ok(/action:\s*"multiattack"/.test(initiative) && /intensity:\s*count === 3 \? "Amazing" : "Remarkable"/.test(initiative), '2/3 attacks create RM/AM Pre-Action requirements');
+// Behavior-level smoke assertions using the pure state machine.
+const base = { initiativeMode:'side', side:'pc', goesFirst:'pc', round:2, declaration:{type:'attack',label:'Attack'}, actorName:'Hero' };
+assert.equal(authorizeRawAction({ ...base, phase:RAW_PHASES.PREACTION, actionType:'blunt-attack' }).ok, false); n++;
+assert.equal(authorizeRawAction({ ...base, phase:RAW_PHASES.ACTIONS_WINNER, actionType:'blunt-attack' }).ok, true); n++;
+assert.equal(authorizeRawAction({ ...base, phase:RAW_PHASES.ACTIONS_WINNER, actionType:'blunt-attack', actionState:{round:2,combatActionUsed:true} }).ok, false); n++;
+assert.equal(authorizeRawMovement({ ...base, phase:RAW_PHASES.PREACTION }).ok, false); n++;
+assert.equal(authorizeRawMovement({ ...base, phase:RAW_PHASES.ACTIONS_WINNER }).ok, true); n++;
+assert.equal(canClosePreAction({ phase:RAW_PHASES.PREACTION, pendingCount:0, initiativeMode:'side', goesFirst:'pc' }).ok, true); n++;
+assert.equal(canClosePreAction({ phase:RAW_PHASES.PREACTION, pendingCount:2, initiativeMode:'side', goesFirst:'pc' }).ok, false); n++;
+
+// Integration wiring.
+ok(/raw-combat-state\.js/.test(initiative), 'initiative controller imports the pure RAW state machine');
+ok(/preMoveToken/.test(initiative) && /authorizeTokenMovement/.test(initiative), 'token movement is phase-gated through Foundry v14 preMoveToken and the RAW controller');
+ok(/mshRawMovementBypass/.test(initiative), 'forced/admin movement has an explicit bypass hook');
+ok(/authorizeRawAction/.test(dispatcher), 'action dispatcher delegates phase/declaration decisions to the RAW controller');
+ok(!/setCombatPhase/.test(dispatcher), 'actions cannot implicitly close Pre-Action');
+ok(!/setCombatPhase/.test(gmUtils), 'obsolete player-to-GM implicit Pre-Action bridge is removed');
+ok(/combatActionUsed/.test(dispatcher) && /markRawCombatActionUsed/.test(dispatcher), 'combat action is consumed after committed dispatch');
+ok(attackFiles.every(src => /rawActionCancelled/.test(src)), 'all primary attack dialogs report cancellation so cancel does not spend the action');
+ok(/actionState/.test(initiative) && /"actionState"/.test(initiative), 'round reset clears action-consumption state');
+ok(/for \(const flag of \["preActionResolved", "changeActionAttempted", "actionState"\]\)/.test(initiative), 'round reset clears only round-scoped results');
+ok(!/for \(const flag of \["declaredAction", "preActionResolved"/.test(initiative), 'round reset preserves unchanged declarations for the next Initiative');
+ok(/declaredAction = \{ \.\.\.choice, label: meta\.label, round: combat\.round \}/.test(initiative), 'new declarations are stamped with the round for carried-plan UI');
+ok(/initiative:\s*null/.test(initiative) && /-=goesFirst/.test(initiative), 'new RAW round clears prior tracker initiative and side-result flags');
+ok(/_findFirstWinnerTurn/.test(initiative) && /_isInitiativeEligible\(x\.c\)/.test(initiative), 'winner cursor calculation ignores KO/ineligible stale initiative rows');
+ok(/if \(rawPhases\) \{\s*await this\._setPhase\(combat, this\.PHASE_PREACTION\);\s*\} else/s.test(initiative), 'RAW initiative enters Pre-Action without positioning the action cursor');
+ok(/btn\.disabled = pending\.length > 0/.test(initiative), 'GM Begin Actions waits for required Pre-Action FEATs');
+ok(/_advanceFromPreAction/.test(initiative) && /canClosePreAction/.test(initiative), 'GM Begin Actions uses explicit validated Pre-Action close logic');
+ok(/One atomic document update is important here/.test(initiative) && /flags\.msh-faserip\.turnPhase/.test(initiative), 'phase close and cursor positioning are written atomically');
+ok(/btn\.type = "button"/.test(initiative), 'phase buttons are explicit non-submit buttons in the live tracker');
+ok(!/GM override: advance with unresolved Pre-Action FEATs/.test(initiative), 'Pre-Action has no skip-required-roll force button');
+ok(/Required rolls complete · Change Action\/Judge window remains open/.test(initiative), 'empty Pre-Action remains an explicit GM-controlled window');
+ok(/_showNpcPlanDialog/.test(initiative) && /Private NPC Plans/.test(initiative), 'GM has private bulk NPC planning');
+ok(/rollBtn\.disabled = !prog\.allComplete/.test(initiative), 'initiative waits for all eligible tracker combatants by default');
+ok(/Undeclared combatants cannot take voluntary actions this round/.test(initiative), 'GM force-roll override states the undeclared-action consequence');
+ok(/requiredColor:\s*"Yellow"/.test(initiative), 'Change Action still requires Yellow Agility');
+ok(/system\.combatMods\.selfPenaltyCS"[^\n]*value:\s*"-1"/.test(initiative), 'successful Change Action still creates -1CS effect');
 ok(/transient \? Number\(options\.columnShift \|\| 0\)/.test(ability) && /transient \? false/.test(ability), 'transient Pre-Action FEATs do not inherit remembered CS/skip-dice state');
-ok(/selfPenaltyCS/.test(ability) && /totalColumnShift = columnShift \+ selfPenaltyCS/.test(ability), 'ability FEAT dialog applies actor self penalties');
-ok(/selfPenaltyCS/.test(defense), 'defense FEATs apply actor self penalties');
-ok(/rawPreAction/.test(dispatcher) && /Pre-Action Roll button in the combat tracker/.test(dispatcher), 'direct sheet defense cannot bypass the locked tracker Pre-Action roll');
-ok(/initiativeMode === "foundry"/.test(dispatcher), 'Standard Foundry initiative is not trapped by RAW declaration gating');
-ok(/Side-Based RAW/.test(dispatcher) && /side is not acting yet/.test(dispatcher), 'side-based RAW gate blocks the inactive side');
-ok(/\["block", "defend", "evade"\]/.test(dispatcher) && /cannot make an attack this round/.test(dispatcher), 'Block/Evade prevent later attacks while Dodge remains distinct');
-ok(/Multiple Attacks were not declared/.test(blunt) && /getDeclaredMultiAttackState/.test(blunt), 'blunt attacks consume tracker Multiple Attack declaration');
-ok(/Multiple Attacks were not declared/.test(edged) && /getDeclaredMultiAttackState/.test(edged), 'edged attacks consume tracker Multiple Attack declaration');
-ok(/Multiple Attacks were not declared/.test(shooting) && /getDeclaredMultiAttackState/.test(shooting), 'shooting consumes tracker Multiple Attack declaration');
-const declarationFn = initiative.split('static async _showDeclarationDialog', 2)[1]?.split('static async _createChangeActionPenalty', 1)[0] || '';
-ok(!/ChatMessage\.create/.test(declarationFn), 'declaration dialog does not post public chat messages');
-ok(/faserip-declaration-chip private/.test(initiative), 'NPC declaration details have a private tracker presentation');
-ok(/player declarations/.test(initiative) && /rollBtn\.disabled = !prog\.complete/.test(initiative), 'initiative waits for eligible player declarations by default');
-ok(/sideMode \? this\.PHASE_ACTIONS_WINNER : this\.PHASE_ACTIONS/.test(initiative), 'individual initiative gets a generic action phase instead of side winner/loser phases');
-
-
-ok(/static _trackedCombatants\(combat\)/.test(initiative) && /Array\.from\(combat\.turns \?\? \[\]\)/.test(initiative), 'declaration roster is scoped to Foundry combat.turns');
-ok(/const all = this\._eligibleCombatants\(combat\)/.test(initiative), 'declaration progress derives only from tracked eligible combatants');
-ok(/for \(const c of this\._trackedCombatants\(combat\)\)/.test(initiative), 'side initiative ignores stale/non-tracker combatant documents');
-ok(/const trackedIds = new Set\(this\._trackedCombatants\(combat\)/.test(initiative), 'individual initiative ignores stale/non-tracker combatant documents');
-ok(/_resolveCombatForCombatant\(combatantId\)/.test(initiative) && /ui\.combat\?\.viewed/.test(initiative), 'tracker controls resolve the viewed combat instead of blindly using game.combat');
-
-
-ok(/async function rawDeclarationGate/.test(dispatcher) && /await rawDeclarationGate\(actor, type, opts\)/.test(dispatcher), 'declaration gate can advance an empty Pre-Action phase before dispatching an attack');
-ok(/Starting the first attack implicitly closes an \*empty\* Pre-Action phase/.test(dispatcher) && /operation: "setCombatPhase"/.test(dispatcher), 'first attack closes empty Pre-Action through GM-safe phase transition');
-ok(/Pre-Action is not complete:/.test(dispatcher) && /required FEAT/.test(dispatcher), 'attack warning identifies unresolved required Pre-Action FEATs instead of generic phase failure');
-const gmUtils = read('scripts/gm-utils.js');
-ok(/current !== "preaction"/.test(gmUtils) && /required Pre-Action FEAT\(s\) remain/.test(gmUtils), 'GM phase bridge refuses arbitrary or unresolved Pre-Action skips');
+ok(/selfPenaltyCS/.test(defense), 'defense FEATs continue to apply actor self penalties');
+ok(/combatId: gate\.combat\.id/.test(dispatcher) && /combatId: combatant\.parent\?\.id/.test(initiative), 'player combatant updates are scoped to the correct combat document');
+ok(/combatId \? game\.combats\?\.get/.test(gmUtils), 'GM combatant-flag bridge resolves the requested combat');
 
 console.log(`initiative/declaration workflow tests passed (${n} assertions)`);

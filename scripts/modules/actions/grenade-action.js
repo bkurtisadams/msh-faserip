@@ -344,7 +344,7 @@ export class GrenadeAction extends RangedAttackAction {
       });
     });
 
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Ephemeral template — no Region persists; just geometry + affectedTokens
     const template = await AreaTemplate.createAtTarget({

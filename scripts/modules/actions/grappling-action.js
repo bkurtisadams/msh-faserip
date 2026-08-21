@@ -118,7 +118,7 @@ export class GrapplingAction extends AttackAction {
       weaponName: (isWeaponGrapple || isPowerGrapple) ? passedItem.name : null,
       strengthSource
     });
-    if (!choice) return;
+    if (!choice) return { rawActionCancelled: true };
 
     // Save prefs
     await actor.setFlag("msh-faserip", "lastGrappleRemember", choice.remember);
