@@ -1,3 +1,8 @@
+// ability-feat-dialog.js v1.9.1 - 2026-08-21
+// v1.9.1: Add transient combat-tracker FEAT mode with result callbacks and
+//         fixed required colors; transient rolls start clean instead of inheriting
+//         remembered manual CS/skip-dice state. Honor selfPenaltyCS for all
+//         ordinary ability FEATs so RAW Change Action penalties propagate.
 // ability-feat-dialog.js v1.9.0 - 2026-08-14
 // v1.9.0: Add Agility Combined FEAT for blunt teamwork. Helper targets the
 //         primary attacker; helper/primary bare-hand damage must be within
@@ -319,7 +324,7 @@ function setNeedPill($el, requirement, { impossible = false, automatic = false }
 
 // ── Main entry point ─────────────────────────────────────────
 
-export async function showAbilityFeatDialog(actor, abilityName) {
+export async function showAbilityFeatDialog(actor, abilityName, options = {}) {
   const ABILITY_MAP = {
     f: "fighting", a: "agility", s: "strength", e: "endurance",
     r: "reason",   i: "intuition", p: "psyche"
@@ -341,15 +346,15 @@ export async function showAbilityFeatDialog(actor, abilityName) {
 
   // Saved settings
   const gf = (flag) => actor.getFlag("msh-faserip", flag);
-  const savedColumnShift    = gf(`last${fullName}ColumnShift`) || 0;
-  const savedIntensity      = gf(`last${fullName}Intensity`) || "None";
-  const skipDiceRoll        = gf(`last${fullName}SkipDiceRoll`) || false;
-  const savedRemember       = gf(`last${fullName}SaveSettings`) !== false; // default ON; remembers an explicit OFF
-  const savedFeatType       = gf(`last${fullName}FeatType`) || "standard";
+  const savedColumnShift    = options.transient ? Number(options.columnShift || 0) : (gf(`last${fullName}ColumnShift`) || 0);
+  const savedIntensity      = options.intensity ?? (options.transient ? "None" : (gf(`last${fullName}Intensity`) ?? "None"));
+  const skipDiceRoll        = options.transient ? false : (gf(`last${fullName}SkipDiceRoll`) || false);
+  const savedRemember       = options.transient ? false : (gf(`last${fullName}SaveSettings`) !== false); // transient pre-action rolls never overwrite saved FEAT UI
+  const savedFeatType       = options.featType || gf(`last${fullName}FeatType`) || "standard";
   const savedWeightIntensity = gf(`last${fullName}WeightIntensity`) || "Remarkable";
   const savedMaterial       = gf(`last${fullName}Material`) || "Steel";
   const savedThickness      = gf(`last${fullName}Thickness`) || "2-12";
-  const savedMultiAttackCount = gf(`last${fullName}MultiAttackCount`) || "2";
+  const savedMultiAttackCount = String(options.multiAttackCount || gf(`last${fullName}MultiAttackCount`) || "2");
 
   // ── Resistance FEAT substitution (powers audit Step #4, slice 4a) ──
   // Owned "featReplace" resistance powers let the matching FEAT roll the
@@ -387,9 +392,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
     }
   }
   const hasSubs = subOptions.length > 0;
-  const initialFeatType = (isAgility && savedFeatType === "combined")
+  const initialFeatType = options.featType || ((isAgility && savedFeatType === "combined")
     ? "combined"
-    : (subOptions.some(o => o.value === savedFeatType) ? savedFeatType : "standard");
+    : (subOptions.some(o => o.value === savedFeatType) ? savedFeatType : (isFighting && savedFeatType === "multiattack" ? "multiattack" : "standard")));
   const resolveRollRank = (ft) => (subOptions.find(o => o.value === ft)?.rank) || abilityRank;
 
   // Build dropdown HTML
@@ -409,7 +414,8 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const abilityShort = RANK_ABBR[abilityRank] || abilityRank;
   const initShift = Number(savedColumnShift) || 0;
   const csInputCls = initShift > 0 ? ' pos' : initShift < 0 ? ' neg' : '';
-  const initEffective = applyCS(resolveRollRank(initialFeatType), initShift);
+  const initSelfPenalty = Number(actor.system?.combatMods?.selfPenaltyCS) || 0;
+  const initEffective = applyCS(resolveRollRank(initialFeatType), initShift + initSelfPenalty);
 
   // Inline CS row — no reference panel (combat modifiers don't apply to FEATs)
   const csRowHtml = `
@@ -427,14 +433,14 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const buildTypeRadios = () => {
     if (isStrength) {
       return `
-        <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
-        <label><input type="radio" name="featType" value="lifting" ${savedFeatType === 'lifting' ? 'checked' : ''}> Lifting</label>
-        <label><input type="radio" name="featType" value="breaking" ${savedFeatType === 'breaking' ? 'checked' : ''}> Breaking</label>`;
+        <label><input type="radio" name="featType" value="standard" ${initialFeatType === 'standard' ? 'checked' : ''}> Standard</label>
+        <label><input type="radio" name="featType" value="lifting" ${initialFeatType === 'lifting' ? 'checked' : ''}> Lifting</label>
+        <label><input type="radio" name="featType" value="breaking" ${initialFeatType === 'breaking' ? 'checked' : ''}> Breaking</label>`;
     }
     if (isFighting) {
       return `
-        <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
-        <label><input type="radio" name="featType" value="multiattack" ${savedFeatType === 'multiattack' ? 'checked' : ''}> Multi-Attack</label>`;
+        <label><input type="radio" name="featType" value="standard" ${initialFeatType === 'standard' ? 'checked' : ''}> Standard</label>
+        <label><input type="radio" name="featType" value="multiattack" ${initialFeatType === 'multiattack' ? 'checked' : ''}> Multi-Attack</label>`;
     }
     if (isAgility) {
       const std = `<label><input type="radio" name="featType" value="standard" ${initialFeatType === 'standard' ? 'checked' : ''}> Standard</label>`;
@@ -469,7 +475,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
 
       <input type="hidden" name="abilityRank" value="${abilityRank}">
 
-      ${(isStrength || isFighting || isAgility || hasSubs) ? `
+      ${(isStrength || isFighting || isAgility || hasSubs) ? (options.lockFeatType
+        ? `<input type="hidden" name="featType" value="${initialFeatType}">`
+        : `
       <!-- FEAT Type — compact horizontal radios -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row" style="gap:10px;">
@@ -477,7 +485,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           ${buildTypeRadios()}
         </div>
       </div>
-      ` : ''}
+      `) : ''}
 
       ${isStrength ? `
       <!-- Lifting sub-panel -->
@@ -545,12 +553,18 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       ` : ''}
 
       <!-- Intensity + Required FEAT readout (one line) -->
-      <div class="frp-box" id="intensity-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
-        <select id="intensity" name="intensity" style="flex:1;min-width:100px;">
-          ${intensityOptionsHTML}
-        </select>
-        <span style="margin-left:auto;display:inline-flex;align-items:center;flex-shrink:0;">${buildNeedPill('required-feat-text')}</span>
+      <div class="frp-box" id="intensity-row" style="display:${options.requiredColor ? 'flex' : 'flex'};align-items:center;gap:8px;flex-wrap:wrap;">
+        ${options.requiredColor ? `
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">REQUIRED</span>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;flex-shrink:0;">${buildNeedPill('required-feat-text', String(options.requiredColor).toUpperCase())}</span>
+          <input type="hidden" id="intensity" name="intensity" value="None">
+        ` : `
+          <span class="frp-box-label" style="margin:0;color:var(--feat-deep);flex-shrink:0;">INTENSITY</span>
+          <select id="intensity" name="intensity" style="flex:1;min-width:100px;">
+            ${intensityOptionsHTML}
+          </select>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;flex-shrink:0;">${buildNeedPill('required-feat-text')}</span>
+        `}
       </div>
 
       <!-- CS row from shared utility -->
@@ -566,7 +580,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
         </div>
         <div class="frp-foot-checks">
-          <label><input type="checkbox" name="saveSettings" id="save-settings" ${savedRemember ? 'checked' : ''}> Remember</label>
+          ${options.transient ? '' : `<label><input type="checkbox" name="saveSettings" id="save-settings" ${savedRemember ? 'checked' : ''}> Remember</label>`}
           <label><input type="checkbox" name="skipDice" id="skip-dice" ${skipDiceRoll ? 'checked' : ''}> Skip dice</label>
         </div>
       </div>
@@ -575,7 +589,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   // ── Dialog ──────────────────────────────────────────────────
 
   showFaseripDialog({
-    title: `${fullName} FEAT Roll: ${actor.name}`,
+    title: options.title || `${fullName} FEAT Roll: ${actor.name}`,
     content: dialogContent,
     render: async (html, dlg) => {
       setupKarmaControlHandlers(html);
@@ -590,7 +604,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const intensity = html.find('[name="intensity"]').val();
           const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
           const spendKarma = html.find('#spend-karma').is(':checked');
-          const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+          const saveSettings = options.transient ? false : html.find('[name="saveSettings"]').is(':checked');
           const skipDice = html.find('[name="skipDice"]').is(':checked');
 
           let featType = 'standard';
@@ -600,28 +614,29 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           let multiAttackCount = '2';
 
           if (isStrength) {
-            featType = html.find('[name="featType"]:checked').val();
+            featType = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
             weightIntensity = html.find('[name="weightIntensity"]').val();
             material = html.find('[name="material"]').val();
             thickness = html.find('[name="thickness"]:checked').val();
           }
 
           if (isFighting) {
-            featType = html.find('[name="featType"]:checked').val();
+            featType = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
             multiAttackCount = html.find('[name="multiAttackCount"]:checked').val() || '2';
           }
 
           if (isAgility) {
-            featType = html.find('[name="featType"]:checked').val() || 'standard';
+            featType = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
           } else if (hasSubs) {
-            featType = html.find('[name="featType"]:checked').val() || 'standard';
+            featType = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
           }
 
-          // Always persist the checkbox's own state so turning it OFF sticks
-          await actor.setFlag("msh-faserip", `last${fullName}SaveSettings`, saveSettings);
+          // Always persist the checkbox's own state so turning it OFF sticks, except
+          // for transient combat-tracker rolls which must not disturb normal FEAT UI memory.
+          if (!options.transient) await actor.setFlag("msh-faserip", `last${fullName}SaveSettings`, saveSettings);
 
           // Save settings
-          if (saveSettings) {
+          if (!options.transient && saveSettings) {
             await actor.setFlag("msh-faserip", `last${fullName}ColumnShift`, columnShift);
             await actor.setFlag("msh-faserip", `last${fullName}Intensity`, intensity);
             await actor.setFlag("msh-faserip", `last${fullName}SkipDiceRoll`, skipDice);
@@ -666,8 +681,12 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             return;
           }
 
-          // Apply column shifts
-          const effectiveRank = applyCS(baseRankName, columnShift);
+          // Apply column shifts. selfPenaltyCS is a true "all subsequent FEATs"
+          // modifier (Dodging, Change Action, Impaired Endurance, etc.), so the
+          // general ability FEAT dialog must honor it too.
+          const selfPenaltyCS = Number(actor.system?.combatMods?.selfPenaltyCS) || 0;
+          const totalColumnShift = columnShift + selfPenaltyCS;
+          const effectiveRank = applyCS(baseRankName, totalColumnShift);
 
           // Fighting multi-attack: override intensity from attack count
           let multiAttackIntensity = '';
@@ -682,7 +701,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           let isImpossible = false;
           let isAutomatic = false;
 
-          if (isAgility && featType === 'combined') {
+          if (options.requiredColor) {
+            featRequirement = String(options.requiredColor);
+          } else if (isAgility && featType === 'combined') {
             featRequirement = "Green";
           } else if (effectiveIntensity !== "None") {
             const req = determineFeatRequirement(effectiveRank, effectiveIntensity);
@@ -739,7 +760,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   <div style="padding: 5px 10px; font-size: 0.9em;">
                     <div>Base Rank: ${baseRankName} (${baseRankValue})</div>
                     ${resistContext}
-                    ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                    ${totalColumnShift !== 0 ? `<div>Column Shift: ${totalColumnShift > 0 ? '+' : ''}${totalColumnShift} → ${effectiveRank}${selfPenaltyCS ? ` <span style="color:#777;">(${columnShift || 0} manual, ${selfPenaltyCS} effects)</span>` : ''}</div>` : ''}
                     ${strengthContext}
                     ${fightingContext}
                     <div>Intensity: ${effectiveIntensity}</div>
@@ -752,6 +773,16 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   ${autoMultiMsg}
                 </div>`
             });
+            try {
+              await options.onResult?.({
+                actor, abilityName: key, resultColor: "automatic", success: true,
+                rollTotal: null, finalTotal: null, karmaUsed: 0,
+                effectiveRank, requirement: featRequirement, featType,
+                multiAttackCount: isFighting && featType === 'multiattack' ? Number(multiAttackCount) : null
+              });
+            } catch (callbackError) {
+              console.error("[FASERIP] FEAT result callback failed", callbackError);
+            }
             return;
           }
 
@@ -775,7 +806,9 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
           let featSuccess = true;
-          if (isAgility && featType === 'combined') {
+          if (options.requiredColor) {
+            featSuccess = checkFeatSuccess(resultColor, String(options.requiredColor));
+          } else if (isAgility && featType === 'combined') {
             featSuccess = checkFeatSuccess(resultColor, "Green");
           } else if (effectiveIntensity !== "None") {
             featSuccess = checkFeatSuccess(resultColor, featRequirement);
@@ -841,11 +874,11 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                 <div style="padding: 5px 10px; font-size: 0.9em;">
                   <div>Base Rank: ${baseRankName} (${baseRankValue})</div>
                   ${resistContext}
-                  ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                  ${totalColumnShift !== 0 ? `<div>Column Shift: ${totalColumnShift > 0 ? '+' : ''}${totalColumnShift} → ${effectiveRank}${selfPenaltyCS ? ` <span style="color:#777;">(${columnShift || 0} manual, ${selfPenaltyCS} effects)</span>` : ''}</div>` : ''}
                   ${strengthContext}
                   ${fightingContext}
                   ${combinedFeatContext}
-                  ${combinedContext?.ok ? `<div>Required: ${buildChatNeedPill('Green')}</div>` : (effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Req: ${buildChatNeedPill(featRequirement)})</div>` : '')}
+                  ${options.requiredColor ? `<div>Required: ${buildChatNeedPill(options.requiredColor)}</div>` : (combinedContext?.ok ? `<div>Required: ${buildChatNeedPill('Green')}</div>` : (effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Req: ${buildChatNeedPill(featRequirement)})</div>` : ''))}
                   <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -853,7 +886,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   color: ${colorFg(resultColor)};">
                   ${resultColor.toUpperCase()} RESULT
                 </div>
-                ${(combinedContext?.ok || effectiveIntensity !== "None") ? `
+                ${(options.requiredColor || combinedContext?.ok || effectiveIntensity !== "None") ? `
                   <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#00a94e' : '#ee1e25'};">
                     ${featSuccess ? 'FEAT SUCCEEDED' : 'FEAT FAILED'}
                   </div>
@@ -868,6 +901,16 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             catch { try { ChatMessage.applyRollMode(featMsg, game.settings.get("core", "rollMode")); } catch {} }
           }
           await ChatMessage.create(featMsg);
+          try {
+            await options.onResult?.({
+              actor, abilityName: key, resultColor, success: featSuccess,
+              rollTotal: roll.total, finalTotal: cappedTotal, karmaUsed,
+              effectiveRank, requirement: featRequirement, featType,
+              multiAttackCount: isFighting && featType === 'multiattack' ? Number(multiAttackCount) : null
+            });
+          } catch (callbackError) {
+            console.error("[FASERIP] FEAT result callback failed", callbackError);
+          }
         };  // end runRoll
 
       // Shared updateFeatRequirement for all abilities — writes to the
@@ -876,10 +919,14 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       // jQuery no-ops.
       const NEED_TARGETS = '#required-feat-text, #multi-need-text, #lift-need-text, #break-need-text';
       const updateFeatRequirement = () => {
+        if (options.requiredColor) {
+          html.find('#required-feat-text').each((_, el) => setNeedPill($(el), String(options.requiredColor)));
+          return;
+        }
         const intensity = html.find('#intensity').val();
         const reqText = html.find(NEED_TARGETS);
         const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-        const ft = html.find('[name="featType"]:checked').val() || 'standard';
+        const ft = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
 
         if (ft === 'combined') {
           reqText.each((_, el) => setNeedPill($(el), 'Green'));
@@ -912,7 +959,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         };
 
         const updateAgilityFeatType = () => {
-          const ft = html.find('[name="featType"]:checked').val() || 'standard';
+          const ft = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
           const combinedSec = html.find('#combined-section');
           const intensityRow = html.find('#intensity-row');
           if (ft === 'combined') {
@@ -942,7 +989,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         };
 
         const updateFightingFeatType = () => {
-          const ft = html.find('[name="featType"]:checked').val();
+          const ft = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
           const multiSec = html.find('#multiattack-section');
           const intensitySelect = html.find('#intensity');
           const intensityRow = html.find('#intensity-row');
@@ -990,7 +1037,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         };
 
         const updateFeatTypeDisplay = () => {
-          const ft = html.find('[name="featType"]:checked').val();
+          const ft = html.find('[name="featType"]:checked').val() || options.featType || 'standard';
           const liftSec = html.find('#lifting-section');
           const breakSec = html.find('#breaking-section');
           const intensitySelect = html.find('#intensity');
@@ -1031,7 +1078,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         $csInput.removeClass('pos neg');
         if (cs > 0) $csInput.addClass('pos');
         else if (cs < 0) $csInput.addClass('neg');
-        $csRank.text(applyCS(resolveRollRank(html.find('[name="featType"]:checked').val() || 'standard'), cs));
+        $csRank.text(applyCS(resolveRollRank(html.find('[name="featType"]:checked').val() || options.featType || 'standard'), cs + (Number(actor.system?.combatMods?.selfPenaltyCS) || 0)));
         updateFeatRequirement();
         if ($dialog.length) $dialog[0].style.height = 'auto';
       };
@@ -1043,7 +1090,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         try { await runRoll(); }
         finally { if (!isDialogDetached(dlg)) dlg.close(); }
       });
-      html.find('#frp-cancel').off('click.frp').on('click.frp', () => dlg.close());
+      html.find('#frp-cancel').off('click.frp').on('click.frp', () => { options.onCancel?.(); dlg.close(); });
       html.find('#frp-roll').focus();
       $dialog.off('keydown.frp').on('keydown.frp', (e) => {
         if (e.key === 'Enter') {

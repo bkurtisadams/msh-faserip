@@ -1,3 +1,8 @@
+// faserip-initiative.js v2.4.0 - 2026-08-21
+// v2.4.0: RAW declaration/pre-action workflow: declaration-gated initiative,
+//         conditional MA-E/Weapon Specialist initiative, locked pre-action FEATs,
+//         real Change Action Yellow Agility FEAT + -1CS effect, private NPC intent,
+//         action-side positioning/back controls, and clearer tracker dashboard.
 // faserip-initiative.js v2.3.2 - 2026-08-20
 // v2.3.2: Initiative cursor positioning is marked mshNoTimeAdvance so CTT
 //         Per Combatant Turn mode does not treat phase setup as elapsed time.
@@ -48,6 +53,7 @@ export class FaseripInitiative {
    */
   static getDeclaredMoveMultiplier(token) {
     if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return null;
+    if (game.settings.get("msh-faserip", "initiativeMode") === this.MODE_FOUNDRY) return null;
     const combat = game.combat;
     if (!combat?.started) return null;
     const tokenId = token?.id ?? token?.document?.id;
@@ -56,7 +62,17 @@ export class FaseripInitiative {
     if (!combatant) return null;
     const decl = combatant.getFlag("msh-faserip", "declaredAction");
     if (!decl?.type) return null;
-    return decl.type === "charge" ? 1 : 0.5;
+
+    // Move Only and Charge permit full movement. Other actions taken while
+    // moving cap movement at half speed. A successfully rolled Dodge already
+    // supplies movementMult=0.5 via its Active Effect, so do not multiply the
+    // same RAW half-speed cap a second time (the old quarter-speed bug).
+    if (decl.type === "move" || decl.type === "charge") return 1;
+    if (decl.type === "dodge") {
+      const hasDodgeEffect = combatant.actor?.effects?.some(e => !e.disabled && e.getFlag?.("msh-faserip", "isDodging"));
+      return hasDodgeEffect ? null : 0.5;
+    }
+    return 0.5;
   }
 
   static registerSettings() {
@@ -77,7 +93,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "autoRerollInitiative", {
       name: "Auto Reroll Initiative Each Round",
-      hint: "Automatically reroll initiative at the start of each new round (side-based and individual modes).",
+      hint: "Automatically reroll initiative at the start of each new round when RAW Turn Phases are off. With RAW phases on, the next round waits for declarations before initiative is rolled.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -86,7 +102,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "showPhaseReminder", {
       name: "Show Turn Phase Reminder",
-      hint: "Show the RAW turn sequence (Pre-Action → Winning Side → Losing Side) on initiative chat cards.",
+      hint: "Show the turn sequence (Declaration → Initiative → Pre-Action → Actions) on initiative chat cards.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -95,7 +111,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "useTalentInitBonuses", {
       name: "Apply Talent Initiative Bonuses",
-      hint: "Include Martial Arts E (+1) and Weapon Specialist (+1) when calculating initiative modifiers.",
+      hint: "Include Martial Arts E (+1 when unarmed) and Weapons Specialist (+1 with the specialty weapon). With RAW declarations enabled, the declared attack context controls whether the bonus applies.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -118,7 +134,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "useRawTurnPhases", {
       name: "Use RAW Turn Phases",
-      hint: "When enabled, players declare actions before initiative is rolled. Adds Pre-Action phase for Dodge/Block/Evade and Change Action (Yellow Agility FEAT, -1CS). When disabled, players decide actions on their turn.",
+      hint: "When enabled, intended actions are declared before initiative. Dodge, Block, Evade, and 2/3 Multiple Attacks generate locked Pre-Action FEATs; changing a declaration requires a Yellow Agility FEAT and applies -1CS to subsequent FEATs. When disabled, actions use the legacy on-demand workflow.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -229,12 +245,19 @@ export class FaseripInitiative {
       // Reset to declaration phase on new round (RAW mode)
       if (rawPhases) {
         await this._setPhase(combat, this.PHASE_DECLARE);
-        // Clear previous declarations
+        // Clear round-scoped declaration/pre-action state. Last declaration
+        // memory is intentionally retained as a convenience for the next round.
         const clearOps = [];
         for (const c of combat.combatants) {
-          if (c.getFlag("msh-faserip", "declaredAction")) {
-            clearOps.push({ _id: c.id, "flags.msh-faserip.-=declaredAction": null });
+          const op = { _id: c.id };
+          let changed = false;
+          for (const flag of ["declaredAction", "preActionResolved", "changeActionAttempted"]) {
+            if (c.getFlag("msh-faserip", flag) !== undefined) {
+              op[`flags.msh-faserip.-=${flag}`] = null;
+              changed = true;
+            }
           }
+          if (changed) clearOps.push(op);
         }
         if (clearOps.length) await combat.updateEmbeddedDocuments("Combatant", clearOps);
         // RAW: declarations must happen before initiative roll.
@@ -335,23 +358,28 @@ export class FaseripInitiative {
     const actor = combatant.actor;
     if (!actor) return { bonus: 0, source: "" };
 
-    let bonus = 0;
-    const sources = [];
     const talents = actor.items.filter(i => i.type === "talent");
+    const hasMAE = talents.some(t => /martial arts\s*[- ]?e/i.test(`${t.name} ${t.system?.specialty || ""}`));
+    const hasWpnSpec = talents.some(t => /weapons? specialist/i.test(`${t.name} ${t.system?.specialty || ""}`));
+    if (!hasMAE && !hasWpnSpec) return { bonus: 0, source: "" };
 
-    for (const t of talents) {
-      const name = t.name.toLowerCase();
-      if (name.includes("martial arts e") || name.includes("martial arts-e") ||
-        (name.includes("martial arts") && name.includes("(e)"))) {
-        bonus += 1;
-        sources.push("MA-E");
-      }
-      if (name.includes("weapon specialist") || name.includes("weapons specialist")) {
-        bonus += 1;
-        sources.push("Wpn Spec");
-      }
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+    if (!rawPhases) {
+      // Legacy/non-declaration mode cannot know the chosen attack context. Keep
+      // the historical +1 benefit, but never stack MA-E and Weapon Specialist.
+      const source = [hasMAE ? "MA-E" : "", hasWpnSpec ? "Wpn Spec" : ""].filter(Boolean).join("/");
+      return { bonus: 1, source: `${source} (assumed)` };
     }
-    return { bonus, source: sources.join(", ") };
+
+    const decl = combatant.getFlag("msh-faserip", "declaredAction");
+    const q = decl?.qualifiers || {};
+    const sources = [];
+    if (hasMAE && q.unarmed === true) sources.push("MA-E");
+    if (hasWpnSpec && q.weaponSpecialist === true) sources.push("Wpn Spec");
+
+    // Both talents grant +1 initiative, but they describe mutually exclusive
+    // contexts (unarmed vs specialist weapon). Never manufacture a +2 stack.
+    return sources.length ? { bonus: 1, source: sources.join("/") } : { bonus: 0, source: "" };
   }
 
   // Get effective Intuition for initiative, considering powers that replace it
@@ -365,10 +393,9 @@ export class FaseripInitiative {
     let best = baseInt;
     let source = "Int";
 
-    if (!game.settings.get("msh-faserip", "useTalentInitBonuses")) {
-      return { value: best, source, name: combatant.name };
-    }
-
+    // Power-based initiative substitutions are independent of the Talent
+    // Initiative Bonuses setting. Turning off talent bonuses must not disable
+    // Combat Sense / Enhanced Senses.
     const powers = actor.items.filter(i => i.type === "power");
     for (const p of powers) {
       const name = p.name.toLowerCase();
@@ -469,27 +496,154 @@ export class FaseripInitiative {
     return null;
   }
 
+  static _isInitiativeEligible(combatant) {
+    const actor = combatant?.actor;
+    if (!actor || combatant.defeated) return false;
+    if (actor.system?.details?.isDead) return false;
+    const hp = Number(actor.system?.attributes?.health?.value ?? 1);
+    if (hp <= 0) return false;
+    if (actor.system?.combatMods?.canAct === false) return false;
+    const blocked = actor.effects?.some(e => {
+      if (e.disabled) return false;
+      const n = String(e.name || "").toLowerCase();
+      if (n.includes("unconscious")) return true;
+      if (e.statuses?.has?.("unconscious") || e.statuses?.has?.("dead")) return true;
+      return (e.changes || []).some(ch => ch.key === "system.combatMods.canAct" && String(ch.value) === "false");
+    });
+    return !blocked;
+  }
+
+  static _eligibleCombatants(combat) {
+    return Array.from(combat?.combatants ?? []).filter(c => this._isInitiativeEligible(c));
+  }
+
+  static _getPlayerDeclarationProgress(combat) {
+    const all = this._eligibleCombatants(combat);
+    const eligible = all.filter(c => c.actor?.hasPlayerOwner);
+    const declared = eligible.filter(c => c.getFlag("msh-faserip", "declaredAction"));
+    const npc = all.filter(c => !c.actor?.hasPlayerOwner);
+    const npcDeclared = npc.filter(c => c.getFlag("msh-faserip", "declaredAction"));
+    return {
+      total: eligible.length,
+      declared: declared.length,
+      complete: declared.length >= eligible.length,
+      missing: eligible.filter(c => !c.getFlag("msh-faserip", "declaredAction")),
+      npcTotal: npc.length,
+      npcDeclared: npcDeclared.length
+    };
+  }
+
+  static _declarationMeta(type, data = {}) {
+    const count = Number(data.attackCount || 2);
+    const map = {
+      move:   { label: "Move Only", short: "Move", icon: "fa-running" },
+      attack: { label: "Attack", short: "Attack", icon: "fa-fist-raised" },
+      charge: { label: "Charge", short: "Charge", icon: "fa-bolt" },
+      dodge:  { label: "Dodge", short: "Dodge", icon: "fa-running" },
+      block:  { label: "Block", short: "Block", icon: "fa-shield-alt" },
+      evade:  { label: "Evade", short: "Evade", icon: "fa-eye-slash" },
+      multi:  { label: `${count} Attacks`, short: `×${count} Attacks`, icon: "fa-burst" },
+      other:  { label: "Other Action", short: "Other", icon: "fa-ellipsis-h" },
+      defend: { label: "Defend (legacy)", short: "Defend", icon: "fa-shield-alt" }
+    };
+    return map[type] || { label: type || "Unknown", short: type || "?", icon: "fa-question" };
+  }
+
+  static _getPreActionRequirement(combatant) {
+    const decl = combatant?.getFlag?.("msh-faserip", "declaredAction");
+    if (!decl?.type) return null;
+    if (decl.type === "dodge") return { action: "dodging", ability: "agility", label: "Dodge", icon: "fa-running" };
+    if (decl.type === "block" || decl.type === "defend") return { action: "blocking", ability: "strength", label: "Block", icon: "fa-shield-alt" };
+    if (decl.type === "evade") return { action: "evading", ability: "fighting", label: "Evade", icon: "fa-eye-slash" };
+    if (decl.type === "multi") {
+      const count = Number(decl.attackCount || 2) >= 3 ? 3 : 2;
+      return { action: "multiattack", ability: "fighting", label: `${count} Attacks`, icon: "fa-burst", attackCount: count, intensity: count === 3 ? "Amazing" : "Remarkable" };
+    }
+    return null;
+  }
+
+  static _getPendingPreActions(combat) {
+    return this._eligibleCombatants(combat).filter(c => {
+      const req = this._getPreActionRequirement(c);
+      if (!req) return false;
+      const resolved = c.getFlag("msh-faserip", "preActionResolved");
+      return !(resolved?.round === combat.round && resolved.action === req.action);
+    });
+  }
+
+  static _esc(value) {
+    try { return foundry.utils.escapeHTML(String(value ?? "")); }
+    catch { return String(value ?? "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  }
+
+  static async _setCombatantFlags(combatant, flags) {
+    if (!combatant) return false;
+    if (game.user.isGM) {
+      const update = { _id: combatant.id };
+      for (const [key, value] of Object.entries(flags)) update[`flags.msh-faserip.${key}`] = value;
+      await combatant.parent.updateEmbeddedDocuments("Combatant", [update]);
+      return true;
+    }
+    if (game.msh?.runAsGM) {
+      await game.msh.runAsGM({ operation: "setCombatantFlags", combatantId: combatant.id, flags });
+      return true;
+    }
+    ui.notifications.warn("Cannot update combat declaration — no GM connection available.");
+    return false;
+  }
+
+  static async _clearCombatantFlag(combatant, flag) {
+    if (!combatant) return;
+    if (game.user.isGM) return combatant.unsetFlag("msh-faserip", flag);
+    if (game.msh?.runAsGM) {
+      return game.msh.runAsGM({ operation: "setCombatantFlags", combatantId: combatant.id, flags: { [flag]: null } });
+    }
+  }
+
+  static async _positionTurnToSide(combat, side) {
+    if (!combat?.turns?.length) return;
+    const idx = combat.turns.findIndex(t => {
+      const c = combat.combatants.get(t.id);
+      return c && this._getCombatantSide(c) === side && this._isInitiativeEligible(c);
+    });
+    if (idx >= 0) await combat.update({ turn: idx }, { mshNoTimeAdvance: true });
+  }
+
+  static async _setPhaseAndPosition(combat, phase) {
+    await this._setPhase(combat, phase);
+    const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
+    if (phase === this.PHASE_ACTIONS_WINNER && goesFirst) await this._positionTurnToSide(combat, goesFirst);
+    if (phase === this.PHASE_ACTIONS_LOSER && goesFirst) await this._positionTurnToSide(combat, goesFirst === "pc" ? "npc" : "pc");
+    ui.combat?.render(true);
+  }
+
+  static _hasTalent(actor, regex) {
+    return !!actor?.items?.some(i => i.type === "talent" && regex.test(`${i.name} ${i.system?.specialty || ""}`));
+  }
+
   static _modifyCombatantDisplay_native(root, combat) {
     const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
     const phase = this._getPhase(combat);
+    const sideMode = this._isSideMode();
     const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
+    const labels = this._getSideLabels();
+    const winnerLabel = goesFirst === "pc" ? labels.pc : labels.npc;
+    const loserLabel = goesFirst === "pc" ? labels.npc : labels.pc;
 
-    // Phase indicator bar (RAW mode only, after combat has started)
+    // RAW round dashboard. The phase bar is intentionally the primary control
+    // surface so the GM does not need Foundry's individual-turn semantics to
+    // run a side-based FASERIP round.
     if (rawPhases && phase && !root.querySelector(".faserip-phase-bar")) {
-      const labels = this._getSideLabels();
-      const winnerLabel = goesFirst === "pc" ? labels.pc : labels.npc;
-      const loserLabel = goesFirst === "pc" ? labels.npc : labels.pc;
-
       const phaseLabels = {
-        [this.PHASE_DECLARE]: "Declaration Phase",
-        [this.PHASE_PREACTION]: "Pre-Action Phase",
-        [this.PHASE_ACTIONS_WINNER]: `${winnerLabel} Act (Winner)`,
-        [this.PHASE_ACTIONS_LOSER]: `${loserLabel} Act (Loser)`,
+        [this.PHASE_DECLARE]: "Declaration",
+        [this.PHASE_PREACTION]: "Pre-Action",
+        [this.PHASE_ACTIONS_WINNER]: `${winnerLabel} Act`,
+        [this.PHASE_ACTIONS_LOSER]: `${loserLabel} Act`,
         [this.PHASE_ACTIONS]: "Actions"
       };
       const phaseColors = {
         [this.PHASE_DECLARE]: "#1E90FF",
-        [this.PHASE_PREACTION]: "#DAA520",
+        [this.PHASE_PREACTION]: "#9a7412",
         [this.PHASE_ACTIONS_WINNER]: "#006400",
         [this.PHASE_ACTIONS_LOSER]: "#8B4513",
         [this.PHASE_ACTIONS]: "#006400"
@@ -498,73 +652,173 @@ export class FaseripInitiative {
       const bar = document.createElement("div");
       bar.className = "faserip-phase-bar";
       bar.style.cssText = `background:${phaseColors[phase] || "#006400"}; color:#fff;`;
-      bar.innerHTML = `<span class="faserip-phase-label">${phaseLabels[phase] || "Actions"}</span>`;
+      const labelWrap = document.createElement("div");
+      labelWrap.className = "faserip-phase-label";
+      labelWrap.innerHTML = `<strong>${phaseLabels[phase] || "Actions"}</strong>`;
 
-      // GM-only phase advance buttons
+      if (phase === this.PHASE_DECLARE) {
+        const prog = this._getPlayerDeclarationProgress(combat);
+        const progress = document.createElement("span");
+        progress.className = `faserip-declare-progress ${prog.complete ? "complete" : "pending"}`;
+        const playerText = prog.total ? `${prog.declared}/${prog.total} player declarations` : "No player declarations required";
+        progress.textContent = game.user.isGM && prog.npcTotal ? `${playerText} · NPC ${prog.npcDeclared}/${prog.npcTotal}` : playerText;
+        const tips = [];
+        if (prog.missing.length) tips.push(`Waiting on: ${prog.missing.map(c => c.name).join(", ")}`);
+        if (game.user.isGM && prog.npcTotal > prog.npcDeclared) tips.push(`NPC declarations are optional tracker notes; undeclared NPCs receive no conditional MA-E/Weapons Specialist initiative bonus.`);
+        if (tips.length) progress.title = tips.join("\n");
+        labelWrap.appendChild(progress);
+      }
+      bar.appendChild(labelWrap);
+
+      const controls = document.createElement("div");
+      controls.className = "faserip-phase-controls";
+
       if (game.user.isGM && phase === this.PHASE_DECLARE) {
-        const btn = document.createElement("button");
-        btn.className = "faserip-phase-advance-btn";
-        btn.innerHTML = `<i class="fas fa-dice"></i> Roll Initiative`;
-        btn.title = "End declarations and roll initiative";
-        btn.addEventListener("click", async () => {
+        const prog = this._getPlayerDeclarationProgress(combat);
+        const rollBtn = document.createElement("button");
+        rollBtn.className = "faserip-phase-advance-btn";
+        rollBtn.innerHTML = `<i class="fas fa-dice"></i> Initiative`;
+        rollBtn.title = prog.complete ? "Roll initiative" : "Waiting for all eligible player declarations";
+        rollBtn.disabled = !prog.complete;
+        rollBtn.addEventListener("click", async () => {
           const live = game.combats.get(combat.id) ?? game.combat;
           if (!live) return ui.notifications.warn("No active combat.");
-          if (this._isSideMode()) {
-            await this.rollSideInitiative(live);
-          } else {
-            await this.rollIndividualInitiative(live);
-          }
+          if (this._isSideMode()) await this.rollSideInitiative(live);
+          else await this.rollIndividualInitiative(live);
         });
-        bar.appendChild(btn);
+        controls.appendChild(rollBtn);
+
+        if (!prog.complete) {
+          const forceBtn = document.createElement("button");
+          forceBtn.className = "faserip-phase-secondary-btn";
+          forceBtn.innerHTML = `<i class="fas fa-forward"></i>`;
+          forceBtn.title = "GM override: roll initiative with missing declarations";
+          forceBtn.addEventListener("click", async () => {
+            const live = game.combats.get(combat.id) ?? game.combat;
+            if (!live) return;
+            if (this._isSideMode()) await this.rollSideInitiative(live, { force: true });
+            else await this.rollIndividualInitiative(live, null, { force: true });
+          });
+          controls.appendChild(forceBtn);
+        }
       }
 
       if (game.user.isGM && phase === this.PHASE_PREACTION) {
+        const pending = this._getPendingPreActions(combat);
+        if (pending.length) {
+          const status = document.createElement("span");
+          status.className = "faserip-preaction-progress pending";
+          status.textContent = `${pending.length} roll${pending.length === 1 ? "" : "s"} pending`;
+          status.title = pending.map(c => c.name).join(", ");
+          labelWrap.appendChild(status);
+        }
         const btn = document.createElement("button");
         btn.className = "faserip-phase-advance-btn";
-        btn.innerHTML = `<i class="fas fa-play"></i> ${winnerLabel} Act`;
-        btn.title = `End Pre-Action phase — ${winnerLabel} (initiative winner) act first`;
+        const beginLabel = sideMode ? winnerLabel : "Begin Actions";
+        btn.innerHTML = `<i class="fas fa-play"></i> ${beginLabel}`;
+        btn.title = pending.length ? "Resolve required Pre-Action FEATs first" : (sideMode ? `End Pre-Action and begin ${winnerLabel} actions` : "End Pre-Action and begin individual initiative order");
+        btn.disabled = pending.length > 0;
         btn.addEventListener("click", async () => {
           const live = game.combats.get(combat.id) ?? game.combat;
-          if (!live) return ui.notifications.warn("No active combat.");
-          await this._setPhase(live, this.PHASE_ACTIONS_WINNER);
+          if (live) await this._setPhaseAndPosition(live, sideMode ? this.PHASE_ACTIONS_WINNER : this.PHASE_ACTIONS);
         });
-        bar.appendChild(btn);
+        controls.appendChild(btn);
+        if (pending.length) {
+          const force = document.createElement("button");
+          force.className = "faserip-phase-secondary-btn";
+          force.innerHTML = `<i class="fas fa-forward"></i>`;
+          force.title = "GM override: advance with unresolved Pre-Action FEATs";
+          force.addEventListener("click", async () => {
+            const live = game.combats.get(combat.id) ?? game.combat;
+            if (live) await this._setPhaseAndPosition(live, sideMode ? this.PHASE_ACTIONS_WINNER : this.PHASE_ACTIONS);
+          });
+          controls.appendChild(force);
+        }
       }
 
-      if (game.user.isGM && phase === this.PHASE_ACTIONS_WINNER) {
+      if (game.user.isGM && sideMode && phase === this.PHASE_ACTIONS_WINNER) {
+        const back = document.createElement("button");
+        back.className = "faserip-phase-secondary-btn";
+        back.innerHTML = `<i class="fas fa-arrow-left"></i>`;
+        back.title = "Back to Pre-Action";
+        back.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (live) await this._setPhase(live, this.PHASE_PREACTION);
+        });
+        controls.appendChild(back);
+
         const btn = document.createElement("button");
         btn.className = "faserip-phase-advance-btn";
-        btn.innerHTML = `<i class="fas fa-forward"></i> ${loserLabel} Act`;
-        btn.title = `${winnerLabel} done — ${loserLabel} (initiative loser) act now`;
+        btn.innerHTML = `<i class="fas fa-forward"></i> ${loserLabel}`;
+        btn.title = `${winnerLabel} done; begin ${loserLabel} actions`;
         btn.addEventListener("click", async () => {
           const live = game.combats.get(combat.id) ?? game.combat;
-          if (!live) return ui.notifications.warn("No active combat.");
-          await this._setPhase(live, this.PHASE_ACTIONS_LOSER);
+          if (live) await this._setPhaseAndPosition(live, this.PHASE_ACTIONS_LOSER);
         });
-        bar.appendChild(btn);
+        controls.appendChild(btn);
       }
 
-      // Insert after initiative bar or header
-      const anchor =
-        root.querySelector(".faserip-initiative-bar") ||
-        root.querySelector(".combat-sidebar-header") ||
-        root.querySelector(".directory-header") ||
-        root.querySelector("header");
-      if (anchor?.parentElement) {
-        anchor.parentElement.insertBefore(bar, anchor.nextSibling);
+      if (game.user.isGM && sideMode && phase === this.PHASE_ACTIONS_LOSER) {
+        const back = document.createElement("button");
+        back.className = "faserip-phase-secondary-btn";
+        back.innerHTML = `<i class="fas fa-arrow-left"></i>`;
+        back.title = `Back to ${winnerLabel} actions`;
+        back.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (live) await this._setPhaseAndPosition(live, this.PHASE_ACTIONS_WINNER);
+        });
+        controls.appendChild(back);
+
+        const endBtn = document.createElement("button");
+        endBtn.className = "faserip-phase-advance-btn";
+        endBtn.innerHTML = `<i class="fas fa-step-forward"></i> End Round`;
+        endBtn.title = "Complete this FASERIP round and begin the next Declaration phase";
+        endBtn.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (live) await live.nextRound();
+        });
+        controls.appendChild(endBtn);
       }
+
+      if (game.user.isGM && !sideMode && phase === this.PHASE_ACTIONS) {
+        const back = document.createElement("button");
+        back.className = "faserip-phase-secondary-btn";
+        back.innerHTML = `<i class="fas fa-arrow-left"></i>`;
+        back.title = "Back to Pre-Action";
+        back.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (live) await this._setPhase(live, this.PHASE_PREACTION);
+        });
+        controls.appendChild(back);
+
+        const endBtn = document.createElement("button");
+        endBtn.className = "faserip-phase-advance-btn";
+        endBtn.innerHTML = `<i class="fas fa-step-forward"></i> End Round`;
+        endBtn.title = "Complete this round and begin the next Declaration phase";
+        endBtn.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (live) await live.nextRound();
+        });
+        controls.appendChild(endBtn);
+      }
+
+      if (controls.childElementCount) bar.appendChild(controls);
+      const anchor = root.querySelector(".faserip-initiative-bar") || root.querySelector(".combat-sidebar-header") || root.querySelector(".directory-header") || root.querySelector("header");
+      if (anchor?.parentElement) anchor.parentElement.insertBefore(bar, anchor.nextSibling);
     }
 
     for (const el of root.querySelectorAll(".combatant")) {
       const id = el.getAttribute("data-combatant-id");
       const c = combat.combatants.get(id);
       if (!c) continue;
-
       const side = this._getCombatantSide(c);
       el.classList.add(`${side}-side`);
 
-      // Compact medical-state badge: current state lives in the tracker; chat
-      // is reserved for meaningful transitions rather than every recovery tick.
+      if (rawPhases && sideMode && (phase === this.PHASE_ACTIONS_WINNER || phase === this.PHASE_ACTIONS_LOSER) && goesFirst) {
+        const activeSide = phase === this.PHASE_ACTIONS_WINNER ? goesFirst : (goesFirst === "pc" ? "npc" : "pc");
+        if (side !== activeSide) el.classList.add("faserip-side-inactive");
+      }
+
       if (!el.querySelector(".faserip-health-status")) {
         const healthStatus = this._getHealthStatusBadgeData(c.actor);
         if (healthStatus) {
@@ -573,93 +827,112 @@ export class FaseripInitiative {
           badge.textContent = healthStatus.label;
           badge.title = healthStatus.title;
           const statusAnchor = el.querySelector(".token-name") || el.querySelector(".combatant-name");
-          if (statusAnchor) statusAnchor.after(badge);
-          else el.appendChild(badge);
+          if (statusAnchor) statusAnchor.after(badge); else el.appendChild(badge);
         }
       }
 
-      // Skip button injection if not RAW, no active phase, or already injected
       if (!rawPhases || !phase || !c.actor?.id || el.querySelector(".faserip-tracker-actions")) continue;
-
+      const eligible = this._isInitiativeEligible(c);
+      const canControl = game.user.isGM || c.actor.isOwner;
+      const declared = c.getFlag("msh-faserip", "declaredAction");
+      const meta = declared ? this._declarationMeta(declared.type, declared) : null;
       const container = document.createElement("div");
       container.className = "faserip-tracker-actions";
 
-      if (phase === this.PHASE_DECLARE) {
-        // Declaration phase: compact icon badge or declare button
-        const declared = c.getFlag("msh-faserip", "declaredAction");
-        const declIcons = { attack: "fa-fist-raised", defend: "fa-shield-alt", other: "fa-ellipsis-h", multi: "fa-burst", charge: "fa-bolt" };
-        const declTips = { attack: "Attack", defend: "Defend", other: "Other", multi: "Multi-Action", charge: "Charge" };
+      const declarationChip = () => {
+        if (!declared) return "";
+        const isPrivateNPC = !game.user.isGM && !c.actor.hasPlayerOwner;
+        if (isPrivateNPC) return `<span class="faserip-declaration-chip private" title="NPC action recorded privately"><i class="fas fa-lock"></i> Declared</span>`;
+        const detail = declared.note ? `: ${this._esc(declared.note)}` : "";
+        return `<span class="faserip-declaration-chip faserip-decl-${declared.type}" title="${this._esc(meta.label + detail)}"><i class="fas ${meta.icon}"></i> ${this._esc(meta.short)}</span>`;
+      };
+
+      if (!eligible) {
+        container.innerHTML = `<span class="faserip-declaration-chip ineligible" title="Cannot currently act">No Action</span>`;
+      } else if (phase === this.PHASE_DECLARE) {
         if (declared) {
-          const icon = declIcons[declared.type] || "fa-question";
-          const tip = (declTips[declared.type] || declared.type) + (declared.note ? `: ${declared.note}` : "") + " — Right-click to change";
-          container.innerHTML = `<span class="faserip-declared-icon faserip-decl-${declared.type}" title="${tip}"><i class="fas ${icon}"></i></span>`;
+          container.innerHTML = declarationChip();
+          if (canControl) container.innerHTML += `<button class="faserip-tracker-ctrl faserip-edit-declare" data-action="declare" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Edit declaration before initiative"><i class="fas fa-pen"></i></button>`;
+        } else if (canControl) {
+          container.innerHTML = `<button class="faserip-tracker-ctrl faserip-declare-btn" data-action="declare" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declare Action"><i class="fas fa-bullhorn"></i> <span>Declare</span></button>`;
         } else {
-          container.innerHTML = `
-            <button class="faserip-tracker-ctrl faserip-declare-btn" data-action="declare" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declare Action"><i class="fas fa-bullhorn"></i></button>
-          `;
+          container.innerHTML = `<span class="faserip-declaration-chip undeclared">Not Declared</span>`;
         }
       } else if (phase === this.PHASE_PREACTION) {
-        // Pre-action phase: dodge/block/evade + change action (either side per RAW)
-        const declared = c.getFlag("msh-faserip", "declaredAction");
-        const declIcons = { attack: "fa-fist-raised", defend: "fa-shield-alt", other: "fa-ellipsis-h", multi: "fa-burst", charge: "fa-bolt" };
-        const declTips = { attack: "Attack", defend: "Defend", other: "Other", multi: "Multi-Action", charge: "Charge" };
-        let buttons = `
-          <button class="faserip-tracker-ctrl" data-action="dodging" data-actor-id="${c.actor.id}" title="Dodge (Agility)"><i class="fas fa-running"></i></button>
-          <button class="faserip-tracker-ctrl" data-action="blocking" data-actor-id="${c.actor.id}" title="Block (Strength)"><i class="fas fa-shield-alt"></i></button>
-          <button class="faserip-tracker-ctrl" data-action="evading" data-actor-id="${c.actor.id}" title="Evade (Fighting)"><i class="fas fa-eye-slash"></i></button>
-          <button class="faserip-tracker-ctrl faserip-change-ctrl" data-action="change-action" data-actor-id="${c.actor.id}" title="Change Action (Yellow Agility, -1CS)"><i class="fas fa-exchange-alt"></i></button>
-        `;
-        // Show current declaration as a compact icon
-        if (declared) {
-          const icon = declIcons[declared.type] || "fa-question";
-          const tip = (declTips[declared.type] || declared.type) + (declared.note ? `: ${declared.note}` : "") + " — Right-click to change";
-          buttons = `<span class="faserip-declared-icon faserip-decl-${declared.type}" title="${tip}"><i class="fas ${icon}"></i></span>` + buttons;
+        container.innerHTML = declarationChip();
+        const requirement = this._getPreActionRequirement(c);
+        const resolved = c.getFlag("msh-faserip", "preActionResolved");
+        const resolvedThisRound = resolved?.round === combat.round && (!requirement || resolved.action === requirement.action);
+        if (requirement && canControl) {
+          if (resolvedThisRound) {
+            const result = String(resolved.result || "done").toUpperCase();
+            container.innerHTML += `<span class="faserip-preaction-result ${resolved.success === false ? "failed" : "success"}" title="Pre-Action FEAT resolved">${this._esc(requirement.label)}: ${this._esc(result)}</span>`;
+          } else {
+            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-required-roll" data-action="${requirement.action}" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Required Pre-Action: ${this._esc(requirement.label)}"><i class="fas ${requirement.icon}"></i> <span>Roll</span></button>`;
+          }
+        } else if (!requirement && declared) {
+          container.innerHTML += `<span class="faserip-preaction-none">No required roll</span>`;
         }
-        container.innerHTML = buttons;
+
+        const change = c.getFlag("msh-faserip", "changeActionAttempted");
+        const changedThisRound = change?.round === combat.round;
+        if (canControl && declared && !resolvedThisRound) {
+          if (changedThisRound) {
+            container.innerHTML += `<span class="faserip-change-result ${change.success ? "success" : "failed"}">Change: ${change.success ? "✓" : "✕"}</span>`;
+          } else {
+            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-change-ctrl" data-action="change-action" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Change Action: Yellow Agility FEAT; success applies -1CS to subsequent FEATs"><i class="fas fa-exchange-alt"></i></button>`;
+          }
+        }
+      } else if (declared) {
+        container.innerHTML = declarationChip();
       }
-      // PHASE_ACTIONS: no buttons
 
       if (container.innerHTML.trim()) {
-        // Wire click handlers
-        for (const btn of container.querySelectorAll(".faserip-tracker-ctrl")) {
-          btn.addEventListener("click", (ev) => this._onTrackerActionButton(ev));
-        }
-
-        // Right-click on declaration icon to change declaration
-        for (const badge of container.querySelectorAll(".faserip-declared-icon")) {
-          badge.addEventListener("contextmenu", (ev) => {
-            ev.preventDefault();
-            if (c.actor?.id) this._showDeclarationDialog(c.actor, c.id);
-          });
-        }
-
+        for (const btn of container.querySelectorAll(".faserip-tracker-ctrl")) btn.addEventListener("click", ev => this._onTrackerActionButton(ev));
         const nameEl = el.querySelector(".token-name") || el.querySelector(".combatant-name");
-        if (nameEl) {
-          nameEl.after(container);
-        } else {
-          el.appendChild(container);
-        }
+        if (nameEl) nameEl.after(container); else el.appendChild(container);
       }
     }
   }
 
   // --- Side-Based Initiative (RAW) ---
 
-  static async rollSideInitiative(combat) {
+  static async rollSideInitiative(combat, { force = false } = {}) {
     if (!game.user.isGM || !combat || this.isRolling) return;
     if (!combat.id || !combat.combatants) {
       console.warn("[FASERIP WARN] Invalid combat state");
       return;
     }
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+    if (rawPhases) {
+      const phase = this._getPhase(combat);
+      if (phase !== this.PHASE_DECLARE) {
+        ui.notifications.warn("RAW initiative may only be rolled from the Declaration phase.");
+        return;
+      }
+      const progress = this._getPlayerDeclarationProgress(combat);
+      if (!force && !progress.complete) {
+        ui.notifications.warn(`Waiting for ${progress.total - progress.declared} player declaration(s).`);
+        return;
+      }
+    }
+
     this.isRolling = true;
 
     try {
-      // Categorize combatants
+      // Categorize only combatants who can actually act this round. KO, dead,
+      // defeated, and otherwise action-blocked characters do not contribute
+      // Intuition or Talent initiative bonuses.
       const pcCombatants = [];
       const npcCombatants = [];
       for (const c of combat.combatants) {
+        if (!this._isInitiativeEligible(c)) continue;
         const side = this._getCombatantSide(c);
         (side === "pc" ? pcCombatants : npcCombatants).push(c);
+      }
+      if (!pcCombatants.length || !npcCombatants.length) {
+        ui.notifications.warn("Side initiative requires at least one eligible combatant on each side.");
+        return;
       }
 
       // Highest Intuition per side
@@ -695,7 +968,7 @@ export class FaseripInitiative {
           flavor: "Initiative Tie"
         });
         this.isRolling = false;
-        setTimeout(() => this.rollSideInitiative(combat), 1000);
+        setTimeout(() => this.rollSideInitiative(combat, { force }), 1000);
         return;
       }
 
@@ -781,13 +1054,27 @@ export class FaseripInitiative {
 
   // --- Individual FASERIP Initiative ---
 
-  static async rollIndividualInitiative(combat, ids) {
+  static async rollIndividualInitiative(combat, ids, { force = false } = {}) {
     if (!game.user.isGM || !combat || this.isRolling) return;
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+    if (rawPhases) {
+      const phase = this._getPhase(combat);
+      if (phase !== this.PHASE_DECLARE) {
+        ui.notifications.warn("RAW initiative may only be rolled from the Declaration phase.");
+        return;
+      }
+      const progress = this._getPlayerDeclarationProgress(combat);
+      if (!force && !progress.complete) {
+        ui.notifications.warn(`Waiting for ${progress.total - progress.declared} player declaration(s).`);
+        return;
+      }
+    }
     this.isRolling = true;
 
     try {
       // If no ids specified, roll for all combatants
-      const combatantIds = ids?.length ? ids : combat.combatants.map(c => c.id);
+      const combatantIds = (ids?.length ? ids : combat.combatants.map(c => c.id))
+        .filter(id => this._isInitiativeEligible(combat.combatants.get(id)));
       const results = [];
 
       for (const id of combatantIds) {
@@ -905,7 +1192,7 @@ export class FaseripInitiative {
 
   // --- Chat Cards ---
 
-  // Handle tracker and chat card pre-action button clicks
+  // Handle tracker pre-action/declaration controls.
   static async _onTrackerActionButton(ev) {
     ev.preventDefault();
     ev.stopPropagation();
@@ -913,148 +1200,253 @@ export class FaseripInitiative {
     const action = btn.dataset.action;
     const actorId = btn.dataset.actorId;
     const combatantId = btn.dataset.combatantId;
+    const combat = game.combat;
+    const combatant = combat?.combatants?.get(combatantId);
+    const actor = game.actors.get(actorId) ?? combatant?.actor;
+    if (!actor || !combatant) return ui.notifications.warn("Combatant not found");
+    if (!actor.isOwner && !game.user.isGM) return ui.notifications.warn("You don't have permission to act for this character");
 
-    const actor = game.actors.get(actorId);
-    if (!actor) return ui.notifications.warn("Actor not found");
-
-    if (!actor.isOwner && !game.user.isGM) {
-      return ui.notifications.warn("You don't have permission to act for this character");
-    }
-
+    const phase = this._getPhase(combat);
     if (action === "declare") {
+      if (phase !== this.PHASE_DECLARE) return ui.notifications.warn("Declarations are locked after initiative. Use Change Action during Pre-Action.");
       await this._showDeclarationDialog(actor, combatantId);
-    } else if (action === "change-action") {
-      await this._rollChangeAction(actor);
-    } else {
-      // Defensive pre-action: dodging, evading, blocking
-      await ActionDispatcher.roll(action, {
-        actor,
-        abilityName: action === "dodging" ? "agility" : action === "blocking" ? "strength" : "fighting",
-        opts: { actionType: action }
-      });
+      return;
     }
+
+    if (phase !== this.PHASE_PREACTION) return ui.notifications.warn("Pre-Action rolls may only be made during the Pre-Action phase.");
+
+    if (action === "change-action") {
+      await this._rollChangeAction(actor, combatantId);
+      return;
+    }
+
+    const requirement = this._getPreActionRequirement(combatant);
+    if (!requirement || requirement.action !== action) {
+      return ui.notifications.warn(`${actor.name} did not declare this Pre-Action maneuver.`);
+    }
+    const prior = combatant.getFlag("msh-faserip", "preActionResolved");
+    if (prior?.round === combat.round && prior.action === action) {
+      return ui.notifications.warn(`${requirement.label} has already been resolved this round.`);
+    }
+
+    if (action === "multiattack") {
+      await this._rollMultipleAttacksPreAction(actor, combatant, requirement);
+      return;
+    }
+
+    const result = await ActionDispatcher.roll(action, {
+      actor,
+      abilityName: requirement.ability,
+      opts: {
+        actionType: action,
+        rawPreAction: true,
+        evadeTarget: combatant.getFlag("msh-faserip", "declaredAction")?.target || ""
+      }
+    });
+    if (!result) return; // cancelled dialog
+    await this._setCombatantFlags(combatant, {
+      preActionResolved: {
+        round: combat.round,
+        action,
+        result: result.resultColor || result.color || "done",
+        success: action === "evading" ? result.resultColor !== "white" : true
+      }
+    });
+    ui.combat?.render(true);
   }
 
-  // Legacy chat card handler — delegates to tracker handler
+  // Legacy chat card handler — delegates to tracker handler.
   static async _onPreActionButton(ev) {
     return this._onTrackerActionButton(ev);
   }
 
-  // Declaration dialog: Attack, Defend, Other, Multi-Action
-  static async _showDeclarationDialog(actor, combatantId) {
-    const combat = game.combat;
-    if (!combat) return;
-    const combatant = combat.combatants.get(combatantId);
-    if (!combatant) return;
+  static async _rollMultipleAttacksPreAction(actor, combatant, requirement) {
+    await new Promise(resolve => {
+      showAbilityFeatDialog(actor, "fighting", {
+        title: `Pre-Action: ${requirement.attackCount} Attacks — ${actor.name}`,
+        featType: "multiattack",
+        multiAttackCount: requirement.attackCount,
+        lockFeatType: true,
+        transient: true,
+        onCancel: () => resolve(),
+        onResult: async result => {
+          await this._setCombatantFlags(combatant, {
+            preActionResolved: {
+              round: game.combat?.round ?? null,
+              action: "multiattack",
+              result: result.resultColor,
+              success: !!result.success,
+              attackCount: requirement.attackCount,
+              consequenceCS: result.success ? -1 : -3,
+              attacksAllowed: result.success ? requirement.attackCount : 1
+            }
+          });
+          ui.combat?.render(true);
+          resolve();
+        }
+      });
+    });
+  }
 
-    // Recall last declaration type and note for auto-fill
-    const lastType = combatant.getFlag("msh-faserip", "lastDeclaredType") || "attack";
-    const lastNote = combatant.getFlag("msh-faserip", "lastDeclaredNote") || "";
-    const chk = (v) => v === lastType ? "checked" : "";
+  // Declaration dialog. RAW declarations are represented in the combat tracker,
+  // not posted as public chat spam. NPC details are rendered GM-only.
+  static async _showDeclarationDialog(actor, combatantId, { isChange = false } = {}) {
+    const combat = game.combat;
+    if (!combat) return null;
+    const combatant = combat.combatants.get(combatantId);
+    if (!combatant) return null;
+
+    const current = combatant.getFlag("msh-faserip", "declaredAction") || {};
+    const lastType = current.type || combatant.getFlag("msh-faserip", "lastDeclaredType") || "attack";
+    const lastNote = current.note ?? combatant.getFlag("msh-faserip", "lastDeclaredNote") ?? "";
+    const selectedTargets = Array.from(game.user?.targets ?? []);
+    const selectedTargetName = selectedTargets.length === 1 ? (selectedTargets[0]?.name || selectedTargets[0]?.actor?.name || "") : "";
+    const lastTarget = current.target ?? selectedTargetName;
+    const lastCount = Number(current.attackCount || 2) >= 3 ? 3 : 2;
+    const hasMAE = this._hasTalent(actor, /martial arts\s*[- ]?e/i);
+    const hasWpnSpec = this._hasTalent(actor, /weapons? specialist/i);
+    const chk = v => v === lastType ? "checked" : "";
+    const q = current.qualifiers || {};
 
     const choice = await new Promise(resolve => {
       new Dialog({
-        title: `Declare Action: ${actor.name}`,
+        title: `${isChange ? "New Action" : "Declare Action"}: ${actor.name}`,
         content: `
-          <div style="padding:4px 0;">
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="radio" name="declaration" value="attack" ${chk("attack")}/>
-                <i class="fas fa-fist-raised" style="width:16px;"></i> <strong>Attack</strong>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="radio" name="declaration" value="defend" ${chk("defend")}/>
-                <i class="fas fa-shield-alt" style="width:16px;"></i> <strong>Defend</strong>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="radio" name="declaration" value="other" ${chk("other")}/>
-                <i class="fas fa-ellipsis-h" style="width:16px;"></i> <strong>Other</strong>
-                <span style="color:#666;font-size:0.85em;">(move, talk, item, etc.)</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="radio" name="declaration" value="multi" ${chk("multi")}/>
-                <i class="fas fa-burst" style="width:16px;color:#1E90FF;"></i> <strong>Multi-Action</strong>
-                <span style="color:#666;font-size:0.85em;">(Fighting FEAT required)</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                <input type="radio" name="declaration" value="charge" ${chk("charge")}/>
-                <i class="fas fa-bolt" style="width:16px;color:#cc7a00;"></i> <strong>Charge</strong>
-                <span style="color:#666;font-size:0.85em;">(full move; no half-move penalty)</span>
-              </label>
+          <div class="faserip-declare-dialog">
+            <div class="faserip-declare-grid">
+              <label><input type="radio" name="declaration" value="move" ${chk("move")}> <i class="fas fa-running"></i> <strong>Move Only</strong><small>full movement</small></label>
+              <label><input type="radio" name="declaration" value="attack" ${chk("attack")}> <i class="fas fa-fist-raised"></i> <strong>Attack</strong><small>half move if moving</small></label>
+              <label><input type="radio" name="declaration" value="charge" ${chk("charge")}> <i class="fas fa-bolt"></i> <strong>Charge</strong><small>full move + attack</small></label>
+              <label><input type="radio" name="declaration" value="dodge" ${chk("dodge")}> <i class="fas fa-running"></i> <strong>Dodge</strong><small>Agility in Pre-Action</small></label>
+              <label><input type="radio" name="declaration" value="block" ${chk("block")}> <i class="fas fa-shield-alt"></i> <strong>Block</strong><small>Strength in Pre-Action</small></label>
+              <label><input type="radio" name="declaration" value="evade" ${chk("evade")}> <i class="fas fa-eye-slash"></i> <strong>Evade</strong><small>Fighting in Pre-Action</small></label>
+              <label><input type="radio" name="declaration" value="multi" ${chk("multi")}> <i class="fas fa-burst"></i> <strong>Multiple Attacks</strong><small>Fighting FEAT in Pre-Action</small></label>
+              <label><input type="radio" name="declaration" value="other" ${chk("other")}> <i class="fas fa-ellipsis-h"></i> <strong>Other</strong><small>item, power stunt, talk, etc.</small></label>
             </div>
-            <div style="margin-top:8px;">
-              <label style="font-size:0.85em;color:#666;">Notes (optional):</label>
-              <input type="text" name="note" value="${lastNote.replace(/"/g, '&quot;')}" placeholder="e.g. punch Rhino, web to rooftop..." style="width:100%;padding:3px 6px;box-sizing:border-box;"/>
+            <div class="faserip-declare-sub" data-section="multi">
+              <span>Attacks:</span>
+              <label><input type="radio" name="attackCount" value="2" ${lastCount === 2 ? "checked" : ""}> 2 (RM intensity)</label>
+              <label><input type="radio" name="attackCount" value="3" ${lastCount === 3 ? "checked" : ""}> 3 (AM intensity)</label>
             </div>
+            ${(hasMAE || hasWpnSpec) ? `<div class="faserip-declare-sub" data-section="initiative-context">
+              <span>Initiative talent:</span>
+              ${hasMAE ? `<label><input type="checkbox" name="unarmed" ${q.unarmed ? "checked" : ""}> Unarmed combat (MA-E)</label>` : ""}
+              ${hasWpnSpec ? `<label><input type="checkbox" name="weaponSpecialist" ${q.weaponSpecialist ? "checked" : ""}> Using specialist weapon</label>` : ""}
+            </div>` : ""}
+            <label class="faserip-declare-field"><span>Target / opponent</span><input type="text" name="target" value="${this._esc(lastTarget)}" placeholder="optional, but recommended for Evade"></label>
+            <label class="faserip-declare-field"><span>Notes</span><input type="text" name="note" value="${this._esc(lastNote)}" placeholder="punch MODOK, grab console, fly to gantry..."></label>
           </div>
         `,
         buttons: {
           declare: {
             icon: '<i class="fas fa-check"></i>',
-            label: "Declare",
-            callback: (html) => {
-              const type = html.find('[name="declaration"]:checked').val();
-              const note = html.find('[name="note"]').val()?.trim() || "";
-              resolve({ type, note });
+            label: isChange ? "Use New Action" : "Declare",
+            callback: html => {
+              const type = String(html.find('[name="declaration"]:checked').val() || "attack");
+              const attackCount = Number(html.find('[name="attackCount"]:checked').val() || 2);
+              const note = String(html.find('[name="note"]').val() || "").trim();
+              const target = String(html.find('[name="target"]').val() || "").trim();
+              resolve({
+                type, attackCount: type === "multi" ? (attackCount >= 3 ? 3 : 2) : null,
+                note, target,
+                qualifiers: {
+                  unarmed: !!html.find('[name="unarmed"]').is(':checked'),
+                  weaponSpecialist: !!html.find('[name="weaponSpecialist"]').is(':checked')
+                }
+              });
             }
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
-        default: "declare"
+        default: "declare",
+        render: html => {
+          const update = () => {
+            const type = String(html.find('[name="declaration"]:checked').val() || "attack");
+            html.find('[data-section="multi"]').toggle(type === "multi");
+            html.find('[data-section="initiative-context"]').toggle(["attack", "charge", "multi"].includes(type));
+          };
+          html.find('[name="declaration"]').on("change", update);
+          update();
+        }
       }).render(true);
     });
-    if (!choice) return;
+    if (!choice) return null;
 
-    const labels = { attack: "⚔ Attack", defend: "🛡 Defend", other: "… Other", multi: "⚔×2 Multi", charge: "⚡ Charge" };
-    const label = labels[choice.type] || choice.type;
-
-    // Save declaration on combatant — players can't modify Combatant docs directly
-    const flagData = {
+    // Mutually exclusive initiative contexts: MA-E is unarmed; Weapon
+    // Specialist requires the specialist weapon. If both are checked, prefer
+    // the explicit specialist weapon declaration and turn off unarmed.
+    if (choice.qualifiers.weaponSpecialist) choice.qualifiers.unarmed = false;
+    const meta = this._declarationMeta(choice.type, choice);
+    const declaredAction = { ...choice, label: meta.label };
+    const ok = await this._setCombatantFlags(combatant, {
       lastDeclaredType: choice.type,
       lastDeclaredNote: choice.note,
-      declaredAction: { type: choice.type, label, note: choice.note }
-    };
-    if (game.user.isGM) {
-      await combatant.setFlag("msh-faserip", "lastDeclaredType", choice.type);
-      await combatant.setFlag("msh-faserip", "lastDeclaredNote", choice.note);
-      await combatant.setFlag("msh-faserip", "declaredAction", { type: choice.type, label, note: choice.note });
-    } else if (game.msh?.runAsGM) {
-      await game.msh.runAsGM({
-        operation: "setCombatantFlags",
-        combatantId: combatant.id,
-        flags: flagData
-      });
-    } else {
-      ui.notifications.warn("Cannot save declaration — no GM connection available.");
-    }
-
-    // Post to chat
-    const noteStr = choice.note ? ` — <em>${choice.note}</em>` : "";
-    await ChatMessage.create({
-      user: game.user.id,
-      content: `<div class="faserip-declaration-card">
-        <strong>${actor.name}</strong> declares: ${label}${noteStr}
-        ${choice.type === "multi" ? `<div style="font-size:0.85em;color:#666;margin-top:2px;">Fighting FEAT will be rolled when attack is executed.</div>` : ""}
-      </div>`,
-      speaker: ChatMessage.getSpeaker({ actor })
+      declaredAction
     });
-
+    if (!ok) return null;
     ui.combat?.render(true);
+    return declaredAction;
   }
 
-  // Change Action: Yellow Agility FEAT, -1CS on subsequent actions this turn
-  // RAW: requires Yellow result on Agility FEAT. Resolved in pre-action phase.
-  static async _rollChangeAction(actor) {
-    await ChatMessage.create({
-      user: game.user.id,
-      content: `<div class="faserip-change-action-result">
-        <strong>${actor.name}</strong> attempts to change action.
-        <em>Requires Yellow Agility FEAT. If successful, all subsequent FEATs this turn are at -1CS.</em>
-      </div>`,
-      speaker: ChatMessage.getSpeaker({ actor })
+  static async _createChangeActionPenalty(actor, combat) {
+    const existing = actor.effects?.filter(e => !e.disabled && e.getFlag?.("msh-faserip", "isChangeActionPenalty")) || [];
+    if (existing.length) await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+    await actor.createEmbeddedDocuments("ActiveEffect", [{
+      name: "Changed Action (-1CS)",
+      icon: "icons/svg/daze.svg",
+      origin: actor.uuid,
+      disabled: false,
+      duration: { value: 1, units: "rounds", expiry: "roundEnd" },
+      changes: [{ key: "system.combatMods.selfPenaltyCS", mode: "add", value: "-1", priority: 30 }],
+      flags: { "msh-faserip": { isChangeActionPenalty: true, createdRound: combat?.round ?? null, notes: "RAW Change Action: -1CS on subsequent FEATs this round." } }
+    }]);
+  }
+
+  // RAW Change Action: Yellow Agility FEAT. Success permits a replacement
+  // declaration and applies -1CS to every subsequent FEAT this round.
+  static async _rollChangeAction(actor, combatantId) {
+    const combat = game.combat;
+    const combatant = combat?.combatants?.get(combatantId);
+    if (!combatant || this._getPhase(combat) !== this.PHASE_PREACTION) return;
+    const attempted = combatant.getFlag("msh-faserip", "changeActionAttempted");
+    if (attempted?.round === combat.round) return ui.notifications.warn("Change Action has already been attempted this round.");
+    const resolved = combatant.getFlag("msh-faserip", "preActionResolved");
+    if (resolved?.round === combat.round) return ui.notifications.warn("The declared Pre-Action FEAT has already been resolved; the action is locked.");
+
+    const featResult = await new Promise(resolve => {
+      showAbilityFeatDialog(actor, "agility", {
+        title: `Change Action (Yellow Agility): ${actor.name}`,
+        featType: "standard",
+        lockFeatType: true,
+        requiredColor: "Yellow",
+        transient: true,
+        onCancel: () => resolve(null),
+        onResult: result => resolve(result)
+      });
     });
-    // Open proper Agility FEAT dialog — player sets intensity to match the Yellow requirement
-    await showAbilityFeatDialog(actor, "agility");
+    if (!featResult) return;
+
+    if (!featResult.success) {
+      await this._setCombatantFlags(combatant, { changeActionAttempted: { round: combat.round, success: false, result: featResult.resultColor } });
+      ui.notifications.info(`${actor.name} fails to change action; the original declaration stands.`);
+      ui.combat?.render(true);
+      return;
+    }
+
+    const replacement = await this._showDeclarationDialog(actor, combatantId, { isChange: true });
+    if (!replacement) {
+      await this._setCombatantFlags(combatant, { changeActionAttempted: { round: combat.round, success: true, result: featResult.resultColor, changed: false } });
+      ui.combat?.render(true);
+      return;
+    }
+
+    await this._createChangeActionPenalty(actor, combat);
+    await this._setCombatantFlags(combatant, {
+      changeActionAttempted: { round: combat.round, success: true, result: featResult.resultColor, changed: true },
+      preActionResolved: null
+    });
+    ui.notifications.info(`${actor.name} changes action; subsequent FEATs this round are -1CS.`);
+    ui.combat?.render(true);
   }
 
   // Build collapsible turn phase step list
@@ -1071,9 +1463,9 @@ export class FaseripInitiative {
     if (rawPhases) {
       steps = [
         "Judge plans NPC actions",
-        "Players declare actions (Attack / Defend / Other / Multi-Action)",
+        "Players declare actions (Move / Attack / Charge / Dodge / Block / Evade / Multiple Attacks / Other)",
         "Roll Initiative",
-        "Pre-Action — Dodge / Block / Evade / Change Action",
+        "Pre-Action — resolve declared defenses / Multiple Attacks; Change Action if needed",
         `${winner} act`,
         `${loser} act`
       ];
@@ -1104,9 +1496,9 @@ export class FaseripInitiative {
     if (rawPhases) {
       steps = [
         "Judge plans NPC actions",
-        "Players declare actions (Attack / Defend / Other / Multi-Action)",
+        "Players declare actions (Move / Attack / Charge / Dodge / Block / Evade / Multiple Attacks / Other)",
         "Roll Initiative",
-        "Pre-Action — Dodge / Block / Evade / Change Action",
+        "Pre-Action — resolve declared defenses / Multiple Attacks; Change Action if needed",
         "Actions in initiative order"
       ];
     } else {

@@ -1,3 +1,5 @@
+// edged-attack-action.js v3.3.3 - 2026-08-21
+// v3.3.3: Consume RAW Multiple Attacks from the combat tracker Pre-Action result.
 // edged-attack-action.js v3.3.2 - 2026-07-09
 // v3.3.2: Treat Claws powers as first-class edged sources. A power
 //         launched through power-router is now added to the damage-source
@@ -64,7 +66,8 @@ import {
   buildActionsBox,
   getTargetData,
   getBodyArmorValues,
-  getEffectiveArmor as _getEffectiveArmor
+  getEffectiveArmor as _getEffectiveArmor,
+  getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -177,9 +180,19 @@ export class EdgedAttackAction extends AttackAction {
     const savedNatRank = shouldRemember ? ((await actor.getFlag("msh-faserip","lastNaturalWeaponRank")) || "Good") : "Good";
     const savedNatDmg = shouldRemember ? ((await actor.getFlag("msh-faserip","lastNaturalWeaponDamage")) || game.msh.getRankValue(savedNatRank)) : game.msh.getRankValue("Good");
 
-    const savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false) : false;
-    const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2) : 2;
-    const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAdjacent") || false) : false;
+    let savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false) : false;
+    let savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2) : 2;
+    let savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAdjacent") || false) : false;
+    const declaredMultiState = getDeclaredMultiAttackState(actor);
+    if (declaredMultiState.raw) {
+      savedMultiAttacks = !!declaredMultiState.declared;
+      if (declaredMultiState.declared) {
+        savedAttackCount = declaredMultiState.count;
+        // RAW declaration of 2/3 attacks is distinct from the single-roll
+        // adjacent-target tactic. Do not let remembered UI state select Adj.
+        savedMultiAdjacent = false;
+      }
+    }
     const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedShift") || 0) : 0;
     const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip","lastEdgedReason")) || "") : "";
     
@@ -612,56 +625,38 @@ export class EdgedAttackAction extends AttackAction {
       ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
     }
 
-    // Handle multi-attacks
+    // Multiple Attacks. RAW tracker mode resolves the Fighting FEAT during
+    // Pre-Action; do not roll it again during attack execution.
     let actualAttackCount = 1;
     let multiAttackFeatResult = null;
-    
+    const rawMulti = getDeclaredMultiAttackState(actor);
+    if (rawMulti.raw) {
+      if (rawMulti.declared) { choice.multiAttacks = true; choice.attackCount = rawMulti.count; }
+      else if (choice.multiAttacks) {
+        ui.notifications.warn("Multiple Attacks were not declared before initiative; making a normal attack.");
+        choice.multiAttacks = false;
+      }
+    }
     if (choice.multiAttacks) {
-      const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
-      
-      // Multi-attack FEAT uses raw Fighting rank — attack CS does not apply
-      const featResult = await this._rollFightingFeat(
-        actor, 
-        fightingAbility, 
-        intensity, 
-        choice.attackCount
-      );
-      
-      if (featResult?.cancelled) {
-        ui.notifications.info("Multi-attack cancelled.");
-        return;
-      }
-      
-      multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
-      
-      let useConsolidated = false;
-      try {
-        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
-      } catch (_e) { /* setting not registered yet */ }
-      
-      if (!useConsolidated) {
-        await ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
-            <b>Multi-Attack FEAT:</b> ${intensity} — ${
-              featResult?.success ? "SUCCESS" : "FAIL"
-            } ${featResult?.auto ? "(Automatic)" : ""}</div>`
-        });
-      }
-
-      const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
-      const featImpossible = !!(featResult?.resultColor === "IMPOSSIBLE");
-      if (featSuccess && !featImpossible) {
-        actualAttackCount = choice.attackCount;
-        shiftBreakdown.multiAttack = -1;
-        choice.shift = (choice.shift || 0) - 1;
-        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
+      if (rawMulti.raw) {
+        if (!rawMulti.resolved) { ui.notifications.warn("Resolve the Multiple Attacks Fighting FEAT in Pre-Action before attacking."); return; }
+        multiAttackFeatResult = { success: rawMulti.success, resultColor: rawMulti.result, intensity, attackCount: rawMulti.count, preAction: true };
+        actualAttackCount = rawMulti.attacksAllowed;
+        shiftBreakdown.multiAttack = rawMulti.consequenceCS;
+        choice.shift = (choice.shift || 0) + rawMulti.consequenceCS;
       } else {
-        actualAttackCount = 1;
-        shiftBreakdown.multiAttack = -3;
-        choice.shift = (choice.shift || 0) - 3;
-        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
+        const fightingAbility = getAbilityInfo(actor, "fighting");
+        const featResult = await this._rollFightingFeat(actor, fightingAbility, intensity, choice.attackCount);
+        if (featResult?.cancelled) { ui.notifications.info("Multi-attack cancelled."); return; }
+        multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
+        let useConsolidated = false;
+        try { useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards"); } catch (_e) {}
+        if (!useConsolidated) await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;"><b>Multi-Attack FEAT:</b> ${intensity} — ${featResult?.success ? "SUCCESS" : "FAIL"} ${featResult?.auto ? "(Automatic)" : ""}</div>` });
+        const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
+        const featImpossible = !!(featResult?.resultColor === "IMPOSSIBLE");
+        if (featSuccess && !featImpossible) { actualAttackCount = choice.attackCount; shiftBreakdown.multiAttack = -1; choice.shift = (choice.shift || 0) - 1; }
+        else { actualAttackCount = 1; shiftBreakdown.multiAttack = -3; choice.shift = (choice.shift || 0) - 3; }
       }
     }
 

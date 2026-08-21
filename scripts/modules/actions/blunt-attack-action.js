@@ -1,3 +1,6 @@
+// blunt-attack-action.js v3.7.1 - 2026-08-21
+// v3.7.1: Consume RAW Multiple Attacks from the combat tracker Pre-Action result;
+//         do not reroll Fighting during attack execution.
 // blunt-attack-action.js v3.7.0 - 2026-08-14
 // v3.7.0: Combined Attack assist consumer. Blunt dialog adds one compact
 //         Combined [+damage] input on the Karma row. A successful Agility
@@ -73,7 +76,7 @@ import {
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetData, getBodyArmorValues, applyDamageToTargets,
   buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector,
-  applyCapabilitiesToDialog, buildInlineFeatDisplay
+  applyCapabilitiesToDialog, buildInlineFeatDisplay, getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -180,9 +183,19 @@ export class BluntAttackAction extends AttackAction {
     const savedPullEnabled = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntPullEnabled")) || false) : false;
     const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntResultCap")) || "none") : "none";
 
-    const savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAttacks") || false) : false;
-    const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
-    const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
+    let savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAttacks") || false) : false;
+    let savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
+    let savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
+    const declaredMultiState = getDeclaredMultiAttackState(actor);
+    if (declaredMultiState.raw) {
+      savedMultiAttacks = !!declaredMultiState.declared;
+      if (declaredMultiState.declared) {
+        savedAttackCount = declaredMultiState.count;
+        // RAW declaration of 2/3 attacks is distinct from the single-roll
+        // adjacent-target tactic. Do not let remembered UI state select Adj.
+        savedMultiAdjacent = false;
+      }
+    }
     const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
     
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
@@ -899,65 +912,58 @@ export class BluntAttackAction extends AttackAction {
       ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
     }
 
-    // Handle multi-attacks
+    // Handle multiple attacks. In RAW tracker mode the Fighting FEAT was
+    // already resolved in Pre-Action; consume that result instead of rolling
+    // a second time here.
     let actualAttackCount = 1;
     let multiAttackFeatResult = null;
-    
+    const rawMulti = getDeclaredMultiAttackState(actor);
+    if (rawMulti.raw) {
+      if (rawMulti.declared) {
+        choice.multiAttacks = true;
+        choice.attackCount = rawMulti.count;
+      } else if (choice.multiAttacks) {
+        ui.notifications.warn("Multiple Attacks were not declared before initiative; making a normal attack.");
+        choice.multiAttacks = false;
+      }
+    }
+
     if (choice.multiAttacks) {
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
-      
-      // Use effective Fighting rank from dialog (includes auto-detected mods + manual FEAT CS)
-      const effFightRank = choice.effectiveFightingRank || fightingAbility.rank;
-      const featFightAbility = { ...fightingAbility, rank: effFightRank };
-      
-      // Check if impossible — block without penalty
-      const effIdx = RANKS.indexOf(effFightRank);
-      const intIdx = RANKS.indexOf(intensity);
-      const diff = effIdx - intIdx;
-      if (diff <= -2) {
-        ui.notifications.warn(`Multi-attack impossible — ${effFightRank} Fighting vs ${intensity} intensity. Performing normal attack.`);
-        choice.multiAttacks = false;
-      } else {
-        const featResult = await this._rollFightingFeat(
-          actor, 
-          featFightAbility, 
-          intensity, 
-          choice.attackCount
-        );
-        
-        if (featResult?.cancelled) {
-          ui.notifications.info("Multi-attack cancelled.");
+      if (rawMulti.raw) {
+        if (!rawMulti.resolved) {
+          ui.notifications.warn("Resolve the Multiple Attacks Fighting FEAT in Pre-Action before attacking.");
           return;
         }
-        
-        multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
-        
-        let useConsolidated = false;
-        try {
-          useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
-        } catch (_e) {}
-        
-        if (!useConsolidated) {
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
-              <b>Multi-Attack FEAT:</b> ${intensity} — ${
-                featResult?.success ? "SUCCESS" : "FAIL"
-              } ${featResult?.auto ? "(Automatic)" : ""}</div>`
-          });
-        }
-
-        const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
-        if (featSuccess) {
-          actualAttackCount = choice.attackCount;
-          shiftBreakdown.multiAttack = -1;
-          choice.shift = (choice.shift || 0) - 1;
-          ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
+        multiAttackFeatResult = {
+          success: rawMulti.success, resultColor: rawMulti.result, intensity,
+          attackCount: rawMulti.count, preAction: true
+        };
+        actualAttackCount = rawMulti.attacksAllowed;
+        shiftBreakdown.multiAttack = rawMulti.consequenceCS;
+        choice.shift = (choice.shift || 0) + rawMulti.consequenceCS;
+      } else {
+        // Legacy/non-RAW workflow: resolve the FEAT at attack execution.
+        const effFightRank = choice.effectiveFightingRank || fightingAbility.rank;
+        const featFightAbility = { ...fightingAbility, rank: effFightRank };
+        const effIdx = RANKS.indexOf(effFightRank);
+        const intIdx = RANKS.indexOf(intensity);
+        const diff = effIdx - intIdx;
+        if (diff <= -2) {
+          ui.notifications.warn(`Multi-attack impossible — ${effFightRank} Fighting vs ${intensity} intensity. Performing normal attack.`);
+          choice.multiAttacks = false;
         } else {
-          actualAttackCount = 1;
-          shiftBreakdown.multiAttack = -3;
-          choice.shift = (choice.shift || 0) - 3;
-          ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
+          const featResult = await this._rollFightingFeat(actor, featFightAbility, intensity, choice.attackCount);
+          if (featResult?.cancelled) { ui.notifications.info("Multi-attack cancelled."); return; }
+          multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
+          let useConsolidated = false;
+          try { useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards"); } catch (_e) {}
+          if (!useConsolidated) {
+            await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;"><b>Multi-Attack FEAT:</b> ${intensity} — ${featResult?.success ? "SUCCESS" : "FAIL"} ${featResult?.auto ? "(Automatic)" : ""}</div>` });
+          }
+          const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
+          if (featSuccess) { actualAttackCount = choice.attackCount; shiftBreakdown.multiAttack = -1; choice.shift = (choice.shift || 0) - 1; }
+          else { actualAttackCount = 1; shiftBreakdown.multiAttack = -3; choice.shift = (choice.shift || 0) - 3; }
         }
       }
     }

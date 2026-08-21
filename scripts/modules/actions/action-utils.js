@@ -3458,3 +3458,39 @@ export function getAreaIntensityRank(item) {
   const raw = _blank(sys.intensityRank) ? sys.grenadeIntensity : sys.intensityRank;
   return _blank(raw) ? "" : String(raw);
 }
+
+/**
+ * Return the RAW combat-tracker Multiple Attacks declaration/pre-action state
+ * for an actor. Attack dialogs use this to avoid rolling the Fighting FEAT a
+ * second time during the action phase.
+ */
+export function getDeclaredMultiAttackState(actor) {
+  let raw = false;
+  let initiativeMode = "side";
+  try {
+    raw = !!game.settings.get("msh-faserip", "useRawTurnPhases");
+    initiativeMode = game.settings.get("msh-faserip", "initiativeMode") || "side";
+  } catch { raw = false; }
+  if (!raw || initiativeMode === "foundry" || !actor || !game.combat?.started) return { raw: false, declared: false, resolved: false };
+
+  const combat = game.combat;
+  const combatant = combat.combatants.find(c => c.actor?.id === actor.id || c.actor?.uuid === actor.uuid);
+  if (!combatant) return { raw: true, declared: false, resolved: false };
+  const declaration = combatant.getFlag("msh-faserip", "declaredAction");
+  const declared = declaration?.type === "multi";
+  const count = Number(declaration?.attackCount || 2) >= 3 ? 3 : 2;
+  const pre = combatant.getFlag("msh-faserip", "preActionResolved");
+  const resolved = declared && pre?.round === combat.round && pre?.action === "multiattack";
+  return {
+    raw: true,
+    combatant,
+    declaration,
+    declared,
+    resolved,
+    count,
+    success: resolved ? pre.success !== false : false,
+    result: resolved ? pre.result : null,
+    attacksAllowed: resolved ? Number(pre.attacksAllowed || (pre.success ? count : 1)) : 1,
+    consequenceCS: resolved ? Number(pre.consequenceCS ?? (pre.success ? -1 : -3)) : 0
+  };
+}

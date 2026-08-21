@@ -1,3 +1,6 @@
+// scripts/modules/actions/defense-action.js v2.0.4 - 2026-08-21
+// v2.0.4: Return tracker-consumable defense results and honor selfPenaltyCS on
+//         Pre-Action FEATs; support declared Evade target prefill.
 // scripts/modules/actions/defense-action.js v2.0.3 - 2026-04-19
 // v2.0.3: Scope evading effect to attacks only. Removed canAct:false from
 //         the Evading effect's changes array. Attack blocking is handled by
@@ -289,10 +292,12 @@ export class DefenseAction extends BaseAction {
       }
     }
 
-    // Effective rank
-    // Catching: -3CS if the object/attack is directed specifically at the catcher (RAW)
+    // Effective rank. selfPenaltyCS applies to all of the actor's subsequent
+    // FEATs this round (Dodging, Change Action, Impaired Endurance, etc.).
+    // Catching: -3CS if the object/attack is directed specifically at the catcher (RAW).
     const directedPenalty = (actionType === "catching" && choice.catchVsYou) ? -3 : 0;
-    const effectiveRank = shiftRank(ability.rank, (choice.shift || 0) + directedPenalty);
+    const selfPenaltyCS = Number(actor.system?.combatMods?.selfPenaltyCS) || 0;
+    const effectiveRank = shiftRank(ability.rank, (choice.shift || 0) + directedPenalty + selfPenaltyCS);
 
     // Check consolidated chat card setting
     let useConsolidated = false;
@@ -333,13 +338,14 @@ export class DefenseAction extends BaseAction {
     const featLabel = `${abilityLabel} FEAT`;
 
     // Shift display (hover tooltip style) — includes directed-catch -3CS when applicable
-    const totalShift = (choice.shift || 0) + directedPenalty;
+    const totalShift = (choice.shift || 0) + directedPenalty + selfPenaltyCS;
     let shiftDisplay = "";
     if (totalShift) {
       const label = `${totalShift > 0 ? '+' : ''}${totalShift}CS`;
       const tipParts = [];
       if (choice.shift) tipParts.push(`${choice.shift > 0 ? '+' : ''}${choice.shift} CS panel`);
       if (directedPenalty) tipParts.push(`${directedPenalty} directed`);
+      if (selfPenaltyCS) tipParts.push(`${selfPenaltyCS} active self penalty`);
       const tip = tipParts.join(', ');
       const csBox = `<span title="${tip}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${label}</span>`;
       shiftDisplay = ` (${csBox} → ${effectiveRank})`;
@@ -382,20 +388,22 @@ export class DefenseAction extends BaseAction {
     `;
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    return { actionType, resultColor: colorLower, color: String(color), effectiveRank, totalShift };
   }
 
   // ------- Per-action UI bits -------
 
   _buildExtraHtml(actionType) {
     if (actionType === "evading") {
-      let prefillTarget = "";
+      let prefillTarget = String(this.opts?.evadeTarget || "");
       const targets = Array.from(game.user?.targets ?? []);
-      if (targets.length === 1) prefillTarget = targets[0].name || "";
+      if (!prefillTarget && targets.length === 1) prefillTarget = targets[0].name || "";
+      const safePrefillTarget = foundry.utils.escapeHTML(prefillTarget);
       return `
         <div class="frp-box">
           <div class="frp-box-label">Opponent</div>
           <input type="text" name="evadeTarget" class="frp-cs-notes" style="margin-top:0;"
-                 placeholder="Who you're evading (single adjacent)" value="${prefillTarget}">
+                 placeholder="Who you're evading (single adjacent)" value="${safePrefillTarget}">
         </div>`;
     }
     if (actionType === "catching") {
