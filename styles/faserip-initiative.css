@@ -254,48 +254,6 @@
 }
 
 /* =====================
-   PRE-ACTION BUTTONS
-   ===================== */
-.faserip-preaction-icons {
-  display: inline-flex;
-  gap: 2px;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-
-.faserip-preaction-btn,
-.faserip-change-action-btn {
-  width: 18px;
-  height: 18px;
-  line-height: 18px;
-  text-align: center;
-  border: 1px solid #999;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #555;
-  font-size: 9px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.faserip-preaction-btn:hover {
-  background: rgba(0, 100, 0, 0.15);
-  border-color: #006400;
-  color: #006400;
-}
-
-.faserip-change-action-btn {
-  border-color: #DAA520;
-  background: rgba(255, 215, 0, 0.1);
-}
-
-.faserip-change-action-btn:hover {
-  background: rgba(255, 215, 0, 0.25);
-  border-color: #B8860B;
-  color: #B8860B;
-}
-
-/* =====================
    PHASE INDICATOR BAR
    ===================== */
 .faserip-phase-bar {
@@ -363,12 +321,22 @@
 /* =====================
    TRACKER CONTROLS (Foundry-sized)
    ===================== */
+/* Chips/buttons live on their own full-width row beneath the name so the
+   combatant name is never squeezed into a truncated column. */
 .faserip-tracker-actions {
   display: flex;
   align-items: center;
   gap: 1px;
-  padding: 0;
-  flex-shrink: 0;
+  padding: 0 0 0 2px;
+  flex: 1 1 100%;
+  order: 99;
+  min-width: 0;
+}
+
+/* Defaulted (implicit Attack) declaration */
+.faserip-declaration-chip.defaulted {
+  opacity: 0.75;
+  font-style: italic;
 }
 
 /* Compact icon-only declaration indicator */
@@ -430,6 +398,7 @@
 /* Ensure combatant rows accommodate controls without clipping */
 .combatant:has(.faserip-tracker-actions) {
   overflow: visible;
+  flex-wrap: wrap;
 }
 .combatant:has(.faserip-tracker-actions) .combatant-controls,
 .combatant:has(.faserip-tracker-actions) .token-resource {
@@ -437,6 +406,7 @@
 }
 .combatant:has(.faserip-tracker-actions) .token-name,
 .combatant:has(.faserip-tracker-actions) .combatant-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

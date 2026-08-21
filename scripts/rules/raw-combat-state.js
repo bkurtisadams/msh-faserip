@@ -1,4 +1,5 @@
-// scripts/rules/raw-combat-state.js v1.1.0 - 2026-08-21
+// scripts/rules/raw-combat-state.js v1.2.0 - 2026-08-21
+// v1.2.0: Missing declarations default to Attack instead of refusing the action.
 // Pure RAW combat-state helpers. No Foundry globals so the phase traffic-cop
 // can be regression-tested without booting Foundry.
 
@@ -93,8 +94,8 @@ export function authorizeRawAction({
 } = {}) {
   if (!RAW_VOLUNTARY_TYPES.has(actionType)) return { ok: true, consumesCombatAction: false };
 
-  const decl = declaration || {};
-  if (!decl.type) return { ok: false, message: `${actorName} has no declared action. Record an intended action before proceeding.` };
+  // Declarations are optional: an absent one is the default Attack intention.
+  const decl = (declaration && declaration.type) ? declaration : { type: "attack", label: "Attack", defaulted: true };
 
   if (phase === RAW_PHASES.DECLARE) {
     return { ok: false, message: "RAW Declaration phase: record intended actions first. Movement and combat actions begin after Initiative and Pre-Action." };
@@ -165,8 +166,8 @@ export function authorizeRawMovement({
   declaration,
   actorName = "Character"
 } = {}) {
-  const decl = declaration || {};
-  if (!decl.type) return { ok: false, message: `${actorName} has no declared action. Record an intended action before proceeding.` };
+  // Declarations are optional: an absent one is the default Attack intention.
+  const decl = (declaration && declaration.type) ? declaration : { type: "attack", label: "Attack", defaulted: true };
 
   if (phase === RAW_PHASES.DECLARE) {
     return { ok: false, message: "Movement is resolved during the action phase, after Initiative and Pre-Action." };
