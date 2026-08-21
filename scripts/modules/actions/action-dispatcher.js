@@ -144,7 +144,7 @@ const registry = {
 };
 
 
-function rawDeclarationGate(actor, type, opts = {}) {
+async function rawDeclarationGate(actor, type, opts = {}) {
   let enabled = false;
   let initiativeMode = "side";
   try {
@@ -164,7 +164,7 @@ function rawDeclarationGate(actor, type, opts = {}) {
 
   const combatant = combat.combatants.find(c => c.actor?.id === actor.id || c.actor?.uuid === actor.uuid);
   if (!combatant) return { ok: true };
-  const phase = combat.getFlag("msh-faserip", "turnPhase") || "declare";
+  let phase = combat.getFlag("msh-faserip", "turnPhase") || "declare";
   const decl = combatant.getFlag("msh-faserip", "declaredAction");
   if (!decl?.type) return { ok: false, message: `${actor.name} has not declared an action this round.` };
 
@@ -174,7 +174,55 @@ function rawDeclarationGate(actor, type, opts = {}) {
     return { ok: false, message: "RAW Declaration phase: record the intended action first; actions are resolved after initiative." };
   }
   if (phase === "preaction" && attackTypes.has(type)) {
-    return { ok: false, message: "Attacks are resolved after the Pre-Action phase." };
+    // Starting the first attack implicitly closes an *empty* Pre-Action phase.
+    // This keeps RAW Change Action available after initiative, but avoids forcing
+    // the GM to click a redundant "Begin Actions" button when nobody has a
+    // required Dodge/Block/Evade/Multiple-Attack FEAT to resolve.
+    const tracked = Array.from(combat.turns ?? []);
+    const pending = tracked.filter(c => {
+      if (!c?.actor || c.defeated) return false;
+      const hp = Number(c.actor.system?.attributes?.health?.value ?? 1);
+      if (hp <= 0 || c.actor.system?.details?.isDead || c.actor.system?.combatMods?.canAct === false) return false;
+      const d = c.getFlag?.("msh-faserip", "declaredAction");
+      if (!d?.type) return false;
+      let expected = null;
+      if (d.type === "dodge") expected = "dodging";
+      else if (d.type === "block" || d.type === "defend") expected = "blocking";
+      else if (d.type === "evade") expected = "evading";
+      else if (d.type === "multi") expected = "multiattack";
+      if (!expected) return false;
+      const resolved = c.getFlag?.("msh-faserip", "preActionResolved");
+      return !(resolved?.round === combat.round && resolved.action === expected);
+    });
+
+    if (pending.length) {
+      const names = pending.slice(0, 4).map(c => c.name).join(", ");
+      const more = pending.length > 4 ? ` +${pending.length - 4} more` : "";
+      return {
+        ok: false,
+        message: `Pre-Action is not complete: ${pending.length} required FEAT${pending.length === 1 ? "" : "s"} remain (${names}${more}). Resolve ${pending.length === 1 ? "it" : "them"} in the combat tracker first.`
+      };
+    }
+
+    const nextPhase = initiativeMode === "side" ? "actions-winner" : "actions";
+    try {
+      if (game.user.isGM) {
+        await combat.setFlag("msh-faserip", "turnPhase", nextPhase);
+      } else if (game.msh?.runAsGM) {
+        await game.msh.runAsGM({
+          operation: "setCombatPhase",
+          combatId: combat.id,
+          phase: nextPhase
+        });
+      } else {
+        return { ok: false, message: "Pre-Action is complete, but the combat phase could not be advanced because no GM connection is available." };
+      }
+      phase = nextPhase;
+      ui.combat?.render?.(true);
+    } catch (err) {
+      console.error("[FASERIP] Could not advance empty Pre-Action phase", err);
+      return { ok: false, message: "Pre-Action is complete, but the combat tracker could not advance to the action phase." };
+    }
   }
   if (phase === "preaction" && defenseMap[type]) {
     const declaredDefense = decl.type === "defend" ? "block" : decl.type;
@@ -237,7 +285,7 @@ export class ActionDispatcher {
 
     const type = normalizeActionType(actionType);
 
-    const declarationGate = rawDeclarationGate(actor, type, opts);
+    const declarationGate = await rawDeclarationGate(actor, type, opts);
     if (!declarationGate.ok) {
       ui.notifications?.warn?.(declarationGate.message);
       return;

@@ -56,4 +56,11 @@ ok(/for \(const c of this\._trackedCombatants\(combat\)\)/.test(initiative), 'si
 ok(/const trackedIds = new Set\(this\._trackedCombatants\(combat\)/.test(initiative), 'individual initiative ignores stale/non-tracker combatant documents');
 ok(/_resolveCombatForCombatant\(combatantId\)/.test(initiative) && /ui\.combat\?\.viewed/.test(initiative), 'tracker controls resolve the viewed combat instead of blindly using game.combat');
 
+
+ok(/async function rawDeclarationGate/.test(dispatcher) && /await rawDeclarationGate\(actor, type, opts\)/.test(dispatcher), 'declaration gate can advance an empty Pre-Action phase before dispatching an attack');
+ok(/Starting the first attack implicitly closes an \*empty\* Pre-Action phase/.test(dispatcher) && /operation: "setCombatPhase"/.test(dispatcher), 'first attack closes empty Pre-Action through GM-safe phase transition');
+ok(/Pre-Action is not complete:/.test(dispatcher) && /required FEAT/.test(dispatcher), 'attack warning identifies unresolved required Pre-Action FEATs instead of generic phase failure');
+const gmUtils = read('scripts/gm-utils.js');
+ok(/current !== "preaction"/.test(gmUtils) && /required Pre-Action FEAT\(s\) remain/.test(gmUtils), 'GM phase bridge refuses arbitrary or unresolved Pre-Action skips');
+
 console.log(`initiative/declaration workflow tests passed (${n} assertions)`);

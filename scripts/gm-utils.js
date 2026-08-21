@@ -280,6 +280,12 @@ async function runGMCommand(data = {}) {
         flags: data.flags
       });
 
+    case "setCombatPhase":
+      return await setCombatPhase({
+        combatId: data.combatId,
+        phase: data.phase
+      });
+
     default:
       throw new Error(`Unknown GM operation: ${operation}`);
   }
@@ -481,6 +487,48 @@ async function setCombatantFlags({ combatantId, flags }) {
   for (const [key, value] of Object.entries(flags)) {
     await combatant.setFlag("msh-faserip", key, value);
   }
+  return true;
+}
+
+
+/**
+ * Advance the FASERIP RAW phase on behalf of a player. This is intentionally
+ * narrow: only known phase values are accepted, and the requested combat must
+ * exist. Used when a player's first action implicitly closes an empty
+ * Pre-Action phase.
+ */
+async function setCombatPhase({ combatId, phase }) {
+  if (!combatId) throw new Error("setCombatPhase: combatId required");
+  const combat = game.combats?.get?.(combatId) ?? (game.combat?.id === combatId ? game.combat : null);
+  if (!combat) throw new Error(`setCombatPhase: combat not found: ${combatId}`);
+
+  // Player-initiated phase advancement is deliberately narrow. It may only
+  // close an empty RAW Pre-Action window; it cannot skip required FEATs or
+  // jump arbitrary combat phases.
+  const current = combat.getFlag("msh-faserip", "turnPhase") || "declare";
+  if (current !== "preaction") throw new Error(`setCombatPhase: expected preaction, found ${current}`);
+  const initiativeMode = game.settings.get("msh-faserip", "initiativeMode") || "side";
+  const expectedPhase = initiativeMode === "side" ? "actions-winner" : "actions";
+  if (phase !== expectedPhase) throw new Error(`setCombatPhase: invalid transition preaction -> ${phase}`);
+
+  const pending = Array.from(combat.turns ?? []).filter(c => {
+    if (!c?.actor || c.defeated) return false;
+    const hp = Number(c.actor.system?.attributes?.health?.value ?? 1);
+    if (hp <= 0 || c.actor.system?.details?.isDead || c.actor.system?.combatMods?.canAct === false) return false;
+    const d = c.getFlag?.("msh-faserip", "declaredAction");
+    let expected = null;
+    if (d?.type === "dodge") expected = "dodging";
+    else if (d?.type === "block" || d?.type === "defend") expected = "blocking";
+    else if (d?.type === "evade") expected = "evading";
+    else if (d?.type === "multi") expected = "multiattack";
+    if (!expected) return false;
+    const resolved = c.getFlag?.("msh-faserip", "preActionResolved");
+    return !(resolved?.round === combat.round && resolved.action === expected);
+  });
+  if (pending.length) throw new Error(`setCombatPhase: ${pending.length} required Pre-Action FEAT(s) remain`);
+
+  await combat.setFlag("msh-faserip", "turnPhase", phase);
+  ui.combat?.render?.(true);
   return true;
 }
 
