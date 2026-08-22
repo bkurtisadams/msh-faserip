@@ -1,3 +1,16 @@
+// faserip-initiative.js v3.2.0 - 2026-08-21
+// v3.2.0: Saved per-character FEAT details. The Multi declaration stores a
+//         standing CS modifier (e.g. Counter-Strike's +3CS Ultimate Skill) and
+//         an "auto-roll each round" toggle, remembered on the actor across
+//         combats. Auto-rolled FEATs post a compact chat card; Automatic
+//         FEATs (incl. saved CS) resolve with no dice at all. Manual rolls
+//         prefill the saved CS.
+// faserip-initiative.js v3.1.0 - 2026-08-21
+// v3.1.0: Auto-resolve declared Multiple Attacks FEATs that are Automatic per
+//         RAW (effective Fighting, incl. -1CS penalties, 3+ ranks above the
+//         Rm/Am intensity) — no dice, no dialog, chip shows "N Attacks: AUTO".
+//         Re-checked after a Change Action to Multi. Rolled FEATs keep their
+//         dialogs (CS input lives there).
 // faserip-initiative.js v3.0.0 - 2026-08-21
 // v3.0.0: Collapse the RAW phase machine to two states. Declaration is no
 //         longer a gated phase (chips editable until initiative; Attack is the
@@ -39,7 +52,7 @@
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
-import { getInitiativeModifier } from "./rules/rules-reference.js";
+import { getInitiativeModifier, rankIndex, shiftRank } from "./rules/rules-reference.js";
 import { authorizeRawMovement, getPreActionRequirement, normalizeRawPhase } from "./rules/raw-combat-state.js";
 
 export class FaseripInitiative {
@@ -925,7 +938,12 @@ export class FaseripInitiative {
         if (requirement) {
           if (resolvedThisRound) {
             const result = String(resolved.result || "done").toUpperCase();
-            container.innerHTML += `<span class="faserip-preaction-result ${resolved.success === false ? "failed" : "success"}" title="Declared FEAT locked">${this._esc(requirement.label)}: ${this._esc(result)}</span>`;
+            const lockTitle = resolved.auto
+              ? "Automatic FEAT — Fighting 3+ ranks above intensity; no roll needed"
+              : resolved.autoRolled
+                ? `Auto-rolled with saved ${resolved.shift > 0 ? "+" : ""}${resolved.shift || 0}CS`
+                : "Declared FEAT locked";
+            container.innerHTML += `<span class="faserip-preaction-result ${resolved.success === false ? "failed" : "success"}" title="${lockTitle}">${this._esc(requirement.label)}: ${this._esc(result)}</span>`;
           } else if (canControl) {
             container.innerHTML += `<button class="faserip-tracker-ctrl faserip-required-roll" data-action="${requirement.action}" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declared ${this._esc(requirement.label)}: roll and lock the FEAT"><i class="fas ${requirement.icon}"></i> <span>Roll</span></button>`;
           }
@@ -1099,6 +1117,7 @@ export class FaseripInitiative {
         const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
         if (turnIndex >= 0) update.turn = turnIndex;
         await combat.update(update, { mshNoTimeAdvance: true });
+        await this._autoResolveMultiFeats(combat);
       } else {
         if (turnIndex >= 0) await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
       }
@@ -1188,6 +1207,7 @@ export class FaseripInitiative {
         const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
         if (turnIndex >= 0) update.turn = turnIndex;
         await combat.update(update, { mshNoTimeAdvance: true });
+        await this._autoResolveMultiFeats(combat);
       } else {
         if (turnIndex >= 0) await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
       }
@@ -1242,6 +1262,94 @@ export class FaseripInitiative {
     }
     if (updates.length) await combat.updateEmbeddedDocuments("Combatant", updates);
     return updates.length;
+  }
+
+  // Declared Multiple Attacks whose Fighting FEAT is Automatic per RAW
+  // (effective rank, including selfPenaltyCS, 3+ ranks above the Remarkable/
+  // Amazing intensity) resolve without a roll. Counter-Strike's Unearthly
+  // Fighting vs 2 attacks (Remarkable) is the canonical case. Impossible and
+  // rollable FEATs keep the tracker Roll button and its dialog (CS input).
+  static _multiAutoState(combatant) {
+    const decl = combatant.getFlag("msh-faserip", "declaredAction");
+    if (decl?.type !== "multi") return null;
+    const count = Number(decl.attackCount || 2) >= 3 ? 3 : 2;
+    const intensity = count === 3 ? "Amazing" : "Remarkable";
+    const baseRank = combatant.actor?.system?.abilities?.fighting?.rank;
+    if (!baseRank) return null;
+    const shift = Number(decl.shift) || 0; // saved standing CS (e.g. Ultimate Skill +3)
+    const selfPenaltyCS = Number(combatant.actor.system?.combatMods?.selfPenaltyCS) || 0;
+    const totalShift = shift + selfPenaltyCS;
+    const effRank = totalShift ? shiftRank(baseRank, totalShift) : baseRank;
+    const diff = rankIndex(effRank) - rankIndex(intensity);
+    return {
+      count, intensity, effRank, shift, totalShift,
+      automatic: diff >= 3,
+      impossible: diff <= -2,
+      // Required color when a roll is needed: 1 below = red; equal = yellow; 1-2 above = green.
+      requiredColor: diff === -1 ? "red" : diff === 0 ? "yellow" : "green",
+      autoRoll: decl.autoRoll === true
+    };
+  }
+
+  static async _autoResolveMultiFeats(combat) {
+    const COLOR_ORDER = { white: 0, green: 1, yellow: 2, red: 3 };
+    const ops = [];
+    for (const c of this._eligibleCombatants(combat)) {
+      const pre = c.getFlag("msh-faserip", "preActionResolved");
+      if (pre?.round === combat.round && pre.action === "multiattack") continue;
+      const st = this._multiAutoState(c);
+      if (!st) continue;
+
+      // Automatic per RAW (effective rank incl. saved CS 3+ ranks above): no dice.
+      if (st.automatic) {
+        ops.push({
+          _id: c.id,
+          "flags.msh-faserip.preActionResolved": {
+            round: combat.round, action: "multiattack", result: "auto", success: true,
+            auto: true, attackCount: st.count, consequenceCS: -1, attacksAllowed: st.count, shift: st.shift
+          }
+        });
+        this._dbg("auto multi FEAT", { name: c.name, effRank: st.effRank, intensity: st.intensity, count: st.count, shift: st.shift });
+        continue;
+      }
+
+      // Saved auto-roll: roll the FEAT now with the saved CS (no Karma; uncheck
+      // Auto-roll on the declaration to roll manually with Karma).
+      if (!st.autoRoll) continue;
+      let stamp;
+      let cardLine;
+      if (st.impossible) {
+        stamp = {
+          round: combat.round, action: "multiattack", result: "impossible", success: false,
+          attackCount: st.count, consequenceCS: -3, attacksAllowed: 1, shift: st.shift, autoRolled: true
+        };
+        cardLine = `<b>Impossible</b> — ${this._esc(st.effRank)} Fighting vs ${st.intensity}. 1 attack at -3CS.`;
+      } else {
+        const roll = await (new Roll("1d100")).evaluate();
+        if (game.dice3d) await game.dice3d.showForRoll(roll, game.user, true);
+        const color = String(game.msh.rollUniversalTable(st.effRank, roll.total) || "white").toLowerCase();
+        const success = (COLOR_ORDER[color] ?? 0) >= (COLOR_ORDER[st.requiredColor] ?? 1);
+        stamp = {
+          round: combat.round, action: "multiattack", result: color, success,
+          attackCount: st.count, consequenceCS: success ? -1 : -3,
+          attacksAllowed: success ? st.count : 1, shift: st.shift, autoRolled: true, roll: roll.total
+        };
+        cardLine = `Roll ${roll.total} → <b style="text-transform:uppercase;">${color}</b> (needed ${st.requiredColor}+): ${success ? `<b>SUCCESS</b> — ${st.count} attacks at -1CS` : `<b>FAIL</b> — 1 attack at -3CS`}`;
+      }
+      ops.push({ _id: c.id, "flags.msh-faserip.preActionResolved": stamp });
+      this._dbg("auto-rolled multi FEAT", { name: c.name, ...stamp });
+      const shiftNote = st.totalShift ? ` ${st.totalShift > 0 ? "+" : ""}${st.totalShift}CS → ${this._esc(st.effRank)}` : "";
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: c.actor }),
+        content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;">
+          <b>${this._esc(c.name)} — Multiple Attacks FEAT (auto)</b><br>
+          ${st.count} attacks vs ${st.intensity} · Fighting ${this._esc(c.actor?.system?.abilities?.fighting?.rank || "?")}${shiftNote}<br>
+          ${cardLine}
+        </div>`
+      });
+    }
+    if (ops.length) await combat.updateEmbeddedDocuments("Combatant", ops);
+    return ops.length;
   }
 
   static async _ensureSideFlags(combat) {
@@ -1329,6 +1437,7 @@ export class FaseripInitiative {
         multiAttackCount: requirement.attackCount,
         lockFeatType: true,
         transient: true,
+        columnShift: Number(combatant.getFlag("msh-faserip", "declaredAction")?.shift) || 0,
         onCancel: () => resolve(),
         onResult: async result => {
           await this._setCombatantFlags(combatant, {
@@ -1364,6 +1473,10 @@ export class FaseripInitiative {
     const selectedTargetName = selectedTargets.length === 1 ? (selectedTargets[0]?.name || selectedTargets[0]?.actor?.name || "") : "";
     const lastTarget = current.target ?? selectedTargetName;
     const lastCount = Number(current.attackCount || 2) >= 3 ? 3 : 2;
+    // Standing FEAT details, remembered on the actor across combats (e.g.
+    // Counter-Strike's +3CS Ultimate Skill on his Multiple Attacks FEAT).
+    const lastShift = Number(current.shift ?? actor.getFlag("msh-faserip", "lastMultiShift") ?? 0) || 0;
+    const lastAutoRoll = (current.autoRoll ?? actor.getFlag("msh-faserip", "lastMultiAutoRoll") ?? false) === true;
     const hasMAE = this._hasTalent(actor, /martial arts\s*[- ]?e/i);
     const hasWpnSpec = this._hasTalent(actor, /weapons? specialist/i);
     const chk = v => v === lastType ? "checked" : "";
@@ -1389,6 +1502,10 @@ export class FaseripInitiative {
               <label><input type="radio" name="attackCount" value="2" ${lastCount === 2 ? "checked" : ""}> 2 (RM intensity)</label>
               <label><input type="radio" name="attackCount" value="3" ${lastCount === 3 ? "checked" : ""}> 3 (AM intensity)</label>
             </div>
+            <div class="faserip-declare-sub" data-section="multi">
+              <label title="Standing column shift applied to this FEAT every round (talents, powers such as Ultimate Skill). Saved on the character.">CS <input type="number" name="featShift" value="${lastShift}" min="-5" max="5" step="1" style="width:44px;"></label>
+              <label title="Roll the FEAT automatically each round with the saved CS — no dialog, no Karma. Uncheck to roll manually."><input type="checkbox" name="autoRoll" ${lastAutoRoll ? "checked" : ""}> Auto-roll each round</label>
+            </div>
             ${(hasMAE || hasWpnSpec) ? `<div class="faserip-declare-sub" data-section="initiative-context">
               <span>Initiative talent:</span>
               ${hasMAE ? `<label><input type="checkbox" name="unarmed" ${q.unarmed ? "checked" : ""}> Unarmed combat (MA-E)</label>` : ""}
@@ -1407,9 +1524,13 @@ export class FaseripInitiative {
               const attackCount = Number(html.find('[name="attackCount"]:checked').val() || 2);
               const note = String(html.find('[name="note"]').val() || "").trim();
               const target = String(html.find('[name="target"]').val() || "").trim();
+              const shift = Math.max(-5, Math.min(5, Number(html.find('[name="featShift"]').val() || 0) || 0));
+              const autoRoll = !!html.find('[name="autoRoll"]').is(':checked');
               resolve({
                 type, attackCount: type === "multi" ? (attackCount >= 3 ? 3 : 2) : null,
                 note, target,
+                shift: type === "multi" ? shift : 0,
+                autoRoll: type === "multi" ? autoRoll : false,
                 qualifiers: {
                   unarmed: !!html.find('[name="unarmed"]').is(':checked'),
                   weaponSpecialist: !!html.find('[name="weaponSpecialist"]').is(':checked')
@@ -1445,6 +1566,15 @@ export class FaseripInitiative {
       declaredAction
     });
     if (!ok) return null;
+    if (choice.type === "multi" && (actor.isOwner || game.user.isGM)) {
+      await actor.setFlag("msh-faserip", "lastMultiShift", choice.shift || 0);
+      await actor.setFlag("msh-faserip", "lastMultiAutoRoll", !!choice.autoRoll);
+    }
+    // A declaration edited after initiative may qualify for immediate
+    // resolution; during Declaration this is a no-op (phase gate). Change
+    // Action defers to _rollChangeAction, which resolves after the -1CS
+    // penalty is applied so the auto-roll uses the penalized rank.
+    if (!isChange && this._getPhase(combat) === this.PHASE_ACTIONS) await this._autoResolveMultiFeats(combat);
     ui.combat?.render(true);
     return declaredAction;
   }
@@ -1583,6 +1713,7 @@ export class FaseripInitiative {
       changeActionAttempted: { round: combat.round, success: true, result: featResult.resultColor, changed: true },
       preActionResolved: null
     });
+    await this._autoResolveMultiFeats(combat);
     ui.notifications.info(`${actor.name} changes action; subsequent FEATs this round are -1CS.`);
     ui.combat?.render(true);
   }

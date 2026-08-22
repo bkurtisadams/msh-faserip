@@ -1,3 +1,6 @@
+// edged-attack-action.js v3.4.0 - 2026-08-21
+// v3.4.0: Lock the Multi controls when the tracker Multiple Attacks FEAT is
+//         already resolved (rolled or Automatic) — no implied second roll.
 // edged-attack-action.js v3.3.3 - 2026-08-21
 // v3.3.3: Consume RAW Multiple Attacks from the combat tracker Pre-Action result.
 // edged-attack-action.js v3.3.2 - 2026-07-09
@@ -586,6 +589,11 @@ export class EdgedAttackAction extends AttackAction {
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
           });
+          if (declaredMultiState.resolved) {
+            html.find('#multi-enabled').prop('disabled', true)
+              .attr('title', `Multiple Attacks FEAT locked in tracker: ${String(declaredMultiState.result || 'done').toUpperCase()} — ${declaredMultiState.attacksAllowed} attack(s) at ${declaredMultiState.consequenceCS}CS`);
+            html.find('[name="multiCount"]').prop('disabled', true);
+          }
 
           // Karma toggle — inactive styling
           html.find('#spend-karma').on('change', function() {

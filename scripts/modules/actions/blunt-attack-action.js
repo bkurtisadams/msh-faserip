@@ -1,3 +1,7 @@
+// blunt-attack-action.js v3.8.0 - 2026-08-21
+// v3.8.0: When the tracker Multiple Attacks FEAT is already locked (rolled or
+//         Automatic), show the locked result in the multi panel and disable
+//         the Multi controls — no implied second FEAT roll.
 // blunt-attack-action.js v3.7.1 - 2026-08-21
 // v3.7.1: Consume RAW Multiple Attacks from the combat tracker Pre-Action result;
 //         do not reroll Fighting during attack execution.
@@ -822,10 +826,27 @@ export class BluntAttackAction extends AttackAction {
 
           // ── Multi-attack FEAT panel update ──
           _updateFeatPanel = () => {
+            const $panel = html.find('#multi-feat-panel');
+
+            // Tracker already locked the Fighting FEAT (rolled or Automatic):
+            // show the locked result; there is no second roll to preview.
+            if (declaredMultiState.resolved) {
+              $panel.show();
+              const $bar = html.find('#feat-result-bar');
+              const ok = declaredMultiState.success;
+              $bar.css(ok
+                ? { background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }
+                : { background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a' })
+                .text(`FEAT locked in tracker: ${String(declaredMultiState.result || 'done').toUpperCase()} — ${declaredMultiState.attacksAllowed} attack(s), ${declaredMultiState.consequenceCS}CS`);
+              html.find('#multi-enabled').prop('disabled', true).attr('title', 'Declared and locked in the combat tracker');
+              html.find('[name="multiCount"]').prop('disabled', true);
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+              return;
+            }
+
             const enabled = html.find('#multi-enabled').is(':checked');
             const countVal = html.find('[name="multiCount"]:checked').val() || "2";
             const isMultiAttack = enabled && countVal !== "adjacent";
-            const $panel = html.find('#multi-feat-panel');
 
             if (!isMultiAttack) { $panel.hide(); if ($dialog.length) $dialog[0].style.height = 'auto'; return; }
             $panel.show();

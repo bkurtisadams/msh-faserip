@@ -1,3 +1,6 @@
+// shooting-action.js v3.10.0 - 2026-08-21
+// v3.10.0: Lock the Multi controls when the tracker Multiple Attacks FEAT is
+//          already resolved (rolled or Automatic) — no implied second roll.
 // shooting-action.js v3.9.4 - 2026-08-21
 // v3.9.4: Consume RAW Multiple Attacks from the combat tracker Pre-Action result.
 // shooting-action.js v3.9.3 - 2026-08-02
@@ -695,6 +698,11 @@ export class ShootingAction extends RangedAttackAction {
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
           });
+          if (declaredMultiState.resolved) {
+            html.find('#multi-enabled').prop('disabled', true)
+              .attr('title', `Multiple Attacks FEAT locked in tracker: ${String(declaredMultiState.result || 'done').toUpperCase()} — ${declaredMultiState.attacksAllowed} attack(s) at ${declaredMultiState.consequenceCS}CS`);
+            html.find('[name="multiCount"]').prop('disabled', true);
+          }
 
           // Aim tactic toggle
           html.find('#aim-enabled').on('change', function() {
