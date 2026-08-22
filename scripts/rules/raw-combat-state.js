@@ -1,15 +1,23 @@
-// scripts/rules/raw-combat-state.js v1.2.0 - 2026-08-21
-// v1.2.0: Missing declarations default to Attack instead of refusing the action.
+// scripts/rules/raw-combat-state.js v2.0.0 - 2026-08-21
+// v2.0.0: Two-state model (declare / actions). Pre-Action is a per-character
+//         gate inside the actions state, not a phase; winner/loser sub-phases
+//         removed (side initiative values already order the tracker). Missing
+//         declarations default to Attack.
 // Pure RAW combat-state helpers. No Foundry globals so the phase traffic-cop
 // can be regression-tested without booting Foundry.
 
 export const RAW_PHASES = Object.freeze({
   DECLARE: "declare",
-  PREACTION: "preaction",
-  ACTIONS_WINNER: "actions-winner",
-  ACTIONS_LOSER: "actions-loser",
   ACTIONS: "actions"
 });
+
+// Pre-v2 combats may still carry these stored phase values.
+const LEGACY_ACTION_PHASES = new Set(["preaction", "actions-winner", "actions-loser", "actions"]);
+
+export function normalizeRawPhase(stored) {
+  if (LEGACY_ACTION_PHASES.has(stored)) return RAW_PHASES.ACTIONS;
+  return RAW_PHASES.DECLARE;
+}
 
 export const RAW_ATTACK_TYPES = new Set([
   "blunt-attack", "edged-attack", "shooting", "throwing-edged", "throwing-blunt",
@@ -26,6 +34,13 @@ export const RAW_VOLUNTARY_TYPES = new Set([
   ...RAW_ATTACK_TYPES,
   ...Object.keys(RAW_DEFENSE_ACTIONS)
 ]);
+
+// Declarations are optional: an absent one is the default Attack intention.
+function withDefault(declaration) {
+  return (declaration && declaration.type)
+    ? declaration
+    : { type: "attack", label: "Attack", defaulted: true };
+}
 
 export function getPreActionRequirement(declaration) {
   const decl = declaration || {};
@@ -52,38 +67,8 @@ export function isPreActionResolved({ declaration, preActionResolved, round }) {
   return !!(preActionResolved && preActionResolved.round === round && preActionResolved.action === req.action);
 }
 
-
-export function canClosePreAction({
-  phase,
-  pendingCount = 0,
-  initiativeMode = "side",
-  goesFirst = null
-} = {}) {
-  if (phase !== RAW_PHASES.PREACTION) {
-    return { ok: false, message: "Pre-Action can only be closed while the combat tracker is in the Pre-Action phase." };
-  }
-  if (Number(pendingCount || 0) > 0) {
-    const n = Number(pendingCount || 0);
-    return { ok: false, message: `${n} required Pre-Action FEAT${n === 1 ? "" : "s"} still ${n === 1 ? "remains" : "remain"}.` };
-  }
-  if (initiativeMode === "side" && !["pc", "npc"].includes(goesFirst)) {
-    return { ok: false, message: "No initiative-winning side is recorded. Roll initiative before ending Pre-Action." };
-  }
-  return { ok: true };
-}
-
-export function getActiveSide({ phase, goesFirst }) {
-  if (!goesFirst) return null;
-  if (phase === RAW_PHASES.ACTIONS_WINNER) return goesFirst;
-  if (phase === RAW_PHASES.ACTIONS_LOSER) return goesFirst === "pc" ? "npc" : "pc";
-  return null;
-}
-
 export function authorizeRawAction({
   phase,
-  initiativeMode = "side",
-  side,
-  goesFirst,
   declaration,
   preActionResolved,
   actionState,
@@ -94,46 +79,34 @@ export function authorizeRawAction({
 } = {}) {
   if (!RAW_VOLUNTARY_TYPES.has(actionType)) return { ok: true, consumesCombatAction: false };
 
-  // Declarations are optional: an absent one is the default Attack intention.
-  const decl = (declaration && declaration.type) ? declaration : { type: "attack", label: "Attack", defaulted: true };
+  const decl = withDefault(declaration);
+  const state = normalizeRawPhase(phase);
 
-  if (phase === RAW_PHASES.DECLARE) {
-    return { ok: false, message: "RAW Declaration phase: record intended actions first. Movement and combat actions begin after Initiative and Pre-Action." };
+  if (state === RAW_PHASES.DECLARE) {
+    return { ok: false, message: "Roll initiative first. Combat actions and movement begin once initiative is set." };
   }
 
-  if (phase === RAW_PHASES.PREACTION) {
-    const declaredDefense = decl.type === "defend" ? "block" : decl.type;
-    const expectedDefense = RAW_DEFENSE_ACTIONS[actionType];
-    if (expectedDefense) {
-      if (declaredDefense !== expectedDefense) {
-        return { ok: false, message: `${actorName} declared ${decl.label || decl.type}, not ${expectedDefense}. Use Change Action first.` };
-      }
-      if (!rawPreAction) {
-        return { ok: false, message: `Use ${actorName}'s Pre-Action Roll button in the combat tracker so the result can be locked.` };
-      }
-      return { ok: true, consumesCombatAction: false };
+  const declaredDefense = decl.type === "defend" ? "block" : decl.type;
+  const expectedDefense = RAW_DEFENSE_ACTIONS[actionType];
+  const resolved = isPreActionResolved({ declaration: decl, preActionResolved, round });
+
+  // Declared defensive FEATs: rolled once via the tracker Roll button, then locked.
+  if (expectedDefense) {
+    if (declaredDefense !== expectedDefense) {
+      return { ok: false, message: `${actorName} declared ${decl.label || decl.type}, not ${expectedDefense}. Use Change Action first.` };
     }
-    return {
-      ok: false,
-      message: "Pre-Action is still open. Resolve required FEATs, Change Actions, and Judge events, then the GM must click Begin Actions."
-    };
+    if (resolved) {
+      return { ok: false, message: "The declared defensive FEAT is already locked for this round." };
+    }
+    if (!rawPreAction) {
+      return { ok: false, message: `Use ${actorName}'s Roll button in the combat tracker so the result can be locked.` };
+    }
+    return { ok: true, consumesCombatAction: false };
   }
 
-  if (![RAW_PHASES.ACTIONS_WINNER, RAW_PHASES.ACTIONS_LOSER, RAW_PHASES.ACTIONS].includes(phase)) {
-    return { ok: false, message: "Combat actions are not available in the current RAW phase." };
-  }
-
-  if (initiativeMode === "side" && phase !== RAW_PHASES.ACTIONS) {
-    const activeSide = getActiveSide({ phase, goesFirst });
-    if (activeSide && side !== activeSide) return { ok: false, message: `${actorName}'s side is not acting yet.` };
-  }
-
-  if (!isPreActionResolved({ declaration: decl, preActionResolved, round })) {
-    return { ok: false, message: `${actorName}'s required Pre-Action FEAT has not been resolved.` };
-  }
-
-  if (RAW_DEFENSE_ACTIONS[actionType]) {
-    return { ok: false, message: "Defensive Pre-Action FEATs are already locked for this round." };
+  // Attack path: a declared Multiple Attacks FEAT must be resolved first.
+  if (!resolved) {
+    return { ok: false, message: `${actorName}'s declared FEAT has not been rolled yet. Use the tracker Roll button.` };
   }
 
   if (!RAW_ATTACK_TYPES.has(actionType)) return { ok: true, consumesCombatAction: false };
@@ -160,27 +133,14 @@ export function authorizeRawAction({
 
 export function authorizeRawMovement({
   phase,
-  initiativeMode = "side",
-  side,
-  goesFirst,
   declaration,
   actorName = "Character"
 } = {}) {
-  // Declarations are optional: an absent one is the default Attack intention.
-  const decl = (declaration && declaration.type) ? declaration : { type: "attack", label: "Attack", defaulted: true };
+  const decl = withDefault(declaration);
+  const state = normalizeRawPhase(phase);
 
-  if (phase === RAW_PHASES.DECLARE) {
-    return { ok: false, message: "Movement is resolved during the action phase, after Initiative and Pre-Action." };
-  }
-  if (phase === RAW_PHASES.PREACTION) {
-    return { ok: false, message: "Movement waits until Pre-Action is closed by the GM." };
-  }
-  if (![RAW_PHASES.ACTIONS_WINNER, RAW_PHASES.ACTIONS_LOSER, RAW_PHASES.ACTIONS].includes(phase)) {
-    return { ok: false, message: "Movement is not available in the current RAW phase." };
-  }
-  if (initiativeMode === "side" && phase !== RAW_PHASES.ACTIONS) {
-    const activeSide = getActiveSide({ phase, goesFirst });
-    if (activeSide && side !== activeSide) return { ok: false, message: `${actorName}'s side is not acting yet.` };
+  if (state === RAW_PHASES.DECLARE) {
+    return { ok: false, message: "Movement begins once initiative is rolled." };
   }
   if (["block", "defend"].includes(decl.type)) {
     return { ok: false, message: `${actorName} declared Block and may take no other action this round.` };

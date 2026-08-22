@@ -161,19 +161,8 @@ async function rawDeclarationGate(actor, type, opts = {}) {
   const combatant = Array.from(combat.turns ?? []).find(c => c.actor?.id === actor.id || c.actor?.uuid === actor.uuid);
   if (!combatant) return { ok: true, consumesCombatAction: false };
 
-  const sideFlag = combatant.getFlag("msh-faserip", "side");
-  const disposition = combatant.token?.disposition ?? combatant.actor?.prototypeToken?.disposition;
-  const side = sideFlag || (combatant.actor?.type === "hero" ? "pc"
-    : combatant.actor?.type === "villain" ? "npc"
-    : disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "pc"
-    : disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE ? "npc"
-    : combatant.actor?.hasPlayerOwner ? "pc" : "npc");
-
   const verdict = authorizeRawAction({
-    phase: combat.getFlag("msh-faserip", "turnPhase") || "declare",
-    initiativeMode,
-    side,
-    goesFirst: combat.getFlag("msh-faserip", "goesFirst"),
+    phase: combat.getFlag("msh-faserip", "turnPhase"),
     declaration: combatant.getFlag("msh-faserip", "declaredAction"),
     preActionResolved: combatant.getFlag("msh-faserip", "preActionResolved"),
     actionState: combatant.getFlag("msh-faserip", "actionState"),

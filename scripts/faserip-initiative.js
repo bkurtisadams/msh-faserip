@@ -1,3 +1,11 @@
+// faserip-initiative.js v3.0.0 - 2026-08-21
+// v3.0.0: Collapse the RAW phase machine to two states. Declaration is no
+//         longer a gated phase (chips editable until initiative; Attack is the
+//         default); Pre-Action FEATs are per-character row gates inside the
+//         Actions state with no global stop; winner/loser sub-phases removed —
+//         side-based initiative values already sort all winners above all
+//         losers, and anyone may act once their required FEAT is locked.
+//         Round loop for the GM is now: [Initiative (or auto-roll)] → End Round.
 // faserip-initiative.js v2.6.0 - 2026-08-21
 // v2.6.0: Fix stale tracker DOM under v14 partial re-renders (bars/chips are now
 //         rebuilt every render instead of skip-if-exists — root cause of round-2
@@ -32,7 +40,7 @@
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
 import { getInitiativeModifier } from "./rules/rules-reference.js";
-import { authorizeRawMovement, getPreActionRequirement, canClosePreAction } from "./rules/raw-combat-state.js";
+import { authorizeRawMovement, getPreActionRequirement, normalizeRawPhase } from "./rules/raw-combat-state.js";
 
 export class FaseripInitiative {
   static initialized = false;
@@ -43,12 +51,10 @@ export class FaseripInitiative {
   static MODE_INDIVIDUAL = "individual";
   static MODE_FOUNDRY = "foundry";
 
-  // Turn phase constants (RAW mode)
+  // Turn states (RAW mode). Two only: before initiative (declarations open)
+  // and after (actions; per-character Pre-Action FEAT gates live inside it).
   static PHASE_DECLARE = "declare";
-  static PHASE_PREACTION = "preaction";
-  static PHASE_ACTIONS_WINNER = "actions-winner";
-  static PHASE_ACTIONS_LOSER = "actions-loser";
-  static PHASE_ACTIONS = "actions"; // legacy fallback
+  static PHASE_ACTIONS = "actions";
 
   static _dbg(...args) {
     try { if (!game.settings.get("msh-faserip", "debugMode")) return; } catch { return; }
@@ -59,7 +65,9 @@ export class FaseripInitiative {
     if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return this.PHASE_ACTIONS;
     // Before encounter begins (round 0), no phase applies
     if (!combat?.round) return null;
-    return combat?.getFlag("msh-faserip", "turnPhase") ?? this.PHASE_DECLARE;
+    // normalizeRawPhase maps legacy stored values (preaction/actions-winner/
+    // actions-loser) from pre-v3 combats onto the two-state model.
+    return normalizeRawPhase(combat?.getFlag("msh-faserip", "turnPhase"));
   }
 
   static async _setPhase(combat, phase) {
@@ -118,7 +126,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "autoRerollInitiative", {
       name: "Auto Reroll Initiative Each Round",
-      hint: "Automatically reroll initiative at the start of each new round when RAW Turn Phases are off. With RAW phases on, the next round waits for declarations before initiative is rolled.",
+      hint: "Automatically roll initiative at the start of each round. With RAW Turn Phases on, note that this skips the declaration window each round — carried-forward declarations still apply, but changing one then requires a Change Action FEAT.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -159,7 +167,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "useRawTurnPhases", {
       name: "Use RAW Turn Phases",
-      hint: "When enabled, intended actions are declared before initiative. Dodge, Block, Evade, and 2/3 Multiple Attacks generate locked Pre-Action FEATs; changing a declaration requires a Yellow Agility FEAT and applies -1CS to subsequent FEATs. When disabled, actions use the legacy on-demand workflow.",
+      hint: "When enabled, intended actions are declared before initiative (Attack is assumed for anyone who declares nothing). Declared Dodge, Block, Evade, and Multiple Attacks become locked FEATs rolled from the tracker; changing a declaration after initiative requires a Yellow Agility FEAT and applies -1CS to subsequent FEATs. When disabled, actions use the legacy on-demand workflow.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -312,9 +320,18 @@ export class FaseripInitiative {
           "flags.msh-faserip.npcTalentSource": null
         }, { mshNoTimeAdvance: true });
         this._dbg("combatRound: cleared", { combatants: clearOps.length });
-        // RAW: declarations must happen before initiative roll.
-        // Don't auto-roll here — GM advances from declaration phase to trigger the roll.
         ui.combat?.render(true);
+        // Optional auto-roll: rolls immediately each round (declarations carry
+        // forward; changing one afterwards is a RAW Change Action). Off by
+        // default so the table has a window to declare non-Attack actions.
+        if (game.settings.get("msh-faserip", "autoRerollInitiative")) {
+          try {
+            if (this._isSideMode()) await this.rollSideInitiative(combat);
+            else await this.rollIndividualInitiative(combat);
+          } catch (err) {
+            console.error("[FASERIP ERROR] RAW auto-roll failed", err);
+          }
+        }
         return;
       }
 
@@ -332,6 +349,21 @@ export class FaseripInitiative {
     });
 
     Hooks.on("createCombatant", this._onCreateCombatant.bind(this));
+
+    // Foundry fires combatStart (not combatRound) for round 1, so auto-roll
+    // needs its own entry point at the start of combat.
+    Hooks.on("combatStart", async (combat) => {
+      if (!game.user.isGM || !this._isFaseripMode()) return;
+      if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return;
+      if (!game.settings.get("msh-faserip", "autoRerollInitiative")) return;
+      this._dbg("combatStart: auto-roll");
+      try {
+        if (this._isSideMode()) await this.rollSideInitiative(combat);
+        else await this.rollIndividualInitiative(combat);
+      } catch (err) {
+        console.error("[FASERIP ERROR] RAW auto-roll on combat start failed", err);
+      }
+    });
 
     // RAW phases govern movement as well as attack dialogs. Normal token drags
     // are denied until the correct action phase/side is active. System/GM code
@@ -607,9 +639,6 @@ export class FaseripInitiative {
     if (!this._isInitiativeEligible(combatant)) return { ok: false, message: `${combatant.name} cannot currently act.` };
     return authorizeRawMovement({
       phase: this._getPhase(combat),
-      initiativeMode,
-      side: this._getCombatantSide(combatant),
-      goesFirst: combat.getFlag("msh-faserip", "goesFirst"),
       declaration: combatant.getFlag("msh-faserip", "declaredAction"),
       actorName: combatant.name
     });
@@ -718,52 +747,6 @@ export class FaseripInitiative {
     return combat.turns.findIndex(t => this._isInitiativeEligible(combat.combatants.get(t.id) ?? t));
   }
 
-  static async _setPhaseAndPosition(combat, phase) {
-    if (!combat) return false;
-    const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
-    const update = { "flags.msh-faserip.turnPhase": phase };
-
-    let idx = -1;
-    if (phase === this.PHASE_ACTIONS_WINNER && goesFirst) idx = this._firstEligibleTurnIndexForSide(combat, goesFirst);
-    if (phase === this.PHASE_ACTIONS_LOSER && goesFirst) idx = this._firstEligibleTurnIndexForSide(combat, goesFirst === "pc" ? "npc" : "pc");
-    if (phase === this.PHASE_ACTIONS) idx = this._firstEligibleTurnIndex(combat);
-    if (idx >= 0) update.turn = idx;
-    this._dbg("setPhaseAndPosition", { phase, goesFirst, turn: idx });
-
-    // One atomic document update is important here. Calling setFlag() first can
-    // rerender/destroy the live tracker button before the cursor write finishes.
-    await combat.update(update, { mshNoTimeAdvance: true });
-    ui.combat?.render(true);
-    return this._getPhase(combat) === phase;
-  }
-
-  static async _advanceFromPreAction(combat) {
-    if (!game.user.isGM || !combat) return false;
-    const pending = this._getPendingPreActions(combat);
-    const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
-    const verdict = canClosePreAction({
-      phase: this._getPhase(combat),
-      pendingCount: pending.length,
-      initiativeMode: game.settings.get("msh-faserip", "initiativeMode"),
-      goesFirst
-    });
-    if (!verdict.ok) {
-      ui.notifications.warn(verdict.message);
-      return false;
-    }
-
-    const target = this._isSideMode() ? this.PHASE_ACTIONS_WINNER : this.PHASE_ACTIONS;
-    try {
-      const changed = await this._setPhaseAndPosition(combat, target);
-      if (!changed) throw new Error(`Combat phase remained ${this._getPhase(combat)} instead of ${target}`);
-      return true;
-    } catch (err) {
-      console.error("[FASERIP ERROR] Could not close Pre-Action:", err);
-      ui.notifications.error("Could not end Pre-Action. Check the console for details.");
-      return false;
-    }
-  }
-
   static _hasTalent(actor, regex) {
     return !!actor?.items?.some(i => i.type === "talent" && regex.test(`${i.name} ${i.system?.specialty || ""}`));
   }
@@ -775,49 +758,52 @@ export class FaseripInitiative {
     const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
     const labels = this._getSideLabels();
     const winnerLabel = goesFirst === "pc" ? labels.pc : labels.npc;
-    const loserLabel = goesFirst === "pc" ? labels.npc : labels.pc;
-    root.classList.toggle("faserip-raw-nonaction", !!(rawPhases && [this.PHASE_DECLARE, this.PHASE_PREACTION].includes(phase)));
+    root.classList.toggle("faserip-raw-nonaction", !!(rawPhases && phase === this.PHASE_DECLARE));
 
-    // RAW round dashboard. The phase bar is intentionally the primary control
-    // surface so the GM does not need Foundry's individual-turn semantics to
-    // run a side-based FASERIP round. Always rebuilt: v14 partial re-renders
-    // can leave a stale bar (wrong phase, dead buttons) in the DOM.
+    // RAW round dashboard, two states only:
+    //   Declare — chips editable, [Plan NPCs (optional)] [Initiative]
+    //   Actions — winners sorted on top, pending FEAT count, [End Round]
+    // Always rebuilt: v14 partial re-renders can leave a stale bar in the DOM.
     root.querySelector(".faserip-phase-bar")?.remove();
     if (rawPhases && phase) {
       this._dbg("phase bar", { phase, goesFirst, sideMode });
-      const phaseLabels = {
-        [this.PHASE_DECLARE]: "Declaration",
-        [this.PHASE_PREACTION]: "Pre-Action",
-        [this.PHASE_ACTIONS_WINNER]: `${winnerLabel} Act`,
-        [this.PHASE_ACTIONS_LOSER]: `${loserLabel} Act`,
-        [this.PHASE_ACTIONS]: "Actions"
-      };
-      const phaseColors = {
-        [this.PHASE_DECLARE]: "#1E90FF",
-        [this.PHASE_PREACTION]: "#9a7412",
-        [this.PHASE_ACTIONS_WINNER]: "#006400",
-        [this.PHASE_ACTIONS_LOSER]: "#8B4513",
-        [this.PHASE_ACTIONS]: "#006400"
-      };
 
       const bar = document.createElement("div");
       bar.className = "faserip-phase-bar";
-      bar.style.cssText = `background:${phaseColors[phase] || "#006400"}; color:#fff;`;
+      bar.style.cssText = `background:${phase === this.PHASE_DECLARE ? "#1E90FF" : "#006400"}; color:#fff;`;
       const labelWrap = document.createElement("div");
       labelWrap.className = "faserip-phase-label";
-      labelWrap.innerHTML = `<strong>${phaseLabels[phase] || "Actions"}</strong>`;
 
       if (phase === this.PHASE_DECLARE) {
+        labelWrap.innerHTML = `<strong>Declare</strong>`;
         const prog = this._getPlayerDeclarationProgress(combat);
         const progress = document.createElement("span");
-        progress.className = `faserip-declare-progress ${prog.complete ? "complete" : "pending"}`;
-        const playerText = prog.total ? `${prog.declared}/${prog.total} player declarations` : "No player declarations required";
-        progress.textContent = game.user.isGM && prog.npcTotal ? `${playerText} · NPC ${prog.npcDeclared}/${prog.npcTotal}` : playerText;
-        const tips = ["Declarations are optional — anyone without one defaults to Attack when Initiative is rolled."];
+        progress.className = "faserip-declare-progress complete";
+        progress.textContent = "Attack is assumed — declare only non-Attack actions";
+        const tips = ["Declarations lock when Initiative is rolled; changing one afterwards is a Yellow Agility Change Action at -1CS."];
         if (prog.missing.length) tips.push(`Defaulting to Attack: ${prog.missing.map(c => c.name).join(", ")}`);
         if (game.user.isGM && prog.npcMissing.length) tips.push(`NPCs defaulting to Attack: ${prog.npcMissing.map(c => c.name).join(", ")}`);
         progress.title = tips.join("\n");
         labelWrap.appendChild(progress);
+      } else {
+        labelWrap.innerHTML = sideMode && goesFirst
+          ? `<strong>Actions</strong>`
+          : `<strong>Actions</strong>`;
+        if (sideMode && goesFirst) {
+          const order = document.createElement("span");
+          order.className = "faserip-declare-progress complete";
+          order.textContent = `${winnerLabel} act first`;
+          order.title = "Winners are sorted above losers. Step through combatants or let players act; required FEATs gate each character individually.";
+          labelWrap.appendChild(order);
+        }
+        const pending = this._getPendingPreActions(combat);
+        if (pending.length) {
+          const status = document.createElement("span");
+          status.className = "faserip-preaction-progress pending";
+          status.textContent = `${pending.length} declared FEAT roll${pending.length === 1 ? "" : "s"} pending`;
+          status.title = pending.map(c => c.name).join(", ");
+          labelWrap.appendChild(status);
+        }
       }
       bar.appendChild(labelWrap);
 
@@ -830,8 +816,8 @@ export class FaseripInitiative {
           const npcPlanBtn = document.createElement("button");
           npcPlanBtn.type = "button";
           npcPlanBtn.className = "faserip-phase-secondary-btn faserip-npc-plan-btn";
-          npcPlanBtn.innerHTML = `<i class="fas fa-users-cog"></i> NPCs`;
-          npcPlanBtn.title = prog.npcMissing.length ? `Plan ${prog.npcMissing.length} undeclared NPC(s) in bulk` : "Review/change private NPC plans";
+          npcPlanBtn.innerHTML = `<i class="fas fa-users-cog"></i> Plan`;
+          npcPlanBtn.title = "Optional: record private NPC intentions in bulk (undeclared NPCs simply Attack)";
           npcPlanBtn.addEventListener("click", async () => {
             const live = game.combats.get(combat.id) ?? game.combat;
             if (live) await this._showNpcPlanDialog(live);
@@ -843,7 +829,7 @@ export class FaseripInitiative {
         rollBtn.type = "button";
         rollBtn.className = "faserip-phase-advance-btn";
         rollBtn.innerHTML = `<i class="fas fa-dice"></i> Initiative`;
-        rollBtn.title = prog.allComplete ? "Roll initiative" : "Roll initiative — undeclared combatants default to Attack";
+        rollBtn.title = "Roll initiative — undeclared combatants default to Attack";
         rollBtn.addEventListener("click", async () => {
           const live = game.combats.get(combat.id) ?? game.combat;
           if (!live) return ui.notifications.warn("No active combat.");
@@ -853,98 +839,12 @@ export class FaseripInitiative {
         controls.appendChild(rollBtn);
       }
 
-      if (game.user.isGM && phase === this.PHASE_PREACTION) {
-        const pending = this._getPendingPreActions(combat);
-        {
-          const status = document.createElement("span");
-          status.className = `faserip-preaction-progress ${pending.length ? "pending" : "complete"}`;
-          status.textContent = pending.length ? `${pending.length} required roll${pending.length === 1 ? "" : "s"} pending` : "Required rolls complete · Change Action/Judge window remains open";
-          status.title = pending.length ? pending.map(c => c.name).join(", ") : "The GM deliberately closes Pre-Action when optional Change Actions and Judge events are finished.";
-          labelWrap.appendChild(status);
-        }
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "faserip-phase-advance-btn";
-        const beginLabel = sideMode ? winnerLabel : "Begin Actions";
-        btn.innerHTML = `<i class="fas fa-play"></i> ${beginLabel}`;
-        btn.title = pending.length ? "Resolve required Pre-Action FEATs first" : (sideMode ? `End Pre-Action and begin ${winnerLabel} actions` : "End Pre-Action and begin individual initiative order");
-        btn.disabled = pending.length > 0;
-        btn.addEventListener("click", async ev => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          const live = game.combats.get(combat.id) ?? game.combat;
-          if (!live) return ui.notifications.warn("No active combat.");
-          btn.disabled = true;
-          const ok = await this._advanceFromPreAction(live);
-          if (!ok && btn.isConnected) btn.disabled = false;
-        });
-        controls.appendChild(btn);
-      }
-
-      if (game.user.isGM && sideMode && phase === this.PHASE_ACTIONS_WINNER) {
-        const back = document.createElement("button");
-        back.type = "button";
-        back.className = "faserip-phase-secondary-btn";
-        back.innerHTML = `<i class="fas fa-arrow-left"></i>`;
-        back.title = "Back to Pre-Action";
-        back.addEventListener("click", async () => {
-          const live = game.combats.get(combat.id) ?? game.combat;
-          if (live) await this._setPhase(live, this.PHASE_PREACTION);
-        });
-        controls.appendChild(back);
-
-        const btn = document.createElement("button");
-        btn.className = "faserip-phase-advance-btn";
-        btn.innerHTML = `<i class="fas fa-forward"></i> ${loserLabel}`;
-        btn.title = `${winnerLabel} done; begin ${loserLabel} actions`;
-        btn.addEventListener("click", async () => {
-          const live = game.combats.get(combat.id) ?? game.combat;
-          if (live) await this._setPhaseAndPosition(live, this.PHASE_ACTIONS_LOSER);
-        });
-        controls.appendChild(btn);
-      }
-
-      if (game.user.isGM && sideMode && phase === this.PHASE_ACTIONS_LOSER) {
-        const back = document.createElement("button");
-        back.type = "button";
-        back.className = "faserip-phase-secondary-btn";
-        back.innerHTML = `<i class="fas fa-arrow-left"></i>`;
-        back.title = `Back to ${winnerLabel} actions`;
-        back.addEventListener("click", async () => {
-          const live = game.combats.get(combat.id) ?? game.combat;
-          if (live) await this._setPhaseAndPosition(live, this.PHASE_ACTIONS_WINNER);
-        });
-        controls.appendChild(back);
-
+      if (game.user.isGM && phase === this.PHASE_ACTIONS) {
         const endBtn = document.createElement("button");
         endBtn.type = "button";
         endBtn.className = "faserip-phase-advance-btn";
         endBtn.innerHTML = `<i class="fas fa-step-forward"></i> End Round`;
-        endBtn.title = "Complete this FASERIP round and begin the next Declaration phase";
-        endBtn.addEventListener("click", async () => {
-          const live = game.combats.get(combat.id) ?? game.combat;
-          if (live) await live.nextRound();
-        });
-        controls.appendChild(endBtn);
-      }
-
-      if (game.user.isGM && !sideMode && phase === this.PHASE_ACTIONS) {
-        const back = document.createElement("button");
-        back.type = "button";
-        back.className = "faserip-phase-secondary-btn";
-        back.innerHTML = `<i class="fas fa-arrow-left"></i>`;
-        back.title = "Back to Pre-Action";
-        back.addEventListener("click", async () => {
-          const live = game.combats.get(combat.id) ?? game.combat;
-          if (live) await this._setPhase(live, this.PHASE_PREACTION);
-        });
-        controls.appendChild(back);
-
-        const endBtn = document.createElement("button");
-        endBtn.type = "button";
-        endBtn.className = "faserip-phase-advance-btn";
-        endBtn.innerHTML = `<i class="fas fa-step-forward"></i> End Round`;
-        endBtn.title = "Complete this round and begin the next Declaration phase";
+        endBtn.title = "Complete this FASERIP round (declarations carry forward)";
         endBtn.addEventListener("click", async () => {
           const live = game.combats.get(combat.id) ?? game.combat;
           if (live) await live.nextRound();
@@ -963,11 +863,6 @@ export class FaseripInitiative {
       if (!c) continue;
       const side = this._getCombatantSide(c);
       el.classList.add(`${side}-side`);
-
-      if (rawPhases && sideMode && (phase === this.PHASE_ACTIONS_WINNER || phase === this.PHASE_ACTIONS_LOSER) && goesFirst) {
-        const activeSide = phase === this.PHASE_ACTIONS_WINNER ? goesFirst : (goesFirst === "pc" ? "npc" : "pc");
-        if (side !== activeSide) el.classList.add("faserip-side-inactive");
-      }
 
       // Always rebuild injected row content; stale chips from a prior phase
       // (e.g. Pre-Action Roll buttons surviving into Declaration) were caused
@@ -1016,36 +911,37 @@ export class FaseripInitiative {
           container.innerHTML = `<span class="faserip-declaration-chip faserip-decl-attack defaulted" title="No declaration recorded — defaults to Attack when Initiative is rolled"><i class="fas fa-fist-raised"></i> Attack*</span>`;
           if (canControl) container.innerHTML += `<button class="faserip-tracker-ctrl faserip-declare-btn" data-action="declare" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declare a different action (optional; Attack is assumed)"><i class="fas fa-pen"></i></button>`;
         }
-      } else if (phase === this.PHASE_PREACTION) {
+      } else {
+        // Actions state. Per-character gates replace the old global Pre-Action
+        // phase: a declared Dodge/Block/Evade/Multi shows its Roll button here
+        // and only that character waits on it.
         container.innerHTML = declarationChip();
         const requirement = this._getPreActionRequirement(c);
         const resolved = c.getFlag("msh-faserip", "preActionResolved");
         const resolvedThisRound = resolved?.round === combat.round && (!requirement || resolved.action === requirement.action);
-        if (requirement && canControl) {
+        const actionState = c.getFlag("msh-faserip", "actionState");
+        const acted = actionState?.round === combat.round && actionState.combatActionUsed;
+
+        if (requirement) {
           if (resolvedThisRound) {
             const result = String(resolved.result || "done").toUpperCase();
-            container.innerHTML += `<span class="faserip-preaction-result ${resolved.success === false ? "failed" : "success"}" title="Pre-Action FEAT resolved">${this._esc(requirement.label)}: ${this._esc(result)}</span>`;
-          } else {
-            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-required-roll" data-action="${requirement.action}" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Required Pre-Action: ${this._esc(requirement.label)}"><i class="fas ${requirement.icon}"></i> <span>Roll</span></button>`;
+            container.innerHTML += `<span class="faserip-preaction-result ${resolved.success === false ? "failed" : "success"}" title="Declared FEAT locked">${this._esc(requirement.label)}: ${this._esc(result)}</span>`;
+          } else if (canControl) {
+            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-required-roll" data-action="${requirement.action}" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declared ${this._esc(requirement.label)}: roll and lock the FEAT"><i class="fas ${requirement.icon}"></i> <span>Roll</span></button>`;
           }
-        } else if (!requirement && declared) {
-          container.innerHTML += `<span class="faserip-preaction-none">No required roll</span>`;
+        }
+
+        if (acted) {
+          container.innerHTML += `<span class="faserip-action-used" title="Declared combat action already used this round"><i class="fas fa-check"></i> Done</span>`;
         }
 
         const change = c.getFlag("msh-faserip", "changeActionAttempted");
-        const changedThisRound = change?.round === combat.round;
-        if (canControl && declared && !resolvedThisRound) {
-          if (changedThisRound) {
+        if (canControl && declared && !resolvedThisRound && !acted) {
+          if (change?.round === combat.round) {
             container.innerHTML += `<span class="faserip-change-result ${change.success ? "success" : "failed"}">Change: ${change.success ? "✓" : "✕"}</span>`;
           } else {
             container.innerHTML += `<button class="faserip-tracker-ctrl faserip-change-ctrl" data-action="change-action" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Change Action: Yellow Agility FEAT; success applies -1CS to subsequent FEATs"><i class="fas fa-exchange-alt"></i></button>`;
           }
-        }
-      } else if (declared) {
-        container.innerHTML = declarationChip();
-        const actionState = c.getFlag("msh-faserip", "actionState");
-        if (actionState?.round === combat.round && actionState.combatActionUsed) {
-          container.innerHTML += `<span class="faserip-action-used" title="Declared combat action already used this round"><i class="fas fa-check"></i> Done</span>`;
         }
       }
 
@@ -1193,15 +1089,14 @@ export class FaseripInitiative {
         goesFirst
       });
 
-      // RAW: initiative determines the side order, but nobody acts yet until
-      // the GM explicitly closes Pre-Action. Still focus the tracker cursor on
-      // the winning side's lead combatant so the table sees who acts first.
+      // Initiative sets the acting order: winners sort above losers via their
+      // higher initiative value. Focus the winning side's lead combatant.
       const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
       await combat.setupTurns();
       const turnIndex = this._firstEligibleTurnIndexForSide(combat, goesFirst);
       this._dbg("post-roll cursor", { turnIndex, rawPhases });
       if (rawPhases) {
-        const update = { "flags.msh-faserip.turnPhase": this.PHASE_PREACTION };
+        const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
         if (turnIndex >= 0) update.turn = turnIndex;
         await combat.update(update, { mshNoTimeAdvance: true });
       } else {
@@ -1283,14 +1178,14 @@ export class FaseripInitiative {
       // Chat card
       await this._postIndividualInitiativeCard(combat, results);
 
-      // RAW: initiative is known, but actions wait until the GM closes
-      // Pre-Action. Still focus the top-initiative combatant immediately.
+      // Focus the top-initiative combatant; actions begin immediately, with
+      // declared FEATs gating each character individually.
       const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
       await combat.setupTurns();
       const turnIndex = this._firstEligibleTurnIndex(combat);
       this._dbg("post-roll cursor", { turnIndex, rawPhases });
       if (rawPhases) {
-        const update = { "flags.msh-faserip.turnPhase": this.PHASE_PREACTION };
+        const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
         if (turnIndex >= 0) update.turn = turnIndex;
         await combat.update(update, { mshNoTimeAdvance: true });
       } else {
@@ -1379,12 +1274,12 @@ export class FaseripInitiative {
     const phase = this._getPhase(combat);
     this._dbg("tracker action", { action, actor: actor.name, phase, round: combat?.round });
     if (action === "declare") {
-      if (phase !== this.PHASE_DECLARE) return ui.notifications.warn("Declarations are locked after initiative. Use Change Action during Pre-Action.");
+      if (phase !== this.PHASE_DECLARE) return ui.notifications.warn("Declarations are locked once initiative is rolled. Use Change Action instead.");
       await this._showDeclarationDialog(actor, combatantId);
       return;
     }
 
-    if (phase !== this.PHASE_PREACTION) return ui.notifications.warn("Pre-Action rolls may only be made during the Pre-Action phase.");
+    if (phase !== this.PHASE_ACTIONS) return ui.notifications.warn("Declared FEATs are rolled after initiative.");
 
     if (action === "change-action") {
       await this._rollChangeAction(actor, combatantId);
@@ -1648,9 +1543,11 @@ export class FaseripInitiative {
   static async _rollChangeAction(actor, combatantId) {
     const combat = this._resolveCombatForCombatant(combatantId);
     const combatant = combat?.combatants?.get(combatantId);
-    if (!combatant || this._getPhase(combat) !== this.PHASE_PREACTION) return;
+    if (!combatant || this._getPhase(combat) !== this.PHASE_ACTIONS) return;
     const attempted = combatant.getFlag("msh-faserip", "changeActionAttempted");
     if (attempted?.round === combat.round) return ui.notifications.warn("Change Action has already been attempted this round.");
+    const actionState = combatant.getFlag("msh-faserip", "actionState");
+    if (actionState?.round === combat.round && actionState.combatActionUsed) return ui.notifications.warn("The declared combat action has already been used this round.");
     const resolved = combatant.getFlag("msh-faserip", "preActionResolved");
     if (resolved?.round === combat.round) return ui.notifications.warn("The declared Pre-Action FEAT has already been resolved; the action is locked.");
 
@@ -1703,12 +1600,10 @@ export class FaseripInitiative {
     let steps;
     if (rawPhases) {
       steps = [
-        "Judge plans NPC actions",
-        "Players declare actions (Move / Attack / Charge / Dodge / Block / Evade / Multiple Attacks / Other)",
-        "Roll Initiative",
-        "Pre-Action — resolve declared defenses / Multiple Attacks; Change Action if needed",
-        `${winner} act`,
-        `${loser} act`
+        "Declared actions locked (Attack assumed; changes now need a Yellow Agility Change Action, -1CS after)",
+        "Roll declared Dodge / Block / Evade / Multiple Attacks FEATs from the tracker",
+        `${winner} act, then ${loser} act`,
+        "End Round"
       ];
     } else {
       steps = [
@@ -1736,11 +1631,10 @@ export class FaseripInitiative {
     let steps;
     if (rawPhases) {
       steps = [
-        "Judge plans NPC actions",
-        "Players declare actions (Move / Attack / Charge / Dodge / Block / Evade / Multiple Attacks / Other)",
-        "Roll Initiative",
-        "Pre-Action — resolve declared defenses / Multiple Attacks; Change Action if needed",
-        "Actions in initiative order"
+        "Declared actions locked (Attack assumed; changes now need a Yellow Agility Change Action, -1CS after)",
+        "Roll declared Dodge / Block / Evade / Multiple Attacks FEATs from the tracker",
+        "Actions in initiative order",
+        "End Round"
       ];
     } else {
       steps = [

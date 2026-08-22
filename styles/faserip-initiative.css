@@ -564,19 +564,9 @@
 .faserip-declare-progress.pending,
 .faserip-preaction-progress.pending { color: #fff3b0; }
 
-/* In side-based RAW mode, visually demote the side that is not acting. */
-.combatant.faserip-side-inactive {
-  opacity: .48;
-  filter: saturate(.55);
-}
-.combatant.faserip-side-inactive .faserip-health-status {
-  opacity: .9;
-}
-
 /* Declaration/status chips shown beside the combatant name. */
 .faserip-declaration-chip,
 .faserip-preaction-result,
-.faserip-preaction-none,
 .faserip-change-result {
   display: inline-flex;
   align-items: center;
@@ -626,7 +616,6 @@
   background: rgba(163,22,45,.08);
   border-color: rgba(163,22,45,.35);
 }
-.faserip-preaction-none { color: #777; border-style: dashed; background: transparent; }
 
 /* =====================
    DECLARE ACTION DIALOG — v2.4
