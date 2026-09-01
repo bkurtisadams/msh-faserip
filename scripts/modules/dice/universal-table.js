@@ -1,217 +1,121 @@
-// File: scripts/modules/dice/universal-table.js v1.3.0 - 2026-02-19
-// v1.3.0: Fix Blocking (Bl) in ACTION_RESULT_LABELS: white/green/yellow were all wrong (Autohit/+4CS/+2CS → -6CS/-4CS/-2CS)
-//         Fix resultRows display: Ev/Bl swapped in white row; +4CS→-4CS green Bl; +2CS→-2CS yellow Bl
-// v1.2.0: Fix 4 table errors vs published chart: Ch green Slam→Hit; rankRows 02-03 ShiftZ green→white;
-//         rankRows 76-80 ShiftY red→yellow; rankRows row 100 add missing Beyond column
-// Universal Table data structures and rank lookup utilities for FASERIP system
+// File: scripts/modules/dice/universal-table.js v2.0.0 - 2026-08-31
+// v2.0.0: Rewritten as a shim over @graycloak/faserip-rules (scripts/lib/faserip-rules,
+//         certified against the Advanced Set with 169 kernel tests + errata ledger).
+//         All table data and resolution now derive from kernel exports; this file
+//         keeps the existing public API and display shapes.
+//         Behavior fixes vs v1.3.0 (all certified against the published chart /
+//         GM rulings): Poor bands yellow 86->81, red 100->98; Remarkable yellow
+//         66->71; Shift Y yellow 41->36, red 81->76; Ca column Miss/Catch/Catch/No
+//         -> Autohit/Miss/Damage/Catch; St yellow Damage->No; Ch white None->Miss;
+//         Do white Autohit->None; TB yellow Hit->Bullseye (RULED 2026-08-31).
+//         POWER_RANGE_VALUES retained verbatim (range table not yet kernelized).
 
-// Rank names array for lookups
-export const RANKS = [
-  "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable",
-  "Incredible", "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
-  "Class 1000", "Class 3000", "Class 5000"
-];
+import {
+  RANKS as KERNEL_RANKS, UNIVERSAL_TABLE, colorForRoll,
+} from '../../lib/faserip-rules/faserip-kernel.js';
+import {
+  EFFECT_COLUMNS, STUN_TABLE, SLAM_TABLE, KILL_TABLE,
+} from '../../lib/faserip-rules/faserip-effects.js';
+import {
+  kernelKeyFor, foundryNameFor, labelForToken,
+} from '../../kernel/adapter.js';
 
-// Extended rank names including Shift-0 and Beyond
-export const RANKS_EXTENDED = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
-  "Amazing", "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
-  "Class 1000", "Class 3000", "Class 5000", "Beyond"
+const COLUMN_ORDER = ['BA','EA','Sh','TE','TB','En','Fo','Gp','Gb','Es','Ch','Do','Ev','Bl','Ca'];
+const SUB_COLUMNS = [
+  { code: 'St', label: 'Stun?', table: STUN_TABLE },
+  { code: 'Sl', label: 'Slam?', table: SLAM_TABLE },
+  { code: 'Ki', label: 'Kill?', table: KILL_TABLE },
 ];
+const EXTENDED_KEYS = KERNEL_RANKS.map(r => r.key);
+
+// Rank names array for lookups (Feeble .. Class 5000, dash-style shifts)
+export const RANKS = EXTENDED_KEYS
+  .filter(k => !['SH0', 'BEYOND'].includes(k))
+  .map(k => foundryNameFor(k, 'dash'));
+
+// Extended rank names including Shift-0 and Beyond (space-style shifts)
+export const RANKS_EXTENDED = EXTENDED_KEYS.map(k => foundryNameFor(k, 'space'));
 
 // Action types with codes and labels
 export const actionTypes = [
-  { code: "BA", label: "Blunt Attacks" },
-  { code: "EA", label: "Edged Attacks" },
-  { code: "Sh", label: "Shooting Attacks" },
-  { code: "TE", label: "Throwing Edged" },
-  { code: "TB", label: "Throwing Blunt" },
-  { code: "En", label: "Energy" },
-  { code: "Fo", label: "Force" },
-  { code: "Gp", label: "Grappling" },
-  { code: "Gb", label: "Grabbing" },
-  { code: "Es", label: "Escaping" },
-  { code: "Ch", label: "Charging" },
-  { code: "Do", label: "Dodging" },
-  { code: "Ev", label: "Evading" },
-  { code: "Bl", label: "Blocking" },
-  { code: "Ca", label: "Catching" },
-  { code: "St", label: "Stun?" },
-  { code: "Sl", label: "Slam?" },
-  { code: "Ki", label: "Kill?" }
+  ...COLUMN_ORDER.map(code => ({
+    code,
+    label: code === 'Sh' ? 'Shooting Attacks' : EFFECT_COLUMNS[code].name,
+  })),
+  ...SUB_COLUMNS.map(({ code, label }) => ({ code, label })),
 ];
 
 // Maps action codes to the ability they use
-export const ACTION_ABILITY_MAP = {
-  BA: "fighting",
-  EA: "fighting",
-  Sh: "agility",
-  TE: "agility",
-  TB: "agility",
-  En: "agility",
-  Fo: "agility",
-  Gp: "strength",
-  Gb: "strength",
-  Es: "strength",
-  Ch: "endurance",
-  Do: "agility",
-  Ev: "fighting",
-  Bl: "strength",
-  Ca: "agility",
-  St: "endurance",
-  Sl: "endurance",
-  Ki: "endurance"
-};
+export const ACTION_ABILITY_MAP = Object.fromEntries([
+  ...COLUMN_ORDER.map(code => [code, EFFECT_COLUMNS[code].ability]),
+  ...SUB_COLUMNS.map(({ code }) => [code, 'endurance']),
+]);
 
 // Maps action codes and colors to result labels
-export const ACTION_RESULT_LABELS = {
-  BA: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-  EA: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-  Sh: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-  TE: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-  TB: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-  En: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-  Fo: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-  Gp: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-  Gb: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-  Es: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-  Ch: { white: "None", green: "Hit", yellow: "Slam", red: "Stun" },
-  Do: { white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
-  Ev: { white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
-  Bl: { white: "-6 CS", green: "-4 CS", yellow: "-2 CS", red: "+1 CS" },
-  Ca: { white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
-  St: { white: "1–10", green: "1", yellow: "Damage", red: "No" },
-  Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
-  Ki: { white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
-};
+export const ACTION_RESULT_LABELS = Object.fromEntries([
+  ...COLUMN_ORDER.map(code => [code, Object.fromEntries(
+    Object.entries(EFFECT_COLUMNS[code].results).map(([c, t]) => [c, labelForToken(t)])
+  )]),
+  ...SUB_COLUMNS.map(({ code, table }) => [code, Object.fromEntries(
+    Object.entries(table).map(([c, t]) => [c, labelForToken(t)])
+  )]),
+]);
 
-// The Universal Table - maps roll results to colors for each rank
-// Columns: Shift-0, Feeble, Poor, Typical, Good, Excellent, Remarkable, Incredible, Amazing, Monstrous, Unearthly, Shift X, Shift Y, Shift Z, Class 1000, Class 3000, Class 5000, Beyond
-export const rankRows = [
-  { label: "01", colors:    ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
-  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green"] },
-  { label: "04–06", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
-  { label: "07–10", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green"] },
-  { label: "11–15", colors: ["white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green"] },
-  { label: "16–20", colors: ["white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green"] },
-  { label: "21–25", colors: ["white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow"] },
-  { label: "26–30", colors: ["white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow","yellow"] },
-  { label: "31–35", colors: ["white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow","yellow","yellow"] },
-  { label: "36–40", colors: ["white","white","white","white","white","white","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "41–45", colors: ["white","white","white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "46–50", colors: ["white","white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "51–55", colors: ["white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "56–60", colors: ["white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "61–65", colors: ["white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"] },
-  { label: "66–70", colors: ["green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"  ,"red"] },
-  { label: "71–75", colors: ["green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"   ,"red"  ,"red"] },
-  { label: "76–80", colors: ["green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"yellow","red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "81–85", colors: ["green","green","green","yellow","yellow","yellow","yellow","yellow","yellow" ,"yellow","yellow","red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "86–90", colors: ["green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "91–94", colors: ["green","yellow","yellow","yellow","yellow","yellow","yellow","red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "95–97", colors: ["yellow","yellow","yellow","yellow","yellow","red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "98–99", colors: ["yellow","yellow","yellow","red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"] }
+// The Universal Table - maps roll bands to colors for each rank
+// (generated from the certified kernel bands; columns in RANKS_EXTENDED order)
+const BAND_ROWS = [
+  [1, '01'], [2, '02\u201303'], [4, '04\u201306'], [7, '07\u201310'], [11, '11\u201315'],
+  [16, '16\u201320'], [21, '21\u201325'], [26, '26\u201330'], [31, '31\u201335'],
+  [36, '36\u201340'], [41, '41\u201345'], [46, '46\u201350'], [51, '51\u201355'],
+  [56, '56\u201360'], [61, '61\u201365'], [66, '66\u201370'], [71, '71\u201375'],
+  [76, '76\u201380'], [81, '81\u201385'], [86, '86\u201390'], [91, '91\u201394'],
+  [95, '95\u201397'], [98, '98\u201399'], [100, '100'],
 ];
 
+export const rankRows = BAND_ROWS.map(([lo, label]) => ({
+  label,
+  colors: EXTENDED_KEYS.map(k => colorForRoll(k, lo)),
+}));
+
 // Power Rank Range Table - maps ranks to range in areas
+// (retained verbatim from v1.3.0; range table is not yet in the kernel)
 export const POWER_RANGE_VALUES = {
   "Shift-0": 0, "Feeble": 0, "Poor": 1, "Typical": 2, "Good": 4,
   "Excellent": 6, "Remarkable": 8, "Incredible": 10, "Amazing": 20,
   "Monstrous": 40, "Unearthly": 60, "Shift-X": 80, "Shift-Y": 160,
   "Shift-Z": 400,
-  // Converted miles to areas (1 mile = 1760 yards/areas)
-  "Class 1000": 176000,   // 100 miles
-  "Class 3000": 17600000, // 10,000 miles
-  "Class 5000": 1760000000, // 1,000,000 miles
-  "Beyond": Infinity      // Unlimited
+  "Class 1000": 176000,
+  "Class 3000": 17600000,
+  "Class 5000": 1760000000,
+  "Beyond": Infinity
 };
 
-// Result rows for UI display (used in Universal Table dialog)
-export const resultRows = [
-  {
-    result: "white",
-    cells: [
-      { value: "Miss", span: 5 }, { value: "Miss", span: 2 }, { value: "Miss", span: 1 },
-      { value: "Miss", span: 1 }, { value: "Miss", span: 1 }, { value: "None", span: 1 },
-      { value: "Autohit", span: 1 }, { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 },
-      { value: "Miss", span: 1 }, { value: "1–10", span: 1 }, { value: "Gr. Slam", span: 1 },
-      { value: "En. Loss", span: 1 }
-    ]
-  },
-  {
-    result: "green",
-    cells: [
-      { value: "Hit", span: 5 }, { value: "Hit", span: 2 }, { value: "Hit", span: 1 },
-      { value: "Hit", span: 1 }, { value: "Hit", span: 1 }, { value: "-2 CS", span: 1 },
-      { value: "Evasion", span: 1 }, { value: "-4 CS", span: 1 }, { value: "Catch", span: 1 },
-      { value: "1", span: 1 }, { value: "1 area", span: 1 }, { value: "E/S", span: 1 }
-    ]
-  },
-  {
-    result: "yellow",
-    cells: [
-      { value: "Slam", span: 1 }, { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 },
-      { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 }, { value: "Bullseye", span: 1 },
-      { value: "Partial", span: 1 }, { value: "Grab", span: 1 }, { value: "Escape", span: 1 },
-      { value: "Slam", span: 1 }, { value: "-4 CS", span: 1 }, { value: "+1 CS", span: 1 },
-      { value: "-2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
-      { value: "Stagger", span: 1 }, { value: "No", span: 1 }
-    ]
-  },
-  {
-    result: "red",
-    cells: [
-      { value: "Stun", span: 1 }, { value: "Kill", span: 1 }, { value: "Kill", span: 1 },
-      { value: "Kill", span: 1 }, { value: "Stun", span: 1 }, { value: "Kill", span: 1 },
-      { value: "Hold", span: 1 }, { value: "Break", span: 1 }, { value: "Reverse", span: 1 },
-      { value: "Stun", span: 1 }, { value: "-6 CS", span: 1 }, { value: "+2 CS", span: 1 },
-      { value: "+1 CS", span: 1 }, { value: "No", span: 1 }, { value: "No", span: 1 },
-      { value: "No", span: 1 }
-    ]
+// Result rows for UI display (generated; consecutive identical labels merged)
+function buildResultRow(color) {
+  const labels = [...COLUMN_ORDER, ...SUB_COLUMNS.map(s => s.code)]
+    .map(code => ACTION_RESULT_LABELS[code][color]);
+  const cells = [];
+  for (const value of labels) {
+    const last = cells[cells.length - 1];
+    if (last && last.value === value) last.span += 1;
+    else cells.push({ value, span: 1 });
   }
-];
-// === Compatibility exports for column-shifts.js ===
-// Canonical rank order used for Column Shift math (Shift-0 .. Shift Z)
-export const RANKS_ORDERED = [
-  "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-  "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-  "Shift X","Shift Y","Shift Z"
-];
-
-// Accept common spellings/abbreviations; normalize to our canonical names above
-function normalizeRankName(name) {
-  const s = String(name ?? "").trim().toLowerCase()
-    .replace(/\s*-\s*/g, " ")         // "Shift-X" -> "Shift X", "Shift-0" -> "Shift 0"
-    .replace(/\s+/g, " ");            // collapse spaces
-  const ABBR = {
-    "fe":"feeble","pr":"poor","ty":"typical","gd":"good","ex":"excellent",
-    "rm":"remarkable","in":"incredible","am":"amazing","mn":"monstrous","un":"unearthly",
-    "sx":"shift x","sy":"shift y","sz":"shift z","s0":"shift 0","shift-0":"shift 0"
-  };
-  const expanded = ABBR[s] ?? s;
-  // map "shift 0" -> "Shift-0" (our canonical for zero); others are "Shift X/Y/Z"
-  if (expanded === "shift 0") return "Shift-0";
-  return expanded.replace(/\bshift x\b/, "Shift X")
-                 .replace(/\bshift y\b/, "Shift Y")
-                 .replace(/\bshift z\b/, "Shift Z")
-                 .replace(/\bfeeble\b/, "Feeble")
-                 .replace(/\bpoor\b/, "Poor")
-                 .replace(/\btypical\b/, "Typical")
-                 .replace(/\bgood\b/, "Good")
-                 .replace(/\bexcellent\b/, "Excellent")
-                 .replace(/\bremarkable\b/, "Remarkable")
-                 .replace(/\bincredible\b/, "Incredible")
-                 .replace(/\bamazing\b/, "Amazing")
-                 .replace(/\bmonstrous\b/, "Monstrous")
-                 .replace(/\bunearthly\b/, "Unearthly");
+  return { result: color, cells };
 }
 
-// Public helpers used by column-shifts.js:
+export const resultRows = ['white', 'green', 'yellow', 'red'].map(buildResultRow);
+
+// === Compatibility exports for column-shifts.js ===
+export const RANKS_ORDERED = EXTENDED_KEYS
+  .filter(k => !['CL1000', 'CL3000', 'CL5000', 'BEYOND'].includes(k))
+  .map(k => (k === 'SH0' ? 'Shift-0' : foundryNameFor(k, 'space')));
+
 export function rankIndexOf(rankName) {
-  const norm = normalizeRankName(rankName);
-  const idx = RANKS_ORDERED.indexOf(norm);
-  return idx >= 0 ? idx : 0; // default to Shift-0
+  const key = kernelKeyFor(rankName);
+  if (!key) return 0;
+  const name = key === 'SH0' ? 'Shift-0' : foundryNameFor(key, 'space');
+  const idx = RANKS_ORDERED.indexOf(name);
+  return idx >= 0 ? idx : 0;
 }
 
 export function rankNameAt(index) {
@@ -226,56 +130,11 @@ export function rankNameAt(index) {
  * @returns {String} - The color result ("white", "green", "yellow", or "red")
  */
 export function rollUniversalTable(rank, roll) {
-  // Thresholds: [lastWhite, lastGreen, lastYellow]
-  // roll <= lastWhite = white, roll <= lastGreen = green, roll <= lastYellow = yellow, else red
-  const tableRanks = {
-    "Shift-0": [65, 94, 99],
-    "Feeble": [60, 90, 99],
-    "Poor": [55, 85, 99],
-    "Typical": [50, 80, 97],
-    "Good": [45, 75, 97],
-    "Excellent": [40, 70, 94],
-    "Remarkable": [35, 65, 94],
-    "Incredible": [30, 60, 90],
-    "Amazing": [25, 55, 90],
-    "Monstrous": [20, 50, 85],
-    "Unearthly": [15, 45, 85],
-    "Shift X": [10, 40, 80],
-    "Shift Y": [6, 40, 80],
-    "Shift Z": [3, 35, 75],
-    "Class 1000": [1, 35, 75],
-    "Class 3000": [1, 30, 70],
-    "Class 5000": [1, 25, 65],
-    "Beyond": [1, 20, 60],
-    
-    // Backward compatibility
-    "Shift-X": [10, 40, 80],
-    "Shift-Y": [6, 40, 80],
-    "Shift-Z": [3, 35, 75],
-    "1000": [1, 35, 75],
-    "3000": [1, 30, 70],
-    "5000": [1, 25, 65]
-  };
-
-  // Normalize the rank name
-  let normalizedRank = rank;
-  
-  // Handle common variations
-  if (rank === "Class1000") normalizedRank = "Class 1000";
-  if (rank === "Class3000") normalizedRank = "Class 3000";
-  if (rank === "Class5000") normalizedRank = "Class 5000";
-  
-  const thresholds = tableRanks[normalizedRank];
-  if (!thresholds) {
+  const key = kernelKeyFor(rank);
+  if (!key || !UNIVERSAL_TABLE[key]) {
     console.warn(`[FASERIP WARN] Rank ${rank} not found in universal table`);
-    ui.notifications.error(`Rank ${rank} not found.`);
-    return "white";
+    if (typeof ui !== 'undefined') ui.notifications?.error(`Rank ${rank} not found.`);
+    return 'white';
   }
-
-  const [green, yellow, red] = thresholds;
-  
-  if (roll <= green) return "white";
-  if (roll <= yellow) return "green";
-  if (roll <= red) return "yellow";
-  return "red";
+  return colorForRoll(key, roll);
 }
