@@ -1,3 +1,7 @@
+// File: scripts/kernel/adapter.js v1.0.1 - 2026-09-01
+// v1.0.1: Evading/Catching labels match the existing chat-card wording
+//         ('Auto-hit', 'Evasion +1CS', 'Evasion +2CS') now that
+//         action-config ACTION_EFFECTS derives from the kernel columns.
 // File: scripts/kernel/adapter.js v1.0.0 - 2026-08-31
 // Bridge between Foundry rank/label conventions and @graycloak/faserip-rules.
 // All Foundry rank-string variants normalize here and nowhere else.
@@ -55,8 +59,8 @@ export const RESULT_TOKEN_LABELS = {
   miss: 'Miss', hit: 'Hit', slam: 'Slam', stun: 'Stun', kill: 'Kill',
   bullseye: 'Bullseye', partial: 'Partial', hold: 'Hold', take: 'Take',
   grab: 'Grab', break: 'Break', escape: 'Escape', reverse: 'Reverse',
-  none: 'None', autohit: 'Autohit', evasion: 'Evasion',
-  'evasion+1cs': '+1 CS', 'evasion+2cs': '+2 CS',
+  none: 'None', autohit: 'Auto-hit', evasion: 'Evasion',
+  'evasion+1cs': 'Evasion +1CS', 'evasion+2cs': 'Evasion +2CS',
   'cs-2': '-2 CS', 'cs-4': '-4 CS', 'cs-6': '-6 CS', 'cs+1': '+1 CS',
   catch: 'Catch', damage: 'Damage',
 };

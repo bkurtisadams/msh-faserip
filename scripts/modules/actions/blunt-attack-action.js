@@ -1,3 +1,7 @@
+// blunt-attack-action.js v3.9.0 - 2026-09-01
+// v3.9.0: Kernel slice 5 (blunt). Effective Fighting rank via shared
+//         shiftRank; multi-attack FEAT preview and impossible gate via kernel
+//         requiredColor (index-clamp ladders retired). Dead imports dropped.
 // blunt-attack-action.js v3.8.0 - 2026-08-21
 // v3.8.0: When the tracker Multiple Attacks FEAT is already locked (rolled or
 //         Automatic), show the locked result in the multi panel and disable
@@ -84,11 +88,10 @@ import {
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
-import { buildColorOutcome } from "../dice/color-results.js";
 import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";
-import { applyColumnShifts } from "../dice/column-shifts.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { RANK_ABBR, RANK_RANGES, RANKS_ORDERED, rankValue, valueToRank } from "../../rules/rules-reference.js";
+import { requiredColor as kernelRequiredColor } from "../../lib/faserip-rules/faserip-kernel.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
@@ -690,8 +693,7 @@ export class BluntAttackAction extends AttackAction {
 
             _resolved = true;
             // For blunt, main CS IS the Fighting CS — use it for the FEAT
-            const effFightIdx = Math.max(0, Math.min(RANKS.indexOf(fightingAbility.rank) + cs.totalShift, RANKS.length - 1));
-            const effFightRank = RANKS[effFightIdx];
+            const effFightRank = shiftRank(fightingAbility.rank, cs.totalShift);
             resolve({
               src, itemId, objectName, objectRank, objectValue,
               shift: cs.totalShift, karma, spendKarma,
@@ -855,22 +857,19 @@ export class BluntAttackAction extends AttackAction {
             const intensity = count >= 3 ? "Amazing" : "Remarkable";
             // For blunt/edged the main CS applies to Fighting — use it for the FEAT too
             const mainCS = _csState ? _csState.get().totalShift : 0;
-            const baseIdx = RANKS.indexOf(fightingAbility.rank);
-            const effIdx = Math.max(0, Math.min(baseIdx + mainCS, RANKS.length - 1));
-            const effRank = RANKS[effIdx];
-            const intIdx = RANKS.indexOf(intensity);
-            const diff = effIdx - intIdx;
+            const effRank = shiftRank(fightingAbility.rank, mainCS);
+            const needed = kernelRequiredColor(kernelKeyFor(effRank), kernelKeyFor(intensity));
 
             const $bar = html.find('#feat-result-bar');
             const effAbbr = RANK_ABBR[effRank] || effRank;
-            if (diff >= 3) {
+            if (needed === "automatic") {
               $bar.css({ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' })
                 .text(`FEAT: Automatic — ${effAbbr} vs ${intensity}`);
-            } else if (diff <= -2) {
+            } else if (needed === "impossible") {
               $bar.css({ background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a' })
                 .text(`FEAT: Impossible — ${effAbbr} vs ${intensity}`);
             } else {
-              const need = diff > 0 ? "Green+" : diff === 0 ? "Yellow+" : "Red only";
+              const need = needed === "green" ? "Green+" : needed === "yellow" ? "Yellow+" : "Red only";
               $bar.css({ background: '#fff8e1', color: '#b8860b', border: '1px solid #ffe082' })
                 .text(`FEAT: ${need} — ${effAbbr} vs ${intensity}`);
             }
@@ -967,10 +966,7 @@ export class BluntAttackAction extends AttackAction {
         // Legacy/non-RAW workflow: resolve the FEAT at attack execution.
         const effFightRank = choice.effectiveFightingRank || fightingAbility.rank;
         const featFightAbility = { ...fightingAbility, rank: effFightRank };
-        const effIdx = RANKS.indexOf(effFightRank);
-        const intIdx = RANKS.indexOf(intensity);
-        const diff = effIdx - intIdx;
-        if (diff <= -2) {
+        if (kernelRequiredColor(kernelKeyFor(effFightRank), kernelKeyFor(intensity)) === "impossible") {
           ui.notifications.warn(`Multi-attack impossible — ${effFightRank} Fighting vs ${intensity} intensity. Performing normal attack.`);
           choice.multiAttacks = false;
         } else {

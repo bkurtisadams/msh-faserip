@@ -1,3 +1,7 @@
+// action-utils.js v1.9.0 - 2026-09-01
+// v1.9.0: Kernel slice 5 (blunt). computeBluntDamage / computeEdgedDamage are
+//         thin wrappers over kernel bluntDamage / meleeWeaponDamage (same
+//         {damage, note} shape; weaponBase floor preserved).
 // action-utils.js v1.8.16 - 2026-08-20
 // v1.8.16: Four-Color knockout uses shared round-aware duration handling so
 //          active CTT time cannot shorten a combat KO.
@@ -133,6 +137,9 @@ import {
 import { recordDamage } from "../rest-system.js";
 import { applyDamageToVehicle } from "./vehicle-damage.js";
 import { safeActorUpdate, safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
+import { bluntDamage as kernelBluntDamage, meleeWeaponDamage as kernelMeleeWeaponDamage } from "../../lib/faserip-rules/faserip-damage.js";
+import { rankDistance as kernelRankDistance, rankForNumber as kernelRankForNumber } from "../../lib/faserip-rules/faserip-kernel.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
 
 // Local helper to read the global combat mode without importing action-dispatcher
 function resolveCombatModeSafe(actor) {
@@ -1303,41 +1310,30 @@ export function bannerColors(colorLower) {
 //
 // The weaponBase floor handles combat weapons with printed damage
 // ("always a minimum of the damage listed").
-// slice 4a: rank values via the shared kernel-backed rankValue (was the
-// game.msh.getRankValue global wrapper around the same function). Logic
-// verified equivalent to kernel bluntDamage + weaponBase floor — see
-// scripts/dev/kernel-damage-diff.mjs.
+// slice 5: wrapper over kernel bluntDamage (Strength rank taken from the
+// number, per the kernel); weaponBase floor preserved; RANKS_LOCAL kept for
+// call-site compatibility.
 export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RANKS_LOCAL=RANKS) {
-  const getVal = (r) => rankValue(r) || 0;
-  const sIdx = RANKS_LOCAL.indexOf(strRank);
-  const mIdx = RANKS_LOCAL.indexOf(matRank);
-  if (sIdx < 0 || mIdx < 0) {
+  const mKey = kernelKeyFor(matRank);
+  let sRank = null;
+  try { sRank = mKey ? kernelRankForNumber(Number(strVal)) : null; } catch (_e) { sRank = null; }
+  if (!mKey || !sRank) {
     const dmg = Math.max(strVal, weaponBase);
     return { damage: dmg, note: weaponBase ? `Using max(STR ${strVal}, base ${weaponBase})` : "Using Strength value" };
   }
 
-  const matValue = getVal(matRank);
+  const kernelDmg = kernelBluntDamage({ strength: Number(strVal), weaponMaterialRank: mKey });
+  const dmg = Math.max(kernelDmg, weaponBase);
 
-  // Bump rule: when Strength rank is strictly below material strength rank,
-  // damage uses the minimum value of the rank ABOVE the attacker's Strength rank.
-  if (sIdx < mIdx) {
-    const nextRankName = RANKS_LOCAL[sIdx + 1] || strRank;
-    const nextRangeMin = RANK_RANGES[nextRankName]?.[0];
-    // Use the next rank's range minimum; fall back to RANK_VALUES for any
-    // rank without a range entry (all ranks have one as of rules-reference
-    // v1.4.0 — the fallback is defensive).
-    const bumped = (nextRangeMin ?? getVal(nextRankName));
-    const dmg = Math.max(bumped, weaponBase);
+  if (kernelRankDistance(sRank.key, mKey) > 0) {
+    const nextRankName = shiftRank(strRank, 1);
     return {
       damage: dmg,
-      note: `bump ${strRank}→${nextRankName} min (${bumped})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}`
+      note: `bump ${strRank}→${nextRankName} min (${kernelDmg})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}`
     };
   }
 
-  // Strength rank is at or above material: damage capped at material strength.
-  const calcDmg = Math.min(strVal, matValue);
-  const dmg = Math.max(calcDmg, weaponBase);
-  return { damage: dmg, note: `min(STR ${strVal}, MAT ${matValue})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}` };
+  return { damage: dmg, note: `min(STR ${strVal}, MAT ${rankValue(matRank)})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}` };
 }
 
 // Edged-capable item filter (damageType/attackType tags or "edged"/EA).
@@ -1358,18 +1354,14 @@ export const isEdgedCapable = (it) => {
 
 // Edged damage: min(STR, MAT) but never less than weapon base damage.
 // natural weapon case: pass weaponBase = 0, matRank = selected natural rank.
-// slice 4a: shared rankValue; equivalent to kernel meleeWeaponDamage(...).max.
+// slice 5: wrapper over kernel meleeWeaponDamage(...).max.
 export function computeEdgedDamage(strRank, strVal, matRank, weaponBase = 0, RANKS_LOCAL = RANKS) {
-  const getVal = (r) => rankValue(r) || 0;
-  const sIdx = RANKS_LOCAL.indexOf(strRank);
-  const mIdx = RANKS_LOCAL.indexOf(matRank);
-  if (sIdx < 0 || mIdx < 0) {
+  const mKey = kernelKeyFor(matRank);
+  if (!mKey || !kernelKeyFor(strRank)) {
     return { damage: Math.max(strVal, weaponBase), note: weaponBase ? `Using base ${weaponBase}` : "Using Strength value" };
   }
-  const matVal = getVal(matRank);
-  const calc   = Math.min(strVal, matVal);
-  const final  = Math.max(calc, weaponBase);
-  return { damage: final, note: `min(STR ${strVal}, MAT ${matVal})${weaponBase ? `, floor ${weaponBase}` : ''} = ${final}` };
+  const final = kernelMeleeWeaponDamage({ listedDamage: weaponBase, strength: Number(strVal), weaponMaterialRank: mKey }).max;
+  return { damage: final, note: `min(STR ${strVal}, MAT ${rankValue(matRank)})${weaponBase ? `, floor ${weaponBase}` : ''} = ${final}` };
 }
 
 export function getUnitsPerArea() {

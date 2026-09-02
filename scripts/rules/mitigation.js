@@ -1,3 +1,6 @@
+// scripts/rules/mitigation.js v3.6.1 - 2026-09-01
+// v3.6.1: Export applyArmorPiercingCS so attack-action.js shares the
+//         range-true AP step instead of its own rank walk (kernel slice 5).
 // scripts/rules/mitigation.js v3.6.0 - 2026-07-31
 // v3.6.0: Borderline "one more point" rule (GM RULINGS LOG). Every layer
 //         reports its blocking capacity (absorbed or not); result.borderline
@@ -1138,7 +1141,7 @@ function applyPassiveArmor(damage, targetActor, options) {
 // unchanged; in-between values now resolve range-true. Matches the ammo
 // module's apAdjustedDefense semantics (RULED: -2CS, no effect on FF —
 // FF layers already carry ignoresAP).
-function applyArmorPiercingCS(armorValue, csReduction) {
+export function applyArmorPiercingCS(armorValue, csReduction) {
   const shifted = sharedShiftRank(valueToRank(armorValue), -csReduction);
   return rankValue(shifted);
 }

@@ -1,3 +1,12 @@
+// attack-action.js v1.10.0 - 2026-09-01
+// v1.10.0: Kernel slice 5 (blunt). Columns in KERNEL_ATTACK_COLUMNS resolve
+//          to-hit colour/effect via kernel resolveAttack with itemized shifts,
+//          pull-punch cap via reduceEffectColor, follow-up Slam/Stun/Kill via
+//          effectForColor. Multi-attack FEAT success via requiredColor +
+//          colorAtLeast at both roll sites (rank ladders retired). AP-CS armor
+//          step via mitigation applyArmorPiercingCS (private _RV walk retired).
+//          Breaking FEAT gate via kernel rankDistance (private RANKS /
+//          RANK_VALUES arrays retired).
 // attack-action.js v1.9.52 - 2026-08-02
 // v1.9.52: Resist FEAT routed through resolveResistFeat (dice-roller): the
 //          whole karma sequence runs on an active owning player's client via
@@ -216,7 +225,7 @@ import {
 } from "../dice/dice-roller.js";
 
 import { 
-  RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
+  getStrengthInfo, shiftRank, getAbilityInfo,
   rollWithKarmaAndHistory, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
   debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay,
@@ -227,8 +236,12 @@ import { executeBreakingFeat } from "./breaking-feat.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
-import { ACTION_EFFECTS } from "./action-config.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { ACTION_EFFECTS, ACTION_COLUMNS } from "./action-config.js";
+import { RANK_ABBR, valueToRank } from "../../rules/rules-reference.js";
+import { rankDistance as kernelRankDistance, requiredColor as kernelRequiredColor, colorAtLeast as kernelColorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
+import { resolveAttack, reduceEffectColor, effectForColor } from "../../lib/faserip-rules/faserip-effects.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
+import { applyArmorPiercingCS } from "../../rules/mitigation.js";
 import { SCOPE, getFlagScope } from "./flags.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
@@ -408,6 +421,21 @@ async function updateAttackCardDamageAfterAutoApply(message, damageResults, cont
 }
 
 
+// Attack columns resolved through the kernel (slice 5). Add a column here as
+// its action lands; columns not listed keep the legacy path.
+const KERNEL_ATTACK_COLUMNS = new Set(["BA"]);
+
+const NEEDED_LABELS = {
+  automatic: "Automatic (no roll)", impossible: "Impossible (fails)",
+  green: "Green or better", yellow: "Yellow or better", red: "Red only"
+};
+
+function featSuccess(colorLower, needed) {
+  if (needed === "automatic") return true;
+  if (needed === "impossible") return false;
+  return kernelColorAtLeast(colorLower, needed);
+}
+
 export class AttackAction extends BaseAction {
   constructor(args) {
     super(args);
@@ -446,60 +474,29 @@ export class AttackAction extends BaseAction {
   _getStrength() { return getStrengthInfo(this.actor); }
 
   async _rollFightingFeat(actor, fightingAbility, intensity, attackCount) {
-    // RAW: Auto when Ability 3+ ranks above Intensity (diff >= 3)
-    // Optional "Impossible": when Intensity ≥ Ability + 2 ranks (diff <= -2)
-    const AUTO_DIFF = 3;
-
-    // Toggle this to enable (RAW optional). If disabled, nothing is "impossible";
-    // the required color rule applies (e.g., Red-only).
-    const USE_IMPOSSIBLE = true;
-    const IMPOSSIBLE_DIFF = -2;
-
     const availableKarma = actor.system.attributes?.karma?.value || 0;
-    
-    // Get intensity rank value for comparison
-    const intensityIndex = RANKS.indexOf(intensity);
-    const fightingIndex  = RANKS.indexOf(fightingAbility.rank);
-    const diff = fightingIndex - intensityIndex;
 
-    // Debug logging for multi-attack FEAT
+    const intensityKey = kernelKeyFor(intensity);
+    const baseNeeded = kernelRequiredColor(kernelKeyFor(fightingAbility.rank), intensityKey);
+
     console.log("[FASERIP] _rollFightingFeat check:", {
       actorName: actor?.name,
       fightingRank: fightingAbility?.rank,
-      fightingIndex,
       intensity,
-      intensityIndex,
-      diff,
-      AUTO_DIFF,
-      willAutoSucceed: diff >= AUTO_DIFF,
-      RANKS_sample: RANKS.slice(0, 12)
+      needed: baseNeeded
     });
 
-    if (diff >= AUTO_DIFF) {
-      console.log("[FASERIP] Multi-attack FEAT: AUTOMATIC SUCCESS (diff >= 3)");
+    if (baseNeeded === "automatic") {
+      console.log("[FASERIP] Multi-attack FEAT: AUTOMATIC SUCCESS");
       // Full Auto: return immediately. Semi: fall through to dialog which shows "Automatic".
       if (this.opts?.autoApply === true) {
         return { success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true };
       }
     }
-    if (USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF) {
+    if (baseNeeded === "impossible") {
       // Full Auto: return immediately. Semi: fall through to dialog which shows "Impossible".
       if (this.opts?.autoApply === true) {
         return { success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false };
-      }
-    }
-
-    if (diff <= IMPOSSIBLE_DIFF) {
-      if (this.opts?.autoApply === true) {
-        return {
-          success: false,
-          intensity,
-          roll: null,
-          totalRoll: null,
-          resultColor: "IMPOSSIBLE",
-          cancelled: false,
-          auto: false
-        };
       }
     }
 
@@ -514,16 +511,7 @@ export class AttackAction extends BaseAction {
       const effFeatRank = shiftRank(fightingAbility.rank, this.opts?.featCs ?? 0);
       const resultColor = game.msh.rollUniversalTable(effFeatRank, totalRoll);
       const colorLower = resultColor.toLowerCase();
-      
-      // Determine success based on FEAT intensity comparison rules
-      let success = false;
-      if (fightingIndex > intensityIndex) {
-        success = ["green", "yellow", "red"].includes(colorLower);
-      } else if (fightingIndex === intensityIndex) {
-        success = ["yellow", "red"].includes(colorLower);
-      } else {
-        success = colorLower === "red";
-      }
+      const success = featSuccess(colorLower, kernelRequiredColor(kernelKeyFor(effFeatRank), intensityKey));
       
       // Check if using consolidated chat cards
       let useConsolidated = false;
@@ -569,19 +557,9 @@ export class AttackAction extends BaseAction {
     }
     
     // Manual/Semi mode: show dialog
-    // Determine required color based on FEAT rules (with auto/impossible)
-    let requiredColor;
-    {
-      const d = fightingIndex - intensityIndex;
-      if (d >= AUTO_DIFF)                         requiredColor = "Automatic (no roll)";
-      else if (USE_IMPOSSIBLE && d <= IMPOSSIBLE_DIFF) requiredColor = "Impossible (fails)";
-      else if (d > 0)                             requiredColor = "Green or better";
-      else if (d === 0)                           requiredColor = "Yellow or better";
-      else                                        requiredColor = "Red only";
-    }
-    
-    const isAuto       = diff >= AUTO_DIFF;
-    const isImpossible = USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF;
+    const requiredColor = NEEDED_LABELS[baseNeeded];
+    const isAuto       = baseNeeded === "automatic";
+    const isImpossible = baseNeeded === "impossible";
     const isPreDetermined = isAuto || isImpossible;
 
     const fightingShort = RANK_ABBR[fightingAbility.rank] || fightingAbility.rank;
@@ -686,17 +664,7 @@ export class AttackAction extends BaseAction {
               
               const resultColor = game.msh.rollUniversalTable(effFeatRank, totalRoll);
               const colorLower = resultColor.toLowerCase();
-              
-              // Determine success using shifted fighting rank so CS actually affects outcome
-              const shiftedFightingIndex = RANKS.indexOf(effFeatRank);
-              let success = false;
-              if (shiftedFightingIndex > intensityIndex) {
-                success = ["green", "yellow", "red"].includes(colorLower);
-              } else if (shiftedFightingIndex === intensityIndex) {
-                success = ["yellow", "red"].includes(colorLower);
-              } else {
-                success = colorLower === "red";
-              }
+              const success = featSuccess(colorLower, kernelRequiredColor(kernelKeyFor(effFeatRank), intensityKey));
               
               // Check if using consolidated chat cards
               let useConsolidated = false;
@@ -1051,10 +1019,28 @@ export class AttackAction extends BaseAction {
     // Apply column shift (manual + range/obstacle/movement + effect modifiers)
     // Ranged actions set choice.totalShift which already includes manual + range + obstacle + movement.
     // Melee actions only set choice.shift (manual CS). Use totalShift when present.
-    let effectiveRank = ability.rank;
     const manualShift = (choice.totalShift != null) ? choice.totalShift : (choice.shift || 0);
     const totalShift = manualShift + effectShift;
-    if (totalShift) effectiveRank = shiftRank(effectiveRank, totalShift);
+    const effectiveRank = totalShift ? shiftRank(ability.rank, totalShift) : ability.rank;
+
+    const kernelColumn = ACTION_COLUMNS[String(actionType)] ?? null;
+    const kernelActive = !!kernelColumn && KERNEL_ATTACK_COLUMNS.has(kernelColumn);
+    const attackKernelKey = kernelKeyFor(ability.rank);
+    const attackShiftable = !!attackKernelKey && kernelRankDistance("SHZ", attackKernelKey) <= 0;
+    const attackShifts = [];
+    if (choice.shiftBreakdown) {
+      let acc = 0;
+      for (const [k, v] of Object.entries(choice.shiftBreakdown)) {
+        if (typeof v !== "number" || !v) continue;
+        attackShifts.push({ cs: v, reason: k });
+        acc += v;
+      }
+      if (acc !== manualShift) attackShifts.push({ cs: manualShift - acc, reason: "other" });
+    } else if (manualShift) {
+      attackShifts.push({ cs: manualShift, reason: "other" });
+    }
+    for (const eff of attackerEffects) attackShifts.push({ cs: eff.shift, reason: eff.name });
+    for (const eff of defenderEffects) attackShifts.push({ cs: -eff.shift, reason: eff.name });
     
     // Log effect modifier application
     if (effectShift !== 0) {
@@ -1094,16 +1080,18 @@ export class AttackAction extends BaseAction {
     //let color = rollUniversalTable(effectiveRank, cappedTotal);
     //const colorLower = String(color || "white").toLowerCase();
     // Resolve color (always, even in manual mode)
-    let color = universalColor(effectiveRank, cappedTotal);
+    const kernelAttack = (kernelActive && attackKernelKey)
+      ? resolveAttack({ column: kernelColumn, rank: attackKernelKey, shifts: attackShiftable ? attackShifts : [], roll: cappedTotal, karma: 0 })
+      : null;
+    let color = kernelAttack ? kernelAttack.color : universalColor(effectiveRank, cappedTotal);
     const colorLower = String(color || "white").toLowerCase();
 
     // Apply result cap if pulling punch
     if (choice.resultCap && choice.resultCap !== 'none') {
       const capOrder = ['white', 'green', 'yellow', 'red'];
-      const currentIndex = capOrder.indexOf(colorLower);
-      const capIndex = capOrder.indexOf(choice.resultCap);
-      if (currentIndex > capIndex) {
-        color = choice.resultCap;
+      const steps = capOrder.indexOf(colorLower) - capOrder.indexOf(choice.resultCap);
+      if (steps > 0) {
+        color = kernelAttack ? reduceEffectColor(kernelColumn, colorLower, steps).color : choice.resultCap;
       }
     }
 
@@ -1284,11 +1272,7 @@ export class AttackAction extends BaseAction {
          const _apMode = choice?.apMode || "value";
          const _baseArmor = Number(armorData?.applicable) || 0;
          if (_apMode === "cs" && _apCS > 0 && _baseArmor > 0) {
-           const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
-           let _i = _RV.findIndex(v => v >= _baseArmor);
-           if (_i < 0) _i = _RV.length - 1;
-           if (_i > 0 && _RV[_i] > _baseArmor) _i--;
-           armorValue = _RV[Math.max(0, _i - _apCS)];
+           armorValue = applyArmorPiercingCS(_baseArmor, _apCS);
          } else {
            armorValue = Math.max(0, _baseArmor - _apFlat);
          }
@@ -1312,44 +1296,28 @@ export class AttackAction extends BaseAction {
       // Show button when weapon material < target material (regardless of penetrating damage)
       let currentBreakingFeat = null;
       if (targetIsHit && breakingFeat && targetActor) {
-        const RANKS = [
-          "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-          "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-          "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-        ];
-        const RANK_VALUES = [0, 1, 3, 5, 8, 16, 26, 36, 46, 63, 88, 150, 250, 500, 1000, 3000, 5000, Infinity];
-        
         // Get target's armor rank for the Breaking FEAT dialog
         const isEnergy = armorData?.isEnergyDamage;
         let targetMatRank = isEnergy ? armorData?.energyRank : armorData?.physicalRank;
-        
+
         // Fallback: if no rank string, derive from numeric armor value
         if (!targetMatRank && armorData) {
           const armorVal = isEnergy ? armorData.energy : armorData.physical;
-          if (armorVal > 0) {
-            // Find closest rank for this armor value
-            for (let i = RANK_VALUES.length - 1; i >= 0; i--) {
-              if (armorVal >= RANK_VALUES[i]) {
-                targetMatRank = RANKS[i];
-                break;
-              }
-            }
-          }
+          if (armorVal > 0) targetMatRank = valueToRank(armorVal);
         }
-        
-        const weaponIdx = RANKS.indexOf(breakingFeat.weaponMat);
-        const targetIdx = RANKS.indexOf(targetMatRank);
-        
+
+        const weaponKey = kernelKeyFor(breakingFeat.weaponMat);
+        const targetKey = kernelKeyFor(targetMatRank);
+        const weaponWeaker = !!weaponKey && !!targetKey && kernelRankDistance(weaponKey, targetKey) > 0;
+
         console.log("[FASERIP] Breaking FEAT check:", {
           weaponMat: breakingFeat.weaponMat,
-          weaponIdx,
           targetMatRank,
-          targetIdx,
-          wouldShow: weaponIdx !== -1 && targetIdx !== -1 && weaponIdx < targetIdx
+          wouldShow: weaponWeaker
         });
-        
+
         // Only show Breaking FEAT if weapon material < target material
-        if (weaponIdx !== -1 && targetIdx !== -1 && weaponIdx < targetIdx) {
+        if (weaponWeaker) {
           currentBreakingFeat = {
             ...breakingFeat,
             targetMat: targetMatRank || ""
@@ -1377,8 +1345,12 @@ export class AttackAction extends BaseAction {
       // Vehicles have no Endurance — Slam/Stun/Kill effects do not apply
       const targetIsVehicle = targetActor?.type === "vehicle";
 
-      switch (String(actionType)) {
-        case "blunt-attack":
+      const followUp = kernelActive ? effectForColor(kernelColumn, targetEffectColor) : null;
+      if (followUp) {
+        showSlam = (followUp === "slam");
+        showStun = (followUp === "stun");
+        showKill = (followUp === "kill");
+      } else switch (String(actionType)) {
         case "charging":
           showSlam = (targetEffectColor === "yellow");
           showStun = (targetEffectColor === "red");
