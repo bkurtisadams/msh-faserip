@@ -1,3 +1,8 @@
+// scripts/rules/mitigation.js v3.7.0 - 2026-09-02
+// v3.7.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
+//         shifts). Flat-value branch retired in both Body Armor layers; a
+//         legacy armorPiercing number is applied as that many CS.
+//         applyArmorPiercingCS now lives in action-utils (re-exported here).
 // scripts/rules/mitigation.js v3.6.1 - 2026-09-01
 // v3.6.1: Export applyArmorPiercingCS so attack-action.js shares the
 //         range-true AP step instead of its own rank walk (kernel slice 5).
@@ -96,9 +101,9 @@
 //         no defense AEs are found. This ensures backward compatibility with actors that
 //         haven't been synced yet.
 
-import { getBodyArmorValues } from "../modules/actions/action-utils.js";
+import { getBodyArmorValues, applyArmorPiercingCS } from "../modules/actions/action-utils.js";
 import { defenseValue } from "../lib/faserip-rules/faserip-damage.js";
-import { valueToRank, shiftRank as sharedShiftRank, rankValue } from "./rules-reference.js";
+export { applyArmorPiercingCS };
 
 export function calculateMitigation(rawDamage, targetActor, options = {}) {
   const debug = game.settings?.get('msh-faserip', 'debugMode') || false;
@@ -715,7 +720,8 @@ function isDefenseAEBackedByCurrentPower(actor, ae, scope) {
 // ─── AE-based mitigation layers ──────────────────────────────────────────────
 
 function applyBodyArmorFromAE(damage, armorData, options) {
-  const { isEnergyDamage, armorPiercing, armorPiercingCS, apMode } = options;
+  const { isEnergyDamage, armorPiercing, armorPiercingCS } = options;
+  const apCS = (Number(armorPiercingCS) || 0) || (Number(armorPiercing) || 0);
 
   let physArmor = Number(armorData.physical || 0);
   let enerArmor = Number(armorData.energy || 0);
@@ -731,15 +737,12 @@ function applyBodyArmorFromAE(damage, armorData, options) {
     }
   }
 
-  if (apMode === "cs" && armorPiercingCS > 0) {
+  if (apCS > 0) {
     const toReduce = isEnergyDamage ? enerArmor : physArmor;
     if (toReduce > 0) {
-      const reduced = applyArmorPiercingCS(toReduce, armorPiercingCS);
+      const reduced = applyArmorPiercingCS(toReduce, apCS);
       if (isEnergyDamage) enerArmor = reduced; else physArmor = reduced;
     }
-  } else if (armorPiercing > 0) {
-    if (isEnergyDamage) enerArmor = Math.max(0, enerArmor - armorPiercing);
-    else physArmor = Math.max(0, physArmor - armorPiercing);
   }
 
   const eff = isEnergyDamage ? enerArmor : physArmor;
@@ -749,7 +752,7 @@ function applyBodyArmorFromAE(damage, armorData, options) {
     capacity: eff,
     original: isEnergyDamage ? armorData.energy : armorData.physical,
     modified: eff,
-    apApplied: (armorPiercing > 0 || armorPiercingCS > 0),
+    apApplied: apCS > 0,
     source: "defense-ae",
   };
 }
@@ -1014,7 +1017,8 @@ function applyBlockingArmor(damage, targetActor, options) {
 // ─── Legacy item-based layers (unchanged) ────────────────────────────────────
 
 function applyBodyArmor(damage, armorData, options) {
-  const { isEnergyDamage, armorPiercing, armorPiercingCS, apMode } = options;
+  const { isEnergyDamage, armorPiercing, armorPiercingCS } = options;
+  const apCS = (Number(armorPiercingCS) || 0) || (Number(armorPiercing) || 0);
   
   let physArmor = Number(armorData.physical || 0);
   let enerArmor = Number(armorData.energy || 0);
@@ -1030,15 +1034,12 @@ function applyBodyArmor(damage, armorData, options) {
     }
   }
   
-  if (apMode === "cs" && armorPiercingCS > 0) {
+  if (apCS > 0) {
     const armorToReduce = isEnergyDamage ? enerArmor : physArmor;
     if (armorToReduce > 0) {
-      const reduced = applyArmorPiercingCS(armorToReduce, armorPiercingCS);
+      const reduced = applyArmorPiercingCS(armorToReduce, apCS);
       if (isEnergyDamage) enerArmor = reduced; else physArmor = reduced;
     }
-  } else if (armorPiercing > 0) {
-    if (isEnergyDamage) enerArmor = Math.max(0, enerArmor - armorPiercing);
-    else physArmor = Math.max(0, physArmor - armorPiercing);
   }
   
   const effectiveArmor = isEnergyDamage ? enerArmor : physArmor;
@@ -1048,7 +1049,7 @@ function applyBodyArmor(damage, armorData, options) {
     capacity: effectiveArmor,
     original: isEnergyDamage ? armorData.energy : armorData.physical,
     modified: effectiveArmor,
-    apApplied: (armorPiercing > 0 || armorPiercingCS > 0)
+    apApplied: apCS > 0
   };
 }
 
@@ -1141,11 +1142,6 @@ function applyPassiveArmor(damage, targetActor, options) {
 // unchanged; in-between values now resolve range-true. Matches the ammo
 // module's apAdjustedDefense semantics (RULED: -2CS, no effect on FF —
 // FF layers already carry ignoresAP).
-export function applyArmorPiercingCS(armorValue, csReduction) {
-  const shifted = sharedShiftRank(valueToRank(armorValue), -csReduction);
-  return rankValue(shifted);
-}
-
 function isResistanceApplicable(damageType, resistanceType) {
   const dmgLower = String(damageType).toLowerCase();
   const resLower = String(resistanceType).toLowerCase();

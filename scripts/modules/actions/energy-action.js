@@ -1,3 +1,11 @@
+// scripts/modules/actions/energy-action.js v3.5.0 - 2026-09-02
+// v3.5.0: Kernel slice 5e. Energy Generation (name/type/canReduceEffect)
+//         resolves as choice.freeEffectReduction — the power-specific
+//         exception to "effect may not be reduced"; every other energy power's
+//         result cap is karma-gated in attack-action (50 per colour step).
+//         Power-rank to-hit value via rankValue (RANKS[rankName] on the name
+//         array always fell through to 30); Remember flags written in ONE
+//         actor.update instead of 17 sequential setFlag calls.
 // scripts/modules/actions/energy-action.js v3.4.4 - 2026-07-09
 // v3.4.4: Normalize equipment damage type E to energy and use derivePowerDamage()
 //         for initial, dropdown, preview, and roll damage so equipment energy
@@ -87,7 +95,7 @@ import {
   getBodyArmorValues,
   getTargetData,
   labelFor,
-  RANKS,
+  rankValue,
   setupModeSelector,
   applyCapabilitiesToDialog,
   shiftRank,
@@ -497,6 +505,7 @@ export class EnergyAction extends RangedAttackAction {
 
             let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
             let powerDamageType = "energy-generic";
+            let freeEffectReduction = false;
 
             if (useAdHoc) {
               powerName = String($dlg('[name="adhocName"]').val() || "Energy Blast");
@@ -522,6 +531,9 @@ export class EnergyAction extends RangedAttackAction {
                 ? (POWER_RANGE[powerRank] || "")
                 : String(s.calculatedRange || "");
               powerDamageType = inferEnergyDamageType(item, "energy-generic");
+              const _nameLc = item.name.toLowerCase();
+              freeEffectReduction = _nameLc.includes('energy generation') ||
+                s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
             }
 
             const cs = _csState.get();
@@ -539,25 +551,28 @@ export class EnergyAction extends RangedAttackAction {
             const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
             const csNotes = cs.csNotes;
 
+            const flagUpdate = { csNotes };
             if (rememberSettings) {
-              await actor.setFlag("msh-faserip", "lastEnergyAdHoc", useAdHoc);
-              await actor.setFlag("msh-faserip", "lastEnergyUsePowerToHit", usePowerToHit);
-              await actor.setFlag("msh-faserip", "lastEnergyShift", cs.manualCS);
-              await actor.setFlag("msh-faserip", "cs_energy", cs.manualCS);
-              await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
-              await actor.setFlag("msh-faserip", "lastEnergyMagical", magicalForced);
-              await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
-              await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
-              await actor.setFlag("msh-faserip", "lastEnergyAdHocRank", powerRank);
-              await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
-              await actor.setFlag("msh-faserip", "lastEnergyRange", range);
-              await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
-              await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
-              await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
-              await actor.setFlag("msh-faserip", "lastEnergyAim", aimMode);
-              await actor.setFlag("msh-faserip", "lastEnergyReason", cs.reason);
+              Object.assign(flagUpdate, {
+                lastEnergyAdHoc: useAdHoc,
+                lastEnergyUsePowerToHit: usePowerToHit,
+                lastEnergyShift: cs.manualCS,
+                cs_energy: cs.manualCS,
+                lastEnergyMultiAdjacent: multiAdjacent,
+                lastEnergyMagical: magicalForced,
+                lastEnergyAdHocName: powerName,
+                lastEnergyAdHocDamage: powerDamage,
+                lastEnergyAdHocRank: powerRank,
+                lastEnergyItemId: powerId || "",
+                lastEnergyRange: range,
+                lastEnergyReduceDamage: reduceDamageEnabled,
+                lastEnergyReducedAmount: reducedDamage,
+                lastEnergyResultCap: resultCap,
+                lastEnergyAim: aimMode,
+                lastEnergyReason: cs.reason
+              });
             }
-            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+            await actor.update({ "flags.msh-faserip": flagUpdate });
 
             _resolved = true;
             resolve({
@@ -569,7 +584,7 @@ export class EnergyAction extends RangedAttackAction {
               rangePenalty: cs.rangePenalty,
               powerDamageType, multiAdjacent,
               isMagic: magicalForced || undefined,
-              reduceDamageEnabled, reducedDamage, resultCap,
+              reduceDamageEnabled, reducedDamage, resultCap, freeEffectReduction,
               aimMode,
               csNotes
             });
@@ -780,7 +795,7 @@ export class EnergyAction extends RangedAttackAction {
     choice.shiftBreakdown = shiftBreakdown;
 
     const toHitAbility = choice.usePowerToHit
-      ? { name: "Power", rank: choice.powerRank, value: RANKS[choice.powerRank] || 30 }
+      ? { name: "Power", rank: choice.powerRank, value: rankValue(choice.powerRank) || 30 }
       : ability;
 
     const baseDamage = choice.reduceDamageEnabled ? choice.reducedDamage : choice.powerDamage;

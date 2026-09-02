@@ -1,11 +1,13 @@
-// faserip-rules effects v0.7.0
+// faserip-rules effects v0.7.1
+// v0.7.1: RULED 2026-09-02 — Force effect may not be reduced (Fo.reduceEffect
+//         false); reverses the 2026-08-31 pullEffect ruling.
 // Battle Effects Table + Slam/Stun/Kill sub-tables.
 // Certified against the Advanced Set Universal Table image (GM-supplied,
 // 2026-08-31) and Players Book combat prose.
 
 import { resolveFeat, colorForRoll, rankForNumber, rankDistance } from './faserip-kernel.js';
 
-export const EFFECTS_VERSION = '0.7.0';
+export const EFFECTS_VERSION = '0.7.1';
 export const EFFECTS_CERTIFIED = true;
 
 // results: color -> outcome token.
@@ -35,7 +37,8 @@ export const EFFECT_COLUMNS = {
         reduceDamage: true,  reduceEffect: false, killCapable: true },
   Fo: { name: 'Force',           ability: 'agility',
         results: { white: 'miss', green: 'hit', yellow: 'bullseye', red: 'stun' },
-        reduceDamage: true,  reduceEffect: true,  killCapable: false },
+        // RULED 2026-09-02: Force Attack section — damage reducible, effect not.
+        reduceDamage: true,  reduceEffect: false, killCapable: false },
   Gp: { name: 'Grappling',       ability: 'strength',
         results: { white: 'miss', green: 'miss', yellow: 'partial', red: 'hold' },
         reduceDamage: true,  reduceEffect: true,  killCapable: false },

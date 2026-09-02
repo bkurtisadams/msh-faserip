@@ -117,6 +117,60 @@ for (const c of COLORS) {
   if (JSON.stringify(l) !== JSON.stringify(k)) fail(`follow-up ${c}: ${JSON.stringify(l)} vs ${JSON.stringify(k)}`);
 }
 
+// 5b. EA follow-up gate + no effect reduction on the edged column
+section("EA follow-up gate vs effectForColor; EA effect reduction refused");
+for (const c of COLORS) {
+  const tok = effectForColor("EA", c);
+  const l = { slam: false, stun: c === "yellow", kill: c === "red" };
+  const k = { slam: tok === "slam", stun: tok === "stun", kill: tok === "kill" };
+  if (JSON.stringify(l) !== JSON.stringify(k)) fail(`EA follow-up ${c}: ${JSON.stringify(l)} vs ${JSON.stringify(k)}`);
+}
+for (const rolled of ["yellow", "red"]) {
+  const r = reduceEffectColor("EA", rolled, 1);
+  if (r.allowed || r.color !== rolled) fail(`EA reduce ${rolled}: expected refused, got ${JSON.stringify(r)}`);
+}
+console.log("  EA yellow=Stun red=Kill; reduceEffectColor refuses without 50 Karma (dialog offers no cap)");
+
+// 5c. Claws limitation +2CS bump: legacy index clamp vs shiftRank
+section("claws +2CS material bump: legacy index clamp vs shiftRank");
+let clawKnown = 0;
+for (const m of NAMES) {
+  const i = NAMES.indexOf(m);
+  const l = NAMES[Math.min(i + 2, NAMES.length - 1)];
+  const key = KEY_OF[m];
+  const k = rankDistance("SHZ", key) > 0 ? m : NAMES[RANKS.indexOf(shiftRank(key, 2))];
+  if (l === k) continue;
+  if (i >= NAMES.indexOf("Shift-Y")) { clawKnown++; continue; }
+  fail(`claw bump ${m}: legacy ${l} vs kernel ${k}`);
+}
+known(`${clawKnown} ranks Shift-Y and above: legacy clamp ran past Shift-Z (to Beyond), kernel stops at Shift-Z / leaves Class ranks unshifted (unreachable: claws material is Fe-Un)`);
+
+// 5e. Fo / En follow-up gates; Fo and En effect reduction refused (RULED 2026-09-02);
+//     En reduction allowed at 50 Karma per step (killCapable); En free path is the
+//     caller's Energy Generation exception, not the column.
+section("Fo / En follow-up gates vs effectForColor");
+for (const c of COLORS) {
+  const fo = effectForColor("Fo", c), en = effectForColor("En", c);
+  const lFo = { slam: false, stun: c === "red", kill: false };
+  const kFo = { slam: fo === "slam", stun: fo === "stun", kill: fo === "kill" };
+  const lEn = { slam: false, stun: false, kill: c === "red" };
+  const kEn = { slam: en === "slam", stun: en === "stun", kill: en === "kill" };
+  if (JSON.stringify(lFo) !== JSON.stringify(kFo)) fail(`Fo follow-up ${c}: ${JSON.stringify(lFo)} vs ${JSON.stringify(kFo)}`);
+  if (JSON.stringify(lEn) !== JSON.stringify(kEn)) fail(`En follow-up ${c}: ${JSON.stringify(lEn)} vs ${JSON.stringify(kEn)}`);
+}
+section("Fo / En effect reduction: refused free; En allowed for 50 Karma per step");
+for (const rolled of ["yellow", "red"]) {
+  const fo = reduceEffectColor("Fo", rolled, 1);
+  if (fo.allowed || fo.color !== rolled) fail(`Fo reduce ${rolled}: expected refused, got ${JSON.stringify(fo)}`);
+  const enFree = reduceEffectColor("En", rolled, 1, 0);
+  if (enFree.allowed || enFree.karmaCost !== 50) fail(`En reduce ${rolled} unpaid: expected refused/cost 50, got ${JSON.stringify(enFree)}`);
+  const enPaid = reduceEffectColor("En", rolled, 1, 50);
+  if (!enPaid.allowed || enPaid.karmaCost !== 50) fail(`En reduce ${rolled} paid: expected allowed/cost 50, got ${JSON.stringify(enPaid)}`);
+}
+const enTwo = reduceEffectColor("En", "red", 2, 100);
+if (!enTwo.allowed || enTwo.color !== "green" || enTwo.karmaCost !== 100) fail(`En red->green for 100: got ${JSON.stringify(enTwo)}`);
+known("Fo effect reduction: legacy pullEffect true (2026-08-31) -> false (RULED 2026-09-02, Force Attack section); force dialog never offered a cap, so no play change");
+
 // 6. AP-CS armor step: legacy _RV walk vs range-true (mitigation applyArmorPiercingCS semantics)
 section("AP-CS armor step: legacy _RV walk vs range-true");
 const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];

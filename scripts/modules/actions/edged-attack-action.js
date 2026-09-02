@@ -1,3 +1,16 @@
+// edged-attack-action.js v3.6.1 - 2026-09-02
+// v3.6.1: Fix ReferenceErrors — weapon dropdown builder still called the
+//         retired local getArmorPiercing, and initialAPLabel still read the
+//         retired initialAP/initialAPMode; both on the CS field now.
+// edged-attack-action.js v3.6.0 - 2026-09-02
+// v3.6.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
+//         shifts). Weapon AP read through shared getItemArmorPiercingCS;
+//         local flat-AP normalizer, apMode and flat preview path retired.
+// edged-attack-action.js v3.5.0 - 2026-09-01
+// v3.5.0: Kernel slice 5b. Claws limitation +2CS via shared shiftRank (was an
+//         index clamp that could land on Beyond); Remember flags written in
+//         ONE actor.update instead of 13 sequential setFlag calls; dead
+//         universal-table import dropped.
 // edged-attack-action.js v3.4.0 - 2026-08-21
 // v3.4.0: Lock the Multi controls when the tracker Multiple Attacks FEAT is
 //         already resolved (rolled or Automatic) — no implied second roll.
@@ -70,11 +83,11 @@ import {
   getTargetData,
   getBodyArmorValues,
   getEffectiveArmor as _getEffectiveArmor,
+  getItemArmorPiercingCS,
   getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { executePenetrationFeat } from "./breaking-feat.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
@@ -89,18 +102,6 @@ export class EdgedAttackAction extends AttackAction {
 
     const ability = getAbilityInfo(actor, this.abilityName);
     const strength = getStrengthInfo(actor);
-
-    // Normalize Armor Piercing across possible fields and shapes
-    const getArmorPiercing = (it) => {
-      const s = it?.system || {};
-      const props = s.properties || {};
-      const ap =
-        s.armorPiercing ??
-        s.penetration ??
-        s.ap ??
-        (props.armorPiercing === true ? 1 : 0);
-      return Number(ap) || 0;
-    };
 
     const isClawsPower = (it) => {
       const s = it?.system || {};
@@ -212,20 +213,16 @@ export class EdgedAttackAction extends AttackAction {
 
     // Compute initial damage based on saved source
     let initialDamage = savedNatDmg;
-    let initialAP = 0;
     let initialAPCS = 0;
-    let initialAPMode = "value";
     if (savedSource === "weapon" && savedItemId) {
       const savedWeapon = attackItems.find(i => i.id === savedItemId);
       if (savedWeapon) {
         const res = getEdgedSourceDamage(savedWeapon);
         initialDamage = res.damage;
-        initialAP = getArmorPiercing(savedWeapon);
-        initialAPCS = Number(savedWeapon.system?.armorPiercingCS || 0) || 0;
-        initialAPMode = savedWeapon.system?.apMode || "value";
+        initialAPCS = getItemArmorPiercingCS(savedWeapon);
       }
     }
-    const initialEffArmor = _getEffectiveArmor(targetArmor, initialAP, initialAPCS, initialAPMode);
+    const initialEffArmor = _getEffectiveArmor(targetArmor, initialAPCS);
     const initialAfterArmor = Math.max(0, initialDamage - initialEffArmor);
 
     // Karma info
@@ -248,8 +245,8 @@ export class EdgedAttackAction extends AttackAction {
     damageSrcOptions.push(`<option value="natural" ${savedSource==='natural'?'selected':''}>Natural Weapon &mdash; ${savedNatRank} (${savedNatDmg})</option>`);
     for (const i of attackItems) {
       const res = getEdgedSourceDamage(i);
-      const ap = getArmorPiercing(i);
-      const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
+      const ap = getItemArmorPiercingCS(i);
+      const apLabel = ap > 0 ? ` [AP ${ap}CS]` : "";
       const isBroken = i.system?.broken === true;
       const sel = (savedSource === 'weapon' && savedItemId === i.id && !isBroken) ? 'selected' : '';
       const disabled = isBroken ? 'disabled' : '';
@@ -264,7 +261,7 @@ export class EdgedAttackAction extends AttackAction {
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // AP label for initial display
-    const initialAPLabel = (initialAPMode === "cs" && initialAPCS > 0) ? `${initialAPCS}CS` : (initialAP > 0 ? String(initialAP) : "");
+    const initialAPLabel = initialAPCS > 0 ? `${initialAPCS}CS` : "";
 
     // ── Dialog HTML — v3 Ultra Compact Layout ──
     const multiEnabled = savedMultiAttacks || savedMultiAdjacent;
@@ -436,7 +433,7 @@ export class EdgedAttackAction extends AttackAction {
 
             // Compute damage and notes
             let weaponMat = "", weaponName = "", damage = natDmg, note = "", sourceItem = null;
-            let ap = 0, apCS = 0, apMode = "value", bypassFF = false, sourceItemType = "";
+            let apCS = 0, bypassFF = false, sourceItemType = "";
             if (src === "weapon") {
               const item = attackItems.find(i => i.id === itemId) || null;
               if (!item) {
@@ -450,9 +447,7 @@ export class EdgedAttackAction extends AttackAction {
                 if (da?.rank && item?.system?.category === "device") {
                   weaponName = `${da.name} (${item.name})`;
                 }
-                ap = getArmorPiercing(item);
-                apCS = Number(item.system?.armorPiercingCS || 0) || 0;
-                apMode = item.system?.apMode || "value";
+                apCS = getItemArmorPiercingCS(item);
                 bypassFF = !!item.system?.bypassForceField;
                 const res = getEdgedSourceDamage(item);
                 damage = res.damage; note = res.note;
@@ -464,33 +459,33 @@ export class EdgedAttackAction extends AttackAction {
               note = `${natRank} natural weapon`;
             }
 
-            // Persist actor flags if remembering
+            // Persist actor flags if remembering — single document update
+            const flagUpdate = { csNotes };
             if (rememberSettings) {
-              await actor.setFlag("msh-faserip", "lastEdgedSource", src);
-              await actor.setFlag("msh-faserip", "lastEdgedShift", _csState.get().manualCS);
-              await actor.setFlag("msh-faserip", "cs_edged-attack", _csState.get().manualCS);
-              await actor.setFlag("msh-faserip", "lastEdgedKarma", karma);
-              await actor.setFlag("msh-faserip", "karma_edged-attack", karma);
-              await actor.setFlag("msh-faserip", "lastEdgedMultiAttacks", multiAttacks);
-              await actor.setFlag("msh-faserip", "lastEdgedAttackCount", attackCount);
-              await actor.setFlag("msh-faserip", "lastEdgedMultiAdjacent", multiAdjacent);
-              await actor.setFlag("msh-faserip", "lastEdgedReason", _csState.get().reason);
-
+              Object.assign(flagUpdate, {
+                lastEdgedSource: src,
+                lastEdgedShift: _csState.get().manualCS,
+                "cs_edged-attack": _csState.get().manualCS,
+                lastEdgedKarma: karma,
+                "karma_edged-attack": karma,
+                lastEdgedMultiAttacks: multiAttacks,
+                lastEdgedAttackCount: attackCount,
+                lastEdgedMultiAdjacent: multiAdjacent,
+                lastEdgedReason: _csState.get().reason
+              });
               if (src === "weapon") {
-                await actor.setFlag("msh-faserip", "lastEdgedItemId", itemId);
+                flagUpdate.lastEdgedItemId = itemId;
               } else {
-                await actor.setFlag("msh-faserip", "lastNaturalWeaponRank", natRank);
-                await actor.setFlag("msh-faserip", "lastNaturalWeaponDamage", natDmg);
+                Object.assign(flagUpdate, { lastNaturalWeaponRank: natRank, lastNaturalWeaponDamage: natDmg });
               }
             }
-            
-            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+            await actor.update({ "flags.msh-faserip": flagUpdate });
 
             _resolved = true;
             resolve({
               src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice,
               weaponMat, weaponName, damage, note, weapon: sourceItem, sourceItemType,
-              armorPiercing: ap, armorPiercingCS: apCS, apMode, bypassForceField: bypassFF,
+              armorPiercingCS: apCS, bypassForceField: bypassFF,
               multiAttacks, attackCount, multiAdjacent, csNotes
             });
             dlg.close();
@@ -526,15 +521,12 @@ export class EdgedAttackAction extends AttackAction {
             }
 
             let currentDamage = savedNatDmg;
-            let currentAP = 0;
             let currentAPCS = 0;
-            let currentAPMode = "value";
 
             if (src === "natural") {
               const rank = String(html.find('[name="natRank"]').val() || savedNatRank);
               const dmg = Number(html.find('[name="natDmg"]').val() || game.msh.getRankValue(rank));
               currentDamage = dmg;
-              currentAP = 0;
             } else {
               const item = attackItems.find(i => i.id === currentItemId) || null;
               if (!item) {
@@ -542,25 +534,22 @@ export class EdgedAttackAction extends AttackAction {
               } else {
                 const res = getEdgedSourceDamage(item);
                 currentDamage = res.damage;
-                currentAP = getArmorPiercing(item);
-                currentAPCS = Number(item.system?.armorPiercingCS || 0) || 0;
-                currentAPMode = item.system?.apMode || "value";
+                currentAPCS = getItemArmorPiercingCS(item);
               }
             }
 
             $val.text(currentDamage);
 
             // AP display
-            const hasAP = (currentAPMode === "cs" && currentAPCS > 0) || (currentAPMode !== "cs" && currentAP > 0);
-            if (hasAP) {
+            if (currentAPCS > 0) {
               $apDisplay.show();
-              $apVal.text(currentAPMode === "cs" ? `${currentAPCS}CS` : currentAP);
+              $apVal.text(`${currentAPCS}CS`);
             } else {
               $apDisplay.hide();
             }
 
             // After-armor display (accounting for AP)
-            const effectiveArmor = _getEffectiveArmor(targetArmor, currentAP, currentAPCS, currentAPMode);
+            const effectiveArmor = _getEffectiveArmor(targetArmor, currentAPCS);
             const afterArmorDmg = Math.max(0, currentDamage - effectiveArmor);
             if (primaryTarget) {
               $afterArmor.text(`${afterArmorDmg} after armor`);
@@ -698,10 +687,7 @@ export class EdgedAttackAction extends AttackAction {
         const _sys = _passedItem.system || {};
         let _clawMat = _sys.clawMaterialStrength || _sys.rank || "Typical";
         // +2CS material strength bump for any limitation (RAW Claws power)
-        if (_sys.isLimited) {
-          const _idx = RANKS.indexOf(_clawMat);
-          if (_idx >= 0) _clawMat = RANKS[Math.min(_idx + 2, RANKS.length - 1)];
-        }
+        if (_sys.isLimited) _clawMat = shiftRank(_clawMat, 2);
         const _penResult = await executePenetrationFeat({
           attackerMatRank: _clawMat,
           targetMatRank: _naturalMatRank,

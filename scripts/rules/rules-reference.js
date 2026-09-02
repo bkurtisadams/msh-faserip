@@ -1,3 +1,7 @@
+// rules-reference.js v2.0.1 - 2026-09-02
+// v2.0.1: No code change. ATTACK_EFFECTS.force.pullEffect is false again via
+//         the re-vendored kernel (RULED 2026-09-02: the Force Attack section
+//         does forbid effect reduction — the v2.0.0 note below was wrong).
 // rules-reference.js v2.0.0 - 2026-09-01
 // v2.0.0: Rank machinery, ATTACK_RESULTS, and ATTACK_EFFECTS now derive from
 //         the vendored @graycloak/faserip-rules kernel (slice 2a). Behavior

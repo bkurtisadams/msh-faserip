@@ -258,15 +258,10 @@
           <div style="padding:8px;">
 
             <div class="form-group">
-              <label>Mode:</label>
+              <label>Column Shifts:</label>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <select name="system.apMode" style="width:auto;">
-                  <option value="value" {{#if (eq system.apMode "value")}}selected{{/if}}>Flat value</option>
-                  <option value="cs" {{#if (eq system.apMode "cs")}}selected{{/if}}>Column shift (CS)</option>
-                </select>
                 <span style="font-size:.85em;color:#555;">
-                  Flat: <input type="number" name="system.armorPiercing" value="{{system.armorPiercing}}" min="0" style="width:50px;" placeholder="0" title="Subtracts directly from armor value" />
-                  &nbsp;CS: <input type="number" name="system.armorPiercingCS" value="{{system.armorPiercingCS}}" min="0" style="width:50px;" placeholder="0" title="Reduces armor rank by this many column shifts" />
+                  <input type="number" name="system.armorPiercingCS" value="{{system.armorPiercingCS}}" min="0" style="width:50px;" placeholder="0" title="Reduces the target's Body Armor rank by this many column shifts (AP shot = 2). No effect on force fields." /> CS
                 </span>
                 <label style="display:flex;align-items:center;gap:4px;font-size:.85em;" title="AP ammo cannot pierce force fields per rules; enable only for Vibranium, Adamantium, etc.">
                   <input type="checkbox" name="system.bypassForceField" {{checked system.bypassForceField}} />

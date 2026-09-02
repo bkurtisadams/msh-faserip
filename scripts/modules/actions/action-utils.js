@@ -1,3 +1,9 @@
+// action-utils.js v1.10.0 - 2026-09-02
+// v1.10.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
+//          shifts). applyArmorPiercingCS is canonical here (range-true, was in
+//          mitigation.js); getItemArmorPiercingCS reads the single CS field
+//          (pre-ruling flat values count as CS); getEffectiveArmor(base, apCS)
+//          replaces the four-argument flat/CS version and its rank walk.
 // action-utils.js v1.9.1 - 2026-09-01
 // v1.9.1: setupModeSelector normalizes legacy global mode values ("auto" /
 //         "classic" -> "full") like the dispatcher does; a legacy value fell
@@ -219,15 +225,23 @@ export function derivePowerDamage(system, actor) {
 
 // Effective armor after Armor Piercing: "cs" mode steps the armor's rank
 // value down apCS ranks; flat mode subtracts ap from the armor value.
-export function getEffectiveArmor(base, ap, apCS, apMode) {
-  if (apMode === "cs" && apCS > 0 && base > 0) {
-    const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
-    let _i = _RV.findIndex(v => v >= base);
-    if (_i < 0) _i = _RV.length - 1;
-    if (_i > 0 && _RV[_i] > base) _i--;
-    return _RV[Math.max(0, _i - apCS)];
-  }
-  return Math.max(0, base - ap);
+export function applyArmorPiercingCS(armorValue, csReduction) {
+  const base = Math.max(0, Number(armorValue) || 0);
+  const cs = Number(csReduction) || 0;
+  if (!(cs > 0) || !(base > 0)) return base;
+  return rankValue(shiftRank(valueToRank(base), -cs));
+}
+
+export function getItemArmorPiercingCS(item) {
+  const s = item?.system || {};
+  const cs = Number(s.armorPiercingCS) || 0;
+  if (cs > 0) return cs;
+  const legacyFlat = Number(s.armorPiercing) || 0;
+  return legacyFlat > 0 ? legacyFlat : 0;
+}
+
+export function getEffectiveArmor(base, apCS) {
+  return applyArmorPiercingCS(base, apCS);
 }
 
 // Roll visibility mode with v13 fallback (messageMode renamed from rollMode).

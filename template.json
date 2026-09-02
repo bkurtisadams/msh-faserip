@@ -626,7 +626,7 @@
       "damageType": "",
       "armorPiercing": 0,
       "armorPiercingCS": 0,
-      "apMode": "value",
+      "apMode": "cs",
       "bypassForceField": false,
       "rate": "1",
       "shots": "",

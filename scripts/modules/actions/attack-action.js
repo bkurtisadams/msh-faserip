@@ -1,3 +1,23 @@
+// attack-action.js v1.12.0 - 2026-09-02
+// v1.12.0: Kernel slice 5e — Energy (En) added to KERNEL_ATTACK_COLUMNS;
+//          legacy shooting/energy follow-up case now shooting-only. Result
+//          cap on kernel columns: free when the column allows it or the
+//          choice carries freeEffectReduction (Energy Generation, per power
+//          text); otherwise kill-capable columns pay 50 Karma per colour step
+//          via deductKarma, or the cap is ignored with a warning.
+// attack-action.js v1.11.1 - 2026-09-02
+// v1.11.1: Kernel slice 5d — Force (Fo) added to KERNEL_ATTACK_COLUMNS;
+//          legacy force follow-up case retired.
+// attack-action.js v1.11.0 - 2026-09-02
+// v1.11.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
+//          shifts). Flat-value AP path and apMode retired at the armor step,
+//          the target-side damage payload, and the card's AP badge.
+// attack-action.js v1.10.2 - 2026-09-02
+// v1.10.2: Kernel slice 5c — Throwing Blunt (TB) and Throwing Edged (TE)
+//          added to KERNEL_ATTACK_COLUMNS; legacy follow-up cases retired.
+// attack-action.js v1.10.1 - 2026-09-01
+// v1.10.1: Kernel slice 5b — Edged Attacks (EA) added to KERNEL_ATTACK_COLUMNS;
+//          legacy edged follow-up case retired.
 // attack-action.js v1.10.0 - 2026-09-01
 // v1.10.0: Kernel slice 5 (blunt). Columns in KERNEL_ATTACK_COLUMNS resolve
 //          to-hit colour/effect via kernel resolveAttack with itemized shifts,
@@ -242,6 +262,7 @@ import { rankDistance as kernelRankDistance, requiredColor as kernelRequiredColo
 import { resolveAttack, reduceEffectColor, effectForColor } from "../../lib/faserip-rules/faserip-effects.js";
 import { kernelKeyFor } from "../../kernel/adapter.js";
 import { applyArmorPiercingCS } from "../../rules/mitigation.js";
+import { deductKarma, getAvailableKarma } from "../dice/dice-roller.js";
 import { SCOPE, getFlagScope } from "./flags.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
@@ -423,7 +444,7 @@ async function updateAttackCardDamageAfterAutoApply(message, damageResults, cont
 
 // Attack columns resolved through the kernel (slice 5). Add a column here as
 // its action lands; columns not listed keep the legacy path.
-const KERNEL_ATTACK_COLUMNS = new Set(["BA"]);
+const KERNEL_ATTACK_COLUMNS = new Set(["BA", "EA", "TB", "TE", "Fo", "En"]);
 
 const NEEDED_LABELS = {
   automatic: "Automatic (no roll)", impossible: "Impossible (fails)",
@@ -1087,11 +1108,28 @@ export class AttackAction extends BaseAction {
     const colorLower = String(color || "white").toLowerCase();
 
     // Apply result cap if pulling punch
+    let effectReductionKarma = 0;
     if (choice.resultCap && choice.resultCap !== 'none') {
       const capOrder = ['white', 'green', 'yellow', 'red'];
       const steps = capOrder.indexOf(colorLower) - capOrder.indexOf(choice.resultCap);
       if (steps > 0) {
-        color = kernelAttack ? reduceEffectColor(kernelColumn, colorLower, steps).color : choice.resultCap;
+        if (!kernelAttack || choice.freeEffectReduction) {
+          color = choice.resultCap;
+        } else {
+          const reduced = reduceEffectColor(kernelColumn, colorLower, steps, getAvailableKarma(actor));
+          if (reduced.allowed) {
+            color = reduced.color;
+            if (reduced.karmaCost > 0) {
+              effectReductionKarma = reduced.karmaCost;
+              await deductKarma(actor, reduced.karmaCost, `${actionName} effect reduction (${colorLower} → ${reduced.color})`);
+              ui.notifications?.info?.(`${actor.name} spends ${reduced.karmaCost} Karma to reduce the ${actionName} result to ${reduced.color}.`);
+            }
+          } else {
+            ui.notifications?.warn?.(reduced.karmaCost > 0
+              ? `${actor.name}: reducing the ${actionName} effect costs ${reduced.karmaCost} Karma (50 per colour); not enough available — result stands.`
+              : `${actor.name}: the ${actionName} effect cannot be reduced — result stands.`);
+          }
+        }
       }
     }
 
@@ -1267,15 +1305,9 @@ export class AttackAction extends BaseAction {
          });
          // Ensure numbers whether rawDamage arrived as "20" or 20
          const rd = Number(rawDamage) || 0;
-         const _apFlat = Number(choice?.armorPiercing || 0);
-         const _apCS   = Number(choice?.armorPiercingCS || 0);
-         const _apMode = choice?.apMode || "value";
+         const _apCS = (Number(choice?.armorPiercingCS) || 0) || (Number(choice?.armorPiercing) || 0);
          const _baseArmor = Number(armorData?.applicable) || 0;
-         if (_apMode === "cs" && _apCS > 0 && _baseArmor > 0) {
-           armorValue = applyArmorPiercingCS(_baseArmor, _apCS);
-         } else {
-           armorValue = Math.max(0, _baseArmor - _apFlat);
-         }
+         armorValue = applyArmorPiercingCS(_baseArmor, _apCS);
          penetratingDamage = Math.max(0, rd - armorValue);
          // Borderline: armor exactly equals damage (effects can still apply per rules)
          //isBorderline = (rd > 0 && rd === armorValue);
@@ -1356,29 +1388,12 @@ export class AttackAction extends BaseAction {
           showStun = (targetEffectColor === "red");
           break;
 
-        case "edged-attack":
-        case "throwing-edged":
-          showStun = (targetEffectColor === "yellow");
-          showKill = (targetEffectColor === "red");    // ← Kill on red
-          break;
-
         case "shooting":
-        case "energy":
           // Yellow = Bullseye → no Slam/Stun check; Red = Kill.
           // Aim=stun (RAW Tactics): Yellow Bullseye treated as Stun → emit
           // stun chip; existing stun-FEAT pipeline uses dmgThrough as intensity.
           showStun = (aimMode === "stun" && targetEffectColor === "yellow");
           showKill = (targetEffectColor === "red");    // ← Kill on red
-          break;
-
-        case "force":
-          // Yellow = Bullseye → no Slam; Red = Stun
-          showStun = (targetEffectColor === "red");
-          break;
-
-        case "throwing-blunt":
-          // Yellow = Hit; Red = Stun
-          showStun = (targetEffectColor === "red");
           break;
 
         default:
@@ -1517,9 +1532,7 @@ export class AttackAction extends BaseAction {
             attackForm,
             damageType,
             bypassArmor: true,  // damage is already post-armor (penetratingDamage)
-            armorPiercing: Number(choice?.armorPiercing || 0),
-            armorPiercingCS: Number(choice?.armorPiercingCS || 0),
-            apMode: choice?.apMode || "value",
+            armorPiercingCS: (Number(choice?.armorPiercingCS) || 0) || (Number(choice?.armorPiercing) || 0),
             bypassForceField: !!choice?.bypassForceField,
             ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
             ignoresArtificialArmor: !!choice?.ignoresArtificialArmor,
@@ -1756,14 +1769,9 @@ export class AttackAction extends BaseAction {
               const isEnergy = armorData?.isEnergyDamage;
               const armorRank = isEnergy ? armorData?.energyRank : armorData?.physicalRank;
               const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
-              const _apFlat = Number(choice?.armorPiercing || 0);
-              const _apCS   = Number(choice?.armorPiercingCS || 0);
-              const _apMode = choice?.apMode || "value";
-              const _apApplied = (_apMode === "cs" && _apCS > 0) || (_apMode !== "cs" && _apFlat > 0);
-              const _apNote = _apApplied
-                ? (_apMode === "cs"
-                    ? ` <span style="color:#1565c0;font-size:.85em;" title="AP ammo: armor reduced ${_apCS}CS">(AP -${_apCS}CS)</span>`
-                    : ` <span style="color:#1565c0;font-size:.85em;" title="Armor Piercing: armor reduced by ${_apFlat}">(AP -${_apFlat})</span>`)
+              const _apCS = (Number(choice?.armorPiercingCS) || 0) || (Number(choice?.armorPiercing) || 0);
+              const _apNote = _apCS > 0
+                ? ` <span style="color:#1565c0;font-size:.85em;" title="Armor Piercing: armor reduced ${_apCS}CS">(AP -${_apCS}CS)</span>`
                 : "";
               const armorHover = armorRank ? `${armorRank} ${armorType} (${armorValue})` : `${armorType} (${armorValue})`;
               const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
@@ -1938,7 +1946,7 @@ export class AttackAction extends BaseAction {
           showNotification: false,
           bypassArmor: true,  // Armor already calculated above
           attackForm: attackForm,
-          armorPiercing: choice.armorPiercing || 0,
+          armorPiercingCS: (Number(choice?.armorPiercingCS) || 0) || (Number(choice?.armorPiercing) || 0),
           bypassForceField: !!choice?.bypassForceField,
           ignoresNaturalArmor: !!choice?.ignoresNaturalArmor,
           ignoresArtificialArmor: !!choice?.ignoresArtificialArmor,

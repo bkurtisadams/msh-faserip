@@ -1,3 +1,13 @@
+// scripts/modules/actions/throwing-edged-action.js v3.4.0 - 2026-09-02
+// v3.4.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
+//         shifts). Weapon AP read through shared getItemArmorPiercingCS and
+//         previewed through getEffectiveArmor (the preview subtracted the AP
+//         number from armor as flat points); flat/apMode plumbing retired.
+// scripts/modules/actions/throwing-edged-action.js v3.3.0 - 2026-09-02
+// v3.3.0: Kernel slice 5c. Remember flags written in ONE actor.update instead
+//         of 9 sequential setFlag calls. Damage already via the kernel-backed
+//         computeEdgedDamage; TE offers no result cap (kernel: no effect
+//         reduction on Throwing Edged).
 // scripts/modules/actions/throwing-edged-action.js v3.2.4 - 2026-07-04
 // v3.2.4: Use shared action-utils derivePowerDamage() (honors damageSource;
 //         replaces the local ||-chain that ignored the Damage Source select).
@@ -37,7 +47,9 @@ import {
   getBodyArmorValues,
   computeEdgedDamage,
   debugLog,
-  derivePowerDamage
+  derivePowerDamage,
+  getEffectiveArmor as _getEffectiveArmor,
+  getItemArmorPiercingCS
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
@@ -85,13 +97,6 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const actionName = labelFor(actionType);
     const effects = effectsFor(actionType);
     const ability = getAbilityInfo(actor, this.abilityName || "agility");
-
-    const getArmorPiercing = (item) => {
-      const s = item?.system ?? {};
-      const props = s.properties ?? {};
-      const ap = s.armorPiercing ?? s.penetration ?? s.ap ?? (props.armorPiercing === true ? 1 : 0);
-      return Number(ap) || 0;
-    };
 
     // Candidate weapons: thrown + edged. Also accepts powers that route to
     // throwing-edged per the power-router (Slashing Missile, etc.)
@@ -151,8 +156,8 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     // Build weapon options for carried select
     const weaponOptions = thrownEdged.map(i => {
       const dmg = Number(i.system?.damage || 0);
-      const ap = getArmorPiercing(i);
-      const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
+      const ap = getItemArmorPiercingCS(i);
+      const apLabel = ap > 0 ? ` [AP ${ap}CS]` : "";
       const sel = (i.id === savedItemId) ? 'selected' : '';
       return `<option value="${i.id}" ${sel}>${i.name} &mdash; ${dmg} dmg${apLabel}</option>`;
     }).join('');
@@ -168,10 +173,10 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const isAdHocInit = savedAdHoc || !thrownEdged.length;
     const initialWeapon = isAdHocInit ? null : thrownEdged.find(i => i.id === savedItemId) || thrownEdged[0];
     const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrowingEdgedDamage(actor, initialWeapon);
-    const initialAP = initialWeapon ? getArmorPiercing(initialWeapon) : 0;
-    const initialEffArmor = Math.max(0, targetArmor - initialAP);
+    const initialAP = initialWeapon ? getItemArmorPiercingCS(initialWeapon) : 0;
+    const initialEffArmor = _getEffectiveArmor(targetArmor, initialAP);
     const initialAfterArmor = Math.max(0, initialDamage - initialEffArmor);
-    const initialAPLabel = initialAP > 0 ? String(initialAP) : "";
+    const initialAPLabel = initialAP > 0 ? `${initialAP}CS` : "";
 
     // Karma info
     const availableKarma = getAvailableKarma(actor);
@@ -352,14 +357,14 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               const wid = html.find('[name="weapon"]').val();
               const w = thrownEdged.find(i => i.id === wid);
               dmg = computeThrowingEdgedDamage(actor, w);
-              ap = w ? getArmorPiercing(w) : 0;
-              const effArmor = Math.max(0, targetArmor - ap);
+              ap = w ? getItemArmorPiercingCS(w) : 0;
+              const effArmor = _getEffectiveArmor(targetArmor, ap);
               const after = Math.max(0, dmg - effArmor);
               html.find('#dmg-val').text(dmg);
               html.find('#after-armor-display').text(primaryTarget ? `${after} after armor` : `${dmg} damage`);
               if (ap > 0) {
                 html.find('#ap-display').show();
-                html.find('#ap-val').text(String(ap));
+                html.find('#ap-val').text(`${ap}CS`);
               } else {
                 html.find('#ap-display').hide();
               }
@@ -481,7 +486,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             const useAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
 
             let weaponName, weaponDamage, weaponId = null;
-            let weaponAP = 0, weaponAPCS = 0, weaponAPMode = "value";
+            let weaponAPCS = 0;
             let weaponDamageType = "physical-edged";
 
             if (useAdHoc) {
@@ -497,9 +502,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               weaponId = wid;
               weaponName = weapon.name;
               weaponDamage = Number(weapon.system?.damage || 0);
-              weaponAP = getArmorPiercing(weapon);
-              weaponAPCS = Number(weapon.system?.armorPiercingCS || 0) || 0;
-              weaponAPMode = weapon.system?.apMode || "value";
+              weaponAPCS = getItemArmorPiercingCS(weapon);
             }
 
             const cs = _csState.get();
@@ -518,19 +521,22 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
             const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
 
-            // Save settings
+            // Save settings — single document update
+            const flagUpdate = { csNotes };
             if (rememberSettings) {
-              await actor.setFlag("msh-faserip", "lastThrowEdgedShift", cs.manualCS);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedAdHoc", useAdHoc);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocName", weaponName);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocDamage", weaponDamage);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedItemId", weaponId || "");
-              await actor.setFlag("msh-faserip", "lastThrowEdgedRange", range);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedPullEnabled", pullEnabled);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedPulledDamage", pulledDamage);
-              await actor.setFlag("msh-faserip", "lastThrowEdgedReason", cs.reason);
+              Object.assign(flagUpdate, {
+                lastThrowEdgedShift: cs.manualCS,
+                lastThrowEdgedAdHoc: useAdHoc,
+                lastThrowEdgedAdHocName: weaponName,
+                lastThrowEdgedAdHocDamage: weaponDamage,
+                lastThrowEdgedItemId: weaponId || "",
+                lastThrowEdgedRange: range,
+                lastThrowEdgedPullEnabled: pullEnabled,
+                lastThrowEdgedPulledDamage: pulledDamage,
+                lastThrowEdgedReason: cs.reason
+              });
             }
-            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+            await actor.update({ "flags.msh-faserip": flagUpdate });
 
             _resolved = true;
             resolve({
@@ -539,9 +545,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               range,
               karma: karmaToSpend, spendKarma, skipDice,
               shiftBreakdown: { manual: cs.manualCS, range: cs.rangePenalty, csNotes },
-              armorPiercing: weaponAP,
               armorPiercingCS: weaponAPCS,
-              apMode: weaponAPMode,
               damageType: weaponDamageType,
               pulledDamage, resultCap: "none"
             });

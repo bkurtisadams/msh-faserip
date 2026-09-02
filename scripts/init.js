@@ -143,6 +143,7 @@ import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
+import { migrateApCsDocuments } from "./ap-cs-migration.js";
 
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
@@ -3182,6 +3183,20 @@ Hooks.once("ready", async () => {
   if (_mshMigrationsPending && !_mshMigrationFailed) {
     await game.settings.set("msh-faserip", "dataMigrationVersion", 1);
     console.log("[FASERIP] One-time document migrations complete (dataMigrationVersion=1)");
+  }
+
+  // dataMigrationVersion 2 — RULED 2026-09-02: armor piercing is always column
+  // shifts. Legacy flat armorPiercing values become the same number of CS.
+  const _mshApCsPending = game.user?.isGM === true
+    && Number(game.settings.get("msh-faserip", "dataMigrationVersion") ?? 0) < 2;
+  if (_mshApCsPending) {
+    try {
+      const n = await migrateApCsDocuments();
+      await game.settings.set("msh-faserip", "dataMigrationVersion", 2);
+      console.log(`[FASERIP] One-time document migrations complete (dataMigrationVersion=2, AP-CS: ${n} item(s))`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] AP-CS migration failed:", e);
+    }
   }
 
 });

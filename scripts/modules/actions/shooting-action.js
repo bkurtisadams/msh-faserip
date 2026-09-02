@@ -1,3 +1,8 @@
+// shooting-action.js v3.11.0 - 2026-09-02
+// v3.11.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
+//          shifts). Weapon AP read through getItemArmorPiercingCS; AP shot
+//          variant = 2CS; flat/apMode plumbing retired; Remember flags
+//          written in ONE actor.update instead of 9 sequential setFlag calls.
 // shooting-action.js v3.10.0 - 2026-08-21
 // v3.10.0: Lock the Multi controls when the tracker Multiple Attacks FEAT is
 //          already resolved (rolled or Automatic) — no implied second roll.
@@ -140,6 +145,7 @@ import {
   shiftRank,
   buildInlineFeatDisplay,
   getEffectiveArmor as _getEffectiveArmor,
+  getItemArmorPiercingCS,
   getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
@@ -258,21 +264,16 @@ export class ShootingAction extends RangedAttackAction {
       return opts.map(o => `<option value="${o.v}" ${o.v === saved ? "selected" : ""}>${o.label}</option>`).join("");
     };
     const _getEffectiveAPForVariant = (weapon, variantType) => {
-      if (variantType === "ap") return { ap: 0, apCS: 2, apMode: "cs", bypassFF: false };
-      return {
-        ap: Number(weapon?.system?.armorPiercing || 0) || 0,
-        apCS: Number(weapon?.system?.armorPiercingCS || 0) || 0,
-        apMode: weapon?.system?.apMode || "value",
-        bypassFF: !!weapon?.system?.bypassForceField
-      };
+      if (variantType === "ap") return { apCS: 2, bypassFF: false };
+      return { apCS: getItemArmorPiercingCS(weapon), bypassFF: !!weapon?.system?.bypassForceField };
     };
 
     const initialVariant = initialWeapon?.system?.variantType || savedVariantType || "standard";
     const initialVariantOptions = _buildVariantOptions(initialWeapon, initialVariant);
     const initialAPInfo = _getEffectiveAPForVariant(initialWeapon, initialVariant);
-    const initialEffArmor = _getEffectiveArmor(targetArmor, initialAPInfo.ap, initialAPInfo.apCS, initialAPInfo.apMode);
+    const initialEffArmor = _getEffectiveArmor(targetArmor, initialAPInfo.apCS);
     const initialAfterArmor = Math.max(0, initialWeaponDamage - initialEffArmor);
-    const initialAPLabel = (initialAPInfo.apMode === "cs" && initialAPInfo.apCS > 0) ? `${initialAPInfo.apCS}CS` : (initialAPInfo.ap > 0 ? String(initialAPInfo.ap) : "");
+    const initialAPLabel = initialAPInfo.apCS > 0 ? `${initialAPInfo.apCS}CS` : "";
 
     // === Karma ===
     const availableKarma = getAvailableKarma(actor);
@@ -285,8 +286,8 @@ export class ShootingAction extends RangedAttackAction {
     const damageSrcOptions = shootingWeapons.map(i => {
       const dmg = _modeDamage(i);
       const rng = Number(i.system?.range || 0);
-      const ap = Number(i.system?.armorPiercing || 0) || 0;
-      const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
+      const ap = getItemArmorPiercingCS(i);
+      const apLabel = ap > 0 ? ` [AP ${ap}CS]` : "";
       const isBroken = i.system?.broken === true;
       const sel = ((i.id === savedItemId || (!savedItemId && i.id === initialWeapon?.id)) && !isBroken) ? 'selected' : '';
       const disabled = isBroken ? 'disabled' : '';
@@ -509,11 +510,11 @@ export class ShootingAction extends RangedAttackAction {
             html.find('#max-range-hint').text(currentRange);
 
             // AP display
-            const apLabel = (apInfo.apMode === "cs" && apInfo.apCS > 0) ? `${apInfo.apCS}CS` : (apInfo.ap > 0 ? String(apInfo.ap) : "");
+            const apLabel = apInfo.apCS > 0 ? `${apInfo.apCS}CS` : "";
             if (apLabel) { $apDisplay.show(); $apVal.text(apLabel); } else { $apDisplay.hide(); }
 
             // After-armor display
-            const effArmor = _getEffectiveArmor(targetArmor, apInfo.ap, apInfo.apCS, apInfo.apMode);
+            const effArmor = _getEffectiveArmor(targetArmor, apInfo.apCS);
             const afterArmorDmg = Math.max(0, previewDamage - effArmor);
             if (primaryTarget) {
               $afterArmor.text(`${afterArmorDmg} after armor`);
@@ -606,20 +607,22 @@ export class ShootingAction extends RangedAttackAction {
               return;
             }
 
-            // Save settings
+            // Save settings — single document update
+            const flagUpdate = { csNotes: cs.csNotes };
             if (rememberSettings) {
-              await actor.setFlag("msh-faserip", "lastShootingItemId", weaponId);
-              await actor.setFlag("msh-faserip", "lastShootingRange", range);
-              await actor.setFlag("msh-faserip", "lastShootingShift", cs.manualCS);
-              await actor.setFlag("msh-faserip", "cs_shooting", cs.manualCS);
-              await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
-              await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
-              await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
-              await actor.setFlag("msh-faserip", "lastShootingAim", aimMode);
-              await actor.setFlag("msh-faserip", "lastShootingReason", cs.reason);
+              Object.assign(flagUpdate, {
+                lastShootingItemId: weaponId,
+                lastShootingRange: range,
+                lastShootingShift: cs.manualCS,
+                cs_shooting: cs.manualCS,
+                lastShootingMultiAttacks: multiAttacks,
+                lastShootingAttackCount: attackCount,
+                lastShootingVariant: variantType,
+                lastShootingAim: aimMode,
+                lastShootingReason: cs.reason
+              });
             }
-
-            await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
+            await actor.update({ "flags.msh-faserip": flagUpdate });
 
             // Persist ammo variant on the weapon — the gun stays loaded with
             // this ammo until changed. Independent of Remember Settings and
@@ -645,9 +648,7 @@ export class ShootingAction extends RangedAttackAction {
               canisterSubType,
               aimMode,
               csNotes: cs.csNotes,
-              armorPiercing: _apInfo.ap,
               armorPiercingCS: _apInfo.apCS,
-              apMode: _apInfo.apMode,
               bypassForceField: _apInfo.bypassFF,
               shiftBreakdown: {
                 manual: cs.manualCS,
