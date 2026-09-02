@@ -1303,8 +1303,12 @@ export function bannerColors(colorLower) {
 //
 // The weaponBase floor handles combat weapons with printed damage
 // ("always a minimum of the damage listed").
+// slice 4a: rank values via the shared kernel-backed rankValue (was the
+// game.msh.getRankValue global wrapper around the same function). Logic
+// verified equivalent to kernel bluntDamage + weaponBase floor — see
+// scripts/dev/kernel-damage-diff.mjs.
 export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RANKS_LOCAL=RANKS) {
-  const getVal = (r)=> game.msh.getRankValue(r) || 0;
+  const getVal = (r) => rankValue(r) || 0;
   const sIdx = RANKS_LOCAL.indexOf(strRank);
   const mIdx = RANKS_LOCAL.indexOf(matRank);
   if (sIdx < 0 || mIdx < 0) {
@@ -1354,8 +1358,9 @@ export const isEdgedCapable = (it) => {
 
 // Edged damage: min(STR, MAT) but never less than weapon base damage.
 // natural weapon case: pass weaponBase = 0, matRank = selected natural rank.
+// slice 4a: shared rankValue; equivalent to kernel meleeWeaponDamage(...).max.
 export function computeEdgedDamage(strRank, strVal, matRank, weaponBase = 0, RANKS_LOCAL = RANKS) {
-  const getVal = (r)=> game.msh.getRankValue(r) || 0;
+  const getVal = (r) => rankValue(r) || 0;
   const sIdx = RANKS_LOCAL.indexOf(strRank);
   const mIdx = RANKS_LOCAL.indexOf(matRank);
   if (sIdx < 0 || mIdx < 0) {

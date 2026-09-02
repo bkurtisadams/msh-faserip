@@ -69,6 +69,7 @@ import {
   applyDamageToTargets
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { chargeDamageParts } from "../../lib/faserip-rules/faserip-damage.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
 /**
@@ -667,10 +668,11 @@ export class ChargingAction extends AttackAction {
     console.log("[FASERIP] Charging: Effective rank capped at Shift-Z per rules");
   }
 
-  // Calculate raw damage: max(Endurance, Body Armor) + 2 * areas
-  const baseRankValue = Math.max(endurance.value, bodyArmorValue);
-  const speedDamage = choice.areas * 2;
-  const rawDamage = baseRankValue + speedDamage;
+  // slice 4a: kernel-backed charge damage (base reducible, speed bonus fixed)
+  const chargeParts = chargeDamageParts({ endurance: endurance.value, bodyArmor: bodyArmorValue, areas: choice.areas });
+  const baseRankValue = chargeParts.base;
+  const speedDamage = chargeParts.speedBonus;
+  const rawDamage = chargeParts.total;
 
   const damageSourceHover = `max(End ${endurance.rank} ${endurance.value}, BA ${bodyArmorRank} ${bodyArmorValue}) = ${baseRankValue} + 2x${choice.areas} areas = ${rawDamage}`;
 
