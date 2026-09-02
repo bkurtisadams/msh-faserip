@@ -803,46 +803,99 @@ export class GMToolsApp extends Application {
   async _openPoisonDialog(actor) {
     const { TOXINS } = await import("./rules/rules-reference.js");
     const { showFaseripDialog } = await import("./modules/actions/dialog-shim.js");
+    const { determineFeatRequirement } = await import("./modules/actions/ability-feat-dialog.js");
+
+    const endRank = actor.system?.abilities?.endurance?.rank || "Typical";
     const toxinOpts = Object.entries(TOXINS)
-      .map(([id, t]) => `<option value="${id}">${t.name} (${t.intensity})</option>`)
+      .map(([id, t]) => `<option value="${id}" data-intensity="${t.intensity}">${t.name} (${t.intensity})</option>`)
       .join("");
     const rankOpts = RANKS_ORDERED
       .filter(r => r !== "Shift-0" && r !== "Beyond")
       .map(r => `<option value="${r}" ${r === "Typical" ? "selected" : ""}>${r}</option>`)
       .join("");
+
     const content = `
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <label>Toxin:
+      <div class="frp-dlg frp-feat">
+        <div class="frp-box">
+          <div class="frp-box-label gold">Toxin</div>
           <select name="toxinId" style="width:100%;">
             ${toxinOpts}
-            <option value="">— Custom (use Intensity below) —</option>
+            <option value="">&mdash; Custom (set Intensity below) &mdash;</option>
           </select>
-        </label>
-        <label>Custom Intensity:
+        </div>
+        <div class="frp-box">
+          <div class="frp-box-label">Intensity</div>
           <select name="intensity" style="width:100%;">${rankOpts}</select>
-        </label>
-        <label>Source (optional):
+        </div>
+        <div class="frp-box" id="poison-save-box">
+          <div class="frp-box-label red">Exposure Save</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span>${actor.name} &mdash; Endurance <b id="poison-end-rank">${endRank}</b></span>
+            <span class="frp-need-line" style="margin-left:auto;">
+              <span class="frp-need-label">Needs:</span>
+              <span id="poison-need-pill" class="frp-feat-pill is-white">ANY COLOR</span>
+            </span>
+          </div>
+        </div>
+        <div class="frp-box">
+          <div class="frp-box-label muted">Source (optional)</div>
           <input type="text" name="sourceName" placeholder="e.g. Snake bite" style="width:100%;">
-        </label>
-        <button type="button" name="apply-poison"
-                style="margin-top:4px;background:#6a1b9a;color:#fff;border:none;border-radius:3px;padding:6px;cursor:pointer;">
-          <i class="fas fa-skull-crossbones"></i> Expose ${actor.name}
-        </button>
+        </div>
+        <div class="frp-foot">
+          <div class="frp-foot-btns">
+            <button type="button" name="apply-poison" class="frp-btn-roll">
+              <i class="fas fa-skull-crossbones"></i> Expose ${actor.name}
+            </button>
+          </div>
+        </div>
       </div>`;
+
     return showFaseripDialog({
-      title: `Poison Exposure — ${actor.name}`,
+      title: `Poison Exposure \u2014 ${actor.name}`,
       content,
-      width: 320,
+      width: 360,
       render: (html) => {
         const root = html instanceof HTMLElement ? html : html?.[0];
-        root?.querySelector('[name="apply-poison"]')?.addEventListener("click", async (ev) => {
-          // Capture refs synchronously — ev.currentTarget is nulled once the
+        if (!root) return;
+        const toxinSel = root.querySelector('[name="toxinId"]');
+        const intSel = root.querySelector('[name="intensity"]');
+        const pill = root.querySelector('#poison-need-pill');
+
+        const setPill = (requirement, { impossible = false, automatic = false } = {}) => {
+          if (!pill) return;
+          pill.classList.remove("is-white", "is-green", "is-yellow", "is-red", "is-auto", "is-impossible");
+          if (impossible) { pill.classList.add("is-impossible"); pill.textContent = "IMPOSSIBLE"; return; }
+          if (automatic)  { pill.classList.add("is-auto"); pill.textContent = "AUTOMATIC"; return; }
+          const map = { green: "is-green", yellow: "is-yellow", red: "is-red" };
+          const key = String(requirement || "").toLowerCase();
+          pill.classList.add(map[key] || "is-white");
+          pill.textContent = map[key] ? key.toUpperCase() : "ANY COLOR";
+        };
+
+        const syncIntensity = () => {
+          const opt = toxinSel?.selectedOptions?.[0];
+          const catalogIntensity = opt?.dataset?.intensity;
+          if (catalogIntensity) {
+            intSel.value = catalogIntensity;
+            intSel.disabled = true;
+          } else {
+            intSel.disabled = false;
+          }
+          const req = determineFeatRequirement(endRank, intSel.value);
+          setPill(req.requirement, req);
+        };
+
+        toxinSel?.addEventListener("change", syncIntensity);
+        intSel?.addEventListener("change", syncIntensity);
+        syncIntensity();
+
+        root.querySelector('[name="apply-poison"]')?.addEventListener("click", async (ev) => {
+          // Capture refs synchronously \u2014 ev.currentTarget is nulled once the
           // handler yields at the first await.
           const btnEl = ev.currentTarget;
-          const form = btnEl.closest("div");
-          const toxinId = form.querySelector('[name="toxinId"]')?.value || "";
-          const intensity = form.querySelector('[name="intensity"]')?.value || "Typical";
-          const sourceName = form.querySelector('[name="sourceName"]')?.value || "";
+          const toxinId = toxinSel?.value || "";
+          const intensity = intSel?.value || "Typical";
+          const sourceName = root.querySelector('[name="sourceName"]')?.value || "";
           btnEl.disabled = true;
           const { applyPoisonExposure } = await import("./modules/effects/poison-engine.js");
           const result = await applyPoisonExposure(actor, {
@@ -850,7 +903,7 @@ export class GMToolsApp extends Application {
             intensity,
             sourceName,
           });
-          ui.notifications.info(`Poison exposure: ${actor.name} — ${result}`);
+          ui.notifications.info(`Poison exposure: ${actor.name} \u2014 ${result}`);
           btnEl.innerHTML = '<i class="fas fa-check"></i> Applied';
         });
       },
