@@ -1,3 +1,6 @@
+// scripts/modules/actions/grabbing-action.js v2.0.1 - 2026-09-02
+// v2.0.1: Third cell is a proper COMPARATOR cell via the template's
+//         thirdCellHtml slot (was squeezed into the red DAMAGE cell).
 // scripts/modules/actions/grabbing-action.js v2.0.0 - 2026-09-02
 // v2.0.0: Chat card on the shared attack-card.hbs template (banner, ROLL /
 //         STRENGTH / COMPARATOR cells, effect block, actions) — matches the
@@ -429,8 +432,11 @@ export class GrabbingAction extends AttackAction {
 
     // Third cell: the Take comparator (grabbing inflicts no damage)
     const cmp = this._chooseComparatorRank(choice);
-    const dmgValue = cmp || "—";
-    const dmgTooltip = compNote ? `Take comparator: ${compNote}` : "No comparator supplied — Take passes";
+    const cmpTooltip = compNote ? `Take comparator: ${compNote}` : "No comparator supplied — Take passes";
+    const thirdCellHtml = `<div style="flex:1.7;padding:8px 3px;cursor:help;" title="${cmpTooltip.replace(/"/g, "&quot;")}">
+      <div style="font-size:16px;font-weight:bold;color:#333;line-height:1.1;padding-top:3px;">${cmp || "—"}</div>
+      <div style="font-size:11px;letter-spacing:.5px;color:#9a9a9a;margin-top:6px;">COMPARATOR</div>
+    </div>`;
 
     const box = (title, body) => `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#555;">${title}</div>
@@ -464,8 +470,7 @@ export class GrabbingAction extends AttackAction {
       abilityLabelUpper: "STRENGTH",
       effRankValue: effectiveRank,
       effRankTooltip,
-      dmgValue,
-      dmgTooltip,
+      thirdCellHtml,
       notesHtml: effectBlocks[effectLower] || "",
       consequenceHtml: "",
       actionsHtml: actions,

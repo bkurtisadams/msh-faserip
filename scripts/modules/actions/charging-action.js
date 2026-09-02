@@ -1,3 +1,14 @@
+// scripts/modules/actions/charging-action.js v3.1.0 - 2026-09-02
+// v3.1.0: Kernel slice 5g. Character target: Ch column via the shared
+//         _executeSingleAttack kernel gate (Slam / Stun tokens, cap allowed).
+//         To-hit movement bonus via kernel chargeToHitShift (+1CS/area, max
+//         +3). Shift-Z cap block retired — shared shiftRank already clamps at
+//         Shift-Z and leaves Class ranks unshifted. Object target: result via
+//         resolveKernelAttack, impact via kernel resolveChargeImpact — the
+//         material absorbs min(damage, material) and that amount rebounds
+//         through the attacker's BA on every hit (was: rebound only when
+//         material > damage, and it returned the full material value).
+//         Remember flags written in ONE actor.update.
 // scripts/modules/actions/charging-action.js v3.0.5 - 2026-04-19
 // v3.0.5: Gate character-target rebound on isHit && color !== "white". Move
 //         the rebound block into a postHitCallback so it only fires when the
@@ -66,10 +77,11 @@ import {
   getBodyArmorValues,
   buildModeSelector,
   setupModeSelector,
-  applyDamageToTargets
+  applyDamageToTargets,
+  resolveKernelAttack
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
-import { chargeDamageParts } from "../../lib/faserip-rules/faserip-damage.js";
+import { chargeDamageParts, chargeToHitShift, resolveChargeImpact } from "../../lib/faserip-rules/faserip-damage.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
 /**
@@ -190,7 +202,7 @@ export class ChargingAction extends AttackAction {
   const initialBaseRankValue = Math.max(endurance.value, bodyArmorValue);
   const initialSpeedDamage = savedAreas * 2;
   const initialTotalDamage = initialBaseRankValue + initialSpeedDamage;
-  const initialMovementBonus = Math.min(3, savedAreas);
+  const initialMovementBonus = chargeToHitShift(savedAreas) ?? 0;
 
   const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
@@ -447,20 +459,23 @@ export class ChargingAction extends AttackAction {
           const baseShift = shift - sitTagCS;
 
           if (remember) {
-            await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
-            await actor.setFlag("msh-faserip", "lastChargingShift", baseShift);
-            await actor.setFlag("msh-faserip", "lastChargingCsNotes", csNotes);
-            await actor.setFlag("msh-faserip", "lastChargingTargetType", targetType);
+            const flagUpdate = {
+              lastChargingAreas: areas,
+              lastChargingShift: baseShift,
+              lastChargingCsNotes: csNotes,
+              lastChargingTargetType: targetType
+            };
             if (targetType === "character") {
-              await actor.setFlag("msh-faserip", "lastChargingTargetBA", targetBArank);
-              await actor.setFlag("msh-faserip", "lastChargingTargetBAValue", targetBAvalue);
+              flagUpdate.lastChargingTargetBA = targetBArank;
+              flagUpdate.lastChargingTargetBAValue = targetBAvalue;
             } else {
-              await actor.setFlag("msh-faserip", "lastChargingObjectMaterial", objectMaterial);
-              await actor.setFlag("msh-faserip", "lastChargingObjectDesc", objectDesc);
+              flagUpdate.lastChargingObjectMaterial = objectMaterial;
+              flagUpdate.lastChargingObjectDesc = objectDesc;
             }
+            await actor.update({ "flags.msh-faserip": flagUpdate });
           }
 
-          const movementBonus = Math.min(3, areas);
+          const movementBonus = chargeToHitShift(areas) ?? 0;
           const totalShift = shift + movementBonus;
 
           const pullEnabled   = !!html.find('#pull-punch-enabled').is(':checked');
@@ -502,7 +517,7 @@ export class ChargingAction extends AttackAction {
 
         const updatePreview = () => {
           const areas = Math.max(1, Number(html.find('[name="areas"]').val() || 1));
-          const movementBonus = Math.min(3, areas);
+          const movementBonus = chargeToHitShift(areas) ?? 0;
           const cs = Number(html.find('[name="shift"]').val() || 0);
 
           html.find('#movement-bonus').text(`+${movementBonus} CS`);
@@ -659,14 +674,9 @@ export class ChargingAction extends AttackAction {
   // POST-DIALOG RESOLUTION
   // ================================================================
 
-  // Cap effective rank at Shift-Z per charging rules
-  let effectiveRank = shiftRank(endurance.rank, choice.totalShift);
-  const shiftZindex = RANKS.indexOf("Shift-Z");
-  const effectiveIndex = RANKS.indexOf(effectiveRank);
-  if (shiftZindex >= 0 && effectiveIndex > shiftZindex) {
-    effectiveRank = "Shift-Z";
-    console.log("[FASERIP] Charging: Effective rank capped at Shift-Z per rules");
-  }
+  // Effective rank: shared shiftRank clamps at Shift-Z (Endurance may not be
+  // raised beyond Shift Z) and leaves Class 1000+ ranks unshifted.
+  const effectiveRank = shiftRank(endurance.rank, choice.totalShift);
 
   // slice 4a: kernel-backed charge damage (base reducible, speed bonus fixed)
   const chargeParts = chargeDamageParts({ endurance: endurance.value, bodyArmor: bodyArmorValue, areas: choice.areas });
@@ -848,25 +858,33 @@ export class ChargingAction extends AttackAction {
       inlineRoll: useConsolidated
     });
 
-  const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-  const colorLower = String(color || "").toLowerCase();
+  const objectShifts = [];
+  if (choice.shift) objectShifts.push({ cs: choice.shift, reason: "manual" });
+  if (choice.movementBonus) objectShifts.push({ cs: choice.movementBonus, reason: "movement" });
+  const kernelAttack = resolveKernelAttack({ column: "Ch", rank: endurance.rank, shifts: objectShifts, roll: cappedTotal });
+  const color = kernelAttack.color;
+  const colorLower = color;
   const { bg, fg } = bannerColors(colorLower);
-  const effectResult = effects[colorLower] || color;
+  const effectResult = kernelAttack.effectLabel;
 
   const targetLabel = choice.objectDesc || "Object";
-  const materialDefense = choice.targetBAvalue;
-  const damageToObject = colorLower !== "white" ? Math.max(0, rawDamage - materialDefense) : 0;
+  const materialDefense = Number(choice.targetBAvalue) || 0;
+  const isObjectHit = colorLower !== "white";
+  // Kernel charging exchange: the material absorbs up to its value and that
+  // amount rebounds through the attacker's Body Armor.
+  const impact = isObjectHit
+    ? resolveChargeImpact({ damage: rawDamage, targetDefense: materialDefense, attackerDefense: bodyArmorValue })
+    : { targetTakes: 0, rebound: 0, attackerTakes: 0 };
+  const damageToObject = impact.targetTakes;
 
   // Rebound for objects
   let reboundNote = "";
-  let damageToAttacker = 0;
-  if (colorLower !== "white" && materialDefense > rawDamage) {
-    damageToAttacker = Math.max(0, materialDefense - bodyArmorValue);
+  let damageToAttacker = impact.attackerTakes;
+  if (isObjectHit && impact.rebound > 0) {
     reboundNote = `
-      <div style="padding:6px;margin:6px 10px;background:#ffebee;border:1px solid #f44336;border-radius:3px;">
-        <strong>Rebound:</strong> Material Strength (${materialDefense}) exceeded damage (${rawDamage}).
-        Returns ${materialDefense} to you. Your BA (${bodyArmorValue}) soaks what it can.
-        <strong>You take ${damageToAttacker} damage.</strong>
+      <div style="padding:6px;margin:6px 10px;background:${damageToAttacker > 0 ? "#ffebee" : "#fff"};border:1px solid ${damageToAttacker > 0 ? "#f44336" : "#ddd"};border-radius:3px;">
+        <strong>Rebound:</strong> ${choice.objectMaterial} material (${materialDefense}) absorbed ${impact.rebound} of ${rawDamage} charging damage${materialDefense >= rawDamage ? " — the obstacle holds" : ""}.
+        Rebound: ${impact.rebound} - ${bodyArmorValue} attacker BA = <strong>${damageToAttacker} damage to ${actor.name}</strong>.
       </div>
     `;
     if (!isManualMode && !autoApply && damageToAttacker > 0) {

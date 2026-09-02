@@ -1,3 +1,6 @@
+// attack-action.js v1.12.1 - 2026-09-02
+// v1.12.1: Kernel slice 5g — Charging (Ch) added to KERNEL_ATTACK_COLUMNS;
+//          legacy charging follow-up case retired.
 // attack-action.js v1.12.0 - 2026-09-02
 // v1.12.0: Kernel slice 5e — Energy (En) added to KERNEL_ATTACK_COLUMNS;
 //          legacy shooting/energy follow-up case now shooting-only. Result
@@ -444,7 +447,7 @@ async function updateAttackCardDamageAfterAutoApply(message, damageResults, cont
 
 // Attack columns resolved through the kernel (slice 5). Add a column here as
 // its action lands; columns not listed keep the legacy path.
-const KERNEL_ATTACK_COLUMNS = new Set(["BA", "EA", "TB", "TE", "Fo", "En"]);
+const KERNEL_ATTACK_COLUMNS = new Set(["BA", "EA", "TB", "TE", "Fo", "En", "Ch"]);
 
 const NEEDED_LABELS = {
   automatic: "Automatic (no roll)", impossible: "Impossible (fails)",
@@ -1383,11 +1386,6 @@ export class AttackAction extends BaseAction {
         showStun = (followUp === "stun");
         showKill = (followUp === "kill");
       } else switch (String(actionType)) {
-        case "charging":
-          showSlam = (targetEffectColor === "yellow");
-          showStun = (targetEffectColor === "red");
-          break;
-
         case "shooting":
           // Yellow = Bullseye → no Slam/Stun check; Red = Kill.
           // Aim=stun (RAW Tactics): Yellow Bullseye treated as Stun → emit

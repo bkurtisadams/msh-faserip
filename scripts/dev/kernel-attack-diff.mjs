@@ -9,7 +9,7 @@ import {
 } from "../lib/faserip-rules/faserip-kernel.js";
 import { EFFECT_COLUMNS, effectForColor, reduceEffectColor, resolveGrabBreak } from "../lib/faserip-rules/faserip-effects.js";
 import { resolveFeat } from "../lib/faserip-rules/faserip-kernel.js";
-import { bluntDamage, meleeWeaponDamage } from "../lib/faserip-rules/faserip-damage.js";
+import { bluntDamage, meleeWeaponDamage, bluntThrowDamage, chargeToHitShift, resolveChargeImpact } from "../lib/faserip-rules/faserip-damage.js";
 
 const NAMES = RANKS.map(r => {
   if (r.key === "SH0") return "Shift-0";
@@ -204,6 +204,36 @@ for (const m of SHIFTABLE) for (let roll = 1; roll <= 100; roll++) {
 }
 known(`${gbInverted} of ${gbN} grabbing-break cases differ from the retired model (STR-vs-material Intensity FEAT, success = breaks): RAW is a roll on the material column with white = breaks — fixed bug, grabbing-break.js v2.0.0`);
 console.log(`  ${gbN} cases`);
+
+// 5g. Charging: Ch follow-up gate, cap, movement bonus, object rebound
+section("Ch follow-up gate vs effectForColor; Ch cap; movement bonus");
+for (const c of COLORS) {
+  const ch = effectForColor("Ch", c);
+  const l = { slam: c === "yellow", stun: c === "red", kill: false };
+  const k = { slam: ch === "slam", stun: ch === "stun", kill: ch === "kill" };
+  if (JSON.stringify(l) !== JSON.stringify(k)) fail(`Ch follow-up ${c}: ${JSON.stringify(l)} vs ${JSON.stringify(k)}`);
+}
+for (const rolled of order) for (const cap of ["green", "yellow"]) {
+  const steps = order.indexOf(rolled) - order.indexOf(cap);
+  const legacy = steps > 0 ? cap : rolled;
+  const k = steps > 0 ? reduceEffectColor("Ch", rolled, steps).color : rolled;
+  if (legacy !== k) fail(`Ch cap ${rolled}->${cap}: legacy ${legacy} vs kernel ${k}`);
+}
+for (let areas = 0; areas <= 12; areas++) {
+  const l = Math.min(3, areas), k = chargeToHitShift(areas) ?? 0;
+  if (l !== k) fail(`movement bonus ${areas} areas: legacy ${l} vs kernel ${k}`);
+}
+section("charging into an object: legacy rebound vs resolveChargeImpact");
+let objN = 0, objKnown = 0;
+for (const dmg of [10, 20, 30, 40, 50, 75, 100]) for (const mat of [0, 6, 10, 20, 30, 40, 50, 100]) for (const ba of [0, 10, 20, 30]) {
+  const legacyObj = Math.max(0, dmg - mat);
+  const legacyAtt = mat > dmg ? Math.max(0, mat - ba) : 0;
+  const k = resolveChargeImpact({ damage: dmg, targetDefense: mat, attackerDefense: ba });
+  objN++;
+  if (legacyObj !== k.targetTakes) fail(`object takes dmg ${dmg} mat ${mat}: legacy ${legacyObj} vs kernel ${k.targetTakes}`);
+  if (legacyAtt !== k.attackerTakes) objKnown++;
+}
+known(`${objKnown} of ${objN} object-charge cases: legacy rebounded only when material > damage and returned the FULL material value; kernel/character path rebound min(damage, material) on every hit through attacker BA (book example: 30 dmg vs Ex 20 BA, Gd 10 BA attacker takes 10) — fixed bug`);
 
 // 6. AP-CS armor step: legacy _RV walk vs range-true (mitigation applyArmorPiercingCS semantics)
 section("AP-CS armor step: legacy _RV walk vs range-true");

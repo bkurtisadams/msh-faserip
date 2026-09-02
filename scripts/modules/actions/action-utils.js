@@ -1,3 +1,8 @@
+// action-utils.js v1.11.1 - 2026-09-02
+// v1.11.1: Grabbing Break chip: data-action "grabbing-break" (the chat-hooks
+//          handler listens for grabbing-break / grabbing-break-check; the chip
+//          emitted "grab-break" and never matched) and it now carries
+//          data-actor-uuid / data-item-material / data-item-name.
 // action-utils.js v1.11.0 - 2026-09-02
 // v1.11.0: Kernel slice 5f. resolveKernelAttack({ column, rank, shifts, roll })
 //          — one bridge from Foundry rank names + itemized shifts to kernel
@@ -1292,12 +1297,14 @@ export function buildActionsBox({
   }
 
   if (grabbingBreak) {
+    const gbMaterial = String(grabbingBreak.itemMaterial || "Excellent").replace(/"/g, "&quot;");
+    const gbName = String(grabbingBreak.itemName || "Item").replace(/"/g, "&quot;");
     parts.push(
       chip(
-        "Break Grab",
-        "Attempt to break a grab or hold",
+        "Grabbing Break Check",
+        "Second roll on the item's material column: any colour keeps it intact, white breaks it or sets it off",
         true,
-        `data-action="grab-break" ${prefillAttr}`
+        `data-action="grabbing-break" data-actor-uuid="${actorUuid || ""}" data-item-material="${gbMaterial}" data-item-name="${gbName}" ${prefillAttr}`
       )
     );
   }
