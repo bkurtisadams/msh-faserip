@@ -1,3 +1,9 @@
+// scripts/modules/actions/grappling-action.js v3.4.0 - 2026-09-02
+// v3.4.0: Kernel slice 5f. Result via resolveKernelAttack on the Gp column
+//         with itemized shifts; hold application and buttons keyed on the
+//         effect token (partial / hold) instead of colour; target-movement
+//         rank compare via adapter compareRankNames (private rank array
+//         retired); prefs written in ONE actor.update.
 // scripts/modules/actions/grappling-action.js v3.3.2 - 2026-08-04
 // v3.3.2: Warn on silent hold-apply skips: Partial/Full result with no
 //         targetUuid (untargeted token, name typed in dialog) or an
@@ -31,7 +37,6 @@
 // v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
 import { AttackAction } from "./attack-action.js";
 import {
-  RANKS,
   getStrengthInfo, 
   shiftRank, 
   rollWithKarmaAndHistory,
@@ -44,8 +49,10 @@ import {
   buildModeSelector,
   setupModeSelector,
   getTargetData,
-  getBodyArmorValues
+  getBodyArmorValues,
+  resolveKernelAttack
 } from "./action-utils.js";
+import { compareRankNames } from "../../kernel/adapter.js";
 import { setupKarmaControlHandlers, extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { applyGrappled, applyHeld } from "../effects/effect-engine.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
@@ -120,13 +127,13 @@ export class GrapplingAction extends AttackAction {
     });
     if (!choice) return { rawActionCancelled: true };
 
-    // Save prefs
-    await actor.setFlag("msh-faserip", "lastGrappleRemember", choice.remember);
-    await actor.setFlag("msh-faserip", "lastGrappleSkipDice", choice.skipDice);
+    // Save prefs — single document update
+    const flagUpdate = { lastGrappleRemember: choice.remember, lastGrappleSkipDice: choice.skipDice };
     if (choice.remember) {
-      await actor.setFlag("msh-faserip", "lastGrappleShift", choice.manualCS);
-      await actor.setFlag("msh-faserip", "lastGrappleReason", choice.reason || "");
+      flagUpdate.lastGrappleShift = choice.manualCS;
+      flagUpdate.lastGrappleReason = choice.reason || "";
     }
+    await actor.update({ "flags.msh-faserip": flagUpdate });
 
     // Build shift breakdown for hover text
     const shiftBreakdown = {
@@ -172,13 +179,19 @@ export class GrapplingAction extends AttackAction {
     const { cappedTotal, totalKarmaUsed } =
         await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorLower = String(color || "").toLowerCase();
-    const effect = this.effects[colorLower] || "Miss";
+    const attackShifts = [];
+    if (manualShift) attackShifts.push({ cs: manualShift, reason: "manual" });
+    for (const eff of (attackerEffects.breakdown || [])) attackShifts.push({ cs: eff.shift, reason: eff.name });
+    for (const eff of (defenderEffects.breakdown || [])) attackShifts.push({ cs: -eff.shift, reason: eff.name });
+    const kernelAttack = resolveKernelAttack({ column: "Gp", rank: strength.rank, shifts: attackShifts, roll: cappedTotal });
+    const color = kernelAttack.color;
+    const colorLower = color;
+    const effectToken = kernelAttack.effect || "miss";
+    const effect = kernelAttack.effectLabel;
     const { bg, fg } = bannerColors(colorLower);
 
     // Show escape button for Partial Hold and Hold results
-    const showEscape = (colorLower === "yellow" || colorLower === "red");
+    const showEscape = (effectToken === "partial" || effectToken === "hold");
     if (showEscape && !choice?.targetUuid) {
       ui.notifications?.warn?.(`Grapple ${effect} not applied — no targeted token (card name came from the dialog field).`);
     }
@@ -217,7 +230,7 @@ export class GrapplingAction extends AttackAction {
           }
           
           // Apply appropriate hold effect using effect-engine
-          if (colorLower === "yellow") {
+          if (effectToken === "partial") {
             await applyGrappled(tActor, { 
               holderUuid: actor.uuid, 
               holderName: actor.name,
@@ -239,8 +252,8 @@ export class GrapplingAction extends AttackAction {
     // For the escape button, the "defender" is the HOLDER (this actor)
     const holderStrength = actor.system?.abilities?.strength?.rank || "Good";
     
-    // Show Hold Damage button only on Full Hold (red)
-    const showHoldDamage = (colorLower === "red");
+    // Show Hold Damage button only on Full Hold
+    const showHoldDamage = (effectToken === "hold");
     
     const actions = buildActionsBox({
       showEscape: showEscape,
@@ -540,7 +553,7 @@ export class GrapplingAction extends AttackAction {
 
     // Notes (neutral white — the banner now carries the result colour)
     const partialMovement = choice.targetStrength
-      ? this._compareRanks(strength.rank, choice.targetStrength) >= 0
+      ? (compareRankNames(strength.rank, choice.targetStrength) ?? -1) >= 0
         ? `<div style="color:#f57f17;font-weight:bold;">Target cannot move (STR ${strength.rank} ≥ ${choice.targetStrength})</div>`
         : `<div>Target can still move (STR ${strength.rank} &lt; ${choice.targetStrength})</div>`
       : `<div style="color:#666;font-style:italic;">Movement restriction depends on relative Strength</div>`;
@@ -593,8 +606,4 @@ export class GrapplingAction extends AttackAction {
     );
   }
 
-  _compareRanks(a, b) {
-    const R = ["Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing","Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"];
-    return Math.sign(R.indexOf(a) - R.indexOf(b));
-  }
 }

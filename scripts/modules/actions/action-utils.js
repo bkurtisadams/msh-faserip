@@ -1,3 +1,9 @@
+// action-utils.js v1.11.0 - 2026-09-02
+// v1.11.0: Kernel slice 5f. resolveKernelAttack({ column, rank, shifts, roll })
+//          — one bridge from Foundry rank names + itemized shifts to kernel
+//          resolveAttack, returning colour, effect token and display label
+//          (used by the grapple family, which does not go through
+//          _executeSingleAttack).
 // action-utils.js v1.10.0 - 2026-09-02
 // v1.10.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
 //          shifts). applyArmorPiercingCS is canonical here (range-true, was in
@@ -150,7 +156,19 @@ import { applyDamageToVehicle } from "./vehicle-damage.js";
 import { safeActorUpdate, safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
 import { bluntDamage as kernelBluntDamage, meleeWeaponDamage as kernelMeleeWeaponDamage } from "../../lib/faserip-rules/faserip-damage.js";
 import { rankDistance as kernelRankDistance, rankForNumber as kernelRankForNumber } from "../../lib/faserip-rules/faserip-kernel.js";
-import { kernelKeyFor } from "../../kernel/adapter.js";
+import { resolveAttack as kernelResolveAttack } from "../../lib/faserip-rules/faserip-effects.js";
+import { kernelKeyFor, labelForToken } from "../../kernel/adapter.js";
+
+// Kernel bridge for actions that roll their own Universal Table result.
+// shifts: [{ cs, reason }] — dropped when the rank is Class 1000+ (unshiftable).
+export function resolveKernelAttack({ column, rank, shifts = [], roll }) {
+  const key = kernelKeyFor(rank);
+  if (!key) throw new Error(`resolveKernelAttack: unknown rank "${rank}"`);
+  const shiftable = kernelRankDistance("SHZ", key) <= 0;
+  const res = kernelResolveAttack({ column, rank: key, shifts: shiftable ? shifts : [], roll: Number(roll) || 0, karma: 0 });
+  const color = res.color || "white";
+  return { ...res, color, effectLabel: res.effect ? labelForToken(res.effect) : "Miss" };
+}
 
 // Local helper to read the global combat mode without importing action-dispatcher
 function resolveCombatModeSafe(actor) {

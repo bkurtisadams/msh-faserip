@@ -1,4 +1,6 @@
-// faserip-rules effects v0.7.1
+// faserip-rules effects v0.7.2
+// v0.7.2: resolveGrabBreak — Grabbing Break second roll on the item's material
+//         strength column (colour = intact, white = damaged/goes off).
 // v0.7.1: RULED 2026-09-02 — Force effect may not be reduced (Fo.reduceEffect
 //         false); reverses the 2026-08-31 pullEffect ruling.
 // Battle Effects Table + Slam/Stun/Kill sub-tables.
@@ -7,7 +9,7 @@
 
 import { resolveFeat, colorForRoll, rankForNumber, rankDistance } from './faserip-kernel.js';
 
-export const EFFECTS_VERSION = '0.7.1';
+export const EFFECTS_VERSION = '0.7.2';
 export const EFFECTS_CERTIFIED = true;
 
 // results: color -> outcome token.
@@ -141,6 +143,17 @@ export function resolveKill({ enduranceRank, roll, attackColumn = null, karma = 
       : 'no-effect';
   }
   return { color, modifiedRoll: modified, result };
+}
+
+// --- Grabbing Break follow-up (Players Book, Grabbing Attack) -----------
+// "A second roll is made against the material strength of the item. If a
+// color (red, green or yellow) result is made, the attacker may either use
+// the item or move up to half speed away (round up). If a white result is
+// made, the item is damaged, broken, or goes off." The roll is on the
+// material's column; the attacker's Strength plays no part.
+export function resolveGrabBreak({ materialRank, roll, shifts = [], karma = 0, karmaAllowed = true }) {
+  const feat = resolveFeat({ rank: materialRank, shifts, requiredColorOverride: 'green', roll, karma, karmaAllowed });
+  return { ...feat, intact: feat.success, broken: !feat.success };
 }
 
 // --- Catching maneuver (Players Book, Defensive Actions) ----------------

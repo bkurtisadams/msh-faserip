@@ -1,3 +1,8 @@
+// scripts/modules/actions/grabbing-action.js v1.8.0 - 2026-09-02
+// v1.8.0: Kernel slice 5f. Result via resolveKernelAttack on the Gb column
+//         with itemized shifts (take / grab / break tokens); comparator
+//         rank check via adapter compareRankNames (RANKS index compare
+//         retired).
 // scripts/modules/actions/grabbing-action.js v1.7.0 - 2026-03-11
 // v1.7.0: Consistency fixes — add effect modifiers, mode selector, replace local rankValues
 //         with game.msh.getRankValue, fix remember settings to localStorage pattern,
@@ -10,10 +15,10 @@
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
-  RANKS,
   getStrengthInfo,
   shiftRank,
   rollWithKarmaAndHistory,
+  resolveKernelAttack,
   effectsFor,
   labelFor,
   buildActionsBox,
@@ -33,6 +38,7 @@ import {
 } from "../dice/dice-roller.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { compareRankNames } from "../../kernel/adapter.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -124,10 +130,15 @@ export class GrabbingAction extends AttackAction {
     // Build inline roll display for consolidated mode
     const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
-    // Universal Table result color
-    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    let colorLower = String(color || "").toLowerCase();
-    let effectResult = effects[colorLower] || colorLower;
+    // Universal Table result via kernel (Gb column)
+    const attackShifts = [];
+    if (manualShift) attackShifts.push({ cs: manualShift, reason: "manual" });
+    for (const eff of (attackerEffects.breakdown || [])) attackShifts.push({ cs: eff.shift, reason: eff.name });
+    for (const eff of (defenderEffects.breakdown || [])) attackShifts.push({ cs: -eff.shift, reason: eff.name });
+    const kernelAttack = resolveKernelAttack({ column: "Gb", rank: strength.rank, shifts: attackShifts, roll: cappedTotal });
+    const color = kernelAttack.color;
+    let colorLower = color;
+    let effectResult = kernelAttack.effectLabel;
 
     // Enforce Take rule: Attacker STR ≥ comparator, else Treat as Miss (visual White)
     let takeDowngraded = false;
@@ -433,11 +444,10 @@ export class GrabbingAction extends AttackAction {
   }
 
   _rankGTE(aRank, bRank) {
-    const ai = RANKS.indexOf(String(aRank));
-    const bi = RANKS.indexOf(String(bRank));
-    if (ai < 0) return false;
-    if (bi < 0) return true; // if no/unknown comparator, treat as pass
-    return ai >= bi;
+    const cmp = compareRankNames(aRank, bRank);
+    if (cmp !== null) return cmp >= 0;
+    // unknown comparator -> pass; unknown attacker rank -> fail
+    return !!String(aRank || "").trim() && compareRankNames(aRank, aRank) !== null;
   }
 
   _composeComparatorLine(choice) {

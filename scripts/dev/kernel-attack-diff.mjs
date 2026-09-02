@@ -5,9 +5,10 @@
 // Exit 1 on any diff outside the expected (triaged) set.
 
 import {
-  RANKS, rankByKey, rankForNumber, rankDistance, shiftRank, requiredColor, colorAtLeast, COLORS,
+  RANKS, rankByKey, rankForNumber, rankDistance, shiftRank, requiredColor, colorAtLeast, colorForRoll, COLORS,
 } from "../lib/faserip-rules/faserip-kernel.js";
-import { EFFECT_COLUMNS, effectForColor, reduceEffectColor } from "../lib/faserip-rules/faserip-effects.js";
+import { EFFECT_COLUMNS, effectForColor, reduceEffectColor, resolveGrabBreak } from "../lib/faserip-rules/faserip-effects.js";
+import { resolveFeat } from "../lib/faserip-rules/faserip-kernel.js";
 import { bluntDamage, meleeWeaponDamage } from "../lib/faserip-rules/faserip-damage.js";
 
 const NAMES = RANKS.map(r => {
@@ -170,6 +171,39 @@ for (const rolled of ["yellow", "red"]) {
 const enTwo = reduceEffectColor("En", "red", 2, 100);
 if (!enTwo.allowed || enTwo.color !== "green" || enTwo.karmaCost !== 100) fail(`En red->green for 100: got ${JSON.stringify(enTwo)}`);
 known("Fo effect reduction: legacy pullEffect true (2026-08-31) -> false (RULED 2026-09-02, Force Attack section); force dialog never offered a cap, so no play change");
+
+// 5f. Grapple family: effect tokens vs the colour gates the dialogs used to key on
+section("Gp / Gb / Es effect tokens vs legacy colour gates");
+for (const c of COLORS) {
+  const gp = effectForColor("Gp", c), gb = effectForColor("Gb", c), es = effectForColor("Es", c);
+  const lGp = { escapeBtn: c === "yellow" || c === "red", partial: c === "yellow", holdDmg: c === "red" };
+  const kGp = { escapeBtn: gp === "partial" || gp === "hold", partial: gp === "partial", holdDmg: gp === "hold" };
+  const lGb = LEGACY_EFFECTS.grabbing[c].toLowerCase(), kGb = gb;
+  const lEs = { removeHold: c === "yellow" || c === "red", grappleBack: c === "red", escaped: c === "yellow" };
+  const kEs = { removeHold: es === "escape" || es === "reverse", grappleBack: es === "reverse", escaped: es === "escape" };
+  if (JSON.stringify(lGp) !== JSON.stringify(kGp)) fail(`Gp ${c}: ${JSON.stringify(lGp)} vs ${JSON.stringify(kGp)}`);
+  if (lGb !== kGb) fail(`Gb ${c}: legacy ${lGb} vs kernel ${kGb}`);
+  if (JSON.stringify(lEs) !== JSON.stringify(kEs)) fail(`Es ${c}: ${JSON.stringify(lEs)} vs ${JSON.stringify(kEs)}`);
+}
+section("rank compare (grapple movement / grab comparator): legacy indexOf vs rankDistance");
+for (const a of NAMES) for (const b of NAMES) {
+  const l = Math.sign(NAMES.indexOf(a) - NAMES.indexOf(b));
+  const k = Math.sign(rankDistance(KEY_OF[b], KEY_OF[a]));
+  if (l !== k) fail(`compare ${a} vs ${b}: legacy ${l} vs kernel ${k}`);
+}
+section("grabbing break: roll on the material column (colour = intact, white = broken)");
+let gbN = 0, gbInverted = 0;
+for (const m of SHIFTABLE) for (let roll = 1; roll <= 100; roll++) {
+  const c = colorForRoll(KEY_OF[m], roll);
+  const k = resolveGrabBreak({ materialRank: KEY_OF[m], roll });
+  gbN++;
+  if (k.intact !== (c !== "white") || k.broken !== (c === "white")) fail(`grab break ${m} roll ${roll}: colour ${c} but intact=${k.intact}`);
+  // legacy model: STR-vs-material intensity FEAT, success = breaks (attacker STR = material for the comparison)
+  const legacyBreaks = colorAtLeast(colorForRoll(KEY_OF[m], roll), "yellow");
+  if (legacyBreaks !== k.broken) gbInverted++;
+}
+known(`${gbInverted} of ${gbN} grabbing-break cases differ from the retired model (STR-vs-material Intensity FEAT, success = breaks): RAW is a roll on the material column with white = breaks — fixed bug, grabbing-break.js v2.0.0`);
+console.log(`  ${gbN} cases`);
 
 // 6. AP-CS armor step: legacy _RV walk vs range-true (mitigation applyArmorPiercingCS semantics)
 section("AP-CS armor step: legacy _RV walk vs range-true");

@@ -1,3 +1,6 @@
+// File: scripts/kernel/adapter.js v1.0.2 - 2026-09-02
+// v1.0.2: compareRankNames(a, b) — sign of the rank distance between two
+//         Foundry rank names via the kernel (null when either is unknown).
 // File: scripts/kernel/adapter.js v1.0.1 - 2026-09-01
 // v1.0.1: Evading/Catching labels match the existing chat-card wording
 //         ('Auto-hit', 'Evasion +1CS', 'Evasion +2CS') now that
@@ -6,7 +9,7 @@
 // Bridge between Foundry rank/label conventions and @graycloak/faserip-rules.
 // All Foundry rank-string variants normalize here and nowhere else.
 
-import { rankByKey, rankForNumber, RANKS as KERNEL_RANKS } from '../lib/faserip-rules/faserip-kernel.js';
+import { rankByKey, rankForNumber, rankDistance, RANKS as KERNEL_RANKS } from '../lib/faserip-rules/faserip-kernel.js';
 
 const NAME_TO_KEY = new Map();
 function reg(key, ...names) {
@@ -48,6 +51,13 @@ export function foundryNameFor(key, style = 'space') {
   if (key === 'SH0') return 'Shift-0';
   if (['SHX', 'SHY', 'SHZ'].includes(key) && style === 'dash') return r.name.replace(' ', '-');
   return r.name;
+}
+
+// Sign of (a - b) in rank steps; null if either name is not a rank.
+export function compareRankNames(a, b) {
+  const ka = kernelKeyFor(a), kb = kernelKeyFor(b);
+  if (!ka || !kb) return null;
+  return Math.sign(rankDistance(kb, ka));
 }
 
 export function foundryRankForNumber(n, style = 'space') {

@@ -1,3 +1,8 @@
+// scripts/modules/actions/escaping-action.js v3.2.0 - 2026-09-02
+// v3.2.0: Kernel slice 5f. Result via resolveKernelAttack on the Es column
+//         with itemized shifts; hold removal, Escaped/Reversed effects and
+//         the Grapple Back button keyed on the effect token (escape /
+//         reverse) instead of colour; prefs written in ONE actor.update.
 // scripts/modules/actions/escaping-action.js v3.1.1 - 2026-05-24
 // v3.1.1: Drop the STR-contest third cell (escaping is a one-roll FEAT). Third
 //         cell reverts to DAMAGE (em-dash — escapes deal no damage); meta
@@ -22,10 +27,10 @@
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
-  RANKS,
   getStrengthInfo, 
   shiftRank, 
   rollWithKarmaAndHistory,
+  resolveKernelAttack,
   buildActionsBox,
   bannerColors, 
   labelFor, 
@@ -160,13 +165,18 @@ export class EscapingAction extends AttackAction {
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorLower = String(color || "").toLowerCase();
-    const effect = this.effects[colorLower] || "Miss";
+    const attackShifts = [];
+    if (manualShift) attackShifts.push({ cs: manualShift, reason: "manual" });
+    for (const entry of filteredBreakdown) attackShifts.push({ cs: entry.shift, reason: entry.name });
+    const kernelAttack = resolveKernelAttack({ column: "Es", rank: strength.rank, shifts: attackShifts, roll: cappedTotal });
+    const color = kernelAttack.color;
+    const colorLower = color;
+    const effectToken = kernelAttack.effect || "miss";
+    const effect = kernelAttack.effectLabel;
     const { bg, fg } = bannerColors(colorLower);
 
-    // Build actions box - show Grapple Back on Reverse (red)
-    const showGrappleBack = (colorLower === "red");
+    // Build actions box - show Grapple Back on Reverse
+    const showGrappleBack = (effectToken === "reverse");
     const actions = buildActionsBox({
       showGrappleBack: showGrappleBack,
       grappleBackTargetUuid: choice.opponentUuid || "",
@@ -195,14 +205,14 @@ export class EscapingAction extends AttackAction {
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
-    // Remove hold effects on successful escape (yellow=Escape or red=Reverse only; green is also Miss for escaping)
-    if (colorLower === "yellow") {
-      console.log(`[FASERIP] Escape successful (yellow), removing hold effects from ${actor.name}`);
+    // Remove hold effects on Escape or Reverse (green is a Miss on the Es column)
+    if (effectToken === "escape") {
+      console.log(`[FASERIP] Escape successful (${colorLower}), removing hold effects from ${actor.name}`);
       await removeHoldEffects(actor);
       // Per rules: "free of the hold, may move at half speed, may not perform any other actions"
       await applyEscaped(actor);
-    } else if (colorLower === "red") {
-      console.log(`[FASERIP] Escape reversed (red), removing hold effects from ${actor.name}`);
+    } else if (effectToken === "reverse") {
+      console.log(`[FASERIP] Escape reversed (${colorLower}), removing hold effects from ${actor.name}`);
       await removeHoldEffects(actor);
       // Per rules: "free + may grapple back, or perform any other action at -2CS, half move"
       await applyReversed(actor);
@@ -390,10 +400,9 @@ export class EscapingAction extends AttackAction {
               localStorage.setItem(lsSkipKey, result.skipDice ? "1" : "0");
             } catch (_e) {}
             
-            // Persist settings if requested
+            // Persist settings if requested — single document update
             if (result.remember) {
-              await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
-              await actor.setFlag("msh-faserip", "lastEscapeCsNotes", result.csNotes || "");
+              await actor.update({ "flags.msh-faserip": { lastEscapeShift: result.shift, lastEscapeCsNotes: result.csNotes || "" } });
             }
             
             dlg.close();
