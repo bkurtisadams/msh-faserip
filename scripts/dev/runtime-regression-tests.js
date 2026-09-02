@@ -1,4 +1,7 @@
 // Foundry VTT runtime regression harness for the bootstrap and CTT repairs in v2.1.10.
+// 2026-09-01: createTestCombat now creates pristine -> adds combatants ->
+// updates to round 1, eliminating the uncaught core #triggerTurnEvents
+// TypeError on one-shot creation (also seen on socket replay at reload).
 // Run through macros/run-bootstrap-runtime-tests.js while logged in as a GM.
 
 const SYSTEM_ID = "msh-faserip";
@@ -122,17 +125,21 @@ async function createTestCombat(actors) {
   }));
 
   const CombatClass = Combat.implementation ?? Combat;
+  // Create pristine, then populate, then position. Creating in one shot at
+  // round 1 with embedded combatants makes core _onCreate fire turn events
+  // against a nonexistent previous state (uncaught "reading 'round'" from
+  // #triggerTurnEvents); on update the previous state exists and the path
+  // is safe.
   const combat = await CombatClass.create({
     name: `${TEST_PREFIX} - Combat - ${Date.now()}`,
     type: "base",
     scene: sceneId,
-    active: false,
-    round: 1,
-    turn: 0,
-    combatants: combatantData
+    active: false
   });
 
   if (!combat) throw new Error("Combat creation failed.");
+  await combat.createEmbeddedDocuments("Combatant", combatantData);
+  await combat.update({ round: 1, turn: 0 });
   return combat;
 }
 
