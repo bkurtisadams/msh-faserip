@@ -56,6 +56,7 @@
 
 import { applyEffect } from "./effect-engine.js";
 import { rankValue as getRankValue, valueToRank } from "../../rules/rules-reference.js";
+import { defenseValue } from "../../lib/faserip-rules/faserip-damage.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -153,7 +154,7 @@ function resolveForceFieldValues(item) {
   // blocks override the generic rule (e.g. MODOK: Mn energy / Gd physical).
   // Mirrors the legacy getBodyArmorValues override semantics. fullValue
   // (breach capacity) stays the Power rank per RAW regardless of overrides.
-  const physical = sys.armorPhysical > 0 ? sys.armorPhysical : Math.max(0, value - 10);
+  const physical = sys.armorPhysical > 0 ? sys.armorPhysical : defenseValue({ kind: "force-field", rankNumber: value }, "physical"); // kernel slice 4b
   const energy = sys.armorEnergy > 0 ? sys.armorEnergy : value;
 
   return {

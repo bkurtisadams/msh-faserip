@@ -94,6 +94,8 @@
 //         haven't been synced yet.
 
 import { getBodyArmorValues } from "../modules/actions/action-utils.js";
+import { defenseValue } from "../lib/faserip-rules/faserip-damage.js";
+import { valueToRank, shiftRank as sharedShiftRank, rankValue } from "./rules-reference.js";
 
 export function calculateMitigation(rawDamage, targetActor, options = {}) {
   const debug = game.settings?.get('msh-faserip', 'debugMode') || false;
@@ -720,7 +722,7 @@ function applyBodyArmorFromAE(damage, armorData, options) {
     // Some older/stale defense AEs stored energy equal to physical, so derive
     // the effective energy armor from physical when the AE's energy value is
     // blank, equal to physical, or otherwise higher than the RAW reduction.
-    const rawEnergyFromPhysical = Math.max(0, physArmor - 20);
+    const rawEnergyFromPhysical = defenseValue({ kind: "body-armor", rankNumber: physArmor }, "energy"); // kernel slice 4b
     if (!enerArmor || enerArmor >= physArmor || enerArmor > rawEnergyFromPhysical) {
       enerArmor = rawEnergyFromPhysical;
     }
@@ -1130,16 +1132,15 @@ function applyPassiveArmor(damage, targetActor, options) {
   };
 }
 
+// kernel slice 4b: AP shifts from the armor's TRUE rank per the Rank Range
+// table (26 is Remarkable), where the old walk used the nearest standard
+// value at-or-below (26 counted as Excellent). Standard armor values are
+// unchanged; in-between values now resolve range-true. Matches the ammo
+// module's apAdjustedDefense semantics (RULED: -2CS, no effect on FF —
+// FF layers already carry ignoresAP).
 function applyArmorPiercingCS(armorValue, csReduction) {
-  const rankEntries = Object.entries(CONFIG.FASERIP.rankValues)
-    .sort((a, b) => a[1] - b[1]);
-  
-  let currentIndex = rankEntries.findIndex(([_, val]) => val >= armorValue);
-  if (currentIndex < 0) currentIndex = rankEntries.length - 1;
-  if (currentIndex > 0 && rankEntries[currentIndex][1] > armorValue) currentIndex--;
-  
-  const newIndex = Math.max(0, currentIndex - csReduction);
-  return rankEntries[newIndex][1];
+  const shifted = sharedShiftRank(valueToRank(armorValue), -csReduction);
+  return rankValue(shifted);
 }
 
 function isResistanceApplicable(damageType, resistanceType) {
