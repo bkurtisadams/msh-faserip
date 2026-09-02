@@ -1,3 +1,7 @@
+// blunt-attack-action.js v3.9.1 - 2026-09-01
+// v3.9.1: Remembered settings written in ONE actor.update instead of 14
+//         sequential setFlag calls (each was a full document update + sheet
+//         re-render + socket echo, landing during the dice animation).
 // blunt-attack-action.js v3.9.0 - 2026-09-01
 // v3.9.0: Kernel slice 5 (blunt). Effective Fighting rank via shared
 //         shiftRank; multi-attack FEAT preview and impossible gate via kernel
@@ -665,31 +669,34 @@ export class BluntAttackAction extends AttackAction {
               note += `${note ? "; " : ""}Combined +${combinedBonus}${combinedAssistUsed ? ` from ${combinedSource}` : ""}`;
             }
 
-            // Save settings
+            // Save settings — single document update
+            const flagUpdate = { csNotes: cs.csNotes };
             if (rememberSettings) {
-              await actor.setFlag("msh-faserip", "lastBluntSource", src);
-              await actor.setFlag("msh-faserip", "lastBluntPullEnabled", pullEnabled);
-              await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
-              await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
-              await actor.setFlag("msh-faserip", "lastBluntShift", cs.manualCS);
-              await actor.setFlag("msh-faserip", "lastBluntReason", cs.reason);
-              await actor.setFlag("msh-faserip", "cs_blunt-attack", cs.manualCS);
-              await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
-              await actor.setFlag("msh-faserip", "karma_blunt-attack", karma);
-              await actor.setFlag("msh-faserip", "lastBluntMultiAttacks", multiAttacks);
-              await actor.setFlag("msh-faserip", "lastBluntAttackCount", attackCount);
-              await actor.setFlag("msh-faserip", "lastBluntMultiAdjacent", multiAdjacent);
-
+              Object.assign(flagUpdate, {
+                lastBluntSource: src,
+                lastBluntPullEnabled: pullEnabled,
+                lastBluntPulledDamage: pulledDamage,
+                lastBluntResultCap: resultCap,
+                lastBluntShift: cs.manualCS,
+                lastBluntReason: cs.reason,
+                "cs_blunt-attack": cs.manualCS,
+                lastBluntKarma: karma,
+                "karma_blunt-attack": karma,
+                lastBluntMultiAttacks: multiAttacks,
+                lastBluntAttackCount: attackCount,
+                lastBluntMultiAdjacent: multiAdjacent
+              });
               if (src === "weapon") {
-                await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
+                flagUpdate.lastBluntItemId = itemId;
               } else if (src === "object") {
-                await actor.setFlag("msh-faserip", "lastBluntObjectName", objectName);
-                await actor.setFlag("msh-faserip", "lastBluntObjectRank", objectRank);
-                await actor.setFlag("msh-faserip", "lastBluntObjectValue", objectValue);
+                Object.assign(flagUpdate, {
+                  lastBluntObjectName: objectName,
+                  lastBluntObjectRank: objectRank,
+                  lastBluntObjectValue: objectValue
+                });
               }
             }
-            
-            await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
+            await actor.update({ "flags.msh-faserip": flagUpdate });
 
             _resolved = true;
             // For blunt, main CS IS the Fighting CS — use it for the FEAT
