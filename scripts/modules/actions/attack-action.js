@@ -1,3 +1,10 @@
+// attack-action.js v1.13.0 - 2026-09-02
+// v1.13.0: Kernel slice 5h — Shooting (Sh) added to KERNEL_ATTACK_COLUMNS;
+//          legacy shooting follow-up case retired. choice.effectColumn lets a
+//          dialog resolve on a different kernel column (Rubber Shot reads
+//          the Blunt column) and choice.suppressSlam drops Slam follow-ups
+//          (Rubber Shot: ignore Slam results). Aim: Stun maps a kernel
+//          bullseye token to a Stun follow-up.
 // attack-action.js v1.12.1 - 2026-09-02
 // v1.12.1: Kernel slice 5g — Charging (Ch) added to KERNEL_ATTACK_COLUMNS;
 //          legacy charging follow-up case retired.
@@ -447,7 +454,7 @@ async function updateAttackCardDamageAfterAutoApply(message, damageResults, cont
 
 // Attack columns resolved through the kernel (slice 5). Add a column here as
 // its action lands; columns not listed keep the legacy path.
-const KERNEL_ATTACK_COLUMNS = new Set(["BA", "EA", "TB", "TE", "Fo", "En", "Ch"]);
+const KERNEL_ATTACK_COLUMNS = new Set(["BA", "EA", "TB", "TE", "Fo", "En", "Ch", "Sh"]);
 
 const NEEDED_LABELS = {
   automatic: "Automatic (no roll)", impossible: "Impossible (fails)",
@@ -1047,7 +1054,7 @@ export class AttackAction extends BaseAction {
     const totalShift = manualShift + effectShift;
     const effectiveRank = totalShift ? shiftRank(ability.rank, totalShift) : ability.rank;
 
-    const kernelColumn = ACTION_COLUMNS[String(actionType)] ?? null;
+    const kernelColumn = choice.effectColumn || ACTION_COLUMNS[String(actionType)] || null;
     const kernelActive = !!kernelColumn && KERNEL_ATTACK_COLUMNS.has(kernelColumn);
     const attackKernelKey = kernelKeyFor(ability.rank);
     const attackShiftable = !!attackKernelKey && kernelRankDistance("SHZ", attackKernelKey) <= 0;
@@ -1382,18 +1389,11 @@ export class AttackAction extends BaseAction {
 
       const followUp = kernelActive ? effectForColor(kernelColumn, targetEffectColor) : null;
       if (followUp) {
-        showSlam = (followUp === "slam");
-        showStun = (followUp === "stun");
+        showSlam = (followUp === "slam") && !choice.suppressSlam;
+        // Aim: Stun (RAW Tactics) — a Bullseye is taken as a Stun result
+        showStun = (followUp === "stun") || (aimMode === "stun" && followUp === "bullseye");
         showKill = (followUp === "kill");
       } else switch (String(actionType)) {
-        case "shooting":
-          // Yellow = Bullseye → no Slam/Stun check; Red = Kill.
-          // Aim=stun (RAW Tactics): Yellow Bullseye treated as Stun → emit
-          // stun chip; existing stun-FEAT pipeline uses dmgThrough as intensity.
-          showStun = (aimMode === "stun" && targetEffectColor === "yellow");
-          showKill = (targetEffectColor === "red");    // ← Kill on red
-          break;
-
         default:
           // No generic follow-ups
           break;

@@ -9,6 +9,7 @@ import {
 } from "../lib/faserip-rules/faserip-kernel.js";
 import { EFFECT_COLUMNS, effectForColor, reduceEffectColor, resolveGrabBreak } from "../lib/faserip-rules/faserip-effects.js";
 import { resolveFeat } from "../lib/faserip-rules/faserip-kernel.js";
+import { AP_SHOT_SHIFT, RUBBER_SHOT, MERCY_SHOT, HEAT_SEEKER, explosiveShotDamage, canisterExplosiveDamage, incendiaryBurnIntensity, CANISTERS } from "../lib/faserip-rules/faserip-ammo.js";
 import { bluntDamage, meleeWeaponDamage, bluntThrowDamage, chargeToHitShift, resolveChargeImpact, chargeDamageParts } from "../lib/faserip-rules/faserip-damage.js";
 
 const NAMES = RANKS.map(r => {
@@ -248,6 +249,33 @@ for (const end of [6, 10, 20, 30, 50]) for (const ba of [0, 10, 20, 40]) for (co
   if (parts.total !== total || k.targetTakes !== lObs || k.attackerTakes !== lSelf) fail(`collision end ${end} ba ${ba} areas ${areas} obs ${obs}: legacy ${total}/${lObs}/${lSelf} vs kernel ${parts.total}/${k.targetTakes}/${k.attackerTakes}`);
 }
 console.log(`  ${colN} cases (legacy collision math already matched the kernel model)`);
+
+// 5h. Shooting: Sh follow-up gate (+ Aim: Stun), Rubber Shot on BA with Slam suppressed, ammo constants
+section("Sh follow-up gate vs effectForColor; Aim: Stun; Rubber on BA");
+for (const c of COLORS) {
+  const sh = effectForColor("Sh", c);
+  for (const aim of ["none", "stun"]) {
+    const l = { slam: false, stun: aim === "stun" && c === "yellow", kill: c === "red" };
+    const k = { slam: sh === "slam", stun: sh === "stun" || (aim === "stun" && sh === "bullseye"), kill: sh === "kill" };
+    if (JSON.stringify(l) !== JSON.stringify(k)) fail(`Sh follow-up ${c} aim=${aim}: ${JSON.stringify(l)} vs ${JSON.stringify(k)}`);
+  }
+  const ba = effectForColor("BA", c);
+  const lRub = { slam: false, stun: c === "red", label: LEGACY_EFFECTS["blunt-attack"][c] === "Slam" ? "Hit" : LEGACY_EFFECTS["blunt-attack"][c] };
+  const kRub = { slam: ba === "slam" && !RUBBER_SHOT.suppressSlam, stun: ba === "stun", label: ba === "slam" ? "Hit" : LABEL[ba] };
+  if (JSON.stringify(lRub) !== JSON.stringify(kRub)) fail(`Rubber ${c}: ${JSON.stringify(lRub)} vs ${JSON.stringify(kRub)}`);
+}
+for (const rolled of ["yellow", "red"]) {
+  const r = reduceEffectColor("Sh", rolled, 1);
+  if (r.allowed || r.karmaCost !== 50) fail(`Sh reduce ${rolled}: expected refused/cost 50, got ${JSON.stringify(r)}`);
+}
+section("ammo constants vs legacy literals");
+if (-AP_SHOT_SHIFT !== 2) fail(`AP shot shift ${AP_SHOT_SHIFT}`);
+if (explosiveShotDamage(10) !== 20 || canisterExplosiveDamage(10) !== 20) fail("explosive x2");
+if (MERCY_SHOT.damage !== 0 || MERCY_SHOT.drugIntensity !== "RM") fail("mercy shot");
+if (!HEAT_SEEKER.noRangePenalty) fail("heat seeker");
+if (CANISTERS.gas.intensity !== "IN" || CANISTERS.knockOut.intensity !== "RM" || CANISTERS.smoke.intensity !== "EX") fail("canister intensities");
+if (incendiaryBurnIntensity(20) !== "EX" || incendiaryBurnIntensity(40) !== "IN") fail("incendiary intensity");
+console.log("  AP -2CS, explosive x2, mercy 0 dmg / Rm drug, heat-seeker no range penalty, canister In/Rm/Ex, incendiary = damage rank");
 
 // 6. AP-CS armor step: legacy _RV walk vs range-true (mitigation applyArmorPiercingCS semantics)
 section("AP-CS armor step: legacy _RV walk vs range-true");

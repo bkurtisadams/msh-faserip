@@ -1,3 +1,11 @@
+// shooting-action.js v3.12.0 - 2026-09-02
+// v3.12.0: Kernel slice 5h. Sh column via the shared kernel gate. Ammo variants
+//          on the certified kernel ammo module: AP shot shift, Rubber Shot
+//          (Blunt column, Slam suppressed — effectColumn/suppressSlam),
+//          Mercy Shot drug intensity, Explosive ×2, Canister explosive ×2 and
+//          incendiary burn intensity, Heat-Seeker no range penalty.
+//          Power/throwing range tables and the -1CS/area range penalty stay
+//          local pending a kernel range module.
 // shooting-action.js v3.11.0 - 2026-09-02
 // v3.11.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
 //          shifts). Weapon AP read through getItemArmorPiercingCS; AP shot
@@ -148,6 +156,11 @@ import {
   getItemArmorPiercingCS,
   getDeclaredMultiAttackState
 } from "./action-utils.js";
+import {
+  AP_SHOT_SHIFT, RUBBER_SHOT, MERCY_SHOT, HEAT_SEEKER,
+  explosiveShotDamage, canisterExplosiveDamage, incendiaryBurnIntensity, CANISTERS
+} from "../../lib/faserip-rules/faserip-ammo.js";
+import { foundryNameFor } from "../../kernel/adapter.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { AreaTemplate } from "./area-template.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -264,7 +277,7 @@ export class ShootingAction extends RangedAttackAction {
       return opts.map(o => `<option value="${o.v}" ${o.v === saved ? "selected" : ""}>${o.label}</option>`).join("");
     };
     const _getEffectiveAPForVariant = (weapon, variantType) => {
-      if (variantType === "ap") return { apCS: 2, bypassFF: false };
+      if (variantType === "ap") return { apCS: -AP_SHOT_SHIFT, bypassFF: false };
       return { apCS: getItemArmorPiercingCS(weapon), bypassFF: !!weapon?.system?.bypassForceField };
     };
 
@@ -296,7 +309,7 @@ export class ShootingAction extends RangedAttackAction {
     }).join('');
 
     // === Build CS row via shared utility (manual input + range + ? reference) ===
-    const initialRangePenalty = (initialVariant === "heatSeeker") ? 0 : (savedRange > 1 ? -(savedRange - 1) : 0);
+    const initialRangePenalty = (initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) ? 0 : (savedRange > 1 ? -(savedRange - 1) : 0);
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
@@ -465,7 +478,7 @@ export class ShootingAction extends RangedAttackAction {
           const _getCurrentRangePenalty = () => {
             // Heat-seeker ammo: no range penalty (tracks hottest source)
             const vt = html.find('[name="variantType"]').val() || "standard";
-            if (vt === "heatSeeker") return 0;
+            if (vt === "heatSeeker" && HEAT_SEEKER.noRangePenalty) return 0;
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const weaponId = html.find('#damage-source-select').val() || "";
             const weapon = shootingWeapons.find(i => i.id === weaponId);
@@ -499,11 +512,11 @@ export class ShootingAction extends RangedAttackAction {
             let previewDamage = currentDamage;
             let previewSuffix = "";
             if (variantType === "explosive") {
-              previewDamage = currentDamage * 2;
+              previewDamage = explosiveShotDamage(currentDamage);
               previewSuffix = " (2× explosive)";
             } else if (variantType === "mercy") {
-              previewDamage = 0;
-              previewSuffix = " (Rm KO drug)";
+              previewDamage = MERCY_SHOT.damage;
+              previewSuffix = ` (${foundryNameFor(MERCY_SHOT.drugIntensity)} KO drug)`;
             }
 
             $val.text(previewDamage + previewSuffix);
@@ -799,16 +812,16 @@ export class ShootingAction extends RangedAttackAction {
     const weapon = choice.weapon;
     const weaponSys = weapon?.system || {};
 
+    let effectColumn = null;
+    let suppressSlam = false;
     if (vt === "rubber") {
-      // Rubber Shot per RAW (Advanced Set Ammunition): inflicts slugfest
-      // (blunt) damage, "Ignore Slam results in using rubber bullets."
-      // Clone blunt-attack config and downgrade yellow Slam → Hit;
-      // green Hit and red Stun stand.
+      // Rubber Shot (kernel RUBBER_SHOT): slugfest damage, read on the Blunt
+      // column; Slam results ignored (yellow shows Hit, no Slam follow-up).
       const { ACTION_EFFECTS } = await import("./action-config.js");
-      // ACTION_EFFECTS entries are color-keyed maps; downgrade yellow Slam → Hit,
-      // green Hit and red Stun stand.
       effectiveEffects = { ...ACTION_EFFECTS["blunt-attack"], yellow: "Hit" };
-      effectiveAttackForm = "blunt";
+      effectColumn = "BA";
+      suppressSlam = RUBBER_SHOT.suppressSlam;
+      effectiveAttackForm = RUBBER_SHOT.damageType;
       effectiveDamageType = "physical-blunt";
       variantNote = "Rubber Shot — blunt damage, ignore Slam";
     } else if (vt === "mercy") {
@@ -818,14 +831,14 @@ export class ShootingAction extends RangedAttackAction {
       // takes effect, knocking those affected out for 1-10 rounds."
       // Interpretation: if the shot hits (color ≥ green), target makes an
       // Endurance FEAT vs Remarkable Intensity or is KO'd 1-10 rounds.
-      effectiveDamage = 0;
-      variantNote = "Mercy Shot — Rm Intensity KO drug on hit";
+      effectiveDamage = MERCY_SHOT.damage;
+      variantNote = `Mercy Shot — ${foundryNameFor(MERCY_SHOT.drugIntensity)} Intensity KO drug on hit`;
       postHitCallback = this._mercyKnockoutCallback();
     } else if (vt === "explosive") {
       // Explosive Shot per RAW: 2x weapon damage. If the weapon fires bursts
       // or scatters, all in the area are affected. Single-target weapons
       // just do 2x to the primary target (current single-hit behavior).
-      effectiveDamage = (choice.weaponDamage || 0) * 2;
+      effectiveDamage = explosiveShotDamage(choice.weaponDamage || 0);
       effectiveDamageNote = `${choice.weaponDamage}×2 explosive`;
       const bs = String(weaponSys.burstScatter || "none").toLowerCase();
       if (bs === "burst" || bs === "scatter") {
@@ -846,15 +859,15 @@ export class ShootingAction extends RangedAttackAction {
       // Sub-type default from weapon.system.canisterSubType; dialog may override.
       const subType = String(choice.canisterSubType || weaponSys.canisterSubType || "gas").toLowerCase();
       const subLabels = {
-        gas: "Tear Gas (In Intensity)",
-        knockout: "KO Gas (Rm Intensity)",
-        smoke: "Smoke (Ex Intensity)",
+        gas: `Tear Gas (${foundryNameFor(CANISTERS.gas.intensity)} Intensity)`,
+        knockout: `KO Gas (${foundryNameFor(CANISTERS.knockOut.intensity)} Intensity)`,
+        smoke: `Smoke (${foundryNameFor(CANISTERS.smoke.intensity)} Intensity)`,
         explosive: "Explosive (2× area)",
-        incendiary: `Incendiary (burn 1-10 rnd @ ${choice.weaponDamage || 0})`
+        incendiary: `Incendiary (burn ${CANISTERS.incendiary.burnsRounds} rnd @ ${foundryNameFor(incendiaryBurnIntensity(choice.weaponDamage || 0))})`
       };
       variantNote = `Canister Shot — ${subLabels[subType] || subType}`;
       if (subType === "explosive") {
-        effectiveDamage = (choice.weaponDamage || 0) * 2;
+        effectiveDamage = canisterExplosiveDamage(choice.weaponDamage || 0);
         effectiveDamageNote = `${choice.weaponDamage}×2 canister explosive`;
       } else if (subType === "incendiary") {
         effectiveDamageType = "energy";
@@ -882,7 +895,7 @@ export class ShootingAction extends RangedAttackAction {
         : _baseSourceName;
 
       await this._executeSingleAttack({
-        choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 1 ? multiAttackFeatResult : null },
+        choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 1 ? multiAttackFeatResult : null, effectColumn, suppressSlam },
         actor: this.actor,
         ability,
         actionType: effectiveActionType,
@@ -969,7 +982,7 @@ export class ShootingAction extends RangedAttackAction {
         weapon?.system?.mercyIntensity ||
         weapon?.system?.intensityRank ||
         weapon?.system?.stunIntensity ||
-        "Remarkable";
+        foundryNameFor(MERCY_SHOT.drugIntensity);
       const { determineFeatRequirement, checkFeatSuccess } = await import("./ability-feat-dialog.js");
       const req = determineFeatRequirement(endRank, koIntensity);
 
@@ -1127,8 +1140,9 @@ export class ShootingAction extends RangedAttackAction {
         const lines = [];
 
         if (subType === "explosive") {
-          // 2× weapon damage to all in target area. TODO: 1× adjacent area falloff.
-          const dmg = baseDamage * 2;
+          // 2× weapon damage to all in target area (kernel canisterExplosiveDamage;
+          // adjacent-area 1× falloff still TODO).
+          const dmg = canisterExplosiveDamage(baseDamage);
           if (affected.length > 0) {
             const { applyDamageToTargets } = await import("./action-utils.js");
             await applyDamageToTargets({
