@@ -114,23 +114,16 @@
 //           sessionRIPBonus setting; button hidden when off.
 // v4.1.0: Add Event type (foe-less karma events) alongside encounters.
 //         GM Award field on both events and encounters. Missing karma types added.
+import { RANKS_ORDERED, rankValueForStorage } from "./rules/rules-reference.js";
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey, computeKarmaTotals } from "./karma-rules.js";
 import { EncounterEditor } from "./apps/encounter-editor.js";
 
 export class TeamSheet extends Application {
 
-  static RANK_TABLE = [
-    { rank: "Shift-0", value: 0 }, { rank: "Feeble", value: 2 },
-    { rank: "Poor", value: 4 }, { rank: "Typical", value: 6 },
-    { rank: "Good", value: 10 }, { rank: "Excellent", value: 20 },
-    { rank: "Remarkable", value: 30 }, { rank: "Incredible", value: 40 },
-    { rank: "Amazing", value: 50 }, { rank: "Monstrous", value: 75 },
-    { rank: "Unearthly", value: 100 }, { rank: "Shift-X", value: 150 },
-    { rank: "Shift-Y", value: 200 }, { rank: "Shift-Z", value: 500 },
-    { rank: "Class 1000", value: 1000 }, { rank: "Class 3000", value: 3000 },
-    { rank: "Class 5000", value: 5000 }, { rank: "Beyond", value: 10000 }
-  ];
+  // slice 2b: derived from the shared kernel-backed tables (Beyond 10000
+  // drift removed; Beyond persists as the storage sentinel)
+  static RANK_TABLE = RANKS_ORDERED.map(rank => ({ rank, value: rankValueForStorage(rank) }));
 
   static CRIME_VALUES = {
     violent:              { stop: 30, arrest: 15 },

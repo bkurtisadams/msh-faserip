@@ -31,17 +31,9 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
 
 // Power Rank Range Table (based on "Faserip Combat 02.txt")
-const POWER_RANGE_VALUES = {
-  "Shift-0": 0, "Feeble": 0, "Poor": 1, "Typical": 2, "Good": 4,
-  "Excellent": 6, "Remarkable": 8, "Incredible": 10, "Amazing": 20,
-  "Monstrous": 40, "Unearthly": 60, "Shift X": 80, "Shift Y": 160,
-  "Shift Z": 400,
-  // Converted miles to areas (1 mile = 1760 yards/areas)
-  "Class 1000": 4000,   // 100 miles
-  "Class 3000": 400000, // 10,000 miles
-  "Class 5000": 40000000, // 1,000,000 miles
-  "Beyond": Infinity      // Unlimited
-};
+// slice 2b: canonical copy lives in the dice module (kernel-adjacent);
+// cosmic rows there corrected to this file's miles->areas math.
+import { POWER_RANGE_VALUES } from "./modules/dice/universal-table.js";
 
 export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   static DEFAULT_OPTIONS = {

@@ -1,3 +1,16 @@
+// rules-reference.js v2.0.0 - 2026-09-01
+// v2.0.0: Rank machinery, ATTACK_RESULTS, and ATTACK_EFFECTS now derive from
+//         the vendored @graycloak/faserip-rules kernel (slice 2a). Behavior
+//         changes, all per certified kernel / GM rulings 2026-08-31:
+//         - throwingBlunt.yellow "Hit" -> "Bullseye" (RULED: prose over table)
+//         - ATTACK_EFFECTS.force.pullEffect false -> true (Pulling Punches
+//           lists Force; no contradicting section, unlike Energy)
+//         - Class 5000 range is now 5000+ (finite); Beyond is Infinity only
+//           (RULED, supersedes the 2026-07-31 5000-exact/5001+ split). Any
+//           actor stored with the old Beyond sentinel 5001 now reads as
+//           Class 5000 and should be re-saved; storage sentinel is now
+//           BEYOND_STORAGE_SENTINEL (Number.MAX_SAFE_INTEGER).
+//         - Laser Rifle type "S" -> "E" (RULED: lasers are Energy attacks)
 // rules-reference.js v1.7.0 - 2026-08-02
 // v1.7.0: SHOOTING_WEAPONS price/range columns corrected against the printed
 //         table (pp.42-43). The rank-letter column is PRICE (prose anchor:
@@ -37,40 +50,39 @@
 // Canonical FASERIP rules reference. All mechanics data in one place.
 // Source: Marvel Super Heroes (TSR) Advanced Set / Ultimate Powers Book.
 
-// ── Canonical rank order (low → high) ────────────────────────────────────────
-export const RANKS_ORDERED = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-];
+// ── Canonical rank order (low → high) — derived from the kernel ────────────
+import {
+  RANKS as KERNEL_RANKS, rankByKey as kernelRankByKey,
+  rankForNumber as kernelRankForNumber, shiftRank as kernelShiftRank,
+  rankDistance as kernelRankDistance,
+} from "../lib/faserip-rules/faserip-kernel.js";
+import { EFFECT_COLUMNS } from "../lib/faserip-rules/faserip-effects.js";
+import { kernelKeyFor, labelForToken } from "../kernel/adapter.js";
 
-// ── Rank → standard value ────────────────────────────────────────────────────
-export const RANK_VALUES = {
-  "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-  "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-  "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-  "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": Infinity
-};
+function hyphenName(key) {
+  const r = kernelRankByKey(key);
+  if (key === "SH0") return "Shift-0";
+  if (["SHX", "SHY", "SHZ"].includes(key)) return r.name.replace(" ", "-");
+  return r.name;
+}
+
+export const RANKS_ORDERED = KERNEL_RANKS.map(r => hyphenName(r.key));
+
+// ── Rank → standard value (kernel standard rank numbers) ──────────────────
+export const RANK_VALUES = Object.fromEntries(
+  KERNEL_RANKS.map(r => [hyphenName(r.key), r.standard])
+);
 
 // Legacy alias — old code that imported RANKS as the values object
 export const RANKS = RANK_VALUES;
 
-// ── Rank ranges (for value → rank lookups) ───────────────────────────────────
-// Verified against the printed table 2026-07-31. Monstrous is printed
-// "63-67" (misprint; Un starts at 88, so 63-87 is the coherent reading).
-// Upper tiers per GM ruling 2026-07-31: ShZ 351-999, Class 1000 =
-// 1000-2999, Class 3000 = 3000-4999, Class 5000 = 5000 exactly,
-// Beyond = everything above.
-export const RANK_RANGES = {
-  "Feeble": [1, 2], "Poor": [3, 4], "Typical": [5, 7], "Good": [8, 15],
-  "Excellent": [16, 25], "Remarkable": [26, 35], "Incredible": [36, 45],
-  "Amazing": [46, 62], "Monstrous": [63, 87], "Unearthly": [88, 125],
-  "Shift-X": [126, 175], "Shift-Y": [176, 350], "Shift-Z": [351, 999],
-  "Class 1000": [1000, 2999], "Class 3000": [3000, 4999],
-  "Class 5000": [5000, 5000], "Beyond": [5001, Infinity]
-};
+// ── Rank ranges (kernel min/max; cosmic ranges per GM ruling 2026-08-31) ───
+export const RANK_RANGES = Object.fromEntries(
+  KERNEL_RANKS.filter(r => r.key !== "SH0")
+    .map(r => [hyphenName(r.key), [r.min, r.max]])
+);
 
-// ── Rank abbreviations ───────────────────────────────────────────────────────
+// ── Rank abbreviations ─────────────────────────────────────────────────
 export const RANK_ABBR = {
   "Shift-0": "Sh0", "Feeble": "Fe", "Poor": "Pr", "Typical": "Ty",
   "Good": "Gd", "Excellent": "Ex", "Remarkable": "Rm", "Incredible": "In",
@@ -88,13 +100,15 @@ export const RANK_ALIASES = {
   "Class1000": "Class 1000", "Class3000": "Class 3000", "Class5000": "Class 5000"
 };
 
-// ── Utility functions ────────────────────────────────────────────────────────
+// ── Utility functions ────────────────────────────────────────────────────
 
 /** Normalize any rank name variant to canonical hyphen form. */
 export function normalizeRank(name) {
   if (!name) return "Shift-0";
   const s = String(name).trim();
-  return RANK_ALIASES[s] ?? s;
+  if (RANK_ALIASES[s]) return RANK_ALIASES[s];
+  const key = kernelKeyFor(s);
+  return key ? hyphenName(key) : s;
 }
 
 /** Get the standard numeric value for a rank name. */
@@ -105,40 +119,37 @@ export function rankValue(name) {
 }
 
 /**
- * Numeric value safe to persist in a Foundry document. Beyond's printed
- * standard rank number is infinite, which JSON cannot store, so use the
- * first value in the Beyond range as an internal sentinel. Sheets should
- * display the rank as Infinite/∞ rather than exposing this sentinel.
+ * Numeric value safe to persist in a Foundry document. Beyond's standard
+ * rank number is infinite, which JSON cannot store; persist this finite
+ * sentinel instead. valueToRank maps it (and any non-finite value) back to
+ * Beyond. Sheets should display the rank as Infinite/∞.
  */
+export const BEYOND_STORAGE_SENTINEL = Number.MAX_SAFE_INTEGER;
+
 export function rankValueForStorage(name) {
   const n = normalizeRank(name);
   const standard = RANK_VALUES[n];
-  if (standard === Infinity) return RANK_RANGES.Beyond[0];
+  if (standard === Infinity) return BEYOND_STORAGE_SENTINEL;
   return Number.isFinite(standard) ? standard : 0;
 }
 
-/** Get the rank name for a numeric value per the printed Rank Range table
- *  (upper tiers per GM ruling — see RANK_RANGES). Ranges are contiguous
- *  from 1 upward, so the walk always resolves; 0 and below are Shift-0. */
+/** Get the rank name for a numeric value per the kernel rank ranges
+ *  (cosmic tiers per GM ruling 2026-08-31: Class 5000 is 5000+, Beyond is
+ *  Infinity). 0 and below are Shift-0. */
 export function valueToRank(val) {
   const v = Number(val) || 0;
   if (v <= 0) return "Shift-0";
-  for (const [rank, [lo, hi]] of Object.entries(RANK_RANGES)) {
-    if (v >= lo && v <= hi) return rank;
-  }
-  return "Beyond";
+  if (!Number.isFinite(v) || v >= BEYOND_STORAGE_SENTINEL) return "Beyond";
+  return hyphenName(kernelRankForNumber(v).key);
 }
 
 /** Shift a rank name up/down by delta steps. Class 1000+ ranks cannot be shifted. Clamps to Shift-Z. */
 export function shiftRank(name, delta) {
   const n = normalizeRank(name);
-  const i = RANKS_ORDERED.indexOf(n);
-  if (i < 0) return n;
-  // Class 1000+ ranks (index 14+) cannot be column-shifted (rule pg. 15)
-  if (i >= 14) return n;
-  // Clamp between Shift-0 (0) and Shift-Z (13)
-  const newI = Math.min(Math.max(i + delta, 0), 13);
-  return RANKS_ORDERED[newI];
+  const key = kernelKeyFor(n);
+  if (!key) return n;
+  if (kernelRankDistance("SHZ", key) > 0) return n; // Class 1000+ unshiftable
+  return hyphenName(kernelShiftRank(key, delta).key);
 }
 
 /**
@@ -168,35 +179,31 @@ export function rankIndex(name) {
 // Turn=6sec, 10 turns/min, 600 turns/hr
 export const TIME = { turnSeconds: 6, turnsPerMinute: 10, turnsPerHour: 600 };
 
-// ── COMBAT RESULTS BY ATTACK TYPE ──
-// Each entry: { white, green, yellow, red }
-// Slugfest = Fighting FEAT (adjacent)
-export const ATTACK_RESULTS = {
-  blunt:         { white: "Miss", green: "Hit",      yellow: "Slam",     red: "Stun" },
-  edged:         { white: "Miss", green: "Hit",      yellow: "Stun",     red: "Kill" },
-  shooting:      { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Kill" },
-  throwingEdged: { white: "Miss", green: "Hit",      yellow: "Stun",     red: "Kill" },
-  throwingBlunt: { white: "Miss", green: "Hit",      yellow: "Hit",      red: "Stun" },
-  energy:        { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Kill" },
-  force:         { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Stun" },
-  charging:      { white: "Miss", green: "Hit",      yellow: "Slam",     red: "Stun" },
-  grappling:     { white: "Miss", green: "Miss",     yellow: "Partial",  red: "Hold" },
-  escaping:      { white: "Miss", green: "Miss",     yellow: "Escape",   red: "Reverse" },
-  grabbing:      { white: "Miss", green: "Take",     yellow: "Grab",     red: "Break" }
+// ── COMBAT RESULTS BY ATTACK TYPE (derived from kernel EFFECT_COLUMNS) ──
+const ATTACK_TYPE_TO_COLUMN = {
+  blunt: "BA", edged: "EA", shooting: "Sh", throwingEdged: "TE",
+  throwingBlunt: "TB", energy: "En", force: "Fo", charging: "Ch",
+  grappling: "Gp", escaping: "Es", grabbing: "Gb"
 };
+
+export const ATTACK_RESULTS = Object.fromEntries(
+  Object.entries(ATTACK_TYPE_TO_COLUMN).map(([type, code]) => [type,
+    Object.fromEntries(Object.entries(EFFECT_COLUMNS[code].results)
+      .map(([color, token]) => [color, labelForToken(token)]))
+  ])
+);
 
 // Which effects each attack type can trigger
 // pullDamage: can reduce damage. pullEffect: can reduce effect column.
-export const ATTACK_EFFECTS = {
-  blunt:         { effects: ["Slam", "Stun"], pullDamage: true,  pullEffect: true },
-  edged:         { effects: ["Stun", "Kill"], pullDamage: false, pullEffect: false },
-  shooting:      { effects: ["Kill"],         pullDamage: false, pullEffect: false },
-  throwingEdged: { effects: ["Stun", "Kill"], pullDamage: true,  pullEffect: false },
-  throwingBlunt: { effects: ["Stun"],         pullDamage: true,  pullEffect: true  },
-  energy:        { effects: ["Kill"],         pullDamage: true,  pullEffect: false },
-  force:         { effects: ["Stun"],         pullDamage: true,  pullEffect: false },
-  charging:      { effects: ["Slam", "Stun"], pullDamage: true,  pullEffect: true }
-};
+export const ATTACK_EFFECTS = Object.fromEntries(
+  ["blunt", "edged", "shooting", "throwingEdged", "throwingBlunt", "energy", "force", "charging"]
+    .map(type => {
+      const col = EFFECT_COLUMNS[ATTACK_TYPE_TO_COLUMN[type]];
+      const effects = ["Slam", "Stun", "Kill"]
+        .filter(e => Object.values(col.results).includes(e.toLowerCase()));
+      return [type, { effects, pullDamage: col.reduceDamage, pullEffect: col.reduceEffect }];
+    })
+);
 
 // Blunt weapon dmg (Slugfest / melee only):
 //   = Str or material strength (whichever less);
@@ -1045,7 +1052,7 @@ export const SHOOTING_WEAPONS = {
   assaultRifle:      { name: "Assault Rifle",        range: 7,  price: "Ex", damage: 10, type: "S", rate: 2, shots: 20, material: "Gd", notes: "Military" },
   // Type "S" as printed; prose says lasers use the Energy column (cf. laserPistol/
   // laserCannon "E"). Likely table misprint — GM ruling pending.
-  laserRifle:        { name: "Laser Rifle",          range: 4,  price: "Rm", damage: 20, type: "S", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal" },
+  laserRifle:        { name: "Laser Rifle",          range: 4,  price: "Rm", damage: 20, type: "E", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal. RULED 2026-08-31: lasers are Energy attacks (printed \"S\" is wrong)" },
   stunRifle:         { name: "Stun Rifle",           range: 5,  price: "Rm", damage: null, type: "stun", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal, Remarkable Intensity stunning" },
   concussionRifle:   { name: "Concussion Rifle",     range: 7,  price: "Rm", damage: 10, type: "F", rate: 1, shots: 12, material: "Gd", notes: "Power pack, illegal" },
   automaticRifle:    { name: "Automatic Rifle",      range: 5,  price: "Ex", damage: 15, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Military, bursts" },

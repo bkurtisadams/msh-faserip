@@ -8,32 +8,20 @@
 //   freshly chargen'd actors; without the seed, derive would zero them out.
 
 import { POWER_DATA, TALENT_DATA, CONTACT_DATA } from './chargen-data.js';
-import { stepRank } from './rules/rules-reference.js';
+import { stepRank, RANKS_ORDERED, RANK_RANGES, RANK_VALUES } from './rules/rules-reference.js';
 
 // Ability Modifier Table rule: "no ability may be modified in any fashion
 // below Feeble or above Monstrous"
 const shiftAbilityRank = (rankName, shifts) =>
   stepRank(rankName, shifts, { min: "Feeble", max: "Monstrous" });
 
-export const RANKS = [
-  { name: "Shift-0", min: 0, standard: 0 },
-  { name: "Feeble", min: 1, standard: 2 },
-  { name: "Poor", min: 3, standard: 4 },
-  { name: "Typical", min: 5, standard: 6 },
-  { name: "Good", min: 8, standard: 10 },
-  { name: "Excellent", min: 16, standard: 20 },
-  { name: "Remarkable", min: 26, standard: 30 },
-  { name: "Incredible", min: 36, standard: 40 },
-  { name: "Amazing", min: 46, standard: 50 },
-  { name: "Monstrous", min: 63, standard: 75 },
-  { name: "Unearthly", min: 88, standard: 100 },
-  { name: "Shift-X", min: 126, standard: 150 },
-  { name: "Shift-Y", min: 176, standard: 200 },
-  { name: "Shift-Z", min: 351, standard: 500 },
-  { name: "Class 1000", min: 1000, standard: 1000 },
-  { name: "Class 3000", min: 3000, standard: 3000 },
-  { name: "Class 5000", min: 5000, standard: 5000 }
-];
+// slice 2b: derived from the shared kernel-backed rank tables
+// (min = printed rank-range minimum, standard = standard rank number)
+export const RANKS = RANKS_ORDERED.filter(n => n !== "Beyond").map(name => ({
+  name,
+  min: name === "Shift-0" ? 0 : RANK_RANGES[name][0],
+  standard: RANK_VALUES[name]
+}));
 
 // Origin table
 const ORIGIN_TABLE = [

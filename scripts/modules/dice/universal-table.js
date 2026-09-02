@@ -1,4 +1,8 @@
-// File: scripts/modules/dice/universal-table.js v2.0.0 - 2026-08-31
+// File: scripts/modules/dice/universal-table.js v2.0.1 - 2026-09-01
+// v2.0.1: POWER_RANGE_VALUES cosmic rows corrected (1 mile = 40 areas, not
+//         1760): Cl1000 176000->4000, Cl3000 ->400000, Cl5000 ->40000000
+//         (matches equipment.js, now the single consumer of this copy);
+//         space-key aliases added ("Shift X").
 // v2.0.0: Rewritten as a shim over @graycloak/faserip-rules (scripts/lib/faserip-rules,
 //         certified against the Advanced Set with 169 kernel tests + errata ledger).
 //         All table data and resolution now derive from kernel exports; this file
@@ -84,11 +88,16 @@ export const POWER_RANGE_VALUES = {
   "Excellent": 6, "Remarkable": 8, "Incredible": 10, "Amazing": 20,
   "Monstrous": 40, "Unearthly": 60, "Shift-X": 80, "Shift-Y": 160,
   "Shift-Z": 400,
-  "Class 1000": 176000,
-  "Class 3000": 17600000,
-  "Class 5000": 1760000000,
+  // 1 area = 44 yards; 1 mile = 1760 yards = 40 areas
+  "Class 1000": 4000,       // 100 miles
+  "Class 3000": 400000,     // 10,000 miles
+  "Class 5000": 40000000,   // 1,000,000 miles
   "Beyond": Infinity
 };
+// Space-separated key aliases (equipment.js and older callers use "Shift X")
+for (const [k, v] of Object.entries({ ...POWER_RANGE_VALUES })) {
+  if (k.startsWith("Shift-") && k !== "Shift-0") POWER_RANGE_VALUES[k.replace("-", " ")] = v;
+}
 
 // Result rows for UI display (generated; consecutive identical labels merged)
 function buildResultRow(color) {

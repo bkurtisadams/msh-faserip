@@ -530,12 +530,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       
       // Calculate original health max from original endurance
       if (originalEndurance) {
-        const rankValues = {
-          "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-          "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-          "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-          "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
-        };
+        const rankValues = _RANK_VALUES; // slice 2b: shared kernel-backed values (Beyond 10000 drift removed)
         const originalEnduranceValue = rankValues[originalEndurance] || 0;
         const currentEnduranceValue = context.system.abilities?.endurance?.value || 0;
         const healthMaxDiff = originalEnduranceValue - currentEnduranceValue;
@@ -717,12 +712,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       const healthMaxInput = healthSection.find('input[name="system.attributes.health.max"]');
       
       // Calculate original health max
-      const rankValues = {
-        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-        "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-        "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-        "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
-      };
+      const rankValues = _RANK_VALUES; // slice 2b: shared kernel-backed values (Beyond 10000 drift removed)
       const originalEnduranceValue = rankValues[originalEndurance] || 0;
       const currentEnduranceValue = this.actor.system?.abilities?.endurance?.value || 0;
       const currentHealthMax = this.actor.system?.attributes?.health?.max || 0;

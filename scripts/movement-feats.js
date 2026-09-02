@@ -17,7 +17,7 @@
 // Extracted from actorSheet.js to reduce file size
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
-import { RANKS_ORDERED as RANKS, RANK_ABBR } from './rules/rules-reference.js';
+import { RANKS_ORDERED as RANKS, RANK_ABBR, rankValue } from './rules/rules-reference.js';
 import { checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 
 // Exhaustion-immune ranks
@@ -102,18 +102,13 @@ export class MovementFeats {
     }
     
     // It's a rank name for Leaping power
-    const rankValues = {
-      "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
-      "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
-      "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200, "Shift-Z": 500,
-      "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
-    };
+    // slice 2b: rank values come from the shared kernel-backed table
     
     return {
       id: selection,
       name: 'Leaping',
       rank: selection,
-      value: rankValues[selection] || 6
+      value: rankValue(selection) || 6
     };
   }
 
@@ -1651,16 +1646,11 @@ export class MovementFeats {
    */
   _getTeleportInfoFromSelection(selection) {
     const distData = MovementFeats.TELEPORT_DISTANCE[selection] || MovementFeats.TELEPORT_DISTANCE["Typical"];
-    const rankValues = {
-      "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
-      "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
-      "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200, "Shift-Z": 500,
-      "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
-    };
+    // slice 2b: rank values come from the shared kernel-backed table
     
     return {
       rank: selection,
-      value: rankValues[selection] || 6,
+      value: rankValue(selection) || 6,
       ...distData
     };
   }
