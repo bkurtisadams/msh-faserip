@@ -1,4 +1,8 @@
-// scripts/modules/actions/grabbing-action.js v1.8.0 - 2026-09-02
+// scripts/modules/actions/grabbing-action.js v2.0.0 - 2026-09-02
+// v2.0.0: Chat card on the shared attack-card.hbs template (banner, ROLL /
+//         STRENGTH / COMPARATOR cells, effect block, actions) — matches the
+//         Grappling and Escaping cards; hand-built HTML retired. Break block
+//         text follows the RAW second roll (material column, white = breaks).
 // v1.8.0: Kernel slice 5f. Result via resolveKernelAttack on the Gb column
 //         with itemized shifts (take / grab / break tokens); comparator
 //         rank check via adapter compareRankNames (RANKS index compare
@@ -23,7 +27,6 @@ import {
   labelFor,
   buildActionsBox,
   bannerColors,
-  buildInlineRollDisplay,
   showDiceAnimation,
   getTargetData,
   applyCapabilitiesToDialog,
@@ -127,9 +130,6 @@ export class GrabbingAction extends AttackAction {
     const { cappedTotal, totalKarmaUsed } =
         await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    // Build inline roll display for consolidated mode
-    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
-
     // Universal Table result via kernel (Gb column)
     const attackShifts = [];
     if (manualShift) attackShifts.push({ cs: manualShift, reason: "manual" });
@@ -150,34 +150,9 @@ export class GrabbingAction extends AttackAction {
 
     const { bg, fg } = bannerColors(colorLower);
 
-    // Shift display (hover tooltip style with breakdown)
-    let shiftDisplay = "";
-    if (totalShift) {
-      const parts = [];
-      if (manualShift !== 0) parts.push(`${manualShift > 0 ? '+' : ''}${manualShift} manual`);
-      for (const eff of (attackerEffects.breakdown || [])) {
-        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
-      }
-      for (const eff of (defenderEffects.breakdown || [])) {
-        parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
-      }
-      const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
-      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
-      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
-    }
-
-    // Roll display (yellow hover box)
-    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
-    const rollDisplay = totalKarmaUsed
-      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
-      : rollBox;
-
     const compNote = this._composeComparatorLine(choice);
-    const takeNote = takeDowngraded
-      ? `<div style="font-size:.85em;color:#666;margin-top:2px;">Green downgraded to <strong>Miss</strong> (Attacker STR &lt; comparator).</div>`
-      : "";
 
-    // For RED (Break), show a "Grabbing Break Check" button
+    // For Break, show a "Grabbing Break Check" button
     const grabbingBreak = (String(effectResult).toLowerCase() === "break")
       ? { itemMaterial: choice.itemMaterial || "Excellent", itemName: choice.itemLabel || "Item" }
       : null;
@@ -188,40 +163,13 @@ export class GrabbingAction extends AttackAction {
       autoApply: !!this.opts?.autoApply,
     });
 
-    const effectBlock = this._effectBlock(String(effectResult).toLowerCase(), strength, choice);
-
-    // Final card — matches attack card pattern
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <!-- Header: Action + FEAT type -->
-        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
-          <strong style="color:#8b0000;">${actionName.toUpperCase()}</strong>
-          <span style="color:#666;font-size:.85em;">Strength FEAT</span>
-        </div>
-        <!-- Actor → Target + item -->
-        <div style="padding:4px 10px;font-size:.95em;">
-          <strong>${actor.name}</strong>${choice.targetName ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${choice.targetName}</strong>` : ''}
-          <span style="color:#666;font-size:.85em;margin-left:6px;">· ${choice.itemLabel}</span>
-        </div>
-        <!-- Strength + Roll + inline result badge -->
-        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
-          <div>Strength: ${strength.rank}${shiftDisplay}${choice.targetStrength ? ` <span style="color:#666;font-size:.9em;">(vs ${choice.targetStrength})</span>` : ''}</div>
-          ${compNote ? `<div style="font-size:.85em;color:#666;">Take comparator: ${compNote}</div>` : ''}
-          ${choice.itemMaterial ? `<div style="font-size:.85em;color:#666;">Item material: ${choice.itemMaterial}</div>` : ''}
-          ${inlineRollHtml ? '' : `
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
-            <span>Roll: ${rollDisplay}</span>
-            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-              ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-            </span>
-          </div>`}
-          ${takeNote}
-        </div>
-        ${inlineRollHtml}
-        ${effectBlock}
-        ${actions}
-      </div>
-    `;
+    const cardHtml = await this._buildChatCard({
+      actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal,
+      color, effect: effectResult, bg, fg, actions, totalShift, manualShift,
+      attackerEffects: attackerEffects.breakdown || [],
+      defenderEffects: defenderEffects.breakdown || [],
+      compNote, takeDowngraded
+    });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
   }
@@ -459,38 +407,74 @@ export class GrabbingAction extends AttackAction {
     return ""; // no comparator provided (Take will default to pass if none)
   }
 
-  _effectBlock(effectLower, strength, choice) {
-    if (effectLower === "miss") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
-          <div style="font-weight:bold;color:#c62828;">Miss</div>
-          <div style="font-size:.9em;">Item not secured. If it was loose, it may scatter up to one area (Judge decides direction).</div>
-        </div>`;
+  async _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, manualShift, attackerEffects = [], defenderEffects = [], compNote = "", takeDowngraded = false }) {
+    const effectLower = String(effect).toLowerCase();
+
+    // Effective-rank tooltip (the CS breakdown the FEAT was read against)
+    let effRankTooltip = `Strength ${strength.rank}`;
+    if (totalShift !== 0) {
+      const parts = [];
+      if (manualShift) parts.push(choice.csNotes || `${manualShift > 0 ? '+' : ''}${manualShift} manual`);
+      for (const eff of attackerEffects) parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+      for (const eff of defenderEffects) parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+      const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+      effRankTooltip = `${breakdownText} → ${effectiveRank}`;
     }
-    if (effectLower === "take") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
-          <div style="font-weight:bold;color:#0d47a1;">Take</div>
-          <div style="font-size:.9em;">Possession gained (STR check vs comparator passed).</div>
+
+    // Roll cell
+    const rollNum = totalKarmaUsed ? cappedTotal : roll.total;
+    const rollTooltip = totalKarmaUsed
+      ? `d100 = ${roll.total} + ${totalKarmaUsed} karma = ${cappedTotal}`
+      : `d100 = ${roll.total}`;
+
+    // Third cell: the Take comparator (grabbing inflicts no damage)
+    const cmp = this._chooseComparatorRank(choice);
+    const dmgValue = cmp || "—";
+    const dmgTooltip = compNote ? `Take comparator: ${compNote}` : "No comparator supplied — Take passes";
+
+    const box = (title, body) => `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">${title}</div>
+          <div>${body}</div>
         </div>`;
-    }
-    if (effectLower === "grab") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#fffde7;border:1px solid #f9a825;border-radius:3px;">
-          <div style="font-weight:bold;color:#f57f17;">Grab</div>
-          <div style="font-size:.9em;">You gain possession regardless of Strength comparison.</div>
-        </div>`;
-    }
-    if (effectLower === "break") {
-    return `
-      <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
-        <div style="font-weight:bold;color:#2e7d32;">Break</div>
-        <div style="font-size:.9em;">
-          Item seized. Use the <strong>Grabbing Break Check</strong> button below to roll your Strength vs the item's material 
-          to see if it breaks, is damaged, or activates.
-        </div>
-      </div>`;
-  }
-    return "";
+    const downgradeNote = takeDowngraded
+      ? `<div style="margin-top:3px;color:#666;">Take downgraded to <strong>Miss</strong> — Strength ${strength.rank} is below the comparator (${cmp}).</div>`
+      : "";
+    const effectBlocks = {
+      miss: box("Miss", `Item not secured. If it was loose, it may scatter up to one area (Judge decides direction).${downgradeNote}`),
+      take: box("Take", `Possession gained — Strength ${strength.rank} meets or beats the comparator${cmp ? ` (${cmp})` : ""}.`),
+      grab: box("Grab", "Possession gained regardless of the Strength comparison."),
+      break: box("Break", `Item seized. Use the <strong>Grabbing Break Check</strong> button to roll on the item's material column: any colour keeps it intact (use it or move half speed), white means it is damaged, broken, or goes off.`)
+    };
+
+    const cardData = {
+      actionLabel: "GRABBING",
+      formClass: "grabbing",
+      weaponName: choice.itemLabel || "",
+      indicatorHtml: `<span style="color:#888;font-size:12px;">Strength FEAT</span>`,
+      hasTarget: !!choice.targetName,
+      targetName: choice.targetName || "",
+      targetLabel: "Target",
+      rangeText: "adjacent",
+      badgesHtml: "",
+      resultBg: bg,
+      resultFg: fg,
+      resultText: `${String(color).toUpperCase()} — ${String(effect).toUpperCase()}`,
+      rollNum,
+      rollTooltip,
+      abilityLabelUpper: "STRENGTH",
+      effRankValue: effectiveRank,
+      effRankTooltip,
+      dmgValue,
+      dmgTooltip,
+      notesHtml: effectBlocks[effectLower] || "",
+      consequenceHtml: "",
+      actionsHtml: actions,
+      manualNoticeHtml: ""
+    };
+
+    return await foundry.applications.handlebars.renderTemplate(
+      "systems/msh-faserip/templates/chat/attack-card.hbs",
+      cardData
+    );
   }
 }
