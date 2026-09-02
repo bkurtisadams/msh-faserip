@@ -68,14 +68,10 @@
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { RANK_ABBR, RANKS_ORDERED, shiftRank as sharedShiftRank } from "../../rules/rules-reference.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 
-const RANKS = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-];
+const RANKS = RANKS_ORDERED; // slice 3: shared kernel-backed order
 
 const ALL_RANKS_WITH_NONE = ["None", ...RANKS];
 
@@ -89,12 +85,9 @@ const ABILITIES = [
   { key: "psyche",    label: "Psyche"    }
 ];
 
+// slice 3: shared kernel-backed shift (clamps Shift-0..Shift-Z; Class 1000+ unshiftable)
 function applyCS(rank, shift) {
-  if (shift === 0) return rank;
-  const i = RANKS.indexOf(rank);
-  if (i < 0) return rank;
-  const shifted = Math.max(0, Math.min(RANKS.length - 1, i + shift));
-  return RANKS[shifted];
+  return sharedShiftRank(rank, shift);
 }
 
 function colorBg(c) {

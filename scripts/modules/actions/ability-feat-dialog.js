@@ -79,13 +79,11 @@ import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, 
 import { applyColumnShifts } from '../dice/column-shifts.js';
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
 import { executeAsGM } from "../../gm-utils.js";
-import { RANK_ABBR, rankValue, RANK_RANGES, RANKS_ORDERED, valueToRank } from "../../rules/rules-reference.js";
+import { RANK_ABBR, rankValue, RANK_RANGES, RANKS_ORDERED, valueToRank, shiftRank as sharedShiftRank } from "../../rules/rules-reference.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
+import { requiredColor as kernelRequiredColor, colorAtLeast as kernelColorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
 
-const RANKS = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-];
+const RANKS = RANKS_ORDERED; // slice 3: shared kernel-backed order
 
 const ALL_RANKS_WITH_NONE = ["None", ...RANKS];
 
@@ -129,41 +127,29 @@ for (const [rank, mats] of Object.entries(MATERIALS_BY_RANK)) {
 
 // ── Pure helpers ──────────────────────────────────────────────
 
+// slice 3: kernel-backed (certified requiredColor; automatic at exactly-3-below per ruling)
 export function determineFeatRequirement(abilityRank, intensity) {
-  const abilityIndex = RANKS.indexOf(abilityRank);
-  const intensityIndex = RANKS.indexOf(intensity);
-
-  if (abilityIndex === -1 || intensityIndex === -1) {
+  const aKey = kernelKeyFor(abilityRank);
+  const iKey = kernelKeyFor(intensity);
+  if (!aKey || !iKey) {
     return { requirement: "Any Color", impossible: false, automatic: false };
   }
-
-  const difference = abilityIndex - intensityIndex;
-
-  if (difference < -1) return { requirement: "Red", impossible: true, automatic: false };
-  if (difference >= 3)  return { requirement: "Automatic", impossible: false, automatic: true };
-  if (difference === -1) return { requirement: "Red", impossible: false, automatic: false };
-  if (difference === 0)  return { requirement: "Yellow", impossible: false, automatic: false };
-  if (difference === 1 || difference === 2) return { requirement: "Green", impossible: false, automatic: false };
-
-  return { requirement: "Any Color", impossible: false, automatic: false };
+  const needed = kernelRequiredColor(aKey, iKey);
+  if (needed === "impossible") return { requirement: "Red", impossible: true, automatic: false };
+  if (needed === "automatic")  return { requirement: "Automatic", impossible: false, automatic: true };
+  return { requirement: needed.charAt(0).toUpperCase() + needed.slice(1), impossible: false, automatic: false };
 }
 
+// slice 3: kernel-backed (colorAtLeast)
 export function checkFeatSuccess(resultColor, requirement) {
-  const color = resultColor.toLowerCase();
-  switch (requirement) {
-    case "Green":     return ["green", "yellow", "red"].includes(color);
-    case "Yellow":    return ["yellow", "red"].includes(color);
-    case "Red":       return color === "red";
-    case "Automatic": return true;
-    default:          return true;
-  }
+  const needed = String(requirement).toLowerCase();
+  if (!["green", "yellow", "red"].includes(needed)) return true;
+  return kernelColorAtLeast(String(resultColor).toLowerCase(), needed);
 }
 
+// slice 3: shared kernel-backed shift (clamps Shift-0..Shift-Z; Class 1000+ unshiftable)
 function applyCS(rank, shift) {
-  if (shift === 0) return rank;
-  const idx = RANKS.indexOf(rank);
-  if (idx === -1) return rank;
-  return RANKS[Math.min(Math.max(idx + shift, 0), RANKS.length - 1)];
+  return sharedShiftRank(rank, shift);
 }
 
 function getCombinedNextRank(damage) {

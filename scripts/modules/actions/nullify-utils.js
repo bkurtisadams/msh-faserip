@@ -6,11 +6,10 @@
 // Extracted to break circular import dependency.
 
 import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
+import { RANKS_ORDERED } from "../../rules/rules-reference.js";
+import { colorAtLeast as kernelColorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
 
-export const RANKS = [
-  "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing",
-  "Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-];
+export const RANKS = RANKS_ORDERED; // slice 3: shared kernel-backed order
 
 export const rIdx = (r) => Math.max(0, RANKS.findIndex(x => x.toLowerCase() === String(r||"").toLowerCase()));
 
@@ -38,16 +37,19 @@ export function getNullifyRange(powerRank) {
  *   Intensity 1 rank above (delta = 1)             = Red needed
  *   Intensity 2+ ranks above (delta >= 2)          = Impossible = auto-fail
  */
+// slice 3: thresholds verified equivalent to kernel requiredColor (delta = intensity - ability);
+// kept delta-based because callers precompute the difference. See kernel-feat-diff acceptance test.
 export function requiredColorFromDelta(delta) {
-  if (delta >= 2)  return "auto-fail";   // intensity 2+ ranks above ability = impossible (optional rule, adopted)
+  if (delta >= 2)  return "auto-fail";   // impossible (optional rule, adopted)
   if (delta === 1) return "red";
   if (delta === 0) return "yellow";
   if (delta >= -2) return "green";
-  return "auto-success";                 // ability 3+ ranks above intensity = automatic resist
+  return "auto-success";                 // automatic resist (3+ ranks below)
 }
 
+// slice 3: kernel-backed comparison (colorAtLeast)
 export function meetsThreshold(rolledColor, requiredColor) {
   if (requiredColor === "auto-fail") return false;
   if (requiredColor === "auto-success") return true;
-  return (order[String(rolledColor).toLowerCase()] >= order[String(requiredColor).toLowerCase()]);
+  return kernelColorAtLeast(String(rolledColor).toLowerCase(), String(requiredColor).toLowerCase());
 }
