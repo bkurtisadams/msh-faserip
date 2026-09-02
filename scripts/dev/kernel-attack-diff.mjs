@@ -9,7 +9,7 @@ import {
 } from "../lib/faserip-rules/faserip-kernel.js";
 import { EFFECT_COLUMNS, effectForColor, reduceEffectColor, resolveGrabBreak } from "../lib/faserip-rules/faserip-effects.js";
 import { resolveFeat } from "../lib/faserip-rules/faserip-kernel.js";
-import { bluntDamage, meleeWeaponDamage, bluntThrowDamage, chargeToHitShift, resolveChargeImpact } from "../lib/faserip-rules/faserip-damage.js";
+import { bluntDamage, meleeWeaponDamage, bluntThrowDamage, chargeToHitShift, resolveChargeImpact, chargeDamageParts } from "../lib/faserip-rules/faserip-damage.js";
 
 const NAMES = RANKS.map(r => {
   if (r.key === "SH0") return "Shift-0";
@@ -234,6 +234,20 @@ for (const dmg of [10, 20, 30, 40, 50, 75, 100]) for (const mat of [0, 6, 10, 20
   if (legacyAtt !== k.attackerTakes) objKnown++;
 }
 known(`${objKnown} of ${objN} object-charge cases: legacy rebounded only when material > damage and returned the FULL material value; kernel/character path rebound min(damage, material) on every hit through attacker BA (book example: 30 dmg vs Ex 20 BA, Gd 10 BA attacker takes 10) — fixed bug`);
+
+// 5g-b. Slam collision: legacy collision-damage math vs kernel chargeDamageParts + resolveChargeImpact
+section("slam collision: legacy formula vs kernel");
+let colN = 0;
+for (const end of [6, 10, 20, 30, 50]) for (const ba of [0, 10, 20, 40]) for (const areas of [1, 2, 3, 5]) for (const obs of [0, 10, 20, 40, 100]) {
+  const total = Math.max(end, ba) + 2 * areas;
+  const absorbed = Math.min(obs, total);
+  const lObs = total - absorbed, lSelf = Math.max(0, absorbed - ba);
+  const parts = chargeDamageParts({ endurance: end, bodyArmor: ba, areas });
+  const k = resolveChargeImpact({ damage: parts.total, targetDefense: obs, attackerDefense: ba });
+  colN++;
+  if (parts.total !== total || k.targetTakes !== lObs || k.attackerTakes !== lSelf) fail(`collision end ${end} ba ${ba} areas ${areas} obs ${obs}: legacy ${total}/${lObs}/${lSelf} vs kernel ${parts.total}/${k.targetTakes}/${k.attackerTakes}`);
+}
+console.log(`  ${colN} cases (legacy collision math already matched the kernel model)`);
 
 // 6. AP-CS armor step: legacy _RV walk vs range-true (mitigation applyArmorPiercingCS semantics)
 section("AP-CS armor step: legacy _RV walk vs range-true");

@@ -1,8 +1,31 @@
+// collision-damage.js v2.0.0 - 2026-09-02
+// v2.0.0: Kernel slice 5g follow-up. Slammed character's Body Armor read via
+//         getBodyArmorValues (equipment/override/force-field aware; was a
+//         power-name match). Character obstacle prefilled from the targeted
+//         token and its UUID carried through, so the defender's damage can be
+//         applied (defenderActorUuid was never passed before). Damage via
+//         kernel chargeDamageParts + resolveChargeImpact; material examples
+//         from kernel MATERIAL_EXAMPLES; private rank array retired.
 // collision-damage.js v1.1.1 - 2025-12-23
 // v1.1.1: Fix apply damage - use apply-collision-damage action with target-uuid
 // v1.1.0: Compact dialog layout, default to Good (brick) material
-import { applyDamageToActorUuid, debugLog } from "./action-utils.js";
+import { applyDamageToActorUuid, debugLog, getBodyArmorValues } from "./action-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { RANKS_ORDERED as RANKS } from "../../rules/rules-reference.js";
+import { chargeDamageParts, resolveChargeImpact, MATERIAL_EXAMPLES as KERNEL_MATERIALS, INDESTRUCTIBLE_MATERIAL_RANKS } from "../../lib/faserip-rules/faserip-damage.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
+
+// First targeted token other than the slammed character: the character obstacle.
+function _targetedObstacle(excludeUuid) {
+  for (const t of (game.user?.targets ?? [])) {
+    const a = t?.actor;
+    if (!a) continue;
+    if (excludeUuid && (a.uuid === excludeUuid || t.document?.uuid === excludeUuid)) continue;
+    const ba = getBodyArmorValues(a, "physical-charging");
+    return { name: a.name, uuid: a.uuid, armorRank: ba?.physicalRank || "Shift-0", armorValue: Number(ba?.physicalArmor) || 0 };
+  }
+  return null;
+}
 
 export function openCollisionDamageDialog({ 
   targetName = "Target", 
@@ -10,12 +33,6 @@ export function openCollisionDamageDialog({
   targetEndurance = "Good", 
   slamDistance = 1 
 }) {
-  const RANKS = [
-    "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-    "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-    "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-  ];
-
   // Auto-populate from target actor if UUID provided
   let autoPopulatedEnd = targetEndurance;
   let autoPopulatedArmor = "Shift-0";
@@ -36,50 +53,29 @@ export function openCollisionDamageDialog({
           autoPopulatedEnd = endRank;
         }
         
-        // Get Body Armor from power
-        const bodyArmorPower = targetActor.items.find(i => 
-          i.type === "power" && 
-          (i.name.toLowerCase().includes("body armor") || 
-          i.name.toLowerCase().includes("body armour"))
-        );
-        
-        if (bodyArmorPower) {
-          const baRank = bodyArmorPower.system?.rank || "Shift-0";
-          autoPopulatedArmor = baRank;
-        }
-        
+        // Body Armor via the shared resolver (equipment, overrides, force field)
+        const ba = getBodyArmorValues(targetActor, "physical-charging");
+        if (ba?.physicalRank) autoPopulatedArmor = ba.physicalRank;
+
         console.log(`FASERIP | Auto-populated collision data: ${targetName} (END: ${autoPopulatedEnd}, BA: ${autoPopulatedArmor})`);
-        
-        debugLog("Collision: Auto-populate details", {
-          actorName: targetActor.name,
-          enduranceRank: autoPopulatedEnd,
-          bodyArmorRank: autoPopulatedArmor,
-          allPowers: targetActor.items.filter(i => i.type === "power").map(p => p.name),
-          bodyArmorPowerFound: !!bodyArmorPower,
-          bodyArmorPowerName: bodyArmorPower?.name
-        });
+        debugLog("Collision: Auto-populate details", { actorName: targetActor.name, enduranceRank: autoPopulatedEnd, bodyArmor: ba });
       }
     } catch (e) {
       console.warn("FASERIP | Failed to auto-populate collision data:", e);
     }
   }
 
-  // Material strength examples for each rank
-  const MATERIAL_EXAMPLES = {
-    "Feeble": "Cloth, glass, brush, paper",
-    "Poor": "Normal plastics, crystal, wood",
-    "Typical": "Rubber, soft metals (gold, brass, copper), ice, adobe",
-    "Good": "Brick, aluminum, light machinery, asphalt, high strength plastics",
-    "Excellent": "Concrete, Beta cloth, iron, bullet-proof glass",
-    "Remarkable": "Reinforced concrete, steel",
-    "Incredible": "Solid stone, Vibranium, volcanic rock",
-    "Amazing": "Osmium steel, granite, gemstones",
-    "Monstrous": "Diamond, super-heavy alloys",
-    "Unearthly": "Adamantium steel, mystical/enchanted elements",
-    "Class 1000": "Virtually indestructible (Cap's shield, Thor's hammer)",
-    "Class 3000": "Virtually indestructible (Cap's shield, Thor's hammer)",
-    "Class 5000": "Virtually indestructible (Cap's shield, Thor's hammer)"
+  // Material strength examples from the kernel table
+  const materialExample = (r) => {
+    const key = kernelKeyFor(r);
+    if (!key) return "";
+    if (INDESTRUCTIBLE_MATERIAL_RANKS.includes(key)) return "Virtually indestructible (Cap's shield, Mjolnir)";
+    const list = KERNEL_MATERIALS[key];
+    return list ? list.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ") : "";
   };
+
+  // Character obstacle: prefill from the targeted token (editable)
+  const obstacle = _targetedObstacle(targetUuid);
 
   // Plain rank options with values (for Body Armor and Endurance)
   const enduranceOptions = RANKS.map(r => {
@@ -91,11 +87,16 @@ export function openCollisionDamageDialog({
     const val = game.msh.getRankValue(r);
     return `<option value="${r}" ${r===autoPopulatedArmor?'selected':''}>${r} (${val})</option>`;
   }).join('');
+  const obstacleArmorOptions = RANKS.map(r => {
+    const val = game.msh.getRankValue(r);
+    return `<option value="${r}" ${r===(obstacle?.armorRank || "Good")?'selected':''}>${r} (${val})</option>`;
+  }).join('');
   
   // Material strength options with examples (for obstacles) - default to Good (brick)
   const materialOptions = RANKS.map(r => {
     const val = game.msh.getRankValue(r);
-    const example = MATERIAL_EXAMPLES[r] ? ` — ${MATERIAL_EXAMPLES[r]}` : '';
+    const ex = materialExample(r);
+    const example = ex ? ` — ${ex}` : '';
     return `<option value="${r}" ${r === "Good" ? 'selected' : ''}>${r} (${val})${example}</option>`;
   }).join('');
 
@@ -126,13 +127,16 @@ export function openCollisionDamageDialog({
         </div>
         
         <div id="obstacle-character-panel" style="margin-left:120px;margin-bottom:8px;display:none;">
+          <div style="margin-bottom:4px;font-size:.9em;color:${obstacle ? "#2e7d32" : "#999"};">
+            ${obstacle ? `Targeted: <strong>${obstacle.name}</strong> (Body Armor from sheet)` : "No token targeted — enter the defender's Body Armor"}
+          </div>
           <div style="margin-bottom:4px;">
             <label>BA Rank:</label>
-            <select name="obstacle-armor-rank" style="width:140px;">${armorOptions}</select>
+            <select name="obstacle-armor-rank" style="width:140px;">${obstacleArmorOptions}</select>
           </div>
           <div>
             <label>BA Value:</label>
-            <input type="number" name="obstacle-armor-value" value="10" min="0" style="width:60px;">
+            <input type="number" name="obstacle-armor-value" value="${obstacle ? obstacle.armorValue : 10}" min="0" style="width:60px;">
           </div>
         </div>
       </div>
@@ -168,7 +172,9 @@ export function openCollisionDamageDialog({
             obstacleDefense,
             obstacleDefenseValue,
             areasMovedThrough: slamDistance,
-            selfActorUuid: targetUuid  // Pass the UUID so we can apply damage
+            selfActorUuid: targetUuid,
+            defenderActorUuid: obstacleType === 'character' ? (obstacle?.uuid || "") : "",
+            defenderName: obstacleType === 'character' ? (obstacle?.name || "Defender") : ""
           });
           
           // Post result to chat
@@ -190,9 +196,8 @@ export function openCollisionDamageDialog({
         $armorValue.val(value);
       });
       
-      // Initialize with current rank's value
-      const initialRank = $armorRank.val();
-      $armorValue.val(game.msh.getRankValue(initialRank));
+      // Initialize with the targeted defender's value (or the rank's standard)
+      if (!obstacle) $armorValue.val(game.msh.getRankValue($armorRank.val()));
       
       // Toggle panels based on radio selection
       html.find('[name="obstacle-type"]').on('change', () => {
@@ -219,7 +224,8 @@ function calculateCollisionDamage({
   obstacleDefenseValue,
   areasMovedThrough,
   selfActorUuid = "",          // optional: the slammed character / attacker
-  defenderActorUuid = ""       // optional: the defender if obstacleType is "character"
+  defenderActorUuid = "",      // optional: the defender if obstacleType is "character"
+  defenderName = ""
 }) {
   const getVal = (rank) => game.msh.getRankValue(rank) || 0;
 
@@ -227,21 +233,19 @@ function calculateCollisionDamage({
   const targetArmorVal = getVal(targetArmor);
   const obstacleDefenseVal = obstacleDefenseValue !== undefined ? obstacleDefenseValue : getVal(obstacleDefense);
 
-  // Base damage = max(Endurance, Body Armor) of the slammed character
-  const baseDamage = Math.max(targetEndVal, targetArmorVal);
+  // Kernel: the collision is a charging attack at the slam speed. Damage =
+  // max(Endurance, Body Armor) + 2 per area; the obstacle absorbs up to its
+  // defense and that amount rebounds through the slammed character's BA.
+  const parts = chargeDamageParts({ endurance: targetEndVal, bodyArmor: targetArmorVal, areas: areasMovedThrough });
+  const baseDamage = parts.base;
+  const speedDamage = parts.speedBonus;
+  const totalDamage = parts.total;
 
-  // Speed damage = 2 × areas
-  const speedDamage = 2 * areasMovedThrough;
-
-  // Total damage
-  const totalDamage = baseDamage + speedDamage;
-
-  // Absorbed-portion rebound (always)
-  const absorbedByObstacle = Math.min(obstacleDefenseVal, totalDamage);
-  const damageToObstacle = totalDamage - absorbedByObstacle;
-
-  const reboundAmount = absorbedByObstacle;
-  const damageToTarget = Math.max(0, reboundAmount - targetArmorVal);
+  const impact = resolveChargeImpact({ damage: totalDamage, targetDefense: obstacleDefenseVal, attackerDefense: targetArmorVal });
+  const absorbedByObstacle = impact.rebound;
+  const damageToObstacle = impact.targetTakes;
+  const reboundAmount = impact.rebound;
+  const damageToTarget = impact.attackerTakes;
 
   const rebounded = reboundAmount > 0;
 
@@ -249,7 +253,7 @@ function calculateCollisionDamage({
   explanation += `Total ${totalDamage} = ${baseDamage} base + ${speedDamage} speed. `;
   explanation += `${rebounded ? `Obstacle absorbs ${absorbedByObstacle} and returns it.` : `Obstacle absorbs ${absorbedByObstacle}.`} `;
   explanation += `${targetName} ${damageToTarget > 0 ? `takes ${damageToTarget} after own BA ${targetArmorVal}. ` : `takes no damage after own BA ${targetArmorVal}. `}`;
-  explanation += `${obstacleType === 'character' ? 'Defender' : 'Object'} takes ${damageToObstacle}.`;
+  explanation += `${obstacleType === 'character' ? (defenderName || 'Defender') : 'Object'} takes ${damageToObstacle}.`;
 
   return {
     targetName,
@@ -269,14 +273,15 @@ function calculateCollisionDamage({
     damageToObstacle,
     explanation,
     selfActorUuid,
-    defenderActorUuid
+    defenderActorUuid,
+    defenderName
   };
 }
 
 async function postCollisionResult(result) {
   const targetLine = `${result.targetName} — Endurance ${result.targetEndurance} (${result.targetEndVal}), Body Armor ${result.targetArmor} (${result.targetArmorVal})`;
   const obstacleLabel = result.obstacleType === "character" ? "Body Armor" : "Material Strength";
-  const obstacleLine = `${result.obstacleType === "character" ? "Character" : "Object"} — ${obstacleLabel} ${result.obstacleDefense} (${result.obstacleDefenseVal})`;
+  const obstacleLine = `${result.obstacleType === "character" ? (result.defenderName || "Character") : "Object"} — ${obstacleLabel} ${result.obstacleDefense} (${result.obstacleDefenseVal})`;
 
   const outcomeBlocks = [];
 
@@ -297,7 +302,7 @@ async function postCollisionResult(result) {
   if (result.damageToObstacle > 0) {
     outcomeBlocks.push(
       `<div style="margin-top:8px;padding:6px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
-         ${result.obstacleType === "character" ? "Defender" : "Object"} takes ${result.damageToObstacle} damage
+         ${result.obstacleType === "character" ? (result.defenderName || "Defender") : "Object"} takes ${result.damageToObstacle} damage
        </div>`
     );
   } else {
@@ -332,9 +337,9 @@ async function postCollisionResult(result) {
           data-action="apply-collision-damage"
           data-damage="${result.damageToObstacle}"
           data-target-uuid="${result.defenderActorUuid}"
-          title="Apply collision damage to defender"
+          title="Apply collision damage to ${result.defenderName || "defender"}"
           style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
-          Apply Damage (Defender)
+          Apply Damage (${result.defenderName || "Defender"})
       </a>`
     );
   }
