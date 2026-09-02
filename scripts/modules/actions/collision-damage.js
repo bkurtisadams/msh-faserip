@@ -1,6 +1,7 @@
-// collision-damage.js v2.0.2 - 2026-09-02
-// v2.0.2: console diagnostics on the defender prefill path (target read,
-//         render, Calculate) while the value-0 report is traced.
+// collision-damage.js v2.0.3 - 2026-09-02
+// v2.0.3: Read the defender's armor number from getBodyArmorValues().applicable
+//         (the return object's fields are physical/energy/applicable; the
+//         debug log prints them under other names). Diagnostics removed.
 // collision-damage.js v2.0.1 - 2026-09-02
 // v2.0.1: Defender BA value set explicitly in the render hook and derived from
 //         the rank at Calculate time when the box is empty/0 (the prefilled
@@ -29,9 +30,7 @@ function _targetedObstacle(excludeUuid) {
     if (!a) continue;
     if (excludeUuid && (a.uuid === excludeUuid || t.document?.uuid === excludeUuid)) continue;
     const ba = getBodyArmorValues(a, "physical-charging");
-    const found = { name: a.name, uuid: a.uuid, armorRank: ba?.physicalRank || "Shift-0", armorValue: Number(ba?.physicalArmor) || 0 };
-    console.log("[FASERIP] Collision: targeted defender", found, { rawPhysicalArmor: ba?.physicalArmor, type: typeof ba?.physicalArmor });
-    return found;
+    return { name: a.name, uuid: a.uuid, armorRank: ba?.physicalRank || "Shift-0", armorValue: Number(ba?.applicable ?? ba?.physical) || 0 };
   }
   return null;
 }
@@ -170,7 +169,6 @@ export function openCollisionDamageDialog({
             obstacleDefenseValue = (Number.isFinite(typed) && typed > 0)
               ? typed
               : (obstacle && obstacle.armorRank === obstacleDefense ? obstacle.armorValue : (game.msh.getRankValue(obstacleDefense) || 0));
-            console.log("[FASERIP] Collision: defender at Calculate", { obstacleDefense, typed, obstacle, obstacleDefenseValue, rankValue: game.msh.getRankValue(obstacleDefense), valueInputs: $('[name="obstacle-armor-value"]').length });
           } else {
             obstacleDefense = $('[name="obstacle-material"]').val();
             obstacleDefenseValue = game.msh.getRankValue(obstacleDefense);
@@ -216,7 +214,6 @@ export function openCollisionDamageDialog({
       } else {
         $armorValue.val(game.msh.getRankValue($armorRank.val()));
       }
-      console.log("[FASERIP] Collision: defender prefill (render)", { obstacle, rank: $armorRank.val(), value: $armorValue.val(), valueInputs: html.find('[name="obstacle-armor-value"]').length });
       
       // Toggle panels based on radio selection
       html.find('[name="obstacle-type"]').on('change', () => {
