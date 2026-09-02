@@ -1,3 +1,8 @@
+// action-utils.js v1.9.1 - 2026-09-01
+// v1.9.1: setupModeSelector normalizes legacy global mode values ("auto" /
+//         "classic" -> "full") like the dispatcher does; a legacy value fell
+//         through to the semi branch and every dialog ran semi regardless of
+//         the Full Auto setting.
 // action-utils.js v1.9.0 - 2026-09-01
 // v1.9.0: Kernel slice 5 (blunt). computeBluntDamage / computeEdgedDamage are
 //         thin wrappers over kernel bluntDamage / meleeWeaponDamage (same
@@ -428,6 +433,7 @@ export async function setupModeSelector(actor, $html, opts = {}, flagName = "las
   try {
     globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode") || "semi";
   } catch (_) {}
+  if (globalMode === "auto" || globalMode === "classic") globalMode = "full";
 
   const modeRank = { manual: 0, semi: 1, full: 2 };
   const globalRank = modeRank[globalMode] ?? 1;
