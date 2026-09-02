@@ -1,3 +1,7 @@
+// collision-damage.js v2.0.1 - 2026-09-02
+// v2.0.1: Defender BA value set explicitly in the render hook and derived from
+//         the rank at Calculate time when the box is empty/0 (the prefilled
+//         value attribute was not surviving to the click).
 // collision-damage.js v2.0.0 - 2026-09-02
 // v2.0.0: Kernel slice 5g follow-up. Slammed character's Body Armor read via
 //         getBodyArmorValues (equipment/override/force-field aware; was a
@@ -157,7 +161,10 @@ export function openCollisionDamageDialog({
           let obstacleDefense, obstacleDefenseValue;
           if (obstacleType === 'character') {
             obstacleDefense = $('[name="obstacle-armor-rank"]').val();
-            obstacleDefenseValue = Number($('[name="obstacle-armor-value"]').val() || 0);
+            const typed = Number($('[name="obstacle-armor-value"]').val());
+            obstacleDefenseValue = (Number.isFinite(typed) && typed > 0)
+              ? typed
+              : (obstacle && obstacle.armorRank === obstacleDefense ? obstacle.armorValue : (game.msh.getRankValue(obstacleDefense) || 0));
           } else {
             obstacleDefense = $('[name="obstacle-material"]').val();
             obstacleDefenseValue = game.msh.getRankValue(obstacleDefense);
@@ -197,7 +204,13 @@ export function openCollisionDamageDialog({
       });
       
       // Initialize with the targeted defender's value (or the rank's standard)
-      if (!obstacle) $armorValue.val(game.msh.getRankValue($armorRank.val()));
+      if (obstacle) {
+        $armorRank.val(obstacle.armorRank);
+        $armorValue.val(obstacle.armorValue);
+      } else {
+        $armorValue.val(game.msh.getRankValue($armorRank.val()));
+      }
+      debugLog("Collision: defender prefill", { obstacle, rank: $armorRank.val(), value: $armorValue.val() });
       
       // Toggle panels based on radio selection
       html.find('[name="obstacle-type"]').on('change', () => {
