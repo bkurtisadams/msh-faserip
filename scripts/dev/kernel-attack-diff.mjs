@@ -95,7 +95,7 @@ for (const a of SHIFTABLE) for (const i of SHIFTABLE) for (const c of COLORS) {
   fail(`success ${a} vs ${i} ${c}: legacy ${l} vs kernel ${k} (needed ${needed})`);
 }
 known(`${impossibleRed} cases: post-CS rank 2+ below intensity, legacy let a red succeed; kernel = impossible (USE_IMPOSSIBLE was already applied pre-dialog on the unshifted rank)`);
-known(`${autoWhite} cases: post-CS rank 3+ above intensity on a white roll, legacy failed; kernel = automatic (RULED 2026-08-31 >=3 auto; reachable only when dialog CS lifts a non-auto rank into the auto band)`);
+known(`${autoWhite} cases: post-CS rank 3+ above intensity on a white roll, legacy failed; kernel = automatic (RULED 2026-09-01: automatic succeeds regardless of the roll; reachable only when dialog CS lifts a non-auto rank into the auto band)`);
 console.log(`  ${n3} cases`);
 
 // 4. Pull-punch result cap (BA): legacy order clamp vs reduceEffectColor

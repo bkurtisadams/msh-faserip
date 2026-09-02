@@ -208,6 +208,7 @@ export const ERRATA = [
   'NOTE: AP Shot is RAW (ammunition rules): target Body Armor -2CS for hit and damage, no effect on force fields. Implemented in faserip-ammo.js.',
   'RULED 2026-08-31: Monstrous rank range is 63-87. PDF text "63-67" is an OCR error.',
   'RULED 2026-08-31: Automatic FEAT threshold is exactly three ranks below ability (>=3). Kernel requiredColor implements this.',
+  'RULED 2026-09-01: An automatic FEAT succeeds regardless of any die rolled for it (e.g. column shifts declared at roll time lift the rank into the automatic band); resolveFeat does not consult the roll. Impossible likewise fails regardless of the roll.',
   'RULED 2026-08-31: Universal Table color bands certified against table image; Class 1000/3000/5000/Beyond corrected from provisional values.',
   'RULED 2026-08-31: Rank 36 is Incredible. Players Book text (Rm 26-35, In 36-45) is authoritative; the table image printing Rm 26-36 / In 37-45 is wrong.',
   'RULED 2026-08-31: Throwing Blunt yellow result is Bullseye per prose; the table image printing yellow = Hit is wrong.',
