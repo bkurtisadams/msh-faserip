@@ -1,3 +1,16 @@
+// scripts/modules/actions/check-action.js v1.13.1 - 2026-09-03
+// v1.13.1: _mentalIntensityRank accepts fixedRank under any intensity mode
+//          (Full-Auto passes intensity "power-rank" with saveFixedRank) and
+//          opts.powerRank, so the Intensity threshold applies on both paths.
+// scripts/modules/actions/check-action.js v1.13.0 - 2026-09-03
+// v1.13.0: Mental power saves resolve as Intensity FEATs (kernel requiredColor
+//          thresholds via nullify-utils): intensity 2+ ranks above the defense
+//          = impossible, no roll, effect applies; 3+ below = automatic, no
+//          roll; otherwise the rolled colour must meet the required colour
+//          (red/yellow/green), not merely beat white. Psi-Screen / Mental
+//          Power substitution now sets the column rolled on (both paths) and
+//          prefills the semi dialog; intensity read from fixed-rank,
+//          powerRankName, or intensityRank opts. Cards show the needed colour.
 // scripts/modules/actions/check-action.js v1.12.1 - 2026-08-07
 // v1.12.1: Psionic Attack failed-save KO routes through
 //          Effects.applyUnconscious (statuses, canAct:false, defense
@@ -164,7 +177,11 @@ export class CheckAction extends BaseAction {
       const targetName    = prefill.targetName     || "Target";
       // For power-save / mental powers, use the correct save ability (e.g. psyche) not endurance
       const saveAbilityKey = isSaveNullify ? (this.abilityName || "endurance") : "endurance";
-      const targetEndRank = actor?.system?.abilities?.[saveAbilityKey]?.rank || prefill.targetEndRank || "Good";
+      const mentalDefAuto = (isSaveNullify && saveAbilityKey === "psyche") ? scanMentalDefenses(actor, saveAbilityKey) : null;
+      const mentalSubstituted = !!(mentalDefAuto && mentalDefAuto.source !== "Psyche");
+      const targetEndRank = mentalSubstituted
+        ? mentalDefAuto.rank
+        : (actor?.system?.abilities?.[saveAbilityKey]?.rank || prefill.targetEndRank || "Good");
       const shift         = Number(prefill.shift ?? 0) || 0;
       const dmgThrough    = Number(prefill.dmgThrough ?? 0) || 0;
       const borderline    = !!prefill.borderline;
@@ -179,7 +196,7 @@ export class CheckAction extends BaseAction {
           const doc = await fromUuid(defenderUuid);
           const defenderActor = doc?.actor ?? doc ?? null;
           if (defenderActor) {
-            effectAbilityShift = getAbilityShift(defenderActor, saveAbilityKey);
+            effectAbilityShift = mentalSubstituted ? 0 : getAbilityShift(defenderActor, saveAbilityKey);
             effectAbilityShift += Number(defenderActor.system?.combatMods?.selfPenaltyCS) || 0;
           }
         } catch (_e) { /* uuid resolution failed */ }
@@ -203,8 +220,15 @@ export class CheckAction extends BaseAction {
       
       let roll, capped, colorLower;
       let checkKarmaUsed = 0;
+      const mentalReq = this._mentalRequiredColor(effectiveEndRank);
+      const mentalAuto = (mentalReq === "auto-fail" || mentalReq === "auto-success") ? mentalReq : null;
       
-      if (preRolled && preRolled.colorLower) {
+      if (mentalAuto) {
+        // Impossible / automatic Intensity FEAT — no roll, no Karma offer
+        roll = { total: 0 };
+        capped = 0;
+        colorLower = mentalAuto === "auto-fail" ? "white" : "green";
+      } else if (preRolled && preRolled.colorLower) {
         // Use pre-rolled result (from inline check for consolidated mode)
         colorLower = preRolled.colorLower;
         capped = preRolled.cappedTotal ?? preRolled.roll ?? 50;
@@ -440,9 +464,7 @@ export class CheckAction extends BaseAction {
         const saveActor = await this._resolveTokenActor(defenderUuid || (this.opts?.prefill?.targetUuid || ""));
         if (saveActor) {
           let endRank     = targetEndRank;
-          let intensityRank = endRank;
-          if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
-          if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+          let intensityRank = this._mentalIntensityRank(endRank);
 
           // ── Mental defense substitution (Psi-Screen / Mental Powers replace Psyche) ──
           const saveAbilityCheck = (this.abilityName || "psyche").toLowerCase();
@@ -470,7 +492,10 @@ export class CheckAction extends BaseAction {
             return;
           }
 
-          if (customEffectName && colorLower === "white") {
+          const mentalFailed = mentalAuto === "auto-fail"
+            || (mentalAuto !== "auto-success" && (mentalReq ? !Nullify.meetsThreshold(colorLower, mentalReq) : colorLower === "white"));
+          const mentalRollText = this._mentalRollText({ mentalAuto, mentalReq, colorLower, total: capped, defenseRank: effectiveEndRank, intensityRank });
+          if (customEffectName && mentalFailed) {
             // Custom mental power effect (e.g., Psionic Attack → Unconscious)
             const d = new Roll("1d10");
             await d.evaluate();
@@ -527,7 +552,7 @@ export class CheckAction extends BaseAction {
                 <div style="color:#c62828;font-weight:700;">${targetName} — ${saveAbilityUpper} FEAT Failed</div>
               </div>
               <div style="padding:8px 10px;">
-                <div><strong>Roll:</strong> WHITE (failed)</div>
+                <div><strong>Roll:</strong> ${mentalRollText}</div>
                 <div><strong>Result:</strong> ${customFailMessage} for ${duration} rounds</div>
               </div>
               <div style="text-align:center;padding:8px;margin:6px;background:${bg};color:${fg};font-weight:700;border-radius:4px;">
@@ -551,7 +576,7 @@ export class CheckAction extends BaseAction {
                   </div>
                   <div style="padding:8px 10px;">
                     <div><strong>Power:</strong> ${powerName}</div>
-                    <div><strong>Roll:</strong> ${colorLower.toUpperCase()}</div>
+                    <div><strong>Roll:</strong> ${mentalRollText}</div>
                     <div><strong>Result:</strong> ${effectText}</div>
                   </div>
                   <div style="text-align:center;padding:8px;margin:6px;background:${bg};color:${fg};font-weight:700;border-radius:4px;">
@@ -616,7 +641,9 @@ export class CheckAction extends BaseAction {
     // ------------------------------
     const _saveAbilityName = isSaveNullify ? (this.abilityName || "endurance") : "endurance";
     const _saveAbilityLabel = _saveAbilityName.charAt(0).toUpperCase() + _saveAbilityName.slice(1);
-    const targetRanks = this._rankOptions(prefill.targetEndRank || actor?.system?.abilities?.[_saveAbilityName]?.rank || actor?.system?.abilities?.endurance?.rank || "Good");
+    const _mentalDef = (isSaveNullify && _saveAbilityName === "psyche") ? scanMentalDefenses(actor, _saveAbilityName) : null;
+    const _mentalSubstituted = !!(_mentalDef && _mentalDef.source !== "Psyche");
+    const targetRanks = this._rankOptions(prefill.targetEndRank || (_mentalSubstituted ? _mentalDef.rank : null) || actor?.system?.abilities?.[_saveAbilityName]?.rank || actor?.system?.abilities?.endurance?.rank || "Good");
     const preDmg = Number(prefill.dmgThrough ?? 0) || 0;
     const html = `
       <div class="frp-dialog" style="min-width:410px;">
@@ -672,7 +699,7 @@ export class CheckAction extends BaseAction {
     // convention: save-nullify / power-save uses the declared save ability,
     // everything else is Endurance.
     const _saveAbilityKey = isSaveNullify ? (this.abilityName || "endurance") : "endurance";
-    const _effectShift = Number(getAbilityShift(actor, _saveAbilityKey)) || 0;
+    const _effectShift = _mentalSubstituted ? 0 : (Number(getAbilityShift(actor, _saveAbilityKey)) || 0);
     const _selfPenalty = Number(actor?.system?.combatMods?.selfPenaltyCS) || 0;
     const _totalShift  = choice.shift + _effectShift + _selfPenalty;
     const effectiveEndRank = _totalShift ? shiftRank(choice.targetEndRank, _totalShift) : choice.targetEndRank;
@@ -687,19 +714,25 @@ export class CheckAction extends BaseAction {
     // add Karma to Slam/Stun/Kill FEATs). Routed to the owning player when
     // one is active; the GM's local prompt counts down 10s the same way.
     const _blindside = !!(prefill.blindside || this.opts?.blindside);
-    const _kr = await this._rollCheckWithKarma(actor, {
-      rank: effectiveEndRank,
-      sourceName: `${labelFor(actionType)} Check${prefill.attackerName ? ` vs ${prefill.attackerName}` : ""}`,
-      blindside: _blindside
-    });
+    const _mentalReq = this._mentalRequiredColor(effectiveEndRank);
+    const _mentalAuto = (_mentalReq === "auto-fail" || _mentalReq === "auto-success") ? _mentalReq : null;
+    const _kr = _mentalAuto
+      ? { roll: { total: 0 }, karmaUsed: 0, capped: 0 }
+      : await this._rollCheckWithKarma(actor, {
+          rank: effectiveEndRank,
+          sourceName: `${labelFor(actionType)} Check${prefill.attackerName ? ` vs ${prefill.attackerName}` : ""}`,
+          blindside: _blindside
+        });
     const roll = _kr.roll;
     const _checkKarmaUsed = _kr.karmaUsed;
     
     // Roll is always embedded in the card (no separate roll.toMessage)
     
-    const color = (typeof rollUniversalTable === "function")
-      ? rollUniversalTable(effectiveEndRank, _kr.capped)
-      : (game?.msh?.rollUniversalTable?.(effectiveEndRank, _kr.capped) ?? "white");
+    const color = _mentalAuto
+      ? (_mentalAuto === "auto-fail" ? "white" : "green")
+      : (typeof rollUniversalTable === "function")
+        ? rollUniversalTable(effectiveEndRank, _kr.capped)
+        : (game?.msh?.rollUniversalTable?.(effectiveEndRank, _kr.capped) ?? "white");
     const colorLower = String(color || "white").toLowerCase();
 
     let finalEffect = mapping[colorLower] || color;
@@ -842,8 +875,12 @@ export class CheckAction extends BaseAction {
       const customFailMessage = this.opts.failMessage || "is affected";
       const powerName         = this.opts.powerName || "Mental Power";
       const saveAbilityLabel  = (this.abilityName || "psyche").charAt(0).toUpperCase() + (this.abilityName || "psyche").slice(1);
+      const _mentalIntensity = this._mentalIntensityRank(effectiveEndRank);
+      const _mentalFailed = _mentalAuto === "auto-fail"
+        || (_mentalAuto !== "auto-success" && (_mentalReq ? !Nullify.meetsThreshold(colorLower, _mentalReq) : colorLower === "white"));
+      const _mentalNeed = `<div style="margin-top:4px;font-size:.9em;color:#555;">${this._mentalRollText({ mentalAuto: _mentalAuto, mentalReq: _mentalReq, colorLower, total: _kr.capped, defenseRank: effectiveEndRank, intensityRank: _mentalIntensity })}</div>`;
 
-      if (colorLower === "white") {
+      if (_mentalFailed) {
         // Failed save — roll duration and apply effect
         const d = new Roll("1d10");
         await d.evaluate();
@@ -878,12 +915,12 @@ export class CheckAction extends BaseAction {
           }
         }
 
-        mentalPowerExtraHtml = `<div style="margin-top:6px;color:#c62828;font-weight:bold;">
+        mentalPowerExtraHtml = _mentalNeed + `<div style="margin-top:6px;color:#c62828;font-weight:bold;">
           ${choice.targetName || "Target"} ${customFailMessage} for ${duration} rounds (1d10 = ${duration})
         </div>`;
       } else {
         // Resisted
-        mentalPowerExtraHtml = `<div style="margin-top:6px;color:#2e7d32;font-weight:bold;">
+        mentalPowerExtraHtml = _mentalNeed + `<div style="margin-top:6px;color:#2e7d32;font-weight:bold;">
           ${choice.targetName || "Target"} resists ${powerName}!
         </div>`;
       }
@@ -918,6 +955,36 @@ export class CheckAction extends BaseAction {
       saveAbility: isSaveNullify ? (this.abilityName || null) : null
     });
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
+  }
+
+  /** Intensity rank for a mental power save: fixed rank, else the power's rank, else fallback. */
+  _mentalIntensityRank(fallback) {
+    const o = this.opts || {};
+    if (o.fixedRank) return o.fixedRank;
+    if (o.powerRankName) return o.powerRankName;
+    if (o.powerRank) return o.powerRank;
+    if (o.intensityRank) return o.intensityRank;
+    if (o.prefill?.intensityRank) return o.prefill.intensityRank;
+    return fallback;
+  }
+
+  /** Required colour for a custom-effect mental power save (Intensity vs defense rank), or null when not applicable. */
+  _mentalRequiredColor(defenseRank) {
+    const o = this.opts || {};
+    const aid = String(this?.actionId || this?.type || o.actionId || o.checkType || this?.actionType || "").toLowerCase();
+    const isMental = (aid === "save-nullify" || aid === "nullify-save" || aid === "force-save-nullify" || aid === "power-save" || aid === "force-power-save");
+    if (!isMental || o.isNullifyAura || !o.effectName) return null;
+    const intensityRank = this._mentalIntensityRank(null);
+    if (!intensityRank || !defenseRank) return null;
+    return Nullify.requiredColorFromDelta(Nullify.rIdx(intensityRank) - Nullify.rIdx(defenseRank));
+  }
+
+  _mentalRollText({ mentalAuto, mentalReq, colorLower, total, defenseRank, intensityRank }) {
+    const vs = `${defenseRank} vs ${intensityRank} intensity`;
+    if (mentalAuto === "auto-fail") return `Impossible — no roll (${vs})`;
+    if (mentalAuto === "auto-success") return `Automatic — no roll (${vs})`;
+    const need = mentalReq ? ` — needed ${mentalReq.charAt(0).toUpperCase() + mentalReq.slice(1)}` : "";
+    return `${total ? `${total} ` : ""}${String(colorLower).toUpperCase()}${need} (${vs})`;
   }
 
   /** Prefer a Token's synthetic actor (unlinked tokens) over the base Actor */

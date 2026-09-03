@@ -1,3 +1,7 @@
+// chat-hooks.js v1.8.1 - 2026-09-03
+// v1.8.1: Full-Auto power-save auto-run passes the card's effective power
+//         rank (powerRankName, fixedRank fallback) and a defender prefill so
+//         CheckAction resolves the save as an Intensity FEAT.
 // chat-hooks.js v1.8.0 - 2026-08-02
 // v1.8.0: Live dying-option buttons (Life, Death, and Health p.31):
 //         dying-stabilize-50 (owner/GM; 50 Karma, +1 stabilizedRounds,
@@ -388,12 +392,15 @@ export function installActionChatHandlers() {
                 actor: saveActor,
                 abilityName: f.saveAbility || "endurance",
                 opts: {
+                  prefill: { targetUuid: saveActor.uuid ?? "", targetName: saveActor.name || "Target", dmgThrough: 0, attackForm: "mental" },
                   intensity: f.saveIntensity || "power-rank",
-                  fixedRank: f.saveFixedRank || "",
+                  fixedRank: f.saveFixedRank || f.powerRank || "",
+                  powerRankName: f.powerRank || "",
                   autoApply: true,
                   effectName: f.effectName,
                   failMessage: f.failMessage,
-                  powerName: f.powerName
+                  powerName: f.powerName,
+                  isNullifyAura: !!f.isNullifyAura
                 }
               });
               // Disable force-save buttons so manual click can't double-fire
