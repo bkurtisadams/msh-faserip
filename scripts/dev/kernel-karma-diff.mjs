@@ -6,7 +6,10 @@ import { RANKS, rankForNumber } from "../lib/faserip-rules/faserip-kernel.js";
 import {
   CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS, SPECIAL_DEATH_LOSS,
   rescueAward, ADVANCEMENT, advancementOptions, splitGroupAward, applyKarmaDelta,
+  powerAdditionCost, TALENT_ADDITION_COST, contactAdditionCost, poolLeaveShare,
+  MIN_KARMA_DECLARATION, EFFECT_REDUCTION_COST, POWER_STUNT_COST,
 } from "../lib/faserip-rules/faserip-karma.js";
+import { spendCost, advancementCost } from "../karma-costs.js";
 
 let failures = 0, expected = 0;
 const fail = (s) => { failures++; console.log("  DIFF  " + s); };
@@ -96,6 +99,29 @@ for (const total of [100, 185, 33]) for (const n of [1, 2, 3, 4]) {
   if (l !== k) fail(`split ${total}/${n}: ${l} vs ${k}`);
 }
 console.log("  Math.max(0, ...) == applyKarmaDelta; Math.floor(gross/heroes) == splitGroupAward");
+
+// 4. Spend Karma: legacy flat defaults vs kernel-computed costs (slice 6b)
+section("Spend Karma defaults: legacy flat values vs kernel formulas");
+const LEGACY_SPEND = { "Die Roll": 10, "Reduce Effect": 50, "Power Stunt": 100, "Power Advancement": 100, "Power Addition": 3000,
+  "Resource Advancement": 100, "Popularity Advancement": 50, "Talent Addition": 1000, "Contact Addition": 500 };
+if (spendCost("Die Roll") !== MIN_KARMA_DECLARATION || spendCost("Reduce Effect") !== EFFECT_REDUCTION_COST || spendCost("Power Stunt") !== POWER_STUNT_COST) fail("constant spend costs");
+for (const t of ["Die Roll", "Reduce Effect", "Power Stunt"]) if (spendCost(t) !== LEGACY_SPEND[t]) fail(`${t}: legacy ${LEGACY_SPEND[t]} vs kernel ${spendCost(t)}`);
+known(`Power/Resource/Popularity Advancement and Power/Talent/Contact Addition were flat editable defaults (100/100/50/3000/1000/500); now computed: e.g. Power Rm(30)+1 = ${spendCost("Power Advancement",{current:30,points:1})}, Resource 20+1 = ${spendCost("Resource Advancement",{current:20,points:1})}, Popularity 15+1 = ${spendCost("Popularity Advancement",{current:15,points:1})}, Power Addition Ty(6) = ${spendCost("Power Addition",{startingRank:6})}, Talent from PC = ${spendCost("Talent Addition",{source:"fromPC"})}, Contact Gd(10) = ${spendCost("Contact Addition",{resourceRank:10})}`);
+// advancementCost (all kinds) == chained kernel advancementOptions
+for (const kind of ["ability", "power", "resource", "popularity"]) for (let from = 1; from <= 100; from += 3) for (const pts of [1, 2, 5, 12]) {
+  let cv = from, total = 0;
+  for (let i = 0; i < pts; i++) { const o = advancementOptions({ current: cv, kind }); if (o.step) { total += o.step.cost; cv = o.step.to; } else if (o.crest) { total += o.crest.cost; cv = o.crest.to; } else break; }
+  const r = advancementCost({ kind, current: from, points: pts });
+  if (r.total !== total || r.newValue !== cv) fail(`advancementCost ${kind} ${from}+${pts}: ${r.total}/${r.newValue} vs ${total}/${cv}`);
+}
+const crest61 = advancementCost({ kind: "power", current: 61, mode: "crest" });
+if (crest61.total !== 1720 || crest61.newValue !== 63) fail(`power Amazing(61)->Monstrous crest anchor: ${JSON.stringify(crest61)}`);
+const walk61 = advancementCost({ kind: "power", current: 61, points: 2 });
+known(`crest-from-anywhere vs walk-to-boundary: kernel anchor Am(61)->Mn(63) is one crest purchase = ${crest61.total}; stepping 61->62->63 costs ${walk61.total}. Ability sub-dialog walks; Spend dialog offers both (Crest to next rank checkbox). RULING PENDING on the default`);
+console.log("  advancementCost(step) == chained advancementOptions for ability/power/resource/popularity; crest mode == advancementOptions().crest");
+// pool equal share
+for (const pool of [100, 185, 33]) for (const n of [1, 2, 3, 4]) if (Math.floor(pool / n) !== poolLeaveShare(pool, n)) fail(`pool share ${pool}/${n}`);
+console.log("  Math.floor(pool/members) == poolLeaveShare");
 
 console.log(`\n${failures} unexpected diff(s), ${expected} ruled/known diff classes`);
 process.exit(failures ? 1 : 0);

@@ -1,3 +1,12 @@
+// karma.js v1.14.0 - 2026-09-02
+// v1.14.0: Kernel slice 6b. Spend Karma amounts computed from the kernel via
+//          karma-costs.js: Power/Resource/Popularity advancement (multiplier ×
+//          current number per point, crest fee on crossing a rank), Power
+//          Addition (3000 + 40× starting number, 10× for robots), Talent
+//          Addition (by source), Contact Addition (500 + 10× resource number,
+//          ×2 extradimensional), Die Roll / Reduce Effect / Power Stunt
+//          constants. A calc row under the type select takes the inputs; the
+//          Amount stays editable.
 // karma.js v1.13.0 - 2026-09-02
 // v1.13.0: Kernel slice 6a. Award base amounts derived from faserip-karma
 //          (CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS,
@@ -50,13 +59,14 @@
 // v1.6.2: Fix _getNewRank thresholds to use book Rank Ranges.
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
-import { RANKS_ORDERED, RANK_ABBR, valueToRank } from "./rules/rules-reference.js";
+import { RANKS_ORDERED, RANK_ABBR, valueToRank, rankValue } from "./rules/rules-reference.js";
 import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
 import { computeKarmaTotals } from "./karma-rules.js";
 import {
   CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS, SPECIAL_DEATH_LOSS,
   ADVANCEMENT, rescueAward
 } from "./lib/faserip-rules/faserip-karma.js";
+import { spendCost, advancementCost, SPEND_TYPE_KIND, TALENT_SOURCES } from "./karma-costs.js";
 
 // Crime classes in Summary Listing order; keys match the kernel CRIME_KARMA.
 export const CRIME_CLASSES = [
@@ -716,6 +726,29 @@ export class KarmaSheet extends DocumentSheet {
               <option value="Other">Other</option>
             </select>
           </div>
+          <div class="form-group karma-spend-calc" style="display:none;background:#faf8f2;border:1px solid #c0a070;border-radius:4px;padding:6px 8px;margin:6px 0;font-size:.9em;">
+            <div class="ksc-row ksc-adv" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;">
+              <label style="display:inline-block;">Current #: <input type="number" name="kscCurrent" value="0" min="0" style="width:60px;"></label>
+              <label style="display:inline-block;">Points: <input type="number" name="kscPoints" value="1" min="1" style="width:50px;"></label>
+              <label style="display:inline-block;" title="One purchase from the current number to the next rank's minimum (Am 61 → Mn 63 = 1220 + 500)"><input type="checkbox" name="kscCrest"> Crest to next rank</label>
+              <span class="ksc-adv-lines" style="color:#666;"></span>
+            </div>
+            <div class="ksc-row ksc-power-add" style="display:none;gap:8px;align-items:center;">
+              <label style="display:inline-block;">Starting rank #: <input type="number" name="kscStartingRank" value="6" min="0" style="width:60px;"></label>
+              <label style="display:inline-block;"><input type="checkbox" name="kscRobot"> Robot</label>
+            </div>
+            <div class="ksc-row ksc-talent" style="display:none;gap:8px;align-items:center;">
+              <label style="display:inline-block;">Source: <select name="kscSource">${TALENT_SOURCES.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
+            </div>
+            <div class="ksc-row ksc-contact" style="display:none;gap:8px;align-items:center;">
+              <label style="display:inline-block;">Contact's Resource #: <input type="number" name="kscResourceRank" value="10" min="0" style="width:60px;"></label>
+              <label style="display:inline-block;"><input type="checkbox" name="kscXd"> Extradimensional</label>
+            </div>
+            <div class="ksc-row ksc-reduce" style="display:none;gap:8px;align-items:center;">
+              <label style="display:inline-block;">Colour steps: <input type="number" name="kscSteps" value="1" min="1" max="2" style="width:50px;"></label>
+            </div>
+            <div class="ksc-note" style="color:#666;margin-top:3px;"></div>
+          </div>
           <div class="form-group">
             <label>Amount:</label>
             <input type="number" name="amount" value="10" min="1" max="${availableKarma}" />
@@ -770,6 +803,56 @@ export class KarmaSheet extends DocumentSheet {
       },
       default: "spend",
       render: (html) => {
+        const actorSys = this.object.system;
+        const $calc = html.find('.karma-spend-calc');
+        const showRow = (cls) => { $calc.find('.ksc-row').hide(); if (cls) $calc.find(cls).css('display', 'flex'); };
+        const currentFor = (type) => {
+          if (type === "Resource Advancement") return Number(actorSys.attributes?.resources?.value) || rankValue(actorSys.attributes?.resources?.rank) || 0;
+          if (type === "Popularity Advancement") return Number(actorSys.attributes?.popularity?.hero?.value) || 0;
+          if (type === "Power Advancement") {
+            const p = this.object.items.find(i => i.type === "power" && i.system?.rank);
+            return p ? (Number(p.system.value) || rankValue(p.system.rank) || 0) : 0;
+          }
+          return 0;
+        };
+        const PLACEHOLDER = {
+          "Die Roll": "e.g., Spent on Fighting FEAT roll",
+          "Reduce Effect": "e.g., Reduced Kill to Yellow on energy blast",
+          "Power Stunt": "e.g., Used Telekinesis to lift a building",
+          "Power Advancement": "e.g., Energy Blast from Remarkable to Incredible",
+          "Power Addition": "e.g., Added Flight at Typical rank",
+          "Resource Advancement": "e.g., Resources 20 to 21",
+          "Popularity Advancement": "e.g., Hero Popularity 15 to 16",
+          "Talent Addition": "e.g., Learned Martial Arts A from NPC",
+          "Contact Addition": "e.g., Added Police Contact with Good resources"
+        };
+
+        const recalc = () => {
+          const type = html.find('[name="spendType"]').val();
+          const params = {
+            current: Number(html.find('[name="kscCurrent"]').val()) || 0,
+            points: Number(html.find('[name="kscPoints"]').val()) || 1,
+            startingRank: Number(html.find('[name="kscStartingRank"]').val()) || 0,
+            robot: html.find('[name="kscRobot"]').is(':checked'),
+            source: html.find('[name="kscSource"]').val(),
+            resourceRank: Number(html.find('[name="kscResourceRank"]').val()) || 0,
+            extradimensional: html.find('[name="kscXd"]').is(':checked'),
+            steps: Number(html.find('[name="kscSteps"]').val()) || 1,
+            crest: html.find('[name="kscCrest"]').is(':checked')
+          };
+          if (type === "Other") { $calc.hide(); return; }
+          const cost = spendCost(type, params);
+          html.find('[name="amount"]').val(cost);
+          let note = "";
+          if (SPEND_TYPE_KIND[type]) {
+            html.find('[name="kscPoints"]').prop('disabled', params.crest);
+            const r = advancementCost({ kind: SPEND_TYPE_KIND[type], current: params.current, points: params.points, mode: params.crest ? "crest" : "step", rankNameOf: (n) => RANK_ABBR[this._getNewRank(n)] || this._getNewRank(n) });
+            note = r.lines.map(l => `${l.label}: ${l.cost}`).join(" · ") + ` → ${r.newValue} (${this._getNewRank(r.newValue)})`;
+          }
+          $calc.find('.ksc-note').text(note);
+          $calc.show();
+        };
+
         html.find('[name="spendType"]').change(ev => {
           const type = ev.currentTarget.value;
 
@@ -781,24 +864,17 @@ export class KarmaSheet extends DocumentSheet {
             return;
           }
 
-          let amount = 10;
-          let placeholder = "Describe what you're spending karma on...";
-          
-          switch(type) {
-            case "Die Roll": amount = 10; placeholder = "e.g., Spent on Fighting FEAT roll"; break;
-            case "Reduce Effect": amount = 50; placeholder = "e.g., Reduced Kill to Yellow on energy blast"; break;
-            case "Power Stunt": amount = 100; placeholder = "e.g., Used Telekinesis to lift a building"; break;
-            case "Power Advancement": amount = 100; placeholder = "e.g., Energy Blast from Remarkable to Incredible"; break;
-            case "Power Addition": amount = 3000; placeholder = "e.g., Added Flight at Typical rank"; break;
-            case "Resource Advancement": amount = 100; placeholder = "e.g., Resources 20 to 21"; break;
-            case "Popularity Advancement": amount = 50; placeholder = "e.g., Hero Popularity 15 to 16"; break;
-            case "Talent Addition": amount = 1000; placeholder = "e.g., Learned Martial Arts A from NPC"; break;
-            case "Contact Addition": amount = 500; placeholder = "e.g., Added Police Contact with Good resources"; break;
-          }
-          
-          html.find('[name="amount"]').val(amount);
-          html.find('[name="description"]').attr('placeholder', placeholder);
+          html.find('[name="description"]').attr('placeholder', PLACEHOLDER[type] || "Describe what you're spending karma on...");
+          if (SPEND_TYPE_KIND[type]) { html.find('[name="kscCurrent"]').val(currentFor(type)); showRow('.ksc-adv'); }
+          else if (type === "Power Addition") showRow('.ksc-power-add');
+          else if (type === "Talent Addition") showRow('.ksc-talent');
+          else if (type === "Contact Addition") showRow('.ksc-contact');
+          else if (type === "Reduce Effect") showRow('.ksc-reduce');
+          else showRow(null);
+          recalc();
         });
+        html.find('.karma-spend-calc input, .karma-spend-calc select').on('input change', recalc);
+        recalc();
       }
     });
     dlg.render(true);
