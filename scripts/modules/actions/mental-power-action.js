@@ -1,3 +1,9 @@
+// scripts/modules/actions/mental-power-action.js v2.5.0 - 2026-09-03
+// v2.5.0: Telepathy dialog offers the book's Power Stunts (Telepathic Push,
+//         Mind Link, Mental Probe -2CS) — each runs through StuntRoller and
+//         the stunt tab (stunt-mechanics presets). opts.stuntPreset drives a
+//         stunt-based mental power (rank shift, save/effect defaults) and
+//         bypasses the name-based Telepathy branch.
 // scripts/modules/actions/mental-power-action.js v2.4.0 - 2026-09-03
 // v2.4.0: Telepathy tiers compare Psyche RANKS (RULED 2026-09-03), not rank
 //         numbers; the red tier fires on the presence of mental Powers or
@@ -22,7 +28,8 @@
 // v1.1.0: Unified chat card layout via buildCardShell/buildContentBox utilities
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
-import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
+import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, shiftRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
+import { presetsForItem } from "./stunt-mechanics.js";
 import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
 import { POWER_RANGE, RANKS_ORDERED } from "../../rules/rules-reference.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
@@ -53,9 +60,11 @@ export class MentalPowerAction extends BaseAction {
       return;
     }
 
-    const powerName = item.name;
-    const powerRank = item.system.rank || "Typical";
-    const powerValue = item.system.value || 6;
+    const stuntPreset = this.opts?.stuntPreset || null;
+    const powerName = stuntPreset?.powerName || item.name;
+    const baseRank = item.system.rank || "Typical";
+    const powerRank = stuntPreset?.shift ? shiftRank(baseRank, stuntPreset.shift) : baseRank;
+    const powerValue = stuntPreset?.shift ? rankValue(powerRank) : (Number.isFinite(Number(item.system.value)) && item.system.value !== "" ? Number(item.system.value) : rankValue(baseRank));
     const calculatedRange = item.system.range === "rank"
       ? (POWER_RANGE[powerRank] || "Unknown")
       : (item.system.calculatedRange || POWER_RANGE[powerRank] || "Unknown");
@@ -296,7 +305,8 @@ export class MentalPowerAction extends BaseAction {
     }
 
     // ── Telepathy: contested Power rank FEAT (not a save vs intensity) ──
-    if (nameLc.includes("telepathy")) {
+    if (nameLc.includes("telepathy") && !stuntPreset) {
+      const stuntPresets = presetsForItem(item);
       const targets = Array.from(game.user.targets);
       if (targets.length === 0) {
         ui.notifications.warn("No target selected for Telepathy");
@@ -352,6 +362,10 @@ export class MentalPowerAction extends BaseAction {
             <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" name="willing"> <span>Target is willing</span></label>
           </div>
           ${generateKarmaControlsHTML(actor, 0)}
+          ${stuntPresets.length ? `<div class="frp-box" style="padding:4px 8px;margin-top:4px;background:#ede7f6;border-color:#b39ddb;">
+            <div style="font-weight:600;color:#4527a0;margin-bottom:2px;">Power Stunts (via stunt tab, 100 Karma)</div>
+            ${stuntPresets.map(p => `<div style="font-size:11px;line-height:1.3;"><strong>${p.name}</strong> — ${p.description}</div>`).join("")}
+          </div>` : ""}
           <div style="font-size:10px;color:#555;margin-top:4px;padding:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;line-height:1.35;">
             <div style="font-weight:600;color:#e65100;margin-bottom:2px;">Power rank FEAT</div>
             <div>Willing / lower Psy → Auto</div>
@@ -363,30 +377,45 @@ export class MentalPowerAction extends BaseAction {
         </div>
       `;
 
+      const stuntButtons = {};
+      for (const p of stuntPresets) {
+        stuntButtons[`stunt_${p.key}`] = {
+          icon: '<i class="fas fa-bolt"></i>',
+          label: p.name.replace(/\s*\(.*\)$/, ""),
+          callback: () => ({ stunt: p })
+        };
+      }
       const choice = await new Promise((resolve) => {
+        const buttons = {
+          use: {
+            icon: '<i class="fas fa-brain"></i>',
+            label: "Attempt Contact",
+            callback: (html) => {
+              const { spendKarma } = extractKarmaFromDialog(html);
+              resolve({
+                willing: html.find('[name="willing"]').is(':checked'),
+                spendKarma
+              });
+            }
+          }
+        };
+        for (const [k, b] of Object.entries(stuntButtons)) buttons[k] = { ...b, callback: () => resolve(b.callback()) };
+        buttons.cancel = { icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => resolve(null) };
         showFaseripButtonDialog({
           title: powerName,
-          width: 280,
+          width: stuntPresets.length ? 420 : 280,
           content: dialogHtml,
-          buttons: {
-            use: {
-              icon: '<i class="fas fa-brain"></i>',
-              label: "Attempt Contact",
-              callback: (html) => {
-                const { spendKarma } = extractKarmaFromDialog(html);
-                resolve({
-                  willing: html.find('[name="willing"]').is(':checked'),
-                  spendKarma
-                });
-              }
-            },
-            cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => resolve(null) }
-          },
+          buttons,
           default: "use"
         });
       });
 
       if (!choice) return { rawActionCancelled: true };
+      if (choice.stunt) {
+        const { StuntRoller } = await import("../../stunts.js");
+        await new StuntRoller(actor).rollStuntForPreset(item, choice.stunt);
+        return;
+      }
 
       let required, requiredReason;
       if (outOfRange) {
@@ -512,7 +541,7 @@ export class MentalPowerAction extends BaseAction {
     }
 
     // Determine save ability from power system or default to Psyche
-    const saveAbility = item.system.save?.ability || this._getDefaultSaveAbility(item);
+    const saveAbility = stuntPreset?.saveAbility || item.system.save?.ability || this._getDefaultSaveAbility(item);
     const saveIntensity = item.system.save?.intensity || "power-rank";
     const saveFixedRank = item.system.save?.fixedRank || powerRank;
 
@@ -786,6 +815,11 @@ export class MentalPowerAction extends BaseAction {
     let fixedRank    = item.system?.save?.fixedRank || powerRank;
 
     // Sensible defaults per common mental powers
+    if (!effectName && stuntPreset?.effectName) {
+      effectName   = stuntPreset.effectName;
+      failMessage  = stuntPreset.failMessage || failMessage;
+      abilityLabel = stuntPreset.saveAbility || abilityLabel;
+    }
     if (!effectName) {
       if (nameLc.includes("psionic attack")) {
         effectName   = "Unconscious";

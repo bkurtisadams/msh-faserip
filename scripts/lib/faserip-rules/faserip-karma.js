@@ -1,3 +1,8 @@
+// faserip-rules karma v0.5.0
+// v0.5.0: RULED 2026-09-03 — Power Stunt mastery at 10 SUCCESSES: the FEAT
+//         ladder counts successful uses; the tenth success masters the stunt
+//         (automatic thereafter). Book "more than ten times" read as a
+//         book error (Judge's ruling). powerStuntRequiredColor(successes).
 // faserip-rules karma v0.4.2
 // v0.4.2: RULED 2026-09-02 — Contact Addition costs 500 + 10 x the Contact's
 //         Resource rank number, flat. No multiplier for extradimensional,
@@ -13,7 +18,7 @@
 
 import { rankForNumber, rankDistance, shiftRank, rankByKey } from './faserip-kernel.js';
 
-export const KARMA_VERSION = '0.4.2';
+export const KARMA_VERSION = '0.5.0';
 export const KARMA_CERTIFIED = true;
 
 // --- Awards and losses --------------------------------------------------
@@ -136,12 +141,13 @@ export const MIN_KARMA_DECLARATION = 10;   // declared spends cost at least 10
 export const EFFECT_REDUCTION_COST = 50;   // per color, Kill-capable columns
 export const POWER_STUNT_COST = 100;
 
-// Power stunt FEAT by prior attempts: never tried red; up to three yellow;
-// more than three green; more than ten it's part of the bag of tricks.
-export function powerStuntRequiredColor(timesTried) {
-  if (timesTried > 10) return 'automatic';
-  if (timesTried > 3) return 'green';
-  if (timesTried >= 1) return 'yellow';
+// Power stunt FEAT by prior SUCCESSES (RULED 2026-09-03): none red; one to
+// three yellow; four to nine green; ten successes = mastered, automatic.
+export const POWER_STUNT_MASTERY = 10;
+export function powerStuntRequiredColor(successes) {
+  if (successes >= POWER_STUNT_MASTERY) return 'automatic';
+  if (successes > 3) return 'green';
+  if (successes >= 1) return 'yellow';
   return 'red';
 }
 

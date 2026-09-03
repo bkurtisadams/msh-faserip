@@ -1,3 +1,6 @@
+// action-utils.js v1.12.1 - 2026-09-03
+// v1.12.1: scanMentalDefenses honours a granted Psi-Screen effect
+//          (flags.msh-faserip.psiScreenGrant from psi-screen-action.js).
 // action-utils.js v1.12.0 - 2026-09-03
 // v1.12.0: scanMentalDefenses: inherent Psi-Screen at Psyche rank for any
 //          character with a mental Power (Psi-Screen power text), explicit
@@ -731,6 +734,15 @@ export function scanMentalDefenses(targetActor, baseSaveAbility) {
   } else if (mentalPowers.length) {
     bestDef.hasMentalDefense = true;
     bestDef.screenSource = "Psi-Screen (inherent)";
+  }
+
+  // 1b) Psi-Screen extended by another character (psi-screen-action.js)
+  const grant = targetActor.effects?.find(e => e.flags?.["msh-faserip"]?.psiScreenGrant && !e.disabled)?.flags?.["msh-faserip"]?.psiScreenGrant;
+  if (grant) {
+    bestDef.hasMentalDefense = true;
+    bestDef.screenSource = bestDef.screenSource || grant.source;
+    const gv = rankNumberOr(grant.value, grant.rank);
+    if (gv > bestDef.value) bestDef = { ...bestDef, rank: grant.rank || "Typical", value: gv, source: grant.source };
   }
 
   // 2) Mental Powers — may use Power rank instead of Psyche

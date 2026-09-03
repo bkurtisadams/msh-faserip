@@ -1,3 +1,7 @@
+// power-router.js v1.13.0 - 2026-09-03
+// v1.13.0: Psi-Screen early-route (system.mental.psiScreen or name) to
+//          psi-screen-action.js (protect others) instead of the generic mental
+//          save dialog. Delivered LF.
 // power-router.js v1.12.0 - 2026-07-05
 // v1.12.0: Body-defense early-route (audit: bodyAlterationsDefensive passive
 //          leftovers) — bodyAlterationsDefensive-category powers without a
@@ -172,6 +176,12 @@ export async function rollPower(actor, item) {
       actor,
       opts: { itemId: item.id, item }
     });
+  }
+
+  // Psi-Screen: extend the screen over others (own dialog; passive defense otherwise)
+  if (item.system?.mental?.psiScreen === true || nameLower.includes("psi-screen") || nameLower.includes("psi screen") || nameLower.includes("psiscreen")) {
+    const { showPsiScreenDialog } = await import("./psi-screen-action.js");
+    return showPsiScreenDialog(actor, item);
   }
 
   // Recovery: Power-rank FEAT to restore one Endurance rank per day.

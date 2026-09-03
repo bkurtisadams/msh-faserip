@@ -1,9 +1,19 @@
+// scripts/stunts.js v1.3.0 - 2026-09-03
+// v1.3.0: Stunt mechanics: a stunt entry may carry `mechanic` (see
+//         modules/actions/stunt-mechanics.js); it runs after a successful
+//         roll and directly when the stunt is mastered. rollStuntForPreset()
+//         lets a power dialog attempt a book-listed stunt through the tab.
+//         FEAT colour from kernel powerStuntRequiredColor (RULED 2026-09-03:
+//         mastery at 10 successes).
 // scripts/stunts.js v1.2.0 - 2026-07-23
 // scripts/stunts.js v1.1.0 - 2026-04-22
 // v1.1.0: v14 port — DialogV2 conversions; pre-roll karma declaration (RAW);
 //         min-10 karma commitment enforced; GM impossible refund button;
 //         parentPowerId link (dynamic rank from power item).
 // v1.0.0: Initial stunt roller.
+
+import { powerStuntRequiredColor, POWER_STUNT_MASTERY } from "./lib/faserip-rules/faserip-karma.js";
+import { runStuntMechanic, ensureStuntForPreset } from "./modules/actions/stunt-mechanics.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
 
@@ -21,8 +31,9 @@ export class StuntRoller {
 
     const resolved = this._resolveStuntRank(stunt);
 
-    if (stunt.timesUsed >= 10) {
+    if (stunt.timesUsed >= POWER_STUNT_MASTERY) {
       ui.notifications.info(`${stunt.name} is mastered and does not need to be rolled.`);
+      await runStuntMechanic(this.actor, stunt);
       return;
     }
 
@@ -63,9 +74,14 @@ export class StuntRoller {
   }
 
   _getFeatDifficulty(timesUsed) {
-    if (timesUsed === 0) return { featColor: "Red" };
-    if (timesUsed <= 3) return { featColor: "Yellow" };
-    return { featColor: "Green" };
+    const c = powerStuntRequiredColor(Number(timesUsed) || 0);
+    return { featColor: c.charAt(0).toUpperCase() + c.slice(1) };
+  }
+
+  // Attempt a book-listed stunt for a power (creates the tab entry on first use).
+  async rollStuntForPreset(item, preset) {
+    const idx = await ensureStuntForPreset(this.actor, item, preset);
+    return this.rollStunt(idx);
   }
 
   async _showStuntDialog(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma) {
@@ -74,8 +90,8 @@ export class StuntRoller {
       : 'Need GREEN, YELLOW, or RED result';
 
     const featColorHex = featColor === 'Red' ? '#F44336' : featColor === 'Yellow' ? '#FFC107' : '#4CAF50';
-    const remaining = 10 - stunt.timesUsed;
-    const masterHint = stunt.timesUsed >= 9
+    const remaining = POWER_STUNT_MASTERY - stunt.timesUsed;
+    const masterHint = stunt.timesUsed >= POWER_STUNT_MASTERY - 1
       ? 'One more success and this stunt will be <strong>mastered</strong>!'
       : `${remaining} more successes until mastered.`;
 
@@ -405,9 +421,11 @@ export class StuntRoller {
       "system.karma.history": history
     });
 
-    if (stunts[stuntIndex].timesUsed >= 10) {
+    if (stunts[stuntIndex].timesUsed >= POWER_STUNT_MASTERY) {
       ui.notifications.info(`${stunt.name} is now MASTERED! No future cost or roll required.`);
     }
+
+    if (success) await runStuntMechanic(this.actor, stunts[stuntIndex]);
   }
 
   async _incrementStuntUsage(stuntIndex) {
