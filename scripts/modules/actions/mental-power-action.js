@@ -1,3 +1,9 @@
+// scripts/modules/actions/mental-power-action.js v2.4.0 - 2026-09-03
+// v2.4.0: Telepathy tiers compare Psyche RANKS (RULED 2026-09-03), not rank
+//         numbers; the red tier fires on the presence of mental Powers or
+//         psionic screening (scanMentalDefenses.hasMentalDefense), including
+//         the inherent Psi-Screen every mental-Power holder has, not only when
+//         a defense outranks Psyche. Dialog and card name the screen source.
 // scripts/modules/actions/mental-power-action.js v2.3.3 - 2026-05-15
 // v2.3.3: Telepathy dialog constrained to 280px width. Drop redundant Power
 //         row (title shows it). Reminder block stacked one-rule-per-line.
@@ -18,7 +24,7 @@ import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
 import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
 import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
-import { POWER_RANGE } from "../../rules/rules-reference.js";
+import { POWER_RANGE, RANKS_ORDERED } from "../../rules/rules-reference.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
@@ -309,7 +315,12 @@ export class MentalPowerAction extends BaseAction {
       const targetPsycheValue   = targetActor?.system?.abilities?.psyche?.value ?? rankValue(targetPsycheRank);
 
       const mentalDef = scanMentalDefenses(targetActor, "psyche");
-      const hasMentalDefense = mentalDef.source !== "Psyche";
+      const hasMentalDefense = !!mentalDef.hasMentalDefense;
+      const mentalDefLabel = mentalDef.source !== "Psyche"
+        ? `${mentalDef.source} (${mentalDef.rank})`
+        : (mentalDef.screenSource || "");
+      const rankIdx = (r) => RANKS_ORDERED.indexOf(r);
+      const targetPsycheIdx = rankIdx(targetPsycheRank), telepathPsycheIdx = rankIdx(telepathPsycheRank);
 
       // Range check: telepath token vs target token
       const srcToken = actor.getActiveTokens()?.[0];
@@ -334,7 +345,7 @@ export class MentalPowerAction extends BaseAction {
           <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;background:#f3e5f5;border-color:#ce93d8;">
             <div style="display:grid;grid-template-columns:78px 1fr;gap:1px 6px;line-height:1.35;">
               <span style="font-weight:600;color:#555;">Telepath:</span><span><strong>${telepathPsycheRank}</strong> (${telepathPsycheValue})</span>
-              <span style="font-weight:600;color:#555;">Target Psy:</span><span><strong>${targetPsycheRank}</strong> (${targetPsycheValue})${hasMentalDefense ? `<br><span style="color:#5e35b1;font-size:11px;">${mentalDef.source} (${mentalDef.rank})</span>` : ""}</span>
+              <span style="font-weight:600;color:#555;">Target Psy:</span><span><strong>${targetPsycheRank}</strong> (${targetPsycheValue})${hasMentalDefense ? `<br><span style="color:#5e35b1;font-size:11px;">${mentalDefLabel}</span>` : ""}</span>
             </div>
           </div>
           <div class="frp-box" style="padding:4px 8px;margin-bottom:4px;">
@@ -384,13 +395,13 @@ export class MentalPowerAction extends BaseAction {
       } else if (choice.willing) {
         required = "auto-success";
         requiredReason = "Target is willing";
-      } else if (targetPsycheValue > telepathPsycheValue) {
+      } else if (targetPsycheIdx > telepathPsycheIdx) {
         required = "auto-fail";
         requiredReason = `Target Psyche higher (${targetPsycheRank} > ${telepathPsycheRank}), unwilling`;
       } else if (hasMentalDefense) {
         required = "red";
-        requiredReason = `Target has ${mentalDef.source}`;
-      } else if (targetPsycheValue === telepathPsycheValue) {
+        requiredReason = `Target has ${mentalDefLabel || mentalDef.source}`;
+      } else if (targetPsycheIdx === telepathPsycheIdx) {
         required = "yellow";
         requiredReason = `Target Psyche equal (${targetPsycheRank})`;
       } else {

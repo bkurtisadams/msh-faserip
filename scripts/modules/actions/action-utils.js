@@ -1,3 +1,11 @@
+// action-utils.js v1.12.0 - 2026-09-03
+// v1.12.0: scanMentalDefenses: inherent Psi-Screen at Psyche rank for any
+//          character with a mental Power (Psi-Screen power text), explicit
+//          Psi-Screen / mental Powers detected by item flags (system.mental.
+//          psiScreen, system.isMentalPower, category mentalPowers) before name
+//          matching; returns hasMentalDefense (presence, for Telepathy's red
+//          tier) alongside the best substitution rank. Shift 0 values no
+//          longer collapse to the rank's standard number (both scanners).
 // action-utils.js v1.11.1 - 2026-09-02
 // v1.11.1: Grabbing Break chip: data-action "grabbing-break" (the chat-hooks
 //          handler listens for grabbing-break / grabbing-break-check; the chip
@@ -673,55 +681,62 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
 // Re-exported from rules-reference.js — do not redefine here
 export { RANKS, RANK_VALUES, rankValue, valueToRank };
 
+// Rank number that tolerates a legitimate Shift 0 (0) and only falls back to
+// the rank's standard number when the value is genuinely missing.
+function rankNumberOr(value, rank) {
+  const n = Number(value);
+  return (value !== "" && value !== null && value !== undefined && Number.isFinite(n)) ? n : rankValue(rank || "Typical");
+}
+
 /**
  * Scan target for best mental defense: Psi-Screen first, then Mental Powers, then Psyche.
- * Returns { rank, value, source }.
+ * Psi-Screen power text: every character with a mental Power has an inherent
+ * Psi-Screen at Psyche rank; an explicit Psi-Screen item may be higher.
+ * Returns { rank, value, source, hasMentalDefense, screenSource }.
+ *   rank/value/source     — the best rank to resist with (Psyche unless a higher substitute)
+ *   hasMentalDefense      — target has mental Powers or psionic screening (Telepathy red tier)
+ *   screenSource          — explicit Psi-Screen item name, "Psi-Screen (inherent)", or null
  */
 export function scanMentalDefenses(targetActor, baseSaveAbility) {
   const psycheRank  = targetActor?.system?.abilities?.psyche?.rank  || "Typical";
-  const psycheValue = targetActor?.system?.abilities?.psyche?.value || rankValue(psycheRank);
-  let bestDef = { rank: psycheRank, value: psycheValue, source: "Psyche" };
+  const psycheValue = rankNumberOr(targetActor?.system?.abilities?.psyche?.value, psycheRank);
+  let bestDef = { rank: psycheRank, value: psycheValue, source: "Psyche", hasMentalDefense: false, screenSource: null };
 
   if (!targetActor?.items) return bestDef;
   if (baseSaveAbility !== "psyche") return bestDef;
 
   const powers = targetActor.items.filter(i => i.type === "power" && i.system?.isActive !== false);
+  const nameOf = (p) => (p.name || "").toLowerCase();
+  const isPsiScreen = (p) => p.system?.mental?.psiScreen === true
+    || nameOf(p).includes("psi-screen") || nameOf(p).includes("psi screen") || nameOf(p).includes("psiscreen");
+  const isMentalRes = (p) => nameOf(p).includes("mental resistance") || nameOf(p).includes("resist mental");
+  const isMentalPower = (p) => {
+    if (isPsiScreen(p)) return false;
+    if (p.system?.isMentalPower === true) return true;
+    const cat = (p.system?.category || "").toLowerCase();
+    return cat === "mentalpowers" || cat === "mental powers" || cat === "mental";
+  };
+  const consider = (p) => {
+    const pv = rankNumberOr(p.system?.value, p.system?.rank);
+    if (pv > bestDef.value) bestDef = { ...bestDef, rank: p.system?.rank || "Typical", value: pv, source: p.name };
+  };
 
-  // 1) Psi-Screen — use before any other (RAW)
-  const psiScreen = powers.find(p => {
-    const n = (p.name || "").toLowerCase();
-    return n.includes("psi-screen") || n.includes("psi screen") || n.includes("psiscreen");
-  });
+  // 1) Psi-Screen — explicit item, else inherent at Psyche rank for anyone with a mental Power
+  const psiScreen = powers.find(isPsiScreen);
+  const mentalPowers = powers.filter(isMentalPower);
   if (psiScreen) {
-    const pv = psiScreen.system.value || rankValue(psiScreen.system.rank || "Typical");
-    if (pv > bestDef.value) {
-      bestDef = { rank: psiScreen.system.rank || "Typical", value: pv, source: psiScreen.name };
-    }
+    bestDef.hasMentalDefense = true;
+    bestDef.screenSource = psiScreen.name;
+    consider(psiScreen);
+  } else if (mentalPowers.length) {
+    bestDef.hasMentalDefense = true;
+    bestDef.screenSource = "Psi-Screen (inherent)";
   }
 
-  // 2) Mental Powers — may use Power rank instead of Psyche (only if no Psi-Screen)
-  if (!psiScreen) {
-    const mentalRes = powers.find(p => {
-      const n = (p.name || "").toLowerCase();
-      return n.includes("mental resistance") || n.includes("resist mental");
-    });
-    if (mentalRes) {
-      const mv = mentalRes.system.value || rankValue(mentalRes.system.rank || "Typical");
-      if (mv > bestDef.value) {
-        bestDef = { rank: mentalRes.system.rank || "Typical", value: mv, source: mentalRes.name };
-      }
-    }
-    const mentalPowers = powers.filter(p => {
-      const cat = (p.system.category || "").toLowerCase();
-      return cat === "mentalpowers" || cat === "mental powers" || cat === "mental";
-    });
-    for (const mp of mentalPowers) {
-      const mv = mp.system.value || rankValue(mp.system.rank || "Typical");
-      if (mv > bestDef.value) {
-        bestDef = { rank: mp.system.rank || "Typical", value: mv, source: mp.name };
-      }
-    }
-  }
+  // 2) Mental Powers — may use Power rank instead of Psyche
+  const mentalRes = powers.find(isMentalRes);
+  if (mentalRes) { bestDef.hasMentalDefense = true; consider(mentalRes); }
+  for (const mp of mentalPowers) consider(mp);
 
   return bestDef;
 }
@@ -738,7 +753,7 @@ export function scanForceField(targetActor) {
     i.system?.isActive !== false
   );
   if (!ff) return null;
-  const ffValue = ff.system.value || rankValue(ff.system.rank || "Typical");
+  const ffValue = rankNumberOr(ff.system.value, ff.system.rank);
   return { rank: ff.system.rank || "Typical", value: ffValue, source: ff.name };
 }
 
