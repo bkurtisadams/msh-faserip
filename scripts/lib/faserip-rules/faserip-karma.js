@@ -1,11 +1,14 @@
-// faserip-rules karma v0.4.0
+// faserip-rules karma v0.4.1
+// v0.4.1: RULED 2026-09-02 — advancement raises one rank number at a time;
+//         Cresting is the purchase that crosses the range boundary. The
+//         crest option is offered only from the top number of a rank.
 // Karma awards, losses, pools, spending, and advancement.
 // Certified against Players Book ch.3 (The Campaign) prose, the Karma
 // Summary Listing, and the chapter's worked examples.
 
 import { rankForNumber, rankDistance, shiftRank, rankByKey } from './faserip-kernel.js';
 
-export const KARMA_VERSION = '0.4.0';
+export const KARMA_VERSION = '0.4.1';
 export const KARMA_CERTIFIED = true;
 
 // --- Awards and losses --------------------------------------------------
@@ -139,10 +142,11 @@ export function powerStuntRequiredColor(timesTried) {
 
 // --- Advancement --------------------------------------------------------
 
-// Raising a rank number by one costs multiplier x current number; crossing
-// into the next rank (Cresting) jumps to that rank's minimum number and
-// adds the crest fee (Good(14)->15 = 140; 15 -> Excellent(16) = 150+400;
-// Amazing(61) -> Monstrous(63) = 1220+500).
+// Raising a rank number by one costs multiplier x current number. The
+// purchase that crosses into the next rank (Cresting) adds the crest fee
+// (Good(14)->15 = 140; 15 -> Excellent(16) = 150+400; Amazing(62) ->
+// Monstrous(63) = 1240+500). RULED 2026-09-02: one number at a time — the
+// Coldboy example's 61 -> 63 for 1220+500 is a book error (62 skipped).
 export const ADVANCEMENT = {
   ability:    { multiplier: 10, crestFee: 400 },
   resource:   { multiplier: 10, crestFee: 200 },
@@ -159,7 +163,7 @@ export function advancementOptions({ current, kind }) {
     ? { to: current + 1, cost: stepCost }
     : null;
   let crest = null;
-  if (rankDistance('SHZ', rank.key) <= 0) {
+  if (!step && rankDistance('SHZ', rank.key) <= 0) {
     const next = shiftRank(rank.key, 1);
     if (next.key !== rank.key) crest = { to: next.min, cost: stepCost + cfg.crestFee };
   }

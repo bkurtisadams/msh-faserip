@@ -208,6 +208,8 @@ export const ERRATA = [
   'NOTE: AP Shot is RAW (ammunition rules): target Body Armor -2CS for hit and damage, no effect on force fields. Implemented in faserip-ammo.js.',
   'RULED 2026-08-31: Monstrous rank range is 63-87. PDF text "63-67" is an OCR error.',
   'RULED 2026-08-31: Automatic FEAT threshold is exactly three ranks below ability (>=3). Kernel requiredColor implements this.',
+  'RULED 2026-09-02: Advancement raises a rank number one at a time; Cresting is the purchase that crosses the range boundary (Ex 25 -> Rm 26, Gd 15 -> Ex 16). The Coldboy Power Advancement example (Amazing 61 -> Monstrous 63 for 1220+500) is a book error — Amazing tops at 62, so the crest is 62 -> 63 for 20x62+500 = 1740.',
+  'NOTE: Ability Advancement prose prints "1D times the current rank number" — OCR for "10 times" (the Potato Salad Man example confirms: Good 14 -> 15 = 140).',
   'RULED 2026-09-02: Force attacks — damage may be reduced but not the effect (Force Attack section text authoritative over the Pulling Punches summary, same principle as Energy). Supersedes the 2026-08-31 force pullEffect ruling, which was made without checking the Force Attack section.',
   'NOTE: Energy Generation power text allows the hero to reduce damage or the effect of the attack — a power-specific exception implemented by callers (msh-faserip: power canReduceEffect flag), not by the En/Fo columns.',
   'RULED 2026-09-02: Armor piercing is always expressed in column shifts against Body Armor (AP shot: -2CS to hit and damage, no effect on force fields). A flat point reduction of armor has no Advanced Set basis and is retired from msh-faserip; existing flat values migrate to the same number of column shifts.',

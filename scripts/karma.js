@@ -1,3 +1,6 @@
+// karma.js v1.14.1 - 2026-09-02
+// v1.14.1: RULED 2026-09-02 — advancement one rank number at a time, crest at
+//          the boundary. "Crest to next rank" checkbox removed from Spend.
 // karma.js v1.14.0 - 2026-09-02
 // v1.14.0: Kernel slice 6b. Spend Karma amounts computed from the kernel via
 //          karma-costs.js: Power/Resource/Popularity advancement (multiplier ×
@@ -730,7 +733,6 @@ export class KarmaSheet extends DocumentSheet {
             <div class="ksc-row ksc-adv" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;">
               <label style="display:inline-block;">Current #: <input type="number" name="kscCurrent" value="0" min="0" style="width:60px;"></label>
               <label style="display:inline-block;">Points: <input type="number" name="kscPoints" value="1" min="1" style="width:50px;"></label>
-              <label style="display:inline-block;" title="One purchase from the current number to the next rank's minimum (Am 61 → Mn 63 = 1220 + 500)"><input type="checkbox" name="kscCrest"> Crest to next rank</label>
               <span class="ksc-adv-lines" style="color:#666;"></span>
             </div>
             <div class="ksc-row ksc-power-add" style="display:none;gap:8px;align-items:center;">
@@ -837,16 +839,14 @@ export class KarmaSheet extends DocumentSheet {
             source: html.find('[name="kscSource"]').val(),
             resourceRank: Number(html.find('[name="kscResourceRank"]').val()) || 0,
             extradimensional: html.find('[name="kscXd"]').is(':checked'),
-            steps: Number(html.find('[name="kscSteps"]').val()) || 1,
-            crest: html.find('[name="kscCrest"]').is(':checked')
+            steps: Number(html.find('[name="kscSteps"]').val()) || 1
           };
           if (type === "Other") { $calc.hide(); return; }
           const cost = spendCost(type, params);
           html.find('[name="amount"]').val(cost);
           let note = "";
           if (SPEND_TYPE_KIND[type]) {
-            html.find('[name="kscPoints"]').prop('disabled', params.crest);
-            const r = advancementCost({ kind: SPEND_TYPE_KIND[type], current: params.current, points: params.points, mode: params.crest ? "crest" : "step", rankNameOf: (n) => RANK_ABBR[this._getNewRank(n)] || this._getNewRank(n) });
+            const r = advancementCost({ kind: SPEND_TYPE_KIND[type], current: params.current, points: params.points, rankNameOf: (n) => RANK_ABBR[this._getNewRank(n)] || this._getNewRank(n) });
             note = r.lines.map(l => `${l.label}: ${l.cost}`).join(" · ") + ` → ${r.newValue} (${this._getNewRank(r.newValue)})`;
           }
           $calc.find('.ksc-note').text(note);

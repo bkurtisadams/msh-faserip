@@ -114,11 +114,13 @@ for (const kind of ["ability", "power", "resource", "popularity"]) for (let from
   const r = advancementCost({ kind, current: from, points: pts });
   if (r.total !== total || r.newValue !== cv) fail(`advancementCost ${kind} ${from}+${pts}: ${r.total}/${r.newValue} vs ${total}/${cv}`);
 }
-const crest61 = advancementCost({ kind: "power", current: 61, mode: "crest" });
-if (crest61.total !== 1720 || crest61.newValue !== 63) fail(`power Amazing(61)->Monstrous crest anchor: ${JSON.stringify(crest61)}`);
-const walk61 = advancementCost({ kind: "power", current: 61, points: 2 });
-known(`crest-from-anywhere vs walk-to-boundary: kernel anchor Am(61)->Mn(63) is one crest purchase = ${crest61.total}; stepping 61->62->63 costs ${walk61.total}. Ability sub-dialog walks; Spend dialog offers both (Crest to next rank checkbox). RULING PENDING on the default`);
-console.log("  advancementCost(step) == chained advancementOptions for ability/power/resource/popularity; crest mode == advancementOptions().crest");
+const o61 = advancementOptions({ current: 61, kind: "power" }), o62 = advancementOptions({ current: 62, kind: "power" });
+if (o61.crest || !o61.step || o61.step.cost !== 1220) fail(`61: crest must not be offered mid-rank: ${JSON.stringify(o61)}`);
+if (o62.step || !o62.crest || o62.crest.cost !== 1740 || o62.crest.to !== 63) fail(`62: crest 62->63 for 1740: ${JSON.stringify(o62)}`);
+const walk60 = advancementCost({ kind: "power", current: 60, points: 3 });
+if (walk60.total !== 1200 + 1220 + 1740 || walk60.newValue !== 63) fail(`Coldboy 60->63: ${JSON.stringify(walk60)}`);
+known(`RULED 2026-09-02: one rank number at a time, crest at the boundary — Coldboy Am(60)->Mn(63) = 1200 + 1220 + 1740 = ${walk60.total}; the book's 61->63 for 1720 is an error (62 skipped)`);
+console.log("  advancementCost == chained advancementOptions for ability/power/resource/popularity; crest offered only from the rank's top number");
 // pool equal share
 for (const pool of [100, 185, 33]) for (const n of [1, 2, 3, 4]) if (Math.floor(pool / n) !== poolLeaveShare(pool, n)) fail(`pool share ${pool}/${n}`);
 console.log("  Math.floor(pool/members) == poolLeaveShare");

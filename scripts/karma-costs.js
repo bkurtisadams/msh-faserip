@@ -1,3 +1,7 @@
+// scripts/karma-costs.js v1.1.0 - 2026-09-02
+// v1.1.0: RULED 2026-09-02 — one rank number at a time, crest at the range
+//         boundary. "crest" mode removed; the kernel offers the crest only
+//         from a rank's top number and the step walker takes it there.
 // scripts/karma-costs.js v1.0.0 - 2026-09-02
 // Kernel slice 6b. Karma spend costs from faserip-karma. Pure — no Foundry
 // globals — so the node proof (scripts/dev/kernel-karma-diff.mjs) can import it.
@@ -21,27 +25,13 @@ export const TALENT_SOURCES = [
   ["studentFromPC", "Student, taught by a player character"],
 ];
 
-// Raise a rank number. mode "step": `points` one at a time, crossing a rank
-// boundary with the crest fee when the top of the range is reached.
-// mode "crest": one purchase from the current number straight to the next
-// rank's minimum (kernel book anchor: Amazing(61) -> Monstrous(63) =
-// 20x61 + 500 = 1720). Returns { total, lines, newValue, points }.
-export function advancementCost({ kind, current, points, mode = "step", rankNameOf = (n) => String(n) }) {
+// Raise a rank number by `points`, one at a time; the purchase that crosses
+// a range boundary carries the kernel's crest fee (RULED 2026-09-02).
+// Returns { total, lines, newValue, points }.
+export function advancementCost({ kind, current, points, rankNameOf = (n) => String(n) }) {
   const cfg = ADVANCEMENT[kind];
   if (!cfg) throw new Error(`Unknown advancement kind: ${kind}`);
   const start = Math.max(0, Math.floor(Number(current) || 0));
-  if (mode === "crest") {
-    const o = advancementOptions({ current: start, kind });
-    if (!o.crest) return { total: 0, lines: [], newValue: start, points: 0 };
-    return {
-      total: o.crest.cost,
-      lines: [
-        { label: `1 pt at ${rankNameOf(start)} (${start}→${o.crest.to})`, cost: o.crest.cost - cfg.crestFee },
-        { label: `Cresting: ${rankNameOf(start)} → ${rankNameOf(o.crest.to)}`, cost: cfg.crestFee, cresting: true }
-      ],
-      newValue: o.crest.to, points: o.crest.to - start
-    };
-  }
   const pts = Math.max(0, Math.floor(Number(points) || 0));
   let cv = start, total = 0, segStart = start, segTotal = 0;
   const lines = [];
@@ -70,7 +60,7 @@ export function advancementCost({ kind, current, points, mode = "step", rankName
 //  Contact Addition:  { resourceRank, extradimensional }
 export function spendCost(type, params = {}) {
   const kind = SPEND_TYPE_KIND[type];
-  if (kind) return advancementCost({ kind, current: params.current, points: params.points ?? 1, mode: params.crest ? "crest" : "step" }).total;
+  if (kind) return advancementCost({ kind, current: params.current, points: params.points ?? 1 }).total;
   switch (type) {
     case "Die Roll":         return MIN_KARMA_DECLARATION;
     case "Reduce Effect":    return EFFECT_REDUCTION_COST * Math.max(1, Number(params.steps) || 1);
