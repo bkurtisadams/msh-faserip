@@ -1,3 +1,5 @@
+// faserip-rules kernel v0.2.6
+// v0.2.6: ERRATA — Air Control starting stunt begins mastered.
 // faserip-rules kernel v0.2.5
 // v0.2.5: ERRATA — Power Stunt mastery, Psi-Screen protection rulings.
 // faserip-rules kernel v0.2.4
@@ -10,7 +12,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.5';
+export const KERNEL_VERSION = '0.2.6';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -228,6 +230,7 @@ export const ERRATA = [
   'NOTE: Psi-Screen power text — every character with any mental Power has an inherent Psi-Screen at Psyche rank; an explicit Psi-Screen starts +1CS above Psyche. The inherent screen changes no save rank but satisfies Telepathy\'s "mental Powers or psionic screening" red tier. Implemented in msh-faserip scanMentalDefenses.',
   'RULED 2026-09-03: Power Stunt mastery — the FEAT ladder counts successful uses (0 red, 1-3 yellow, 4-9 green) and the tenth success masters the stunt (no roll, no Karma). The book\'s "more than ten times" is treated as a book error; failed attempts still cost 100 Karma but do not count.',
   'RULED 2026-09-03: Psi-Screen protecting others — one Power rank FEAT per target, green required; failure means all of the protector\'s psionic Powers are lost for 1-10 rounds ("turns" read as rounds) and no further targets are covered; the attacker is aware of the protector\'s mental presence. A protected target resists mental Powers at the protector\'s Psi-Screen rank.',
+  'RULED 2026-09-03: Air Control "begins with one Power stunt" — the chosen starting stunt is mastered from creation (no Karma, no roll; Astrid Stormbringer\'s Flight is the certified example). Sound Generation\'s wide-band attack is an area attack at -1CS Power rank damage; its stunning attack is -1CS Intensity vs Endurance.',
   'RULED 2026-09-01: An automatic FEAT succeeds regardless of any die rolled for it (e.g. column shifts declared at roll time lift the rank into the automatic band); resolveFeat does not consult the roll. Impossible likewise fails regardless of the roll.',
   'RULED 2026-08-31: Universal Table color bands certified against table image; Class 1000/3000/5000/Beyond corrected from provisional values.',
   'RULED 2026-08-31: Rank 36 is Incredible. Players Book text (Rm 26-35, In 36-45) is authoritative; the table image printing Rm 26-36 / In 37-45 is wrong.',

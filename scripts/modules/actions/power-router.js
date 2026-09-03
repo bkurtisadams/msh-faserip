@@ -1,3 +1,6 @@
+// power-router.js v1.13.1 - 2026-09-03
+// v1.13.1: rollPower tags existing tab stunts that match book presets for the
+//          power (stunt-mechanics adoptPresets) before dispatch.
 // power-router.js v1.13.0 - 2026-09-03
 // v1.13.0: Psi-Screen early-route (system.mental.psiScreen or name) to
 //          psi-screen-action.js (protect others) instead of the generic mental
@@ -158,6 +161,11 @@ export async function rollPower(actor, item) {
     ui.notifications.error("Actor or power not found");
     return;
   }
+
+  try {
+    const { adoptPresets } = await import("./stunt-mechanics.js");
+    await adoptPresets(actor, item);
+  } catch (err) { console.warn("[FASERIP] stunt preset adoption skipped:", err); }
 
   const category     = item.system.category || "";
   const powerType    = (item.system.type || "").toLowerCase();
