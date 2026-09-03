@@ -1,3 +1,8 @@
+// faserip-rules karma v0.4.2
+// v0.4.2: RULED 2026-09-02 — Contact Addition costs 500 + 10 x the Contact's
+//         Resource rank number, flat. No multiplier for extradimensional,
+//         mystic, or planetary Contacts (Appendix C assigns categories and
+//         Resource caps, not prices). The x2 option had no book source.
 // faserip-rules karma v0.4.1
 // v0.4.1: RULED 2026-09-02 — advancement raises one rank number at a time;
 //         Cresting is the purchase that crosses the range boundary. The
@@ -8,7 +13,7 @@
 
 import { rankForNumber, rankDistance, shiftRank, rankByKey } from './faserip-kernel.js';
 
-export const KARMA_VERSION = '0.4.1';
+export const KARMA_VERSION = '0.4.2';
 export const KARMA_CERTIFIED = true;
 
 // --- Awards and losses --------------------------------------------------
@@ -180,6 +185,8 @@ export const TALENT_ADDITION_COST = {
   studentFromPC: 1000, studentFromNPC: 800,
 };
 
-export function contactAdditionCost(resourceRankNumber, { extradimensional = false } = {}) {
-  return (500 + 10 * resourceRankNumber) * (extradimensional ? 2 : 1);
+// Contacts cost 500 plus 10 times the Contact's Resource rank number.
+// RULED 2026-09-02: flat — no category multiplier.
+export function contactAdditionCost(resourceRankNumber) {
+  return 500 + 10 * resourceRankNumber;
 }

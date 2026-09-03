@@ -107,6 +107,8 @@ const LEGACY_SPEND = { "Die Roll": 10, "Reduce Effect": 50, "Power Stunt": 100, 
 if (spendCost("Die Roll") !== MIN_KARMA_DECLARATION || spendCost("Reduce Effect") !== EFFECT_REDUCTION_COST || spendCost("Power Stunt") !== POWER_STUNT_COST) fail("constant spend costs");
 for (const t of ["Die Roll", "Reduce Effect", "Power Stunt"]) if (spendCost(t) !== LEGACY_SPEND[t]) fail(`${t}: legacy ${LEGACY_SPEND[t]} vs kernel ${spendCost(t)}`);
 known(`Power/Resource/Popularity Advancement and Power/Talent/Contact Addition were flat editable defaults (100/100/50/3000/1000/500); now computed: e.g. Power Rm(30)+1 = ${spendCost("Power Advancement",{current:30,points:1})}, Resource 20+1 = ${spendCost("Resource Advancement",{current:20,points:1})}, Popularity 15+1 = ${spendCost("Popularity Advancement",{current:15,points:1})}, Power Addition Ty(6) = ${spendCost("Power Addition",{startingRank:6})}, Talent from PC = ${spendCost("Talent Addition",{source:"fromPC"})}, Contact Gd(10) = ${spendCost("Contact Addition",{resourceRank:10})}`);
+if (contactAdditionCost(10) !== 600 || contactAdditionCost(0) !== 500) fail("contact 500+10xRes");
+known(`RULED 2026-09-02: Contact Addition flat 500 + 10x Resource number — legacy x2 extradimensional retired (no book source); Gd(10) = ${contactAdditionCost(10)}`);
 // advancementCost (all kinds) == chained kernel advancementOptions
 for (const kind of ["ability", "power", "resource", "popularity"]) for (let from = 1; from <= 100; from += 3) for (const pts of [1, 2, 5, 12]) {
   let cv = from, total = 0;

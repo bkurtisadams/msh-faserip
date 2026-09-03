@@ -1,3 +1,6 @@
+// karma.js v1.14.2 - 2026-09-02
+// v1.14.2: RULED 2026-09-02 — Contact Addition flat 500 + 10× Resource number.
+//          "Extradimensional" checkbox removed from the Spend calc row.
 // karma.js v1.14.1 - 2026-09-02
 // v1.14.1: RULED 2026-09-02 — advancement one rank number at a time, crest at
 //          the boundary. "Crest to next rank" checkbox removed from Spend.
@@ -744,7 +747,6 @@ export class KarmaSheet extends DocumentSheet {
             </div>
             <div class="ksc-row ksc-contact" style="display:none;gap:8px;align-items:center;">
               <label style="display:inline-block;">Contact's Resource #: <input type="number" name="kscResourceRank" value="10" min="0" style="width:60px;"></label>
-              <label style="display:inline-block;"><input type="checkbox" name="kscXd"> Extradimensional</label>
             </div>
             <div class="ksc-row ksc-reduce" style="display:none;gap:8px;align-items:center;">
               <label style="display:inline-block;">Colour steps: <input type="number" name="kscSteps" value="1" min="1" max="2" style="width:50px;"></label>
@@ -838,7 +840,6 @@ export class KarmaSheet extends DocumentSheet {
             robot: html.find('[name="kscRobot"]').is(':checked'),
             source: html.find('[name="kscSource"]').val(),
             resourceRank: Number(html.find('[name="kscResourceRank"]').val()) || 0,
-            extradimensional: html.find('[name="kscXd"]').is(':checked'),
             steps: Number(html.find('[name="kscSteps"]').val()) || 1
           };
           if (type === "Other") { $calc.hide(); return; }

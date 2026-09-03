@@ -1,3 +1,6 @@
+// scripts/karma-costs.js v1.1.1 - 2026-09-02
+// v1.1.1: RULED 2026-09-02 — Contact Addition flat 500 + 10× Resource number;
+//         extradimensional ×2 removed (no book source).
 // scripts/karma-costs.js v1.1.0 - 2026-09-02
 // v1.1.0: RULED 2026-09-02 — one rank number at a time, crest at the range
 //         boundary. "crest" mode removed; the kernel offers the crest only
@@ -57,7 +60,7 @@ export function advancementCost({ kind, current, points, rankNameOf = (n) => Str
 //  advancement kinds: { current, points }
 //  Power Addition:    { startingRank, robot }
 //  Talent Addition:   { source }              (key of TALENT_SOURCES)
-//  Contact Addition:  { resourceRank, extradimensional }
+//  Contact Addition:  { resourceRank }
 export function spendCost(type, params = {}) {
   const kind = SPEND_TYPE_KIND[type];
   if (kind) return advancementCost({ kind, current: params.current, points: params.points ?? 1 }).total;
@@ -67,7 +70,7 @@ export function spendCost(type, params = {}) {
     case "Power Stunt":      return POWER_STUNT_COST;
     case "Power Addition":   return powerAdditionCost(Number(params.startingRank) || 0, { robot: !!params.robot });
     case "Talent Addition":  return TALENT_ADDITION_COST[params.source] ?? TALENT_ADDITION_COST.fromNPC;
-    case "Contact Addition": return contactAdditionCost(Number(params.resourceRank) || 0, { extradimensional: !!params.extradimensional });
+    case "Contact Addition": return contactAdditionCost(Number(params.resourceRank) || 0);
     default:                 return 0;
   }
 }
