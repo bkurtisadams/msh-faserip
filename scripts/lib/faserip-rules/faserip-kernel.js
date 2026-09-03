@@ -1,8 +1,10 @@
-// faserip-rules kernel v0.2.1
+// faserip-rules kernel v0.2.2
+// v0.2.2: ERRATA — Contact Addition flat cost ruling; Power Advancement
+//         "rank number gained" wording note.
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.1';
+export const KERNEL_VERSION = '0.2.2';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -213,6 +215,8 @@ export const ERRATA = [
   'RULED 2026-09-02: Force attacks — damage may be reduced but not the effect (Force Attack section text authoritative over the Pulling Punches summary, same principle as Energy). Supersedes the 2026-08-31 force pullEffect ruling, which was made without checking the Force Attack section.',
   'NOTE: Energy Generation power text allows the hero to reduce damage or the effect of the attack — a power-specific exception implemented by callers (msh-faserip: power canReduceEffect flag), not by the En/Fo columns.',
   'RULED 2026-09-02: Armor piercing is always expressed in column shifts against Body Armor (AP shot: -2CS to hit and damage, no effect on force fields). A flat point reduction of armor has no Advanced Set basis and is retired from msh-faserip; existing flat values migrate to the same number of column shifts.',
+  'RULED 2026-09-02: Contact Addition costs 500 + 10 x the Contact\'s Resource rank number, flat. No multiplier for extradimensional, mystic, planetary, or any other category — Appendix C assigns Contact categories and Resource caps, not prices. The x2 extradimensional option carried from pre-kernel msh-faserip had no book source and is retired.',
+  'NOTE: Power Advancement prose prints "20 times the rank number gained"; the Coldboy example bills 60 x 20 to go 60 -> 61, so the multiplier applies to the current (departing) number, as for abilities. Kernel ADVANCEMENT.power follows the example.',
   'RULED 2026-09-01: An automatic FEAT succeeds regardless of any die rolled for it (e.g. column shifts declared at roll time lift the rank into the automatic band); resolveFeat does not consult the roll. Impossible likewise fails regardless of the roll.',
   'RULED 2026-08-31: Universal Table color bands certified against table image; Class 1000/3000/5000/Beyond corrected from provisional values.',
   'RULED 2026-08-31: Rank 36 is Incredible. Players Book text (Rm 26-35, In 36-45) is authoritative; the table image printing Rm 26-36 / In 37-45 is wrong.',
