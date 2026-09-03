@@ -1,3 +1,12 @@
+// karma.js v1.15.0 - 2026-09-03
+// v1.15.0: Kernel slice 6c. Power / Resource / Popularity Advancement use the
+//          Ability Advancement sub-dialog (_onAdvancement(kind)): target picker
+//          (ability / power item / Resources / hero or secret-ID Popularity),
+//          target number, kernel step walker via advancementCost (crest at the
+//          boundary, RULED 2026-09-02), rationale (RAW warning when required),
+//          editable Amount marked "(adjusted from N)" in the history entry,
+//          value + rank written to the actor or power item on Advance. The
+//          Spend dialog's advancement calc row is retired.
 // karma.js v1.14.2 - 2026-09-02
 // v1.14.2: RULED 2026-09-02 — Contact Addition flat 500 + 10× Resource number.
 //          "Extradimensional" checkbox removed from the Spend calc row.
@@ -733,11 +742,6 @@ export class KarmaSheet extends DocumentSheet {
             </select>
           </div>
           <div class="form-group karma-spend-calc" style="display:none;background:#faf8f2;border:1px solid #c0a070;border-radius:4px;padding:6px 8px;margin:6px 0;font-size:.9em;">
-            <div class="ksc-row ksc-adv" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;">
-              <label style="display:inline-block;">Current #: <input type="number" name="kscCurrent" value="0" min="0" style="width:60px;"></label>
-              <label style="display:inline-block;">Points: <input type="number" name="kscPoints" value="1" min="1" style="width:50px;"></label>
-              <span class="ksc-adv-lines" style="color:#666;"></span>
-            </div>
             <div class="ksc-row ksc-power-add" style="display:none;gap:8px;align-items:center;">
               <label style="display:inline-block;">Starting rank #: <input type="number" name="kscStartingRank" value="6" min="0" style="width:60px;"></label>
               <label style="display:inline-block;"><input type="checkbox" name="kscRobot"> Robot</label>
@@ -770,9 +774,9 @@ export class KarmaSheet extends DocumentSheet {
           callback: async (html) => {
             const spendType = html.find('[name="spendType"]').val();
 
-            // Ability Advancement uses its own sub-dialog — parent already closed
-            // when dropdown selected it; this is just a safety guard.
-            if (spendType === "Ability Advancement") return;
+            // Advancement types use the sub-dialog — parent already closed
+            // when the dropdown selected one; this is just a safety guard.
+            if (SPEND_TYPE_KIND[spendType]) return;
 
             const amount = Number(html.find('[name="amount"]').val());
             const description = html.find('[name="description"]').val();
@@ -807,18 +811,8 @@ export class KarmaSheet extends DocumentSheet {
       },
       default: "spend",
       render: (html) => {
-        const actorSys = this.object.system;
         const $calc = html.find('.karma-spend-calc');
         const showRow = (cls) => { $calc.find('.ksc-row').hide(); if (cls) $calc.find(cls).css('display', 'flex'); };
-        const currentFor = (type) => {
-          if (type === "Resource Advancement") return Number(actorSys.attributes?.resources?.value) || rankValue(actorSys.attributes?.resources?.rank) || 0;
-          if (type === "Popularity Advancement") return Number(actorSys.attributes?.popularity?.hero?.value) || 0;
-          if (type === "Power Advancement") {
-            const p = this.object.items.find(i => i.type === "power" && i.system?.rank);
-            return p ? (Number(p.system.value) || rankValue(p.system.rank) || 0) : 0;
-          }
-          return 0;
-        };
         const PLACEHOLDER = {
           "Die Roll": "e.g., Spent on Fighting FEAT roll",
           "Reduce Effect": "e.g., Reduced Kill to Yellow on energy blast",
@@ -834,8 +828,6 @@ export class KarmaSheet extends DocumentSheet {
         const recalc = () => {
           const type = html.find('[name="spendType"]').val();
           const params = {
-            current: Number(html.find('[name="kscCurrent"]').val()) || 0,
-            points: Number(html.find('[name="kscPoints"]').val()) || 1,
             startingRank: Number(html.find('[name="kscStartingRank"]').val()) || 0,
             robot: html.find('[name="kscRobot"]').is(':checked'),
             source: html.find('[name="kscSource"]').val(),
@@ -845,29 +837,23 @@ export class KarmaSheet extends DocumentSheet {
           if (type === "Other") { $calc.hide(); return; }
           const cost = spendCost(type, params);
           html.find('[name="amount"]').val(cost);
-          let note = "";
-          if (SPEND_TYPE_KIND[type]) {
-            const r = advancementCost({ kind: SPEND_TYPE_KIND[type], current: params.current, points: params.points, rankNameOf: (n) => RANK_ABBR[this._getNewRank(n)] || this._getNewRank(n) });
-            note = r.lines.map(l => `${l.label}: ${l.cost}`).join(" · ") + ` → ${r.newValue} (${this._getNewRank(r.newValue)})`;
-          }
-          $calc.find('.ksc-note').text(note);
+          $calc.find('.ksc-note').text("");
           $calc.show();
         };
 
         html.find('[name="spendType"]').change(ev => {
           const type = ev.currentTarget.value;
 
-          // Ability Advancement → hand off to sub-dialog and close this one.
+          // Advancement types → hand off to the sub-dialog and close this one.
           // The remaining fields (Amount/Description) don't apply to advancement.
-          if (type === "Ability Advancement") {
+          if (SPEND_TYPE_KIND[type]) {
             dlg.close();
-            this._onAbilityAdvancement();
+            this._onAdvancement(SPEND_TYPE_KIND[type]);
             return;
           }
 
           html.find('[name="description"]').attr('placeholder', PLACEHOLDER[type] || "Describe what you're spending karma on...");
-          if (SPEND_TYPE_KIND[type]) { html.find('[name="kscCurrent"]').val(currentFor(type)); showRow('.ksc-adv'); }
-          else if (type === "Power Addition") showRow('.ksc-power-add');
+          if (type === "Power Addition") showRow('.ksc-power-add');
           else if (type === "Talent Addition") showRow('.ksc-talent');
           else if (type === "Contact Addition") showRow('.ksc-contact');
           else if (type === "Reduce Effect") showRow('.ksc-reduce');
@@ -881,85 +867,88 @@ export class KarmaSheet extends DocumentSheet {
     dlg.render(true);
   }
 
-  /**
-   * Ability Advancement sub-dialog.
-   * Calculates cost per RAW: 10 × rank number per point, +400 cresting when crossing a rank boundary.
-   * Updates the ability value/rank and logs a detailed karma history entry.
-   */
   _onAbilityAdvancement() {
+    return this._onAdvancement("ability");
+  }
+
+  /**
+   * Advancement sub-dialog for ability / power / resource / popularity.
+   * Cost from the kernel step walker (advancementCost): multiplier × current
+   * number per point, crest fee on the purchase that crosses a rank boundary.
+   * Writes the new value/rank to the actor (or power item) and logs a
+   * detailed karma history entry.
+   */
+  _onAdvancement(kind) {
     const actor = this.object;
     const availableKarma = this._getCurrentKarma();
-    const abilities = actor.system.abilities;
-
-    // Rank Range MINIMUMS per Advanced Set book table — used to identify
-    // which rank a numeric value falls into. (NOT the Standard Rank Numbers.)
-    // Rank identification uses Rank Range minimums — see _getNewRank below.
-    // Cost formula: 10 × current numeric value per point (RAW).
-    const RANK_ORDER = RANKS_ORDERED;
-    const abilityKeys = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
-
-    // Abbreviate rank for compact display
     const abbrevRank = (rank) => RANK_ABBR[rank] || rank;
+    const rankNameOf = (n) => abbrevRank(this._getNewRank(n));
+    const KIND_INFO = {
+      ability:    { type: "Ability Advancement",    title: "Ability Advancement",    picker: "Ability",    verb: "advanced" },
+      power:      { type: "Power Advancement",      title: "Power Advancement",      picker: "Power",      verb: "advanced" },
+      resource:   { type: "Resource Advancement",   title: "Resource Advancement",   picker: "Resources",  verb: "advanced" },
+      popularity: { type: "Popularity Advancement", title: "Popularity Advancement", picker: "Popularity", verb: "advanced" },
+    };
+    const info = KIND_INFO[kind];
+    if (!info) throw new Error(`Unknown advancement kind: ${kind}`);
 
-    const calcAdvancementCost = (startValue, targetValue) => {
-      const points = targetValue - startValue;
-      if (points <= 0) return { total: 0, points: 0, newValue: startValue, newRank: this._getNewRank(startValue), lines: [] };
-      // Per RAW: each +1 point costs 10× the CURRENT value (not the rank's Standard Rank Number).
-      // Book example: Good(14)→Good(15) costs 140. Good(15)→Excellent(16) costs 150+400=550.
-      // Cresting adds 400 the moment the value crosses into a new rank's range.
-      let total = 0;
-      let lines = [];
-      let cv = startValue;
-      let curRank = this._getNewRank(cv);
-      let segStart = cv;
-      let segTotal = 0;
-
-      for (let i = 0; i < points; i++) {
-        const pointCost = ADVANCEMENT.ability.multiplier * cv;
-        total += pointCost;
-        segTotal += pointCost;
-        const nv = cv + 1;
-        const nRank = this._getNewRank(nv);
-
-        if (nRank !== curRank) {
-          // Close segment: show "X pts (start-end) at RankAbbrev"
-          const segPts = nv - segStart;
-          lines.push({
-            label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${nv-1 === segStart ? nv : nv})`,
-            cost: segTotal
-          });
-          lines.push({ label: `Cresting: ${curRank} → ${nRank}`, cost: ADVANCEMENT.ability.crestFee, cresting: true });
-          total += ADVANCEMENT.ability.crestFee;
-          curRank = nRank;
-          segStart = nv;
-          segTotal = 0;
-        }
-        cv = nv;
-      }
-      // Close final segment
-      const segPts = cv - segStart;
-      if (segPts > 0) {
-        lines.push({
-          label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${cv})`,
-          cost: segTotal
+    // Targets: { key, label, value, rank, initialRank, apply(newValue, newRank) }
+    const targets = [];
+    if (kind === "ability") {
+      for (const k of ["fighting","agility","strength","endurance","reason","intuition","psyche"]) {
+        const a = actor.system.abilities[k];
+        const label = k.charAt(0).toUpperCase() + k.slice(1);
+        targets.push({
+          key: k, label, value: Number(a.value) || 0, rank: a.rank || this._getNewRank(a.value), initialRank: a.initialRank || "",
+          apply: (v, r) => actor.update({ [`system.abilities.${k}.value`]: v, [`system.abilities.${k}.rank`]: r })
         });
       }
+    } else if (kind === "power") {
+      for (const it of actor.items.filter(i => i.type === "power")) {
+        const v = Number(it.system.value);
+        const value = Number.isFinite(v) && it.system.value !== "" ? v : (rankValue(it.system.rank) || 0);
+        targets.push({
+          key: it.id, label: it.name, value, rank: it.system.rank || this._getNewRank(value), initialRank: it.system.initialRank || "",
+          apply: (nv, r) => it.update({ "system.value": nv, "system.rank": r })
+        });
+      }
+    } else if (kind === "resource") {
+      const res = actor.system.attributes?.resources || {};
+      const v = Number(res.value);
+      const value = Number.isFinite(v) && res.value !== "" ? v : (rankValue(res.rank) || 0);
+      targets.push({
+        key: "resources", label: "Resources", value, rank: res.rank || this._getNewRank(value), initialRank: "",
+        apply: (nv, r) => actor.update({ "system.attributes.resources.value": nv, "system.attributes.resources.rank": r })
+      });
+    } else if (kind === "popularity") {
+      const pop = actor.system.attributes?.popularity || {};
+      for (const [k, label] of [["hero", "Hero Popularity"], ["secretId", "Secret ID Popularity"]]) {
+        const value = Number(pop[k]?.value) || 0;
+        targets.push({
+          key: k, label, value, rank: this._getNewRank(value), initialRank: "",
+          apply: (nv) => actor.update({ [`system.attributes.popularity.${k}.value`]: nv })
+        });
+      }
+    }
+    if (!targets.length) {
+      ui.notifications.warn(`${actor.name} has nothing to advance for ${info.title}.`);
+      return;
+    }
+    const targetByKey = (key) => targets.find(t => t.key === key) || targets[0];
 
-      return { total, points, newValue: targetValue, newRank: this._getNewRank(targetValue), lines };
+    const calc = (start, targetValue) => {
+      const points = targetValue - start;
+      if (points <= 0) return { total: 0, points: 0, newValue: start, newRank: this._getNewRank(start), lines: [] };
+      const r = advancementCost({ kind, current: start, points, rankNameOf });
+      return { total: r.total, points: r.points, newValue: r.newValue, newRank: this._getNewRank(r.newValue), lines: r.lines, short: r.newValue < targetValue };
     };
 
-    // Build current ability options: "Fighting Ex (20)"
-    const currentOptions = abilityKeys.map(k => {
-      const a = abilities[k];
-      const label = k.charAt(0).toUpperCase() + k.slice(1);
-      return `<option value="${k}">${label} ${abbrevRank(a.rank)} (${a.value})</option>`;
-    }).join("");
-
-    // Scoped CSS prefix to avoid Foundry collisions
+    const options = targets.map(t => `<option value="${t.key}">${t.label} ${abbrevRank(t.rank)} (${t.value})</option>`).join("");
     const S = "ka-adv";
+    const popNote = kind === "popularity" ? `<div style="font-size:12px;color:#8b0000;margin-bottom:8px;">RAW: Popularity advancement requires a publicized act of charity within three weeks.</div>` : "";
 
     new Dialog({
-      title: `Ability Advancement: ${actor.name}`,
+      title: `${info.title}: ${actor.name}`,
       content: `
         <div class="${S}-wrap" style="all:initial;font-family:inherit;font-size:13px;color:#333;line-height:1.4;min-width:480px;">
           <style>
@@ -982,14 +971,17 @@ export class KarmaSheet extends DocumentSheet {
             .${S}-calc-total{display:flex;justify-content:space-between;padding:4px 0 0;margin-top:4px;border-top:1px solid #c0a070;font-weight:bold;font-size:13px;color:#333;}
             .${S}-insuf{color:#c62828;font-weight:bold;font-size:12px;margin-top:4px;}
             .${S}-avail{font-size:13px;font-weight:bold;margin-bottom:10px;color:#333;}
+            .${S}-amount input[type=number]{width:90px;}
+            .${S}-adjusted{font-size:11px;color:#8b0000;}
           </style>
 
           <div class="${S}-avail">Available Karma: ${availableKarma}</div>
+          ${popNote}
 
           <div class="${S}-row">
             <div style="flex:1;">
-              <label>Current ability</label>
-              <select name="ability" style="width:100%;">${currentOptions}</select>
+              <label>${info.picker}</label>
+              <select name="target" style="width:100%;">${options}</select>
             </div>
             <div style="padding-top:16px;color:#999;font-size:16px;">→</div>
             <div>
@@ -1005,6 +997,14 @@ export class KarmaSheet extends DocumentSheet {
             <div class="${S}-calc-content"></div>
           </div>
 
+          <div class="${S}-row ${S}-amount" style="align-items:flex-end;">
+            <div>
+              <label>Amount (GM may adjust)</label>
+              <input type="number" name="amount" value="" min="0" />
+            </div>
+            <div class="${S}-adjusted" style="padding-bottom:6px;"></div>
+          </div>
+
           <div style="margin-bottom:6px;">
             <label>Rationale</label>
             <input type="text" name="rationale" placeholder="e.g., Intensive training with Captain America" />
@@ -1016,130 +1016,131 @@ export class KarmaSheet extends DocumentSheet {
           icon: '<i class="fas fa-arrow-up"></i>',
           label: "Advance",
           callback: async (html) => {
-            const abilityKey = html.find('[name="ability"]').val();
+            const t = targetByKey(html.find('[name="target"]').val());
             const targetValue = Number(html.find('[name="targetValue"]').val());
             const rationale = html.find('[name="rationale"]').val()?.trim() || "";
-            const abilityData = abilities[abilityKey];
-            const abilityLabel = abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1);
-            const startValue = abilityData.value;
-            const startRank = abilityData.rank;
+            const startValue = t.value;
+            const startRank = t.rank;
 
             if (targetValue <= startValue) {
               ui.notifications.error("Target must be higher than current value.");
               return;
             }
 
-            const cost = calcAdvancementCost(startValue, targetValue);
-
-            if (cost.total > availableKarma) {
-              ui.notifications.error(`Not enough karma. Need ${cost.total}, have ${availableKarma}.`);
-              return;
-            }
+            const cost = calc(startValue, targetValue);
             if (cost.total <= 0) {
               ui.notifications.error("Cannot calculate advancement cost.");
               return;
             }
+            if (cost.short) {
+              ui.notifications.error(`${t.label} cannot be advanced past ${cost.newValue} (${cost.newRank}) by Karma.`);
+              return;
+            }
+
+            const amountRaw = html.find('[name="amount"]').val();
+            const amount = amountRaw === "" ? cost.total : Math.max(0, Math.floor(Number(amountRaw) || 0));
+            if (amount > availableKarma) {
+              ui.notifications.error(`Not enough karma. Need ${amount}, have ${availableKarma}.`);
+              return;
+            }
 
             const rankChanged = cost.newRank !== startRank;
-            let desc = `${abilityLabel}: ${startValue} (${startRank}) → ${cost.newValue} (${cost.newRank})`;
+            let desc = `${t.label}: ${startValue} (${startRank}) → ${cost.newValue} (${cost.newRank})`;
             desc += ` | ${cost.points} pt${cost.points > 1 ? "s" : ""} | Cost: ${cost.total}`;
             if (rankChanged) {
-              const crestCount = cost.lines.filter(l => l.cresting).length;
-              const crestTotal = crestCount * 400;
-              desc += ` (includes ${crestTotal} cresting)`;
+              const crestTotal = cost.lines.filter(l => l.cresting).reduce((s, l) => s + l.cost, 0);
+              if (crestTotal) desc += ` (includes ${crestTotal} cresting)`;
             }
+            if (amount !== cost.total) desc += ` (adjusted from ${cost.total})`;
             if (rationale) desc += ` | ${rationale}`;
 
-            // Rationale warning
-            const initialRank = abilityData.initialRank || startRank;
-            const initialIdx = RANK_ORDER.indexOf(initialRank);
-            const newIdx = RANK_ORDER.indexOf(cost.newRank);
-            const exIdx = RANK_ORDER.indexOf("Excellent");
-            const needsRationale = newIdx > exIdx || (initialIdx >= 0 && newIdx > initialIdx + 1);
-            if (needsRationale && !rationale) {
-              ui.notifications.warn("RAW: advancing beyond Excellent or +1 rank above original requires a rationale. Proceeding anyway.");
+            // Rationale warning (RAW: abilities beyond Excellent or +1 rank above
+            // original; powers "similar to Ability advancement")
+            if (kind === "ability" || kind === "power") {
+              const initialIdx = RANKS_ORDERED.indexOf(t.initialRank || startRank);
+              const newIdx = RANKS_ORDERED.indexOf(cost.newRank);
+              const exIdx = RANKS_ORDERED.indexOf("Excellent");
+              const needsRationale = newIdx > exIdx || (initialIdx >= 0 && newIdx > initialIdx + 1);
+              if (needsRationale && !rationale) {
+                ui.notifications.warn("RAW: advancing beyond Excellent or +1 rank above original requires a rationale. Proceeding anyway.");
+              }
             }
 
-            await actor.update({
-              [`system.abilities.${abilityKey}.value`]: cost.newValue,
-              [`system.abilities.${abilityKey}.rank`]: cost.newRank
-            });
+            await t.apply(cost.newValue, cost.newRank);
 
             this._addKarmaEvent({
               timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
               gameDate: this._getGameDate(),
-              amount: -cost.total,
-              type: "Ability Advancement",
+              amount: -amount,
+              type: info.type,
               description: desc
             });
 
-            ui.notifications.info(`${actor.name}: ${abilityLabel} advanced to ${cost.newValue} (${cost.newRank}) for ${cost.total} karma.`);
+            ui.notifications.info(`${actor.name}: ${t.label} ${info.verb} to ${cost.newValue} (${cost.newRank}) for ${amount} karma.`);
           }
         },
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "advance",
       render: (html) => {
+        let amountDirty = false;
+        const $amount = html.find('[name="amount"]');
         const updateCalc = () => {
-          const abilityKey = html.find('[name="ability"]').val();
-          const abilityData = abilities[abilityKey];
-          const startValue = abilityData.value;
+          const t = targetByKey(html.find('[name="target"]').val());
+          const startValue = t.value;
           const targetValue = Number(html.find('[name="targetValue"]').val());
 
-          // Update target rank display
-          if (targetValue > 0) {
-            html.find(`.${S}-target-rank`).text(abbrevRank(this._getNewRank(targetValue)));
-          } else {
-            html.find(`.${S}-target-rank`).text("");
-          }
+          html.find(`.${S}-target-rank`).text(targetValue > 0 ? abbrevRank(this._getNewRank(targetValue)) : "");
 
           if (targetValue <= startValue) {
             html.find(`.${S}-calc-content`).html(
               `<div style="color:#999;font-size:12px;">Set a target value above ${startValue} to see costs.</div>`
             );
+            if (!amountDirty) $amount.val("");
+            html.find(`.${S}-adjusted`).text("");
             return;
           }
 
-          const cost = calcAdvancementCost(startValue, targetValue);
+          const cost = calc(startValue, targetValue);
           let h = "";
           for (const line of cost.lines) {
+            if (line.cresting && !line.cost) continue;
             const cls = line.cresting ? ` cresting` : "";
             h += `<div class="${S}-calc-line${cls}"><span>${line.label}</span><span>${line.cost.toLocaleString()}</span></div>`;
           }
           h += `<div class="${S}-calc-total"><span>Total</span><span>${cost.total.toLocaleString()} karma</span></div>`;
-          if (cost.total > availableKarma) {
-            h += `<div class="${S}-insuf">Insufficient karma (need ${(cost.total - availableKarma).toLocaleString()} more)</div>`;
-          }
+          if (cost.short) h += `<div class="${S}-insuf">Cannot advance past ${cost.newValue} (${cost.newRank}) by Karma</div>`;
+          else if (cost.total > availableKarma) h += `<div class="${S}-insuf">Insufficient karma (need ${(cost.total - availableKarma).toLocaleString()} more)</div>`;
           html.find(`.${S}-calc-content`).html(h);
+
+          if (!amountDirty) $amount.val(cost.total);
+          const amt = Number($amount.val());
+          html.find(`.${S}-adjusted`).text(amountDirty && amt !== cost.total ? `adjusted from ${cost.total.toLocaleString()}` : "");
         };
 
-        // When ability changes, reset target to current+1
-        html.find('[name="ability"]').change(() => {
-          const abilityKey = html.find('[name="ability"]').val();
-          const startValue = abilities[abilityKey].value;
-          html.find('[name="targetValue"]').val(startValue + 1);
+        html.find('[name="target"]').change(() => {
+          const t = targetByKey(html.find('[name="target"]').val());
+          html.find('[name="targetValue"]').val(t.value + 1);
+          amountDirty = false;
           updateCalc();
         });
 
         html.find('[name="targetValue"]').on('input change', updateCalc);
+        $amount.on('input', () => { amountDirty = $amount.val() !== ""; updateCalc(); });
 
-        // Mousewheel on target value
         html.find('[name="targetValue"]').on('wheel', (ev) => {
           ev.preventDefault();
           const input = ev.currentTarget;
-          const abilityKey = html.find('[name="ability"]').val();
-          const minVal = abilities[abilityKey].value + 1;
+          const t = targetByKey(html.find('[name="target"]').val());
+          const minVal = t.value + 1;
           let val = Number(input.value) || minVal;
           val += (ev.originalEvent.deltaY < 0) ? 1 : -1;
-          val = Math.max(minVal, val);
-          input.value = val;
+          input.value = Math.max(minVal, val);
           updateCalc();
         });
 
-        // Initialize
-        const initKey = html.find('[name="ability"]').val();
-        html.find('[name="targetValue"]').val(abilities[initKey].value + 1);
+        html.find('[name="targetValue"]').val(targets[0].value + 1);
         updateCalc();
       }
     }).render(true);
