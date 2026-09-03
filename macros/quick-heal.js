@@ -1,3 +1,8 @@
+// quick-heal.js v2.1.0 - 2026-09-02
+// v2.1.0: GM guard. Kept defense effects that were disabled by a force-field
+//         breach are re-enabled (checkbox, default on). Rank values via the
+//         kernel-backed rules-reference (dynamic import; private rank table
+//         kept only as the offline fallback for the macro editor).
 // quick-heal.js v2.0.1 - 2026-03-22
 // v2.0.1: Remove ES export — use self-executing async function for fetch/eval loader.
 //         Works with init.js lazy-load (AsyncFunction) and Foundry macro editor.
@@ -36,10 +41,22 @@ const ABBREV_TO_FULL = {
   "CL1000": "Class 1000", "CL3000": "Class 3000", "CL5000": "Class 5000"
 };
 
+let _rules = null;
+async function loadRules() {
+  if (_rules) return _rules;
+  try { _rules = await import("/systems/msh-faserip/scripts/rules/rules-reference.js"); }
+  catch (e) { console.warn("[FASERIP] Quick Heal: rules-reference unavailable, using local table", e); _rules = {}; }
+  return _rules;
+}
 function getRankValue(r) {
+  const v = _rules?.rankValue?.(r);
+  if (Number.isFinite(v)) return v;
   return RANK_VALUES[r] || game.msh?.getRankValue?.(r) || CONFIG.FASERIP?.rankValues?.[r] || 0;
 }
-function normalizeRank(r) { return r ? (ABBREV_TO_FULL[r] || r) : null; }
+function normalizeRank(r) {
+  if (!r) return null;
+  return _rules?.normalizeRank?.(r) || ABBREV_TO_FULL[r] || r;
+}
 function isCorruptedOriginal(r) {
   if (!r) return true;
   return normalizeRank(r) === "Shift-0" || getRankValue(r) === 0;
@@ -165,7 +182,7 @@ function resolveEndurance(actor, token) {
 
 // ── Apply heal to one token ──
 
-async function applyHeal(token, effectIdsToDelete) {
+async function applyHeal(token, effectIdsToDelete, { reenableDefenses = true } = {}) {
   const actor = token.actor;
   if (!actor) return;
 
@@ -194,6 +211,19 @@ async function applyHeal(token, effectIdsToDelete) {
     await actor.deleteEmbeddedDocuments("ActiveEffect", effectIdsToDelete, { mshIntentional: true });
   }
 
+  // Re-enable kept defense effects that a force-field breach switched off
+  let reenabled = 0;
+  if (reenableDefenses) {
+    const deleted = new Set(effectIdsToDelete);
+    const toEnable = actor.effects
+      .filter(e => !deleted.has(e.id) && e.disabled && e.flags?.[SCOPE]?.effectCategory === "defense")
+      .map(e => ({ _id: e.id, disabled: false }));
+    if (toEnable.length) {
+      await actor.updateEmbeddedDocuments("ActiveEffect", toEnable, { mshIntentional: true });
+      reenabled = toEnable.length;
+    }
+  }
+
   // Clear statuses
   if (isUnlinked) {
     await token.document.update({ "delta.statuses": [] });
@@ -215,7 +245,8 @@ async function applyHeal(token, effectIdsToDelete) {
 
   console.log(`[FASERIP] Quick Heal: ${actor.name} restored`, {
     originalRank, originalValue, targetHealthMax,
-    effectsDeleted: effectIdsToDelete.length
+    effectsDeleted: effectIdsToDelete.length,
+    defensesReenabled: reenabled
   });
 }
 
@@ -291,6 +322,10 @@ function buildDialogContent(tokens, prefs) {
       ${sections.join("")}
       <div style="margin-top:8px;padding-top:6px;border-top:1px solid #ddd;">
         <label style="display:flex;align-items:center;gap:6px;font-size:.85em;color:#666;">
+          <input type="checkbox" id="qh-reenable-defenses" ${prefs.reenableDefenses === false ? "" : "checked"} style="margin:0;">
+          Re-enable kept defenses disabled by a force-field breach
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.85em;color:#666;">
           <input type="checkbox" id="qh-save-prefs" checked style="margin:0;">
           Remember category defaults
         </label>
@@ -303,11 +338,16 @@ function buildDialogContent(tokens, prefs) {
 // Works as: fetched + evaluated by init.js lazy loader
 
 async function _quickHealMain() {
+  if (!game.user?.isGM) {
+    ui.notifications.warn("Quick Heal is GM only.");
+    return;
+  }
   const tokens = canvas.tokens.controlled;
   if (!tokens.length) {
     ui.notifications.warn("No tokens selected");
     return;
   }
+  await loadRules();
 
   // Register prefs setting if not yet registered
   try {
@@ -338,6 +378,8 @@ async function _quickHealMain() {
               (toDelete[actorId] ??= []).push(effectId);
             });
 
+            const reenableDefenses = !!html.find("#qh-reenable-defenses")[0]?.checked;
+
             // Save prefs if requested
             if (html.find("#qh-save-prefs")[0]?.checked) {
               const catPrefs = {};
@@ -349,7 +391,7 @@ async function _quickHealMain() {
                   catPrefs[cat] = this.checked;
                 }
               });
-              savePrefs({ categories: catPrefs });
+              savePrefs({ categories: catPrefs, reenableDefenses });
             }
 
             // Apply heal to each token
@@ -357,7 +399,7 @@ async function _quickHealMain() {
               const actor = token.actor;
               if (!actor) continue;
               const ids = toDelete[actor.id] || [];
-              await applyHeal(token, ids);
+              await applyHeal(token, ids, { reenableDefenses });
             }
 
             ChatMessage.create({
