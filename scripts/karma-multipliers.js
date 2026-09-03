@@ -1,3 +1,6 @@
+// karma-multipliers.js v1.1.1 - 2026-09-02
+// v1.1.1: Commit/Permit Local, National, Global Conspiracy categorized as
+//         penalties (rows added to the Add Karma dialog in kernel slice 6a).
 // karma-multipliers.js v1.1.0 - 2026-04-17
 // v1.1.0: Full-share mode removed. groupMode is now only "split" (RAW) or
 //         "pool". Legacy "full" values in saved settings are silently
@@ -36,11 +39,15 @@ const CATEGORY_BY_EVENT = {
   "Commit Violent Crime": "penalty", "Commit Destructive Crime": "penalty",
   "Commit Theft": "penalty", "Commit Robbery": "penalty",
   "Commit Misdemeanor": "penalty", "Commit National Offense": "penalty",
+  "Commit Local Conspiracy": "penalty", "Commit National Conspiracy": "penalty",
+  "Commit Global Conspiracy": "penalty",
   "Commit Other Crime": "penalty",
   "Public Defeat": "penalty", "Private Defeat": "penalty",
   "Permit Violent Crime": "penalty", "Permit Destructive Crime": "penalty",
   "Permit Theft": "penalty", "Permit Robbery": "penalty",
   "Permit Misdemeanor": "penalty", "Permit National Offense": "penalty",
+  "Permit Local Conspiracy": "penalty", "Permit National Conspiracy": "penalty",
+  "Permit Global Conspiracy": "penalty",
   "Permit Other Crime": "penalty",
   "Property Damage": "penalty",
   "Noble Death": "penalty", "Mysterious Death": "penalty",

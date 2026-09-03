@@ -1,3 +1,11 @@
+// karma.js v1.13.0 - 2026-09-02
+// v1.13.0: Kernel slice 6a. Award base amounts derived from faserip-karma
+//          (CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS,
+//          SPECIAL_DEATH_LOSS): Commit Robbery -40 (was -20), Commit Other
+//          Crime -10 per RULED 2026-08-31 (was -20), Commit/Permit rows added
+//          for Local/National/Global Conspiracy. Ability advancement per-point
+//          and crest costs from ADVANCEMENT.ability. _getNewRank via
+//          valueToRank (private threshold table retired).
 // karma.js v1.12.0 - 2026-07-23
 // karma.js v1.11.0 - 2026-04-17
 // v1.11.0: Compact column layout for karma history. Real Date and
@@ -42,9 +50,60 @@
 // v1.6.2: Fix _getNewRank thresholds to use book Rank Ranges.
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
-import { RANKS_ORDERED, RANK_ABBR } from "./rules/rules-reference.js";
+import { RANKS_ORDERED, RANK_ABBR, valueToRank } from "./rules/rules-reference.js";
 import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
 import { computeKarmaTotals } from "./karma-rules.js";
+import {
+  CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS, SPECIAL_DEATH_LOSS,
+  ADVANCEMENT, rescueAward
+} from "./lib/faserip-rules/faserip-karma.js";
+
+// Crime classes in Summary Listing order; keys match the kernel CRIME_KARMA.
+export const CRIME_CLASSES = [
+  ["violent", "Violent Crime"], ["destructive", "Destructive Crime"], ["theft", "Theft"],
+  ["robbery", "Robbery"], ["misdemeanor", "Misdemeanor"], ["nationalOffense", "National Offense"],
+  ["localConspiracy", "Local Conspiracy"], ["nationalConspiracy", "National Conspiracy"],
+  ["globalConspiracy", "Global Conspiracy"], ["other", "Other Crime"]
+];
+
+// Event type -> base amount, from the kernel. Context-dependent events
+// (Defeated Foe, charity, negative Popularity, Death/Kill) stay 0 here.
+export function buildKarmaEventAmounts() {
+  const amounts = {};
+  for (const [key, label] of CRIME_CLASSES) {
+    const c = CRIME_KARMA[key];
+    amounts[`${label} - Stop`] = c.stop;
+    amounts[`${label} - Arrest`] = c.arrest;
+    amounts[`Commit ${label}`] = c.commit;
+    amounts[`Permit ${label}`] = c.permit;
+  }
+  Object.assign(amounts, {
+    "Rescue": rescueAward(1), "Multiple Rescues (5+)": rescueAward(5),
+    "Defeated Foe": 0,
+    "Personal Commitment": COMMITMENT_KARMA.make, "Weekly Award": COMMITMENT_KARMA.weeklyMax,
+    "Failing Commitment": COMMITMENT_KARMA.failToShow, "Leaving Early": COMMITMENT_KARMA.leaveEarly,
+    "Charity - Appearance": 0, "Charity - Act": 0, "Charity - Donation": 0,
+    "Negative Popularity": 0,
+    "Role-Playing": GAMING_AWARDS.rolePlayMax, "Stump the Judge": GAMING_AWARDS.stumpTheJudgeMax, "Humor Award": GAMING_AWARDS.humor,
+    "Session Award": 0,
+    "Public Defeat": DEFEAT_LOSS.public, "Private Defeat": DEFEAT_LOSS.private,
+    "Property Damage": -5,
+    "Noble Death": SPECIAL_DEATH_LOSS, "Mysterious Death": SPECIAL_DEATH_LOSS, "Self-Destruction": SPECIAL_DEATH_LOSS,
+    "Death - Kill": 0,
+    "Custom": 0
+  });
+  return amounts;
+}
+
+const _opt = (value, label) => `<option value="${value}">${label}</option>`;
+const _signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+export function buildCrimeOptionGroups(amounts) {
+  const stop = CRIME_CLASSES.map(([, l]) => _opt(`${l} - Stop`, `Stop ${l} (${amounts[`${l} - Stop`]})`)).join("\n");
+  const arrest = CRIME_CLASSES.map(([, l]) => _opt(`${l} - Arrest`, `Arrest - ${l} (${amounts[`${l} - Arrest`]})`)).join("\n");
+  const commit = CRIME_CLASSES.map(([, l]) => _opt(`Commit ${l}`, `Commit ${l} (${_signed(amounts[`Commit ${l}`])})`)).join("\n");
+  const permit = CRIME_CLASSES.map(([, l]) => _opt(`Permit ${l}`, `Permit ${l} (${_signed(amounts[`Permit ${l}`])})`)).join("\n");
+  return { stop, arrest, commit, permit };
+}
 
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
@@ -380,39 +439,9 @@ export class KarmaSheet extends DocumentSheet {
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     const teamCount = teamMemberIds.length;
 
-    // Base amounts per event type (before multiplier)
-    const eventAmounts = {
-      "Violent Crime - Stop": 30, "Violent Crime - Arrest": 15,
-      "Destructive Crime - Stop": 20, "Destructive Crime - Arrest": 10,
-      "Theft - Stop": 10, "Theft - Arrest": 5,
-      "Robbery - Stop": 20, "Robbery - Arrest": 10,
-      "Misdemeanor - Stop": 5, "Misdemeanor - Arrest": 5,
-      "National Offense - Stop": 20, "National Offense - Arrest": 10,
-      "Local Conspiracy - Stop": 30, "Local Conspiracy - Arrest": 15,
-      "National Conspiracy - Stop": 40, "National Conspiracy - Arrest": 20,
-      "Global Conspiracy - Stop": 50, "Global Conspiracy - Arrest": 25,
-      "Other Crime - Stop": 15, "Other Crime - Arrest": 5,
-      "Rescue": 20, "Multiple Rescues (5+)": 100,
-      "Defeated Foe": 0,
-      "Personal Commitment": 5, "Weekly Award": 10,
-      "Failing Commitment": -10, "Leaving Early": -5,
-      "Charity - Appearance": 0, "Charity - Act": 0, "Charity - Donation": 0,
-      "Negative Popularity": 0,
-      "Role-Playing": 10, "Stump the Judge": 15, "Humor Award": 5,
-      "Session Award": 0,
-      "Commit Violent Crime": -60, "Commit Destructive Crime": -40,
-      "Commit Theft": -20, "Commit Robbery": -20, "Commit Misdemeanor": -10,
-      "Commit National Offense": -40, "Commit Other Crime": -20,
-      "Public Defeat": -40, "Private Defeat": -20,
-      "Permit Violent Crime": -15, "Permit Destructive Crime": -10,
-      "Permit Theft": -5, "Permit Robbery": -10,
-      "Permit Misdemeanor": -5, "Permit National Offense": -10,
-      "Permit Other Crime": -5,
-      "Property Damage": -5,
-      "Noble Death": -50, "Mysterious Death": -50, "Self-Destruction": -50,
-      "Death - Kill": 0,
-      "Custom": 0
-    };
+    // Base amounts per event type (before multiplier) — from the kernel
+    const eventAmounts = buildKarmaEventAmounts();
+    const crimeOpts = buildCrimeOptionGroups(eventAmounts);
 
     // Events that are always individual (never split)
     const alwaysIndividual = [
@@ -422,37 +451,17 @@ export class KarmaSheet extends DocumentSheet {
       "Negative Popularity",
       "Public Defeat", "Private Defeat", "Property Damage",
       "Noble Death", "Mysterious Death", "Self-Destruction", "Death - Kill",
-      "Commit Violent Crime", "Commit Destructive Crime", "Commit Theft",
-      "Commit Robbery", "Commit Misdemeanor", "Commit National Offense", "Commit Other Crime",
-      "Permit Violent Crime", "Permit Destructive Crime", "Permit Theft",
-      "Permit Robbery", "Permit Misdemeanor", "Permit National Offense",
-      "Permit Other Crime", "Custom"
+      ...CRIME_CLASSES.map(([, l]) => `Commit ${l}`),
+      ...CRIME_CLASSES.map(([, l]) => `Permit ${l}`),
+      "Custom"
     ];
 
     const optionGroups = `
       <optgroup label="Stop/Prevent Crime">
-        <option value="Violent Crime - Stop">Stop Violent Crime (30)</option>
-        <option value="Destructive Crime - Stop">Stop Destructive Crime (20)</option>
-        <option value="Theft - Stop">Stop Theft (10)</option>
-        <option value="Robbery - Stop">Stop Robbery (20)</option>
-        <option value="Misdemeanor - Stop">Stop Misdemeanor (5)</option>
-        <option value="National Offense - Stop">Stop National Offense (20)</option>
-        <option value="Local Conspiracy - Stop">Stop Local Conspiracy (30)</option>
-        <option value="National Conspiracy - Stop">Stop National Conspiracy (40)</option>
-        <option value="Global Conspiracy - Stop">Stop Global Conspiracy (50)</option>
-        <option value="Other Crime - Stop">Stop Other Crime (15)</option>
+        ${crimeOpts.stop}
       </optgroup>
       <optgroup label="Arrest Criminal">
-        <option value="Violent Crime - Arrest">Arrest - Violent Crime (15)</option>
-        <option value="Destructive Crime - Arrest">Arrest - Destructive Crime (10)</option>
-        <option value="Theft - Arrest">Arrest - Theft (5)</option>
-        <option value="Robbery - Arrest">Arrest - Robbery (10)</option>
-        <option value="Misdemeanor - Arrest">Arrest - Misdemeanor (5)</option>
-        <option value="National Offense - Arrest">Arrest - National Offense (10)</option>
-        <option value="Local Conspiracy - Arrest">Arrest - Local Conspiracy (15)</option>
-        <option value="National Conspiracy - Arrest">Arrest - National Conspiracy (20)</option>
-        <option value="Global Conspiracy - Arrest">Arrest - Global Conspiracy (25)</option>
-        <option value="Other Crime - Arrest">Arrest - Other Crime (5)</option>
+        ${crimeOpts.arrest}
       </optgroup>
       <optgroup label="Combat &amp; Rescue">
         <option value="Rescue">Rescue (+20, max 100)</option>
@@ -476,26 +485,14 @@ export class KarmaSheet extends DocumentSheet {
         <option value="Session Award">Session Award (custom)</option>
       </optgroup>
       <optgroup label="Losses: Crimes Committed">
-        <option value="Commit Violent Crime">Commit Violent Crime (-60)</option>
-        <option value="Commit Destructive Crime">Commit Destructive Crime (-40)</option>
-        <option value="Commit Theft">Commit Theft (-20)</option>
-        <option value="Commit Robbery">Commit Robbery (-20)</option>
-        <option value="Commit Misdemeanor">Commit Misdemeanor (-10)</option>
-        <option value="Commit National Offense">Commit National Offense (-40)</option>
-        <option value="Commit Other Crime">Commit Other Crime (-20)</option>
+        ${crimeOpts.commit}
       </optgroup>
       <optgroup label="Losses: Defeats">
         <option value="Public Defeat">Public Defeat (-40)</option>
         <option value="Private Defeat">Private Defeat (-20)</option>
       </optgroup>
       <optgroup label="Losses: Permitted Crimes">
-        <option value="Permit Violent Crime">Permit Violent Crime (-15)</option>
-        <option value="Permit Destructive Crime">Permit Destructive Crime (-10)</option>
-        <option value="Permit Theft">Permit Theft (-5)</option>
-        <option value="Permit Robbery">Permit Robbery (-10)</option>
-        <option value="Permit Misdemeanor">Permit Misdemeanor (-5)</option>
-        <option value="Permit National Offense">Permit National Offense (-10)</option>
-        <option value="Permit Other Crime">Permit Other Crime (-5)</option>
+        ${crimeOpts.permit}
       </optgroup>
       <optgroup label="Losses: Death &amp; Destruction">
         <option value="Property Damage">Property Damage (-5/area)</option>
@@ -841,7 +838,7 @@ export class KarmaSheet extends DocumentSheet {
       let segTotal = 0;
 
       for (let i = 0; i < points; i++) {
-        const pointCost = 10 * cv;
+        const pointCost = ADVANCEMENT.ability.multiplier * cv;
         total += pointCost;
         segTotal += pointCost;
         const nv = cv + 1;
@@ -854,8 +851,8 @@ export class KarmaSheet extends DocumentSheet {
             label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${nv-1 === segStart ? nv : nv})`,
             cost: segTotal
           });
-          lines.push({ label: `Cresting: ${curRank} → ${nRank}`, cost: 400, cresting: true });
-          total += 400;
+          lines.push({ label: `Cresting: ${curRank} → ${nRank}`, cost: ADVANCEMENT.ability.crestFee, cresting: true });
+          total += ADVANCEMENT.ability.crestFee;
           curRank = nRank;
           segStart = nv;
           segTotal = 0;
@@ -1072,25 +1069,7 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   _getNewRank(value) {
-    // Rank Range thresholds per Advanced Set book table (NOT Standard Rank Numbers).
-    if (value >= 10000) return "Beyond";
-    if (value >= 5000) return "Class 5000";
-    if (value >= 3000) return "Class 3000";
-    if (value >= 1000) return "Class 1000";
-    if (value >= 351) return "Shift-Z";
-    if (value >= 176) return "Shift-Y";
-    if (value >= 126) return "Shift-X";
-    if (value >= 88) return "Unearthly";
-    if (value >= 63) return "Monstrous";
-    if (value >= 46) return "Amazing";
-    if (value >= 36) return "Incredible";
-    if (value >= 26) return "Remarkable";
-    if (value >= 16) return "Excellent";
-    if (value >= 8) return "Good";
-    if (value >= 5) return "Typical";
-    if (value >= 3) return "Poor";
-    if (value >= 1) return "Feeble";
-    return "Shift-0";
+    return valueToRank(Number(value) || 0);
   }
 
   _onImportKarma(event) {
