@@ -1,3 +1,7 @@
+// scripts/modules/actions/defense-action.js v2.1.0 - 2026-09-03
+// v2.1.0: opts.autoRoll skips the dialog: roll with the saved CS, no Karma,
+//         dice shown, evadeTarget from the declaration. Used by the tracker to
+//         resolve declared Dodge/Block/Evade at initiative (RAW step 4).
 // scripts/modules/actions/defense-action.js v2.0.4 - 2026-08-21
 // v2.0.4: Return tracker-consumable defense results and honor selfPenaltyCS on
 //         Pre-Action FEATs; support declared Evade target prefill.
@@ -183,7 +187,9 @@ export class DefenseAction extends BaseAction {
     </div>
     `;
 
-    const choice = await new Promise((resolve) => {
+    const choice = this.opts.autoRoll
+      ? { shift: savedShift, karma: 0, spendKarma: false, skipDice: false, evadeTarget: String(this.opts.evadeTarget || "") }
+      : await new Promise((resolve) => {
       let _resolved = false;
       let _csState = null;
       showFaseripDialog({

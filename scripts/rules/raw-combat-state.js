@@ -1,3 +1,10 @@
+// scripts/rules/raw-combat-state.js v2.1.0 - 2026-09-03
+// v2.1.0: Rulings 2026-09-03. isDefenseRequirement / defensePending: a target
+//         whose declared Dodge/Block/Evade is unrolled cannot be attacked yet
+//         (RAW step 4: pre-action rolls precede either side's actions).
+//         canChangeAction: the Change Action window closes once any combatant
+//         has used a combat action this round (RAW: the change roll belongs to
+//         the pre-action phase). Ready state helpers for the Declare window.
 // scripts/rules/raw-combat-state.js v2.0.0 - 2026-08-21
 // v2.0.0: Two-state model (declare / actions). Pre-Action is a per-character
 //         gate inside the actions state, not a phase; winner/loser sub-phases
@@ -65,6 +72,60 @@ export function isPreActionResolved({ declaration, preActionResolved, round }) {
   const req = getPreActionRequirement(declaration);
   if (!req) return true;
   return !!(preActionResolved && preActionResolved.round === round && preActionResolved.action === req.action);
+}
+
+const DEFENSE_REQUIREMENT_ACTIONS = new Set(Object.keys(RAW_DEFENSE_ACTIONS));
+
+export function isDefenseRequirement(requirement) {
+  return !!requirement && DEFENSE_REQUIREMENT_ACTIONS.has(requirement.action);
+}
+
+// A declared Dodge/Block/Evade must be rolled before anyone attacks its owner.
+// Multiple Attacks is the attacker's own gate and never delays a defender.
+export function defensePending({ declaration, preActionResolved, round }) {
+  const req = getPreActionRequirement(declaration);
+  if (!isDefenseRequirement(req)) return false;
+  return !isPreActionResolved({ declaration, preActionResolved, round });
+}
+
+// Change Action (Yellow Agility) is a pre-action roll: available after
+// initiative, before either side acts, once per round, and only while the
+// character's own declaration is still open.
+export function canChangeAction({
+  phase,
+  round,
+  changeActionAttempted,
+  preActionResolved,
+  actionState,
+  actionsBegun = false,
+  actorName = "Character"
+} = {}) {
+  if (normalizeRawPhase(phase) !== RAW_PHASES.ACTIONS) return { ok: false, message: "Change Action is rolled after initiative." };
+  if (changeActionAttempted?.round === round) return { ok: false, message: "Change Action has already been attempted this round." };
+  if (actionState?.round === round && actionState?.combatActionUsed) return { ok: false, message: "The declared combat action has already been used this round." };
+  if (preActionResolved?.round === round) return { ok: false, message: "The declared Pre-Action FEAT has already been resolved; the action is locked." };
+  if (actionsBegun) return { ok: false, message: `Actions have begun this round; ${actorName} can no longer change action (Change Action is a pre-action roll).` };
+  return { ok: true };
+}
+
+// Declare-window readiness. Player-owned eligible combatants must be ready
+// (or have touched their declaration this round); NPCs are the Judge's and
+// never block. With no player-owned combatants there is nothing to wait for,
+// but nothing to auto-trigger on either — the Judge rolls.
+export function isCombatantReady({ ready, declaration, round }) {
+  if (ready?.round === round) return true;
+  return declaration?.round === round && !declaration?.defaulted;
+}
+
+export function readinessSummary(entries, round) {
+  const players = entries.filter(e => e.playerOwned);
+  const readyCount = players.filter(e => isCombatantReady({ ...e, round })).length;
+  return {
+    total: players.length,
+    ready: readyCount,
+    missing: players.filter(e => !isCombatantReady({ ...e, round })),
+    allReady: players.length > 0 && readyCount >= players.length
+  };
 }
 
 export function authorizeRawAction({

@@ -1,4 +1,4 @@
-// tools/test-initiative-declaration-workflow.mjs v2.1.0 - 2026-09-03
+// tools/test-initiative-declaration-workflow.mjs v2.2.0 - 2026-09-03
 // Initiative modifier certification plus source-wiring assertions for the
 // v3 two-state RAW workflow. Run from the repo root:
 //   node tools/test-initiative-declaration-workflow.mjs
@@ -65,8 +65,11 @@ ok(!/\.-=[A-Za-z]/.test(initiative), 'no deprecated "-=" flag deletions');
 
 // Auto-roll entry points.
 const startBlock = initiative.slice(initiative.indexOf('Hooks.on("combatStart"'), initiative.indexOf('Hooks.on("preMoveToken"'));
-ok(!/useRawTurnPhases/.test(startBlock), 'round-1 auto-roll applies in every FASERIP mode, not only RAW phases');
-ok(/autoRerollInitiative/.test(startBlock), 'round-1 auto-roll honours the Auto Reroll setting');
+ok(/autoRerollInitiative/.test(startBlock) && /rollSideInitiative\(combat\)/.test(startBlock), 'legacy modes auto-roll round 1 on combatStart');
+ok(/useRawTurnPhases"\)\) \{ ui\.combat\?\.render\(true\); return; \}/.test(startBlock), 'RAW mode opens round 1 in Declare instead of auto-rolling');
+const rawResetBlock = resetBlock.slice(resetBlock.indexOf('if (rawPhases) {'), resetBlock.indexOf('return;\n      }') );
+ok(!/autoRerollInitiative|rollSideInitiative/.test(rawResetBlock), 'RAW round reset never auto-rolls (declaring is free before the roll)');
+ok(/"flags\.msh-faserip\.ready": null/.test(resetBlock), 'round reset clears Ready flags');
 
 // Batched tracker writes.
 ok(!/setInitiative\(/.test(initiative), 'no per-combatant setInitiative calls');
@@ -79,5 +82,20 @@ ok(!/\$\{source\} \(assumed\)/.test(initiative), 'legacy "+1 (assumed)" talent b
 ok(/if \(!game\.settings\.get\("msh-faserip", "useRawTurnPhases"\)\) return \{ bonus: 0, source: "" \};/.test(initiative), 'talent bonuses require the declared context');
 ok(/name\.includes\("enhanced sense"\) && this\._isHearingPower\(p\)/.test(initiative), 'Enhanced Senses substitutes for Intuition only for the hearing variant');
 ok(/Tie — reroll/.test(initiative) && /setTimeout\(\(\) => this\.rollSideInitiative\(combat\), 1000\)/.test(initiative), 'side initiative ties re-roll');
+
+// RAW workflow rulings (2026-09-03): defences resolve before attacks,
+// Change Action is pre-action only, Ready-driven Declare window.
+const dispatcherSrc = dispatcher;
+const defenseSrc = defense;
+ok(/defensePending\(/.test(dispatcherSrc) && /RAW_ATTACK_TYPES\.has\(type\)/.test(dispatcherSrc), 'dispatcher refuses attacks while a target\'s declared defence is unrolled');
+ok(/this\.opts\.autoRoll\s*\?\s*\{ shift: savedShift, karma: 0, spendKarma: false/.test(defenseSrc), 'DefenseAction has a no-dialog, no-Karma auto-roll path');
+ok(/_autoResolveDefenseFeats/.test(initiative) && /autoRoll: true,\s*shift: Number\(decl\.shift\) \|\| 0/.test(initiative), 'declared defences auto-roll at initiative with the saved CS');
+ok((initiative.match(/_autoResolveDeclaredFeats\(combat\)/g) || []).length >= 4 && (initiative.match(/await this\._autoResolveMultiFeats\(combat\)/g) || []).length === 1, 'every resolution point runs Multi and defence auto-rolls together');
+ok(/canChangeAction\(/.test(initiative) && /actionsBegun: this\._actionsBegun\(combat\)/.test(initiative), 'Change Action availability comes from the pure rule incl. actions-begun lock');
+ok(/Hooks\.on\("updateCombatant"/.test(initiative) && /rawAutoRollWhenReady/.test(initiative) && /readinessSummary/.test(initiative), 'Ready flags close the Declare window on the GM client');
+ok(/data-action="ready"/.test(initiative) && /action === "ready"/.test(initiative), 'players have a Ready control on their tracker row');
+ok(/_postJudgeEvent/.test(initiative) && /Pre-Action Event/.test(initiative), 'Judge Event button posts a pre-action event card');
+ok(/this\.isRolling = true;\s*const rawPhases/.test(initiative), 'side roll claims isRolling before awaiting default declarations');
+ok(/lastDefenseAutoRoll/.test(initiative) && /lastDefenseShift/.test(initiative), 'defence CS / auto-roll remembered per actor');
 
 console.log(`initiative/declaration workflow tests passed (${n} assertions)`);

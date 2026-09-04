@@ -1,3 +1,13 @@
+// faserip-initiative.js v3.4.0 - 2026-09-03
+// v3.4.0: RAW workflow rulings (2026-09-03). Declared Dodge/Block/Evade auto-roll
+//         at initiative (saved CS, no Karma; uncheck Auto-roll to roll by hand)
+//         and attacks are refused while a target's declared defence is unrolled
+//         (RAW step 4). Change Action closes once any combatant has acted this
+//         round. The Declare window is closed by player Ready flags instead of
+//         a timer: RAW mode no longer auto-rolls at round start; it rolls when
+//         every player-owned combatant is Ready (rawAutoRollWhenReady) or when
+//         the Judge clicks Initiative. Judge Event button posts a pre-action
+//         event card. NPC plans can set the auto-roll flag.
 // faserip-initiative.js v3.3.0 - 2026-09-03
 // v3.3.0: Side initiative modifier rulings (2026-09-03): each character's
 //         effective modifier is own Intuition modifier + own talent bonus and
@@ -67,11 +77,12 @@
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
 import { getInitiativeModifier, rankIndex, shiftRank } from "./rules/rules-reference.js";
-import { authorizeRawMovement, getPreActionRequirement, normalizeRawPhase } from "./rules/raw-combat-state.js";
+import { authorizeRawMovement, canChangeAction, getPreActionRequirement, isCombatantReady, isDefenseRequirement, normalizeRawPhase, readinessSummary } from "./rules/raw-combat-state.js";
 
 export class FaseripInitiative {
   static initialized = false;
   static isRolling = false;
+  static _readyRollArmed = false;
 
   // Initiative mode constants
   static MODE_SIDE = "side";
@@ -146,7 +157,16 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "autoRerollInitiative", {
       name: "Auto Reroll Initiative Each Round",
-      hint: "Automatically roll initiative at the start of each round. With RAW Turn Phases on, note that this skips the declaration window each round — carried-forward declarations still apply, but changing one then requires a Change Action FEAT.",
+      hint: "Automatically roll initiative at the start of each round (Standard and legacy modes). With Use RAW Turn Phases on this setting is ignored: the round opens in Declare and initiative rolls when the players are Ready or the Judge clicks Initiative.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+
+    game.settings.register("msh-faserip", "rawAutoRollWhenReady", {
+      name: "RAW: Roll Initiative When Players Are Ready",
+      hint: "With Use RAW Turn Phases on, roll initiative automatically the moment every eligible player-owned combatant has clicked Ready (or declared this round). NPCs never block. Off: the Judge always clicks Initiative.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -320,7 +340,8 @@ export class FaseripInitiative {
           initiative: null,
           "flags.msh-faserip.preActionResolved": null,
           "flags.msh-faserip.changeActionAttempted": null,
-          "flags.msh-faserip.actionState": null
+          "flags.msh-faserip.actionState": null,
+          "flags.msh-faserip.ready": null
         }));
         if (clearOps.length) await combat.updateEmbeddedDocuments("Combatant", clearOps);
         await combat.update({
@@ -341,17 +362,9 @@ export class FaseripInitiative {
         }, { mshNoTimeAdvance: true });
         this._dbg("combatRound: cleared", { combatants: clearOps.length });
         ui.combat?.render(true);
-        // Optional auto-roll: rolls immediately each round (declarations carry
-        // forward; changing one afterwards is a RAW Change Action). Off by
-        // default so the table has a window to declare non-Attack actions.
-        if (game.settings.get("msh-faserip", "autoRerollInitiative")) {
-          try {
-            if (this._isSideMode()) await this.rollSideInitiative(combat);
-            else await this.rollIndividualInitiative(combat);
-          } catch (err) {
-            console.error("[FASERIP ERROR] RAW auto-roll failed", err);
-          }
-        }
+        // RAW never auto-rolls at round start: declaring is free before the
+        // roll every turn. The window closes on player Ready flags (see the
+        // updateCombatant hook) or the Judge's Initiative button.
         return;
       }
 
@@ -370,11 +383,38 @@ export class FaseripInitiative {
 
     Hooks.on("createCombatant", this._onCreateCombatant.bind(this));
 
+    // Ready-driven close of the Declare window (GM client). Fires only on a
+    // combatant change, never at round start, so a Judge-only table (no
+    // player-owned combatants) still rolls by hand.
+    Hooks.on("updateCombatant", async (combatant, changed) => {
+      if (!game.user.isGM || !this._isFaseripMode()) return;
+      if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return;
+      if (!game.settings.get("msh-faserip", "rawAutoRollWhenReady")) return;
+      const flags = changed?.flags?.["msh-faserip"];
+      if (!flags || !("ready" in flags || "declaredAction" in flags)) return;
+      const combat = combatant.parent;
+      if (!combat?.started || this._getPhase(combat) !== this.PHASE_DECLARE) return;
+      if (this.isRolling || this._readyRollArmed) return;
+      const ready = this._getReadiness(combat);
+      if (!ready.allReady) return;
+      this._readyRollArmed = true;
+      try {
+        this._dbg("all players ready: auto-roll", { round: combat.round, ready: ready.ready, total: ready.total });
+        if (this._isSideMode()) await this.rollSideInitiative(combat);
+        else await this.rollIndividualInitiative(combat);
+      } catch (err) {
+        console.error("[FASERIP ERROR] ready auto-roll failed", err);
+      } finally {
+        this._readyRollArmed = false;
+      }
+    });
+
     // Foundry fires combatStart (not combatRound) for round 1, so auto-roll
-    // needs its own entry point at the start of combat. Applies in every
-    // FASERIP mode; RAW phases only change what the roll gates afterwards.
+    // needs its own entry point at the start of combat. RAW mode opens in
+    // Declare instead (Ready flags / Judge close it).
     Hooks.on("combatStart", async (combat) => {
       if (!game.user.isGM || !this._isFaseripMode()) return;
+      if (game.settings.get("msh-faserip", "useRawTurnPhases")) { ui.combat?.render(true); return; }
       if (!game.settings.get("msh-faserip", "autoRerollInitiative")) return;
       this._dbg("combatStart: auto-roll");
       try {
@@ -698,6 +738,34 @@ export class FaseripInitiative {
     };
   }
 
+  static _getReadiness(combat) {
+    const entries = this._eligibleCombatants(combat).map(c => ({
+      combatant: c,
+      name: c.name,
+      playerOwned: !!c.actor?.hasPlayerOwner,
+      ready: c.getFlag("msh-faserip", "ready"),
+      declaration: c.getFlag("msh-faserip", "declaredAction")
+    }));
+    return readinessSummary(entries, combat.round);
+  }
+
+  static _isReady(combatant, combat) {
+    return isCombatantReady({
+      ready: combatant.getFlag("msh-faserip", "ready"),
+      declaration: combatant.getFlag("msh-faserip", "declaredAction"),
+      round: combat.round
+    });
+  }
+
+  // True once any combatant has spent a combat action this round: the
+  // pre-action window (Change Action) is closed for everyone.
+  static _actionsBegun(combat) {
+    return this._trackedCombatants(combat).some(c => {
+      const st = c.getFlag("msh-faserip", "actionState");
+      return st?.round === combat.round && st.combatActionUsed;
+    });
+  }
+
   static _declarationMeta(type, data = {}) {
     const count = Number(data.attackCount || 2);
     const map = {
@@ -803,10 +871,14 @@ export class FaseripInitiative {
       if (phase === this.PHASE_DECLARE) {
         labelWrap.innerHTML = `<strong>Declare</strong>`;
         const prog = this._getPlayerDeclarationProgress(combat);
+        const ready = this._getReadiness(combat);
         const progress = document.createElement("span");
-        progress.className = "faserip-declare-progress complete";
-        progress.textContent = "Attack is assumed — declare only non-Attack actions";
-        const tips = ["Declarations lock when Initiative is rolled; changing one afterwards is a Yellow Agility Change Action at -1CS."];
+        progress.className = `faserip-declare-progress ${ready.total && !ready.allReady ? "pending" : "complete"}`;
+        progress.textContent = ready.total
+          ? `Ready ${ready.ready}/${ready.total} · Attack assumed`
+          : "Attack is assumed — declare only non-Attack actions";
+        const tips = ["Declaring or clicking Ready confirms your plan for this round. Initiative rolls when everyone is Ready (or when the Judge rolls); changing afterwards is a Yellow Agility Change Action at -1CS."];
+        if (ready.missing.length) tips.push(`Waiting on: ${ready.missing.map(e => e.name).join(", ")}`);
         if (prog.missing.length) tips.push(`Defaulting to Attack: ${prog.missing.map(c => c.name).join(", ")}`);
         if (game.user.isGM && prog.npcMissing.length) tips.push(`NPCs defaulting to Attack: ${prog.npcMissing.map(c => c.name).join(", ")}`);
         progress.title = tips.join("\n");
@@ -855,7 +927,11 @@ export class FaseripInitiative {
         rollBtn.type = "button";
         rollBtn.className = "faserip-phase-advance-btn";
         rollBtn.innerHTML = `<i class="fas fa-dice"></i> Initiative`;
-        rollBtn.title = "Roll initiative — undeclared combatants default to Attack";
+        const ready = this._getReadiness(combat);
+        rollBtn.classList.toggle("faserip-ready-complete", ready.allReady);
+        rollBtn.title = ready.total && !ready.allReady
+          ? `Roll initiative now (Judge override) — waiting on ${ready.missing.map(e => e.name).join(", ")}; undeclared combatants default to Attack`
+          : "Roll initiative — undeclared combatants default to Attack";
         rollBtn.addEventListener("click", async () => {
           const live = game.combats.get(combat.id) ?? game.combat;
           if (!live) return ui.notifications.warn("No active combat.");
@@ -866,6 +942,17 @@ export class FaseripInitiative {
       }
 
       if (game.user.isGM && phase === this.PHASE_ACTIONS) {
+        const eventBtn = document.createElement("button");
+        eventBtn.type = "button";
+        eventBtn.className = "faserip-phase-secondary-btn faserip-judge-event-btn";
+        eventBtn.innerHTML = `<i class="fas fa-bolt"></i> Event`;
+        eventBtn.title = "Judge Event: post a planned pre-action event (explosion, collapse, arrival) before the winning side acts";
+        eventBtn.addEventListener("click", async () => {
+          const live = game.combats.get(combat.id) ?? game.combat;
+          if (live) await this._postJudgeEvent(live);
+        });
+        controls.appendChild(eventBtn);
+
         const endBtn = document.createElement("button");
         endBtn.type = "button";
         endBtn.className = "faserip-phase-advance-btn";
@@ -937,6 +1024,16 @@ export class FaseripInitiative {
           container.innerHTML = `<span class="faserip-declaration-chip faserip-decl-attack defaulted" title="No declaration recorded — defaults to Attack when Initiative is rolled"><i class="fas fa-fist-raised"></i> Attack*</span>`;
           if (canControl) container.innerHTML += `<button class="faserip-tracker-ctrl faserip-declare-btn" data-action="declare" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declare a different action (optional; Attack is assumed)"><i class="fas fa-pen"></i></button>`;
         }
+        if (c.actor.hasPlayerOwner) {
+          const isReady = this._isReady(c, combat);
+          if (isReady) {
+            container.innerHTML += `<span class="faserip-ready-chip ready" title="Ready for initiative"><i class="fas fa-check"></i> Ready</span>`;
+          } else if (canControl) {
+            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-ready-btn" data-action="ready" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Ready: keep the shown plan and wait for initiative"><i class="fas fa-check"></i> <span>Ready</span></button>`;
+          } else {
+            container.innerHTML += `<span class="faserip-ready-chip waiting" title="Not yet ready"><i class="fas fa-hourglass-half"></i></span>`;
+          }
+        }
       } else {
         // Actions state. Per-character gates replace the old global Pre-Action
         // phase: a declared Dodge/Block/Evade/Multi shows its Roll button here
@@ -967,11 +1064,11 @@ export class FaseripInitiative {
         }
 
         const change = c.getFlag("msh-faserip", "changeActionAttempted");
-        if (canControl && declared && !resolvedThisRound && !acted) {
+        if (canControl && declared) {
           if (change?.round === combat.round) {
             container.innerHTML += `<span class="faserip-change-result ${change.success ? "success" : "failed"}">Change: ${change.success ? "✓" : "✕"}</span>`;
-          } else {
-            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-change-ctrl" data-action="change-action" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Change Action: Yellow Agility FEAT; success applies -1CS to subsequent FEATs"><i class="fas fa-exchange-alt"></i></button>`;
+          } else if (this._canChangeAction(c, combat).ok) {
+            container.innerHTML += `<button class="faserip-tracker-ctrl faserip-change-ctrl" data-action="change-action" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Change Action (pre-action only): Yellow Agility FEAT; success applies -1CS to subsequent FEATs"><i class="fas fa-exchange-alt"></i></button>`;
           }
         }
       }
@@ -992,14 +1089,19 @@ export class FaseripInitiative {
       console.warn("[FASERIP WARN] Invalid combat state");
       return;
     }
+    // Claim the roll before any await so a Ready-flag update arriving while
+    // defaults are being stamped cannot start a second roll.
+    this.isRolling = true;
     const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
     if (rawPhases) {
       if (!combat.started) {
+        this.isRolling = false;
         ui.notifications.warn("Begin combat before rolling RAW initiative.");
         return;
       }
       const phase = this._getPhase(combat);
       if (phase !== this.PHASE_DECLARE) {
+        this.isRolling = false;
         this._dbg("rollSideInitiative blocked", { phase });
         ui.notifications.warn("RAW initiative may only be rolled from the Declaration phase.");
         return;
@@ -1009,8 +1111,6 @@ export class FaseripInitiative {
       const defaulted = await this._applyDefaultDeclarations(combat);
       this._dbg("rollSideInitiative", { round: combat.round, defaulted });
     }
-
-    this.isRolling = true;
 
     try {
       // Categorize only combatants who can actually act this round. KO, dead,
@@ -1126,7 +1226,7 @@ export class FaseripInitiative {
         const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
         if (turnIndex >= 0) update.turn = turnIndex;
         await combat.update(update, { mshNoTimeAdvance: true });
-        await this._autoResolveMultiFeats(combat);
+        await this._autoResolveDeclaredFeats(combat);
       } else {
         if (turnIndex >= 0) await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
       }
@@ -1145,14 +1245,17 @@ export class FaseripInitiative {
 
   static async rollIndividualInitiative(combat, ids) {
     if (!game.user.isGM || !combat || this.isRolling) return;
+    this.isRolling = true;
     const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
     if (rawPhases) {
       if (!combat.started) {
+        this.isRolling = false;
         ui.notifications.warn("Begin combat before rolling RAW initiative.");
         return;
       }
       const phase = this._getPhase(combat);
       if (phase !== this.PHASE_DECLARE) {
+        this.isRolling = false;
         this._dbg("rollIndividualInitiative blocked", { phase });
         ui.notifications.warn("RAW initiative may only be rolled from the Declaration phase.");
         return;
@@ -1160,7 +1263,6 @@ export class FaseripInitiative {
       const defaulted = await this._applyDefaultDeclarations(combat);
       this._dbg("rollIndividualInitiative", { round: combat.round, defaulted });
     }
-    this.isRolling = true;
 
     try {
       // If no ids specified, roll for all combatants
@@ -1226,7 +1328,7 @@ export class FaseripInitiative {
         const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
         if (turnIndex >= 0) update.turn = turnIndex;
         await combat.update(update, { mshNoTimeAdvance: true });
-        await this._autoResolveMultiFeats(combat);
+        await this._autoResolveDeclaredFeats(combat);
       } else {
         if (turnIndex >= 0) await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
       }
@@ -1305,6 +1407,80 @@ export class FaseripInitiative {
       requiredColor: diff === -1 ? "red" : diff === 0 ? "yellow" : "green",
       autoRoll: decl.autoRoll === true
     };
+  }
+
+  // RAW step 4: every declared pre-action FEAT resolves before either side
+  // acts. Multi first (may be Automatic), then declared defences that carry
+  // the auto-roll flag. Manual rollers keep their tracker Roll button; the
+  // dispatcher refuses attacks on them until they roll.
+  static async _autoResolveDeclaredFeats(combat) {
+    const multi = await this._autoResolveMultiFeats(combat);
+    const defenses = await this._autoResolveDefenseFeats(combat);
+    return multi + defenses;
+  }
+
+  static async _autoResolveDefenseFeats(combat) {
+    let n = 0;
+    for (const c of this._eligibleCombatants(combat)) {
+      const req = this._getPreActionRequirement(c);
+      if (!isDefenseRequirement(req)) continue;
+      const pre = c.getFlag("msh-faserip", "preActionResolved");
+      if (pre?.round === combat.round && pre.action === req.action) continue;
+      const decl = c.getFlag("msh-faserip", "declaredAction");
+      if (decl?.autoRoll !== true || !c.actor) continue;
+      const result = await ActionDispatcher.roll(req.action, {
+        actor: c.actor,
+        abilityName: req.ability,
+        opts: {
+          actionType: req.action,
+          rawPreAction: true,
+          autoRoll: true,
+          shift: Number(decl.shift) || 0,
+          evadeTarget: decl.target || ""
+        }
+      });
+      if (!result) continue;
+      await this._setCombatantFlags(c, {
+        preActionResolved: {
+          round: combat.round,
+          action: req.action,
+          result: result.resultColor || result.color || "done",
+          success: req.action === "evading" ? result.resultColor !== "white" : true,
+          shift: Number(decl.shift) || 0,
+          autoRolled: true
+        }
+      });
+      this._dbg("auto-rolled defence FEAT", { name: c.name, action: req.action, result: result.resultColor });
+      n++;
+    }
+    if (n) ui.combat?.render(true);
+    return n;
+  }
+
+  // RAW step 4 also covers Judge-planned events (explosions, arrivals) that
+  // resolve before the winning side acts. Posts a chat card so the table sees
+  // the event in sequence.
+  static async _postJudgeEvent(combat) {
+    if (!game.user.isGM) return;
+    const text = await new Promise(resolve => {
+      new Dialog({
+        title: `Judge Event — Round ${combat.round}`,
+        content: `<div class="faserip-declare-dialog"><label class="faserip-declare-field"><span>Event</span><textarea name="event" rows="3" placeholder="The gantry gives way... the bomb detonates... reinforcements arrive..."></textarea></label></div>`,
+        buttons: {
+          post: { icon: '<i class="fas fa-bolt"></i>', label: "Post", callback: html => resolve(String(html.find('[name="event"]').val() || "").trim()) },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "post",
+        render: html => html.find('[name="event"]').focus()
+      }).render(true);
+    });
+    if (!text) return;
+    await ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ alias: "Judge" }),
+      flavor: `Round ${combat.round} — Pre-Action Event`,
+      content: `<div class="faserip-judge-event"><strong>Round ${combat.round} · Event</strong><div>${this._esc(text).replace(/\n/g, "<br>")}</div></div>`
+    });
   }
 
   static async _autoResolveMultiFeats(combat) {
@@ -1402,6 +1578,12 @@ export class FaseripInitiative {
       await this._showDeclarationDialog(actor, combatantId);
       return;
     }
+    if (action === "ready") {
+      if (phase !== this.PHASE_DECLARE) return ui.notifications.warn("Initiative has already been rolled.");
+      await this._setCombatantFlags(combatant, { ready: { round: combat.round } });
+      ui.combat?.render(true);
+      return;
+    }
 
     if (phase !== this.PHASE_ACTIONS) return ui.notifications.warn("Declared FEATs are rolled after initiative.");
 
@@ -1491,8 +1673,16 @@ export class FaseripInitiative {
     const lastCount = Number(current.attackCount || 2) >= 3 ? 3 : 2;
     // Standing FEAT details, remembered on the actor across combats (e.g.
     // Counter-Strike's +3CS Ultimate Skill on his Multiple Attacks FEAT).
-    const lastShift = Number(current.shift ?? actor.getFlag("msh-faserip", "lastMultiShift") ?? 0) || 0;
-    const lastAutoRoll = (current.autoRoll ?? actor.getFlag("msh-faserip", "lastMultiAutoRoll") ?? false) === true;
+    // Multi and the declared defences (Dodge/Block/Evade) each remember their
+    // own CS / auto-roll on the actor. Defences default to auto-roll so RAW
+    // step 4 holds without a click; Multi defaults to manual (Karma call).
+    const FEAT_TYPES = ["multi", "dodge", "block", "evade"];
+    const savedFeat = (type) => type === "multi"
+      ? { shift: Number(actor.getFlag("msh-faserip", "lastMultiShift") ?? 0) || 0, autoRoll: actor.getFlag("msh-faserip", "lastMultiAutoRoll") === true }
+      : { shift: Number(actor.getFlag("msh-faserip", "lastDefenseShift") ?? 0) || 0, autoRoll: (actor.getFlag("msh-faserip", "lastDefenseAutoRoll") ?? true) === true };
+    const savedForLast = savedFeat(lastType);
+    const lastShift = Number(current.shift ?? savedForLast.shift) || 0;
+    const lastAutoRoll = (current.autoRoll ?? savedForLast.autoRoll) === true;
     const hasMAE = this._hasTalent(actor, /martial arts\s*[- ]?e/i);
     const hasWpnSpec = this._hasTalent(actor, /weapons? specialist/i);
     const chk = v => v === lastType ? "checked" : "";
@@ -1518,9 +1708,9 @@ export class FaseripInitiative {
               <label><input type="radio" name="attackCount" value="2" ${lastCount === 2 ? "checked" : ""}> 2 (RM intensity)</label>
               <label><input type="radio" name="attackCount" value="3" ${lastCount === 3 ? "checked" : ""}> 3 (AM intensity)</label>
             </div>
-            <div class="faserip-declare-sub" data-section="multi">
+            <div class="faserip-declare-sub" data-section="feat">
               <label title="Standing column shift applied to this FEAT every round (talents, powers such as Ultimate Skill). Saved on the character.">CS <input type="number" name="featShift" value="${lastShift}" min="-5" max="5" step="1" style="width:44px;"></label>
-              <label title="Roll the FEAT automatically each round with the saved CS — no dialog, no Karma. Uncheck to roll manually."><input type="checkbox" name="autoRoll" ${lastAutoRoll ? "checked" : ""}> Auto-roll each round</label>
+              <label title="Roll the FEAT at initiative with the saved CS — no dialog, no Karma. Uncheck to roll it yourself from the tracker (attacks on you wait until you do)."><input type="checkbox" name="autoRoll" ${lastAutoRoll ? "checked" : ""}> Auto-roll at initiative</label>
             </div>
             ${(hasMAE || hasWpnSpec) ? `<div class="faserip-declare-sub" data-section="initiative-context">
               <span>Initiative talent:</span>
@@ -1545,8 +1735,8 @@ export class FaseripInitiative {
               resolve({
                 type, attackCount: type === "multi" ? (attackCount >= 3 ? 3 : 2) : null,
                 note, target,
-                shift: type === "multi" ? shift : 0,
-                autoRoll: type === "multi" ? autoRoll : false,
+                shift: FEAT_TYPES.includes(type) ? shift : 0,
+                autoRoll: FEAT_TYPES.includes(type) ? autoRoll : false,
                 qualifiers: {
                   unarmed: !!html.find('[name="unarmed"]').is(':checked'),
                   weaponSpecialist: !!html.find('[name="weaponSpecialist"]').is(':checked')
@@ -1561,9 +1751,19 @@ export class FaseripInitiative {
           const update = () => {
             const type = String(html.find('[name="declaration"]:checked').val() || "attack");
             html.find('[data-section="multi"]').toggle(type === "multi");
+            html.find('[data-section="feat"]').toggle(FEAT_TYPES.includes(type));
             html.find('[data-section="initiative-context"]').toggle(["attack", "charge", "multi"].includes(type));
           };
-          html.find('[name="declaration"]').on("change", update);
+          html.find('[name="declaration"]').on("change", ev => {
+            // Switching FEAT family: load that family's remembered CS / auto-roll.
+            const type = String(ev.currentTarget.value || "attack");
+            if (FEAT_TYPES.includes(type) && type !== current.type) {
+              const saved = savedFeat(type);
+              html.find('[name="featShift"]').val(saved.shift);
+              html.find('[name="autoRoll"]').prop("checked", saved.autoRoll);
+            }
+            update();
+          });
           update();
         }
       }).render(true);
@@ -1582,15 +1782,18 @@ export class FaseripInitiative {
       declaredAction
     });
     if (!ok) return null;
-    if (choice.type === "multi" && (actor.isOwner || game.user.isGM)) {
-      await actor.setFlag("msh-faserip", "lastMultiShift", choice.shift || 0);
-      await actor.setFlag("msh-faserip", "lastMultiAutoRoll", !!choice.autoRoll);
+    if (FEAT_TYPES.includes(choice.type) && (actor.isOwner || game.user.isGM)) {
+      const key = choice.type === "multi" ? "Multi" : "Defense";
+      await actor.update({
+        [`flags.msh-faserip.last${key}Shift`]: choice.shift || 0,
+        [`flags.msh-faserip.last${key}AutoRoll`]: !!choice.autoRoll
+      });
     }
     // A declaration edited after initiative may qualify for immediate
     // resolution; during Declaration this is a no-op (phase gate). Change
     // Action defers to _rollChangeAction, which resolves after the -1CS
     // penalty is applied so the auto-roll uses the penalized rank.
-    if (!isChange && this._getPhase(combat) === this.PHASE_ACTIONS) await this._autoResolveMultiFeats(combat);
+    if (!isChange && this._getPhase(combat) === this.PHASE_ACTIONS) await this._autoResolveDeclaredFeats(combat);
     ui.combat?.render(true);
     return declaredAction;
   }
@@ -1630,6 +1833,7 @@ export class FaseripInitiative {
             </select></label>
             <label>Multi attacks <select name="attackCount"><option value="2">2 (RM)</option><option value="3">3 (AM)</option></select></label>
             <label>Shared target/note <input type="text" name="note" placeholder="e.g. nearest hero, guard MODOK"></label>
+            <label class="faserip-npc-plan-check"><span>Declared FEAT</span><span><input type="checkbox" name="autoRoll" checked> Auto-roll at initiative (Dodge/Block/Evade/Multi)</span></label>
             <label class="faserip-npc-plan-check"><span>Initiative context</span><span><input type="checkbox" name="unarmed"> Unarmed (MA-E) &nbsp; <input type="checkbox" name="weaponSpecialist"> Specialist weapon</span></label>
           </div>
         </div>`,
@@ -1643,7 +1847,8 @@ export class FaseripInitiative {
               const note = String(html.find('[name="note"]').val() || "").trim();
               const weaponSpecialist = !!html.find('[name="weaponSpecialist"]').is(':checked');
               const unarmed = weaponSpecialist ? false : !!html.find('[name="unarmed"]').is(':checked');
-              resolve({ ids, type, attackCount, note, qualifiers: { unarmed, weaponSpecialist } });
+              const autoRoll = !!html.find('[name="autoRoll"]').is(':checked');
+              resolve({ ids, type, attackCount, note, autoRoll, qualifiers: { unarmed, weaponSpecialist } });
             }
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
@@ -1657,7 +1862,8 @@ export class FaseripInitiative {
     for (const id of choice.ids) {
       const c = combat.combatants.get(id);
       if (!c || c.actor?.hasPlayerOwner || !this._isInitiativeEligible(c)) continue;
-      const data = { type: choice.type, attackCount: choice.type === "multi" ? choice.attackCount : null, note: choice.note, target: "", qualifiers: choice.qualifiers || { unarmed: false, weaponSpecialist: false } };
+      const featType = ["multi", "dodge", "block", "evade"].includes(choice.type);
+      const data = { type: choice.type, attackCount: choice.type === "multi" ? choice.attackCount : null, note: choice.note, target: "", shift: 0, autoRoll: featType && !!choice.autoRoll, qualifiers: choice.qualifiers || { unarmed: false, weaponSpecialist: false } };
       const meta = this._declarationMeta(data.type, data);
       updates.push({
         _id: c.id,
@@ -1686,16 +1892,24 @@ export class FaseripInitiative {
 
   // RAW Change Action: Yellow Agility FEAT. Success permits a replacement
   // declaration and applies -1CS to every subsequent FEAT this round.
+  static _canChangeAction(combatant, combat) {
+    return canChangeAction({
+      phase: this._getPhase(combat),
+      round: combat.round,
+      changeActionAttempted: combatant.getFlag("msh-faserip", "changeActionAttempted"),
+      preActionResolved: combatant.getFlag("msh-faserip", "preActionResolved"),
+      actionState: combatant.getFlag("msh-faserip", "actionState"),
+      actionsBegun: this._actionsBegun(combat),
+      actorName: combatant.name
+    });
+  }
+
   static async _rollChangeAction(actor, combatantId) {
     const combat = this._resolveCombatForCombatant(combatantId);
     const combatant = combat?.combatants?.get(combatantId);
-    if (!combatant || this._getPhase(combat) !== this.PHASE_ACTIONS) return;
-    const attempted = combatant.getFlag("msh-faserip", "changeActionAttempted");
-    if (attempted?.round === combat.round) return ui.notifications.warn("Change Action has already been attempted this round.");
-    const actionState = combatant.getFlag("msh-faserip", "actionState");
-    if (actionState?.round === combat.round && actionState.combatActionUsed) return ui.notifications.warn("The declared combat action has already been used this round.");
-    const resolved = combatant.getFlag("msh-faserip", "preActionResolved");
-    if (resolved?.round === combat.round) return ui.notifications.warn("The declared Pre-Action FEAT has already been resolved; the action is locked.");
+    if (!combatant || !combat) return;
+    const verdict = this._canChangeAction(combatant, combat);
+    if (!verdict.ok) return ui.notifications.warn(verdict.message);
 
     const featResult = await new Promise(resolve => {
       showAbilityFeatDialog(actor, "agility", {
@@ -1729,7 +1943,7 @@ export class FaseripInitiative {
       changeActionAttempted: { round: combat.round, success: true, result: featResult.resultColor, changed: true },
       preActionResolved: null
     });
-    await this._autoResolveMultiFeats(combat);
+    await this._autoResolveDeclaredFeats(combat);
     ui.notifications.info(`${actor.name} changes action; subsequent FEATs this round are -1CS.`);
     ui.combat?.render(true);
   }
@@ -1748,7 +1962,7 @@ export class FaseripInitiative {
     if (rawPhases) {
       steps = [
         "Declared actions locked (Attack assumed; changes now need a Yellow Agility Change Action, -1CS after)",
-        "Roll declared Dodge / Block / Evade / Multiple Attacks FEATs from the tracker",
+        "Declared Dodge / Block / Evade / Multiple Attacks FEATs resolve (auto-rolled, or from the tracker Roll button)",
         `${winner} act, then ${loser} act`,
         "End Round"
       ];
@@ -1779,7 +1993,7 @@ export class FaseripInitiative {
     if (rawPhases) {
       steps = [
         "Declared actions locked (Attack assumed; changes now need a Yellow Agility Change Action, -1CS after)",
-        "Roll declared Dodge / Block / Evade / Multiple Attacks FEATs from the tracker",
+        "Declared Dodge / Block / Evade / Multiple Attacks FEATs resolve (auto-rolled, or from the tracker Roll button)",
         "Actions in initiative order",
         "End Round"
       ];

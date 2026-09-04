@@ -1,4 +1,7 @@
-// scripts/modules/actions/action-dispatcher.js
+// scripts/modules/actions/action-dispatcher.js v1.1.0 - 2026-09-03
+// v1.1.0: Ruling 2026-09-03 — an attack is refused while any targeted
+//         combatant's declared Dodge/Block/Evade is still unrolled (RAW step
+//         4: pre-action rolls precede either side's actions).
 import { BluntAttackAction }   from "./blunt-attack-action.js";
 import { EdgedAttackAction }   from "./edged-attack-action.js";
 import { DefenseAction }       from "./defense-action.js";
@@ -18,7 +21,7 @@ import { debugLog } from "./action-utils.js";
 import { MentalPowerAction } from "./mental-power-action.js";
 import { GrenadeAction } from "./grenade-action.js";
 import { IntensityAction } from "./intensity-action.js";
-import { authorizeRawAction, RAW_VOLUNTARY_TYPES } from "../../rules/raw-combat-state.js";
+import { authorizeRawAction, defensePending, RAW_ATTACK_TYPES, RAW_VOLUNTARY_TYPES } from "../../rules/raw-combat-state.js";
 
 // Anchor: mode resolver (safe even if settings not registered yet)
 export function resolveCombatMode(actor) {
@@ -171,6 +174,21 @@ async function rawDeclarationGate(actor, type, opts = {}) {
     rawPreAction: !!opts?.rawPreAction,
     actorName: actor.name
   });
+  if (verdict.ok && RAW_ATTACK_TYPES.has(type)) {
+    const turns = Array.from(combat.turns ?? []);
+    for (const token of game.user?.targets ?? []) {
+      const target = turns.find(c => c.tokenId === token.id || (token.actor && c.actor?.id === token.actor.id));
+      if (!target) continue;
+      const pending = defensePending({
+        declaration: target.getFlag("msh-faserip", "declaredAction"),
+        preActionResolved: target.getFlag("msh-faserip", "preActionResolved"),
+        round: combat.round
+      });
+      if (pending) {
+        return { ok: false, message: `${target.name} declared ${target.getFlag("msh-faserip", "declaredAction")?.label || "a defense"} and has not rolled it yet. Pre-action FEATs resolve before attacks.` };
+      }
+    }
+  }
   return { ...verdict, combat, combatant };
 }
 

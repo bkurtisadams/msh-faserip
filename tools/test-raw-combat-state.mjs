@@ -1,4 +1,4 @@
-// tools/test-raw-combat-state.mjs v2.0.0 - 2026-09-03
+// tools/test-raw-combat-state.mjs v2.1.0 - 2026-09-03
 // Pure-node tests for scripts/rules/raw-combat-state.js (two-state model).
 // Run from the repo root: node tools/test-raw-combat-state.mjs
 import assert from 'node:assert/strict';
@@ -8,7 +8,12 @@ import {
   authorizeRawAction,
   authorizeRawMovement,
   getPreActionRequirement,
-  isPreActionResolved
+  isPreActionResolved,
+  isDefenseRequirement,
+  defensePending,
+  canChangeAction,
+  isCombatantReady,
+  readinessSummary
 } from '../scripts/rules/raw-combat-state.js';
 
 let passed = 0;
@@ -96,6 +101,55 @@ test('isPreActionResolved is round-scoped', () => {
   assert.equal(isPreActionResolved({ declaration: decl, preActionResolved: { round: 4, action: 'evading' }, round: 4 }), true);
   assert.equal(isPreActionResolved({ declaration: decl, preActionResolved: { round: 3, action: 'evading' }, round: 4 }), false);
   assert.equal(isPreActionResolved({ declaration: { type: 'attack' }, preActionResolved: null, round: 4 }), true);
+});
+
+// Rulings 2026-09-03
+test('Declared defences are defence requirements; Multi is not', () => {
+  assert.equal(isDefenseRequirement(getPreActionRequirement({ type: 'dodge' })), true);
+  assert.equal(isDefenseRequirement(getPreActionRequirement({ type: 'block' })), true);
+  assert.equal(isDefenseRequirement(getPreActionRequirement({ type: 'evade' })), true);
+  assert.equal(isDefenseRequirement(getPreActionRequirement({ type: 'multi' })), false);
+  assert.equal(isDefenseRequirement(null), false);
+});
+test('A target with an unrolled declared Dodge blocks attacks until rolled', () => {
+  assert.equal(defensePending({ declaration: { type: 'dodge' }, preActionResolved: null, round: 4 }), true);
+  assert.equal(defensePending({ declaration: { type: 'dodge' }, preActionResolved: { round: 4, action: 'dodging' }, round: 4 }), false);
+  assert.equal(defensePending({ declaration: { type: 'dodge' }, preActionResolved: { round: 3, action: 'dodging' }, round: 4 }), true);
+});
+test('An unrolled Multi on the target never delays the attacker', () => assert.equal(defensePending({ declaration: { type: 'multi' }, preActionResolved: null, round: 4 }), false));
+test('Default Attack target is never pending', () => assert.equal(defensePending({ declaration: null, preActionResolved: null, round: 4 }), false));
+
+const cca = (over) => canChangeAction({ phase: RAW_PHASES.ACTIONS, round: 4, actorName: 'Hero', ...over });
+test('Change Action is open after initiative before anyone acts', () => assert.equal(cca({}).ok, true));
+test('Change Action is closed during Declaration', () => assert.equal(cca({ phase: RAW_PHASES.DECLARE }).ok, false));
+test('Change Action closes once any combatant has acted this round', () => assert.equal(cca({ actionsBegun: true }).ok, false));
+test('Change Action is once per round', () => assert.equal(cca({ changeActionAttempted: { round: 4 } }).ok, false));
+test('Change Action is closed after own FEAT resolved or own action used', () => {
+  assert.equal(cca({ preActionResolved: { round: 4, action: 'dodging' } }).ok, false);
+  assert.equal(cca({ actionState: { round: 4, combatActionUsed: true } }).ok, false);
+});
+test('Prior-round attempts and states do not lock Change Action', () => assert.equal(cca({ changeActionAttempted: { round: 3 }, preActionResolved: { round: 3 }, actionState: { round: 3, combatActionUsed: true } }).ok, true));
+
+test('Ready flag or a fresh non-default declaration makes a combatant ready', () => {
+  assert.equal(isCombatantReady({ ready: { round: 4 }, declaration: null, round: 4 }), true);
+  assert.equal(isCombatantReady({ ready: { round: 3 }, declaration: null, round: 4 }), false);
+  assert.equal(isCombatantReady({ ready: null, declaration: { type: 'dodge', round: 4 }, round: 4 }), true);
+  assert.equal(isCombatantReady({ ready: null, declaration: { type: 'dodge', round: 3 }, round: 4 }), false);
+  assert.equal(isCombatantReady({ ready: null, declaration: { type: 'attack', round: 4, defaulted: true }, round: 4 }), false);
+});
+test('Readiness counts player-owned combatants only; NPCs never block', () => {
+  const r = readinessSummary([
+    { name: 'A', playerOwned: true, ready: { round: 4 } },
+    { name: 'B', playerOwned: true, ready: null, declaration: { type: 'attack', round: 3 } },
+    { name: 'Thug', playerOwned: false, ready: null }
+  ], 4);
+  assert.equal(r.total, 2); assert.equal(r.ready, 1); assert.equal(r.allReady, false);
+  assert.deepEqual(r.missing.map(e => e.name), ['B']);
+});
+test('All players ready → allReady; no players → never allReady (Judge rolls)', () => {
+  assert.equal(readinessSummary([{ playerOwned: true, ready: { round: 4 } }], 4).allReady, true);
+  assert.equal(readinessSummary([{ playerOwned: false }], 4).allReady, false);
+  assert.equal(readinessSummary([], 4).allReady, false);
 });
 
 console.log(`raw-combat-state tests passed (${passed})`);
