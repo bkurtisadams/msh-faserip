@@ -1,3 +1,11 @@
+// faserip-initiative.js v4.1.1 - 2026-09-04
+// v4.1.1: The stored side flag is a cache, not the source of truth. A stale
+//         value (written by an older determination rule, or before the actor
+//         was retyped) put a hero in the villain block until the next roll
+//         refreshed it. _getCombatantSide now returns override ?? automatic
+//         rule; the cache is refreshed at combat start, on creation and on
+//         every roll, and ignored when it is not "pc"/"npc". explainSides()
+//         (game.msh.explainInitiativeSides) prints why each row is where it is.
 // faserip-initiative.js v4.1.0 - 2026-09-04
 // v4.1.0: Side-Based tracker order. Foundry sorts the tracker by initiative
 //         then name, so before the roll (Declare), and for KO'd rows with no
@@ -457,6 +465,7 @@ export class FaseripInitiative {
     // Declare instead (Ready flags / Judge close it).
     Hooks.on("combatStart", async (combat) => {
       if (!game.user.isGM || !this._isFaseripMode()) return;
+      await this._ensureSideFlags(combat);
       if (game.settings.get("msh-faserip", "useRawTurnPhases")) { ui.combat?.render(true); return; }
       if (!game.settings.get("msh-faserip", "autoRerollInitiative")) return;
       this._dbg("combatStart: auto-roll");
@@ -538,16 +547,39 @@ export class FaseripInitiative {
     return combatant.actor?.hasPlayerOwner ? "pc" : "npc";
   }
 
-  // Manual override (Swap Side) beats the automatic rule; the stored side
-  // flag beats recomputing so the roll and the rows agree within a round.
+  static _validSide(v) { return v === "pc" || v === "npc" ? v : null; }
+
+  // Manual override (Swap Side) beats the automatic rule. The stored "side"
+  // flag is only a cache for other readers; it is never consulted here, so a
+  // stale value cannot move a combatant.
   static _resolveSide(combatant) {
-    return combatant.getFlag("msh-faserip", "sideOverride") ?? this._determineSide(combatant);
+    return this._validSide(combatant.getFlag("msh-faserip", "sideOverride")) ?? this._determineSide(combatant);
   }
 
   static _getCombatantSide(combatant) {
-    return combatant.getFlag("msh-faserip", "sideOverride")
-      ?? combatant.getFlag("msh-faserip", "side")
-      ?? this._determineSide(combatant);
+    return this._resolveSide(combatant);
+  }
+
+  // Diagnostic: why each tracked combatant sits on its side.
+  static explainSides(combat = game.combat) {
+    if (!combat) return console.warn("[FASERIP] explainSides: no active combat");
+    const rows = Array.from(combat.combatants).map(c => {
+      const type = c.actor?.type ?? "(no actor)";
+      const disp = c.token?.disposition ?? c.actor?.prototypeToken?.disposition;
+      const dispName = Object.entries(CONST.TOKEN_DISPOSITIONS).find(([, v]) => v === disp)?.[0] ?? String(disp);
+      const override = c.getFlag("msh-faserip", "sideOverride") ?? null;
+      const cached = c.getFlag("msh-faserip", "side") ?? null;
+      const resolved = this._resolveSide(c);
+      const reason = override ? "override (Swap Side)"
+        : type === "hero" ? "actor type hero"
+        : type === "villain" ? "actor type villain"
+        : disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "token FRIENDLY"
+        : disp === CONST.TOKEN_DISPOSITIONS.HOSTILE ? "token HOSTILE"
+        : c.actor?.hasPlayerOwner ? "player-owned" : "not player-owned (fallback)";
+      return { name: c.name, actorType: type, disposition: dispName, playerOwned: !!c.actor?.hasPlayerOwner, override, cached, resolved, reason, initiative: c.initiative };
+    });
+    console.table(rows);
+    return rows;
   }
 
   static _otherSide(side) { return side === "pc" ? "npc" : "pc"; }

@@ -1,3 +1,9 @@
+// combat-panel.js v1.7.3 - 2026-09-04
+// v1.7.3: Strip side comes from FaseripInitiative._getCombatantSide (override ??
+//         automatic rule), not the cached flag / raw disposition.
+// combat-panel.js v1.7.2 - 2026-09-03
+// v1.7.2: Context menu gains "Swap Side" / "Reset Side (automatic)" (GM), routed
+//         through FaseripInitiative so the tracker and the panel agree.
 // combat-panel.js v1.7.1 - 2026-08-21
 // v1.7.1: Fix hook unregistration (Hooks.off needs hook name + id; ids alone were
 //         silently ignored, leaking render hooks after close). Pip side coloring
@@ -17,6 +23,7 @@
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
+import { FaseripInitiative } from "./faserip-initiative.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -237,7 +244,7 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
       const hpMax = a?.system?.attributes?.health?.max ?? 1;
       const hpPct = Math.round((hp / hpMax) * 100);
       const disposition = c.token?.disposition ?? 0;
-      const side = c.getFlag?.("msh-faserip", "side") ?? (disposition === -1 ? "npc" : "pc");
+      const side = FaseripInitiative._getCombatantSide(c);
       return {
         id: c.id,
         idx,
@@ -554,6 +561,15 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
         }},
       { icon: "fa-eraser", label: "Clear Initiative",
         action: () => combatant.update({ initiative: null }) },
+      ...(game.user.isGM && FaseripInitiative._isFaseripMode() ? [
+        { icon: "fa-exchange-alt",
+          label: `Swap Side → ${FaseripInitiative._sideLabel(FaseripInitiative._otherSide(FaseripInitiative._getCombatantSide(combatant)))}`,
+          action: () => FaseripInitiative.swapSide(combatant) },
+        ...(combatant.getFlag("msh-faserip", "sideOverride") != null ? [
+          { icon: "fa-undo", label: "Reset Side (automatic)",
+            action: () => FaseripInitiative.clearSideOverride(combatant) }
+        ] : [])
+      ] : []),
       { icon: "fa-user-minus", label: "Remove from Combat",
         action: () => combatant.delete() },
     ];

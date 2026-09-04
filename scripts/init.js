@@ -1,4 +1,10 @@
-﻿// init.js v1.15.0 - 2026-09-03
+﻿// init.js v1.16.1 - 2026-09-04
+// v1.16.1: game.msh.explainInitiativeSides() console diagnostic.
+// init.js v1.16.0 - 2026-09-04
+// v1.16.0: Action HUD sizing settings: actionHudButtonSize (client, px); style
+//          gains "both" (Icons + Labels) as default; columns/zoom kept hidden
+//          for the one-time migration in action-hud.js.
+// init.js v1.15.0 - 2026-09-03
 // v1.15.0: Retire the turnSeconds, combatLogs and autoLogCombat settings. A turn
 //          is TURN_SECONDS (6); the log settings were never read.
 // init.js v1.14.0 - 2026-08-20
@@ -1488,8 +1494,18 @@ Hooks.once("init", async () => {
       default: true
     });
 
+    game.settings.register("msh-faserip", "actionHudButtonSize", {
+      name: "Action HUD: Button Size",
+      hint: "Minimum button size in pixels (32–128). Window width sets the column count; buttons grow to fill it. 0 = not yet migrated from the v3.3 columns/zoom model.",
+      scope: "client",
+      config: false,
+      type: Number,
+      default: 0
+    });
+
+    // Legacy (v3.3 sizing model). Read once by the action-hud migration.
     game.settings.register("msh-faserip", "actionHudColumns", {
-      name: "Action HUD: Grid Columns",
+      name: "Action HUD: Grid Columns (legacy)",
       hint: "Number of button columns in the HUD grid.",
       scope: "client",
       config: false,
@@ -1499,8 +1515,8 @@ Hooks.once("init", async () => {
     });
 
     game.settings.register("msh-faserip", "actionHudZoom", {
-      name: "Action HUD: Button Scale",
-      hint: "Zoom level for HUD buttons (0.5â€“2.0). Also adjustable with Ctrl+Wheel.",
+      name: "Action HUD: Button Scale (legacy)",
+      hint: "v3.3 zoom level; superseded by Action HUD: Button Size.",
       scope: "client",
       config: false,
       type: Number,
@@ -1510,12 +1526,12 @@ Hooks.once("init", async () => {
 
     game.settings.register("msh-faserip", "actionHudStyle", {
       name: "Action HUD: Display Style",
-      hint: "Show icon art or text labels on HUD buttons.",
+      hint: "Icon art with a short caption, icon art only, or text codes only.",
       scope: "client",
       config: false,
       type: String,
-      default: "icons",
-      choices: { icons: "Icons Only", labels: "Labels Only" }
+      default: "both",
+      choices: { both: "Icons + Labels", icons: "Icons Only", labels: "Labels Only" }
     });
 
     game.settings.register("msh-faserip", "actionHudLocked", {
@@ -1547,7 +1563,7 @@ Hooks.once("init", async () => {
 
     game.settings.register("msh-faserip", "actionHudPosition", {
       name: "Action HUD Position",
-      hint: "Persisted window position.",
+      hint: "Persisted window position and width.",
       scope: "client",
       config: false,
       type: Object,
@@ -1936,6 +1952,8 @@ Hooks.once("init", async () => {
       canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 500 });
     }
   });
+
+  game.msh.explainInitiativeSides = () => FaseripInitiative.explainSides(game.combat);
 
   game.msh.rollFaseripInitiative = () => {
     if (!game.combat) {
