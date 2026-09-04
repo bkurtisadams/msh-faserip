@@ -52,6 +52,8 @@
 // v1.1.0: Add proper Foundry changes arrays to effect wrappers
 // Centralized Active Effect helpers for FASERIP on Foundry v13
 
+import { TURN_SECONDS } from "../recovery-timing.js";
+
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
 // Permission check for ActiveEffect writes on an actor — handles linked tokens,
@@ -109,8 +111,7 @@ function getCTT() {
 
 /** World setting helpers (with sane fallbacks) */
 function getTurnSeconds() {
-  const v = Number(game.settings?.get?.("msh-faserip", "turnSeconds"));
-  return Number.isFinite(v) && v > 0 ? v : 6;
+  return TURN_SECONDS;
 }
 function durationPolicy() {
   return game.settings?.get?.("msh-faserip", "effects.durationPolicy") || "rounds-in-combat";

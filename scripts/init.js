@@ -1,4 +1,7 @@
-﻿// init.js v1.14.0 - 2026-08-20
+﻿// init.js v1.15.0 - 2026-09-03
+// v1.15.0: Retire the turnSeconds, combatLogs and autoLogCombat settings. A turn
+//          is TURN_SECONDS (6); the log settings were never read.
+// init.js v1.14.0 - 2026-08-20
 // v1.14.0: Dying/poison time jumps now process every elapsed 6-second FASERIP turn;
 //          add unified quiet-by-default NPC recovery/dying output policy.
 // init.js v1.13.2 - 2026-08-20
@@ -133,7 +136,7 @@ import * as Effects from "./modules/effects/effect-engine.js";
 import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
 import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
-import { countElapsedTurns, normalizeTurnSeconds } from "./modules/recovery-timing.js";
+import { countElapsedTurns, TURN_SECONDS } from "./modules/recovery-timing.js";
 import { registerDataModels } from "./data-models.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
@@ -156,7 +159,7 @@ const FASERIP_PROTOTYPE_TOKEN_DEFAULTS_VERSION = 1;
  * turn" governor; large CTT advances must not collapse a minute into one tick.
  */
 async function processElapsedCriticalTurns({ elapsedSeconds, startWorldTime } = {}) {
-  const turnSeconds = normalizeTurnSeconds(game.settings?.get?.("msh-faserip", "turnSeconds"), 6);
+  const turnSeconds = TURN_SECONDS;
   const turns = countElapsedTurns(elapsedSeconds, turnSeconds);
   if (turns <= 0) return 0;
 
@@ -295,12 +298,9 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
 
   const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
   if (syncEnabled && !cttDrivesClock) {
-    // Advance world time by one FASERIP turn. RAW is 6s; the turnSeconds
-    // setting (default 6) is the house-rule knob, and ongoing-engine,
-    // effect-engine and gm-tools already read it. This site used to
-    // hard-code 6, so changing the setting desynced the clock from
-    // effect durations.
-    const turnSeconds = Number(game.settings.get("msh-faserip", "turnSeconds")) || 6;
+    // Advance world time by one FASERIP turn (RAW six seconds; the same
+    // constant drives effect durations in ongoing-engine and effect-engine).
+    const turnSeconds = TURN_SECONDS;
     await game.time.advance(turnSeconds);
     console.log(`[FASERIP] Combat advanced time by ${turnSeconds} seconds`);
   }
@@ -1232,23 +1232,6 @@ Hooks.once("init", async () => {
     default: true
   });
 
-  // Combat Logs Settings (unchanged)
-  game.settings.register("msh-faserip", "combatLogs", {
-    name: "Combat Logs",
-    scope: "world",
-    config: false,
-    type: Array,
-    default: []
-  });
-
-  game.settings.register("msh-faserip", "autoLogCombat", {
-    name: "Auto-Log Combat",
-    scope: "world",
-    config: false,
-    type: Boolean,
-    default: false
-  });
-
   game.settings.register('msh-faserip', 'stunDurationDie', {
     name: "Stun Duration Die",
     hint: "Die rolled for stun duration (White result on Stun check). RAW is d10 (1-10 rounds). Use smaller dice for faster combats.",
@@ -1422,12 +1405,6 @@ Hooks.once("init", async () => {
       config: false,
       type: Array,
       default: []
-    });
-
-    game.settings.register("msh-faserip", "turnSeconds", {
-      name: "Turn Length (seconds)",
-      hint: "Used when Calendar Time Tracker is not present.",
-      scope: "world", config: true, type: Number, default: 6
     });
 
     game.settings.register("msh-faserip", "effects.durationPolicy", {

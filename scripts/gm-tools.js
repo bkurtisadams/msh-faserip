@@ -1,3 +1,5 @@
+// gm-tools.js v1.4.4 - 2026-09-03
+// v1.4.4: Advance Time "round" uses TURN_SECONDS (turnSeconds setting retired).
 // gm-tools.js v1.4.3 - 2026-08-01
 // v1.4.3: Poison dialog — capture button/form refs before awaits
 //         (ev.currentTarget is nulled after handler yields); button shows
@@ -38,6 +40,7 @@ import { ACTIONS as ACTION_LIST } from "../helpers/action-constants.js";
 import { safeActorDeleteEffects } from "./gm-utils.js";
 import { RANKS_ORDERED, rankValue, shiftRank } from "./rules/rules-reference.js";
 import { loseOneEnduranceRank, restoreOneEnduranceRank } from "./modules/effects/ongoing-engine.js";
+import { TURN_SECONDS } from "./modules/recovery-timing.js";
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
@@ -1367,7 +1370,7 @@ export class GMToolsApp extends Application {
   async _onAdvanceTime(ev) {
     ev.preventDefault();
     const unit = ev.currentTarget.dataset.unit;
-    const turnSec = Number(game.settings?.get?.("msh-faserip", "turnSeconds")) || 6;
+    const turnSec = TURN_SECONDS;
     const TIME_SEC = { round: turnSec, min: 60, "10min": 600, hour: 3600, day: 86400 };
     const seconds = TIME_SEC[unit];
     if (!seconds) return;

@@ -1,5 +1,9 @@
-// scripts/modules/recovery-timing.js v1.0.0 - 2026-08-20
+// scripts/modules/recovery-timing.js v1.1.0 - 2026-09-03
+// v1.1.0: TURN_SECONDS constant. A FASERIP turn is six seconds (Advanced Set,
+//         Time Scale); the turnSeconds world setting is retired.
 // Pure timing helpers for FASERIP dying / Recovery / Healing.
+
+export const TURN_SECONDS = 6;
 
 /** Return a sane positive FASERIP turn length in seconds. */
 export function normalizeTurnSeconds(value, fallback = 6) {

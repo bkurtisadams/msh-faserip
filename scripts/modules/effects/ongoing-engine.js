@@ -106,6 +106,7 @@
 import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect, safeActorUpdateEffect } from "../../gm-utils.js";
 import { RANKS_ORDERED, stepRank } from "../../rules/rules-reference.js";
+import { TURN_SECONDS } from "../recovery-timing.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -136,8 +137,7 @@ function getActiveSceneActors() {
 }
 
 function getTurnSeconds() {
-  const v = Number(game.settings?.get?.("msh-faserip", "turnSeconds"));
-  return Number.isFinite(v) && v > 0 ? v : 6;
+  return TURN_SECONDS;
 }
 
 /* ───────────────────────────────────────────
@@ -861,7 +861,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope, effectiveWorldTime
   // dying at every call site so the stamp is fresh when we read it.
   const rankLossStamp = actor.getFlag(scope, "endRankLoss");
   if (rankLossStamp?.source === "poison") {
-    const turnSecs = Number(game.settings.get("msh-faserip", "turnSeconds")) || 6;
+    const turnSecs = TURN_SECONDS;
     const elapsed = dyingNow - rankLossStamp.at;
     if (elapsed >= 0 && elapsed < turnSecs) {
       console.log(`[FASERIP:DYING] ${actor.name}: poison took this turn's rank loss — dying step deferred`);

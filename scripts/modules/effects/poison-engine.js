@@ -55,14 +55,14 @@ import { loseOneEnduranceRank, registerOngoingEffect } from "./ongoing-engine.js
 import { determineFeatRequirement, checkFeatSuccess } from "../actions/ability-feat-dialog.js";
 import { TOXINS } from "../../rules/rules-reference.js";
 import { safeActorSetFlag } from "../../gm-utils.js";
+import { TURN_SECONDS } from "../recovery-timing.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
 const _poisonLocks = new Set();
 
 function turnSeconds() {
-  try { return Number(game.settings.get("msh-faserip", "turnSeconds")) || 6; }
-  catch { return 6; }
+  return TURN_SECONDS;
 }
 
 async function rollD10() {

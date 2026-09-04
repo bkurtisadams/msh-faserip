@@ -317,8 +317,8 @@ async function testConfiguredTurnLength(recorder, combat) {
   }
 
   recorder.assert(
-    captured.length === 1 && captured[0] === 11,
-    "combatRound advances the configured number of seconds",
+    captured.length === 1 && captured[0] === 6,
+    "combatRound advances one RAW six-second turn",
     { calls: captured }
   );
 }
@@ -610,7 +610,6 @@ export async function runBootstrapRuntimeTests({ keepArtifacts = false, postChat
     await preserveSetting(SYSTEM_ID, "ctt.syncMode", state.settings, "off");
     await preserveSetting(SYSTEM_ID, "ctt.timeAuthority", state.settings, false);
     await preserveSetting(SYSTEM_ID, "useRawTurnPhases", state.settings, false);
-    await preserveSetting(SYSTEM_ID, "turnSeconds", state.settings, 11);
 
     const schemaActor = await testRuntimeSchema(recorder, state);
     await testHealthHooks(recorder, schemaActor, scope);

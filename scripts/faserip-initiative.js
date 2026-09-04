@@ -1,3 +1,32 @@
+// faserip-initiative.js v4.1.0 - 2026-09-04
+// v4.1.0: Side-Based tracker order. Foundry sorts the tracker by initiative
+//         then name, so before the roll (Declare), and for KO'd rows with no
+//         initiative, heroes and villains interleave alphabetically. A
+//         FaseripCombat document class now sorts by side first in Side-Based
+//         mode (winning side on top, heroes when unrolled), then initiative,
+//         then defeated-last, then name. Other modes keep Foundry's order.
+// faserip-initiative.js v4.0.0 - 2026-09-04
+// v4.0.0: Initiative numbers come from the vendored @graycloak/faserip-rules
+//         initiative module (kernel slice: initiative). The controller now only
+//         gathers character facts (Intuition, Combat Sense / Enhanced Hearing
+//         power ranks, MA-E / Weapons Specialist talents, declared context) and
+//         hands them to sideInitiativeModifier / initiativeTotal /
+//         resolveSideInitiative; modifier table, natural 1, substitution,
+//         talent context, no-cross-stacking, tie re-roll and the Change Action
+//         constants are certified there. No behaviour change intended.
+// faserip-initiative.js v3.6.0 - 2026-09-03
+// v3.6.0: Swap Side. GM right-click on a tracker row (Foundry tracker and the
+//         combat panel) moves a combatant to the other side; stored as the
+//         sideOverride flag, which _ensureSideFlags honours over actor type and
+//         disposition until "Reset Side (automatic)". Mid-round swaps take the
+//         new side's initiative total. Manual-side rows get a dashed border.
+// faserip-initiative.js v3.5.0 - 2026-09-03
+// v3.5.0: Settings pass. Retire showPhaseReminder (turn-sequence list on the
+//         initiative card is always present, collapsed) and useTalentInitBonuses
+//         (MA-E / Weapons Specialist +1 are RAW; applied whenever the declared
+//         context matches). Labels: "RAW Turn Sequence", "Auto-Roll Initiative
+//         Each Round (non-RAW)", "Roll Initiative When Players Are Ready (RAW)",
+//         mode choices without the FASERIP prefix.
 // faserip-initiative.js v3.4.0 - 2026-09-03
 // v3.4.0: RAW workflow rulings (2026-09-03). Declared Dodge/Block/Evade auto-roll
 //         at initiative (saved CS, no Karma; uncheck Auto-roll to roll by hand)
@@ -76,7 +105,11 @@
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
-import { getInitiativeModifier, rankIndex, shiftRank } from "./rules/rules-reference.js";
+import { rankIndex, shiftRank } from "./rules/rules-reference.js";
+import {
+  CHANGE_ACTION, effectiveIntuition, initiativeModifier, initiativeTotal,
+  resolveSideInitiative, sideInitiativeModifier, talentInitiativeBonus
+} from "./lib/faserip-rules/faserip-initiative.js";
 import { authorizeRawMovement, canChangeAction, getPreActionRequirement, isCombatantReady, isDefenseRequirement, normalizeRawPhase, readinessSummary } from "./rules/raw-combat-state.js";
 
 export class FaseripInitiative {
@@ -142,22 +175,22 @@ export class FaseripInitiative {
   static registerSettings() {
     game.settings.register("msh-faserip", "initiativeMode", {
       name: "Initiative Mode",
-      hint: "Side-Based (RAW): one roll per side + Intuition modifier; winners act first. Individual FASERIP: each character rolls 1d10 + their own Intuition modifier. Standard Foundry: default Foundry individual initiative (no FASERIP modifiers). Action declarations and phase gates are a separate setting (Use RAW Turn Phases); with it off, any mode is roll-and-act with no declarations.",
+      hint: "Side-Based (RAW): one roll per side + Intuition modifier; winners act first. Individual FASERIP: each character rolls 1d10 + their own Intuition modifier. Standard Foundry: default Foundry individual initiative (no FASERIP modifiers). Declarations and phase gates are governed by RAW Turn Sequence; with it off, any mode is roll-and-act with no declarations.",
       scope: "world",
       config: true,
       type: String,
       default: this.MODE_SIDE,
       choices: {
-        [this.MODE_SIDE]: "FASERIP Side-Based (RAW)",
-        [this.MODE_INDIVIDUAL]: "FASERIP Individual",
+        [this.MODE_SIDE]: "Side-Based (RAW)",
+        [this.MODE_INDIVIDUAL]: "Individual (1d10 + own Intuition)",
         [this.MODE_FOUNDRY]: "Standard Foundry"
       },
       onChange: () => ui.combat?.render()
     });
 
     game.settings.register("msh-faserip", "autoRerollInitiative", {
-      name: "Auto Reroll Initiative Each Round",
-      hint: "Automatically roll initiative at the start of each round (Standard and legacy modes). With Use RAW Turn Phases on this setting is ignored: the round opens in Declare and initiative rolls when the players are Ready or the Judge clicks Initiative.",
+      name: "Auto-Roll Initiative Each Round (non-RAW)",
+      hint: "Automatically roll initiative at the start of each round when RAW Turn Sequence is off. With RAW Turn Sequence on this setting is ignored: the round opens in Declare and initiative rolls when the players are Ready or the Judge clicks Initiative.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -165,26 +198,8 @@ export class FaseripInitiative {
     });
 
     game.settings.register("msh-faserip", "rawAutoRollWhenReady", {
-      name: "RAW: Roll Initiative When Players Are Ready",
-      hint: "With Use RAW Turn Phases on, roll initiative automatically the moment every eligible player-owned combatant has clicked Ready (or declared this round). NPCs never block. Off: the Judge always clicks Initiative.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: true
-    });
-
-    game.settings.register("msh-faserip", "showPhaseReminder", {
-      name: "Show Turn Phase Reminder",
-      hint: "Show the turn sequence (declared FEATs → winners act → losers act → End Round) on initiative chat cards.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: true
-    });
-
-    game.settings.register("msh-faserip", "useTalentInitBonuses", {
-      name: "Apply Talent Initiative Bonuses",
-      hint: "Include Martial Arts E (+1 when unarmed) and Weapons Specialist (+1 with the specialty weapon). The declared attack context decides whether a bonus applies, so bonuses only apply with Use RAW Turn Phases on; without declarations no bonus is assumed.",
+      name: "Roll Initiative When Players Are Ready (RAW)",
+      hint: "With RAW Turn Sequence on, roll initiative automatically the moment every eligible player-owned combatant has clicked Ready (or declared this round). NPCs never block. Off: the Judge always clicks Initiative.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -206,7 +221,7 @@ export class FaseripInitiative {
     });
 
     game.settings.register("msh-faserip", "useRawTurnPhases", {
-      name: "Use RAW Turn Phases",
+      name: "RAW Turn Sequence (Declare → Initiative → Actions)",
       hint: "When enabled, intended actions are declared before initiative (Attack is assumed for anyone who declares nothing). Declared Dodge, Block, Evade, and Multiple Attacks become locked FEATs rolled from the tracker; changing a declaration after initiative requires a Yellow Agility FEAT and applies -1CS to subsequent FEATs. When disabled, actions use the legacy on-demand workflow.",
       scope: "world",
       config: true,
@@ -240,6 +255,33 @@ export class FaseripInitiative {
         console.log("[FASERIP] Migrated old useCustomInitiative setting");
       }
     } catch (e) { /* no old setting to migrate */ }
+  }
+
+  // Side-grouped tracker order for Side-Based mode. Sorting by initiative
+  // alone interleaves the sides whenever initiative is null (Declare state,
+  // KO'd rows). Order: winning side first (heroes until a roll exists), then
+  // initiative desc, then defeated last, then name.
+  static _installCombatClass() {
+    const Base = CONFIG.Combat.documentClass ?? Combat;
+    if (Base.name === "FaseripCombat") return;
+    const ctl = this;
+    class FaseripCombat extends Base {
+      static _sortCombatants(a, b) {
+        if (!ctl._isSideMode()) return super._sortCombatants(a, b);
+        const combat = a.parent ?? b.parent;
+        const first = combat?.getFlag?.("msh-faserip", "goesFirst") ?? "pc";
+        const rank = c => (ctl._getCombatantSide(c) === first ? 0 : 1);
+        const sideDiff = rank(a) - rank(b);
+        if (sideDiff) return sideDiff;
+        const ia = Number.isFinite(a.initiative) ? a.initiative : -Infinity;
+        const ib = Number.isFinite(b.initiative) ? b.initiative : -Infinity;
+        if (ib !== ia) return ib - ia;
+        const da = a.isDefeated ? 1 : 0, db = b.isDefeated ? 1 : 0;
+        if (da !== db) return da - db;
+        return (a.name || "").localeCompare(b.name || "") || (a.id > b.id ? 1 : -1);
+      }
+    }
+    CONFIG.Combat.documentClass = FaseripCombat;
   }
 
   static _isFaseripMode() {
@@ -276,6 +318,7 @@ export class FaseripInitiative {
 
   static _registerHooks() {
     CONFIG.Combat.initiative = { formula: "1d10", decimals: 0 };
+    this._installCombatClass();
 
     const originalRollInitiative = Combat.prototype.rollInitiative;
     Combat.prototype.rollInitiative = async function (ids, options = {}) {
@@ -437,6 +480,9 @@ export class FaseripInitiative {
     });
 
     // Chat card handlers
+    Hooks.on("getCombatantContextOptions", (_app, options) => this._sideContextOptions(options));
+    Hooks.on("getCombatTrackerEntryContext", (_html, options) => this._sideContextOptions(options));
+
     Hooks.on("renderChatMessageHTML", (msg, html) => {
       const root = html instanceof HTMLElement ? html : html[0] ?? html;
       // Collapsible step list toggle
@@ -492,8 +538,83 @@ export class FaseripInitiative {
     return combatant.actor?.hasPlayerOwner ? "pc" : "npc";
   }
 
+  // Manual override (Swap Side) beats the automatic rule; the stored side
+  // flag beats recomputing so the roll and the rows agree within a round.
+  static _resolveSide(combatant) {
+    return combatant.getFlag("msh-faserip", "sideOverride") ?? this._determineSide(combatant);
+  }
+
   static _getCombatantSide(combatant) {
-    return combatant.getFlag("msh-faserip", "side") ?? this._determineSide(combatant);
+    return combatant.getFlag("msh-faserip", "sideOverride")
+      ?? combatant.getFlag("msh-faserip", "side")
+      ?? this._determineSide(combatant);
+  }
+
+  static _otherSide(side) { return side === "pc" ? "npc" : "pc"; }
+
+  static _sideLabel(side) {
+    const labels = this._getSideLabels();
+    return side === "pc" ? labels.pc : labels.npc;
+  }
+
+  // GM: move a combatant to the other side (or to an explicit side). Persists
+  // as sideOverride so later rolls keep it. If side initiative has already
+  // been rolled this round the combatant takes the new side's total so the
+  // tracker order stays truthful.
+  static async swapSide(combatant, side = null) {
+    if (!game.user.isGM || !combatant?.parent) return false;
+    const combat = combatant.parent;
+    const newSide = side ?? this._otherSide(this._getCombatantSide(combatant));
+    const update = { _id: combatant.id, "flags.msh-faserip.sideOverride": newSide, "flags.msh-faserip.side": newSide };
+    if (this._isSideMode()) {
+      const data = this._getFlagData(combat);
+      if (this._hasCompleteData(data) && combatant.initiative != null) {
+        update.initiative = newSide === "pc" ? data.pcInit : data.npcInit;
+      }
+    }
+    await combat.updateEmbeddedDocuments("Combatant", [update]);
+    await combat.setupTurns();
+    this._dbg("swapSide", { name: combatant.name, newSide });
+    ui.combat?.render(true);
+    return true;
+  }
+
+  static async clearSideOverride(combatant) {
+    if (!game.user.isGM || !combatant?.parent) return false;
+    const combat = combatant.parent;
+    const auto = this._determineSide(combatant);
+    const update = { _id: combatant.id, "flags.msh-faserip.sideOverride": null, "flags.msh-faserip.side": auto };
+    if (this._isSideMode()) {
+      const data = this._getFlagData(combat);
+      if (this._hasCompleteData(data) && combatant.initiative != null) {
+        update.initiative = auto === "pc" ? data.pcInit : data.npcInit;
+      }
+    }
+    await combat.updateEmbeddedDocuments("Combatant", [update]);
+    await combat.setupTurns();
+    ui.combat?.render(true);
+    return true;
+  }
+
+  // Context-menu entries for both tracker generations: v12 passes (html,
+  // options) with jQuery <li>; v13+ passes (app, options) with HTMLElement.
+  static _sideContextOptions(options) {
+    const combatantFrom = li => {
+      const el = li instanceof HTMLElement ? li : li?.[0];
+      const id = el?.dataset?.combatantId;
+      return id ? this._resolveCombatForCombatant(id)?.combatants?.get(id) ?? null : null;
+    };
+    options.push({
+      name: "Swap Side",
+      icon: '<i class="fas fa-exchange-alt"></i>',
+      condition: li => game.user.isGM && this._isFaseripMode() && !!combatantFrom(li),
+      callback: li => { const c = combatantFrom(li); if (c) this.swapSide(c); }
+    }, {
+      name: "Reset Side (automatic)",
+      icon: '<i class="fas fa-undo"></i>',
+      condition: li => game.user.isGM && this._isFaseripMode() && combatantFrom(li)?.getFlag("msh-faserip", "sideOverride") != null,
+      callback: li => { const c = combatantFrom(li); if (c) this.clearSideOverride(c); }
+    });
   }
 
   static async _onCreateCombatant(combatant) {
@@ -504,68 +625,37 @@ export class FaseripInitiative {
 
   // --- Talent & Power bonus scanning ---
 
-  static _getInitiativeTalentBonus(combatant) {
-    if (!game.settings.get("msh-faserip", "useTalentInitBonuses")) return { bonus: 0, source: "" };
+  // Character facts for the kernel: ability number, substituting power
+  // ranks, talents, and the declared attack context (only known with RAW
+  // Turn Sequence on; without it the kernel applies no talent bonus).
+  static _initiativeFacts(combatant) {
     const actor = combatant.actor;
-    if (!actor) return { bonus: 0, source: "" };
-
+    const facts = { id: combatant.id, name: combatant.name, intuitionNumber: 0, combatSenseNumber: null, enhancedHearingNumber: null, hasMartialArtsE: false, hasWeaponsSpecialist: false, context: null };
+    if (!actor) return facts;
+    facts.intuitionNumber = Number(actor.system?.abilities?.intuition?.value) || 0;
+    for (const p of actor.items.filter(i => i.type === "power")) {
+      const name = p.name.toLowerCase();
+      const pVal = Number(p.system?.value) || 0;
+      if (name.includes("combat sense")) facts.combatSenseNumber = Math.max(facts.combatSenseNumber ?? 0, pVal);
+      if (name.includes("enhanced sense") && this._isHearingPower(p)) facts.enhancedHearingNumber = Math.max(facts.enhancedHearingNumber ?? 0, pVal);
+    }
     const talents = actor.items.filter(i => i.type === "talent");
-    const hasMAE = talents.some(t => /martial arts\s*[- ]?e/i.test(`${t.name} ${t.system?.specialty || ""}`));
-    const hasWpnSpec = talents.some(t => /weapons? specialist/i.test(`${t.name} ${t.system?.specialty || ""}`));
-    if (!hasMAE && !hasWpnSpec) return { bonus: 0, source: "" };
-
-    // Both talents are conditional on the attack context (unarmed / specialist
-    // weapon). Without declarations that context is unknown, so no bonus is
-    // assumed (ruling 2026-09-03).
-    if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return { bonus: 0, source: "" };
-
-    const decl = combatant.getFlag("msh-faserip", "declaredAction");
-    const q = decl?.qualifiers || {};
-    const sources = [];
-    if (hasMAE && q.unarmed === true) sources.push("MA-E");
-    if (hasWpnSpec && q.weaponSpecialist === true) sources.push("Wpn Spec");
-
-    // Both talents grant +1 initiative, but they describe mutually exclusive
-    // contexts (unarmed vs specialist weapon). Never manufacture a +2 stack.
-    return sources.length ? { bonus: 1, source: sources.join("/") } : { bonus: 0, source: "" };
+    facts.hasMartialArtsE = talents.some(t => /martial arts\s*[- ]?e/i.test(`${t.name} ${t.system?.specialty || ""}`));
+    facts.hasWeaponsSpecialist = talents.some(t => /weapons? specialist/i.test(`${t.name} ${t.system?.specialty || ""}`));
+    if (game.settings.get("msh-faserip", "useRawTurnPhases")) {
+      const q = combatant.getFlag("msh-faserip", "declaredAction")?.qualifiers || {};
+      facts.context = { unarmed: q.unarmed === true, specialtyWeapon: q.weaponSpecialist === true };
+    }
+    return facts;
   }
 
-  // Get effective Intuition for initiative, considering powers that replace it
-  // Enhanced Senses (hearing): use power rank instead of Intuition
-  // Combat Sense: use power rank instead of Intuition (for surprise/initiative)
+  static _getInitiativeTalentBonus(combatant) {
+    return talentInitiativeBonus(this._initiativeFacts(combatant));
+  }
+
   static _getEffectiveIntuition(combatant) {
-    const actor = combatant.actor;
-    if (!actor) return { value: 0, source: "Intuition", name: combatant.name };
-
-    const baseInt = actor.system?.abilities?.intuition?.value ?? 0;
-    let best = baseInt;
-    let source = "Int";
-
-    // Power-based initiative substitutions are independent of the Talent
-    // Initiative Bonuses setting. Turning off talent bonuses must not disable
-    // Combat Sense / Enhanced Senses.
-    const powers = actor.items.filter(i => i.type === "power");
-    for (const p of powers) {
-      const name = p.name.toLowerCase();
-      const pVal = p.system?.value ?? 0;
-
-      // Combat Sense: replaces Intuition for surprise (initiative)
-      if (name.includes("combat sense")) {
-        if (pVal > best) {
-          best = pVal;
-          source = "Combat Sense";
-        }
-      }
-      // Enhanced Senses: only the hearing variant replaces Intuition for
-      // initiative. Match hearing in the name or the power's own text fields.
-      if (name.includes("enhanced sense") && this._isHearingPower(p)) {
-        if (pVal > best) {
-          best = pVal;
-          source = "Enh Senses";
-        }
-      }
-    }
-    return { value: best, source, name: combatant.name };
+    const eff = effectiveIntuition(this._initiativeFacts(combatant));
+    return { value: eff.value, source: eff.source === "Intuition" ? "Int" : eff.source, name: combatant.name };
   }
 
   static _isHearingPower(power) {
@@ -579,7 +669,7 @@ export class FaseripInitiative {
   // --- Intuition modifier table ---
 
   static _getModifierForIntuition(intuition) {
-    return getInitiativeModifier(Number(intuition) || 0);
+    return initiativeModifier(Number(intuition) || 0);
   }
 
   // --- UI: Combat Tracker bar & coloring ---
@@ -976,6 +1066,7 @@ export class FaseripInitiative {
       if (!c) continue;
       const side = this._getCombatantSide(c);
       el.classList.add(`${side}-side`);
+      el.classList.toggle("faserip-manual-side", c.getFlag("msh-faserip", "sideOverride") != null);
 
       // Always rebuild injected row content; stale chips from a prior phase
       // (e.g. Pre-Action Roll buttons surviving into Declaration) were caused
@@ -1143,16 +1234,14 @@ export class FaseripInitiative {
       const pcRoll = await (new Roll("1d10")).evaluate();
       const npcRoll = await (new Roll("1d10")).evaluate();
 
-      // Totals: roll of 1 is always 1
-      const pcTotal = pcRoll.total === 1 ? 1 : pcRoll.total + pcMod + pcTalent.bonus;
-      const npcTotal = npcRoll.total === 1 ? 1 : npcRoll.total + npcMod + npcTalent.bonus;
-
-      // Determine winner
-      let goesFirst;
-      if (pcTotal > npcTotal) goesFirst = "pc";
-      else if (npcTotal > pcTotal) goesFirst = "npc";
-      else {
-        // Tie — reroll (ruling 2026-09-03: the book is silent; ties re-roll).
+      // Kernel: natural 1, totals, winner, tie → re-roll (RULED 2026-09-03).
+      const resolved = resolveSideInitiative({
+        pc: { roll: pcRoll.total, modifier: pcBest.total },
+        npc: { roll: npcRoll.total, modifier: npcBest.total }
+      });
+      const { pcTotal, npcTotal } = resolved;
+      let goesFirst = resolved.winner;
+      if (resolved.reroll) {
         ChatMessage.create({
           user: game.user.id,
           speaker: ChatMessage.getSpeaker({ alias: "Initiative" }),
@@ -1285,7 +1374,7 @@ export class FaseripInitiative {
           await game.dice3d.showForRoll(roll, game.user, true);
         }
 
-        const total = roll.total === 1 ? 1 : roll.total + intMod + talent.bonus;
+        const total = initiativeTotal(roll.total, intMod + talent.bonus);
         totals.set(c.id, total);
 
         results.push({
@@ -1347,18 +1436,18 @@ export class FaseripInitiative {
   // Per-character effective initiative modifier (own Intuition modifier + own
   // talent bonus); the side takes the highest. Ties keep the earlier
   // combatant. Never combines one character's Intuition with another's talent.
+  // Kernel sideInitiativeModifier over the side's character facts (RULED
+  // 2026-09-03: per-character total, side takes the max, no cross-stacking).
   static _getSideInitiativeModifier(combatants) {
-    let best = { name: "None", intuition: 0, source: "Int", intMod: 0, talent: { bonus: 0, source: "" }, total: 0 };
-    for (const c of combatants) {
-      const eff = this._getEffectiveIntuition(c);
-      const intMod = this._getModifierForIntuition(eff.value);
-      const talent = this._getInitiativeTalentBonus(c);
-      const total = intMod + talent.bonus;
-      if (total > best.total || (total === best.total && eff.value > best.intuition)) {
-        best = { name: c.name, intuition: eff.value, source: eff.source, intMod, talent, total };
-      }
-    }
-    return best;
+    const best = sideInitiativeModifier(combatants.map(c => this._initiativeFacts(c)));
+    return {
+      name: best.name ?? "None",
+      intuition: best.intuition,
+      source: best.intuitionSource === "Intuition" ? "Int" : best.intuitionSource,
+      intMod: best.intMod,
+      talent: best.talent,
+      total: best.total
+    };
   }
 
   // Default RAW intention: Attack. Declaring is optional; combatants without a
@@ -1547,7 +1636,7 @@ export class FaseripInitiative {
   static async _ensureSideFlags(combat) {
     const updates = [];
     for (const c of this._trackedCombatants(combat)) {
-      const correct = this._determineSide(c);
+      const correct = this._resolveSide(c);
       if (c.getFlag("msh-faserip", "side") !== correct) {
         updates.push({ _id: c.id, "flags.msh-faserip.side": correct });
       }
@@ -1885,7 +1974,7 @@ export class FaseripInitiative {
       origin: actor.uuid,
       disabled: false,
       duration: { value: 1, units: "rounds", expiry: "roundEnd" },
-      changes: [{ key: "system.combatMods.selfPenaltyCS", mode: "add", value: "-1", priority: 30 }],
+      changes: [{ key: "system.combatMods.selfPenaltyCS", mode: "add", value: String(CHANGE_ACTION.penaltyCS), priority: 30 }],
       flags: { "msh-faserip": { isChangeActionPenalty: true, createdRound: combat?.round ?? null, notes: "RAW Change Action: -1CS on subsequent FEATs this round." } }
     }]);
   }
@@ -1912,11 +2001,11 @@ export class FaseripInitiative {
     if (!verdict.ok) return ui.notifications.warn(verdict.message);
 
     const featResult = await new Promise(resolve => {
-      showAbilityFeatDialog(actor, "agility", {
+      showAbilityFeatDialog(actor, CHANGE_ACTION.ability, {
         title: `Change Action (Yellow Agility): ${actor.name}`,
         featType: "standard",
         lockFeatType: true,
-        requiredColor: "Yellow",
+        requiredColor: CHANGE_ACTION.requiredColor[0].toUpperCase() + CHANGE_ACTION.requiredColor.slice(1),
         transient: true,
         onCancel: () => resolve(null),
         onResult: result => resolve(result)
@@ -1950,8 +2039,6 @@ export class FaseripInitiative {
 
   // Build collapsible turn phase step list
   static _buildStepList(combat, goesFirst) {
-    const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
-    if (!showPhase) return "";
 
     const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
     const labels = this._getSideLabels();
@@ -1984,8 +2071,6 @@ export class FaseripInitiative {
 
   // Build individual mode step list (no sides)
   static _buildIndividualStepList() {
-    const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
-    if (!showPhase) return "";
 
     const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
 

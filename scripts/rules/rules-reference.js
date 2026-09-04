@@ -1,3 +1,6 @@
+// rules-reference.js v2.1.0 - 2026-09-04
+// v2.1.0: getInitiativeModifier delegates to the kernel initiative module
+//         (initiativeModifier); same values, 75 → +5 ruling now in ERRATA.
 // rules-reference.js v2.0.1 - 2026-09-02
 // v2.0.1: No code change. ATTACK_EFFECTS.force.pullEffect is false again via
 //         the re-vendored kernel (RULED 2026-09-02: the Force Attack section
@@ -61,6 +64,7 @@ import {
   rankDistance as kernelRankDistance,
 } from "../lib/faserip-rules/faserip-kernel.js";
 import { EFFECT_COLUMNS } from "../lib/faserip-rules/faserip-effects.js";
+import { initiativeModifier } from "../lib/faserip-rules/faserip-initiative.js";
 import { kernelKeyFor, labelForToken } from "../kernel/adapter.js";
 
 function hyphenName(key) {
@@ -454,18 +458,10 @@ export const INITIATIVE = {
   changeAction: "Yellow Agility FEAT, -1CS on subsequent FEATs"
 };
 
-// Intuition modifier lookup. Verified against the printed table 2026-07-31:
-// keys on rank NUMBER (0-10:0, 11-20:1, 21-30:2, 31-40:3, 41-50:4, 51-75:5,
-// "75 and up":6). The printed rows overlap at exactly 75; treated here as a
-// misprint for "76 and up", so 75 (Monstrous) → +5.
+// Intuition modifier lookup — kernel initiative module (keys on rank
+// NUMBER; the printed 51-75 / 75+ overlap resolves to 75 → +5).
 export function getInitiativeModifier(intuitionValue) {
-  if (intuitionValue <= 10) return 0;
-  if (intuitionValue <= 20) return 1;
-  if (intuitionValue <= 30) return 2;
-  if (intuitionValue <= 40) return 3;
-  if (intuitionValue <= 50) return 4;
-  if (intuitionValue <= 75) return 5;
-  return 6;
+  return initiativeModifier(intuitionValue);
 }
 
 // ── FEAT DIFFICULTY ──

@@ -1,3 +1,7 @@
+// faserip-rules kernel v0.2.7
+// v0.2.7: ERRATA — initiative rulings (modifier table overlap, per-character
+//         side modifier, talent context, Enhanced Hearing, ties, pre-action
+//         ordering, Change Action window). Implemented in faserip-initiative.js.
 // faserip-rules kernel v0.2.6
 // v0.2.6: ERRATA — Air Control starting stunt begins mastered.
 // faserip-rules kernel v0.2.5
@@ -12,7 +16,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.6';
+export const KERNEL_VERSION = '0.2.7';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -214,6 +218,13 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'NOTE: Initiative Modifier table is keyed on the highest Intuition rank NUMBER on the side (0-10 +0, 11-20 +1, 21-30 +2, 31-40 +3, 41-50 +4, 51-75 +5, 76+ +6). The PDF text drops the table; the printed rows overlap at 75, resolved as 75 → +5 and +6 from 76. Implemented in faserip-initiative.js.',
+  'RULED 2026-09-03: Side initiative modifier — each character\'s effective modifier is own Intuition modifier plus own talent bonus, and the side uses the highest. One character\'s Intuition is never combined with another character\'s Martial Arts E / Weapons Specialist bonus.',
+  'RULED 2026-09-03: Martial Arts E (+1 unarmed) and Weapons Specialist (+1 with the specialty weapon) initiative bonuses apply only when the declared attack context is known; with no declaration no bonus is assumed. They never stack past +1.',
+  'RULED 2026-09-03: Enhanced Senses substitutes its Power rank for Intuition in initiative only as the hearing variant; Combat Sense substitutes at its Power rank. The higher of ability and substitutions is used.',
+  'RULED 2026-09-03: Side initiative ties re-roll (both sides roll again, declarations unchanged). The book is silent on ties.',
+  'RULED 2026-09-03: Pre-action ordering (turn step 4) — a declared Dodge, Block or Evade must be rolled before anyone attacks its owner; a declared Multiple Attacks FEAT gates only its own attacker. msh-faserip auto-rolls declared defences at initiative unless the player opts to roll by hand.',
+  'RULED 2026-09-03: Change Action (yellow Agility, -1CS afterwards) is a pre-action roll: available after initiative and closed once any combatant has used a combat action that round; once per round; not after the character\'s own declared FEAT has resolved.',
   'RULED 2026-08-31: Cosmic rank ranges — Shift Z 351-999, Class 1000 = 1000-2999, Class 3000 = 3000-4999, Class 5000 = 5000+, Beyond = infinity (imported from msh-faserip rules-reference ruling).',
   'NOTE: AP Shot is RAW (ammunition rules): target Body Armor -2CS for hit and damage, no effect on force fields. Implemented in faserip-ammo.js.',
   'RULED 2026-08-31: Monstrous rank range is 63-87. PDF text "63-67" is an OCR error.',

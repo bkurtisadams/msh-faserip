@@ -1,4 +1,4 @@
-// tools/test-initiative-declaration-workflow.mjs v2.2.0 - 2026-09-03
+// tools/test-initiative-declaration-workflow.mjs v3.0.0 - 2026-09-04
 // Initiative modifier certification plus source-wiring assertions for the
 // v3 two-state RAW workflow. Run from the repo root:
 //   node tools/test-initiative-declaration-workflow.mjs
@@ -47,8 +47,8 @@ ok(/combatActionUsed/.test(dispatcher) && /markRawCombatActionUsed/.test(dispatc
 ok(attackFiles.every(src => /rawActionCancelled/.test(src)), 'all primary attack dialogs report cancellation so cancel does not spend the action');
 ok(/_applyDefaultDeclarations/.test(initiative) && /defaulted: true/.test(initiative), 'undeclared combatants default to Attack at initiative');
 ok(/_autoResolveMultiFeats/.test(initiative), 'Automatic Multiple Attacks FEATs resolve without dice');
-ok(/requiredColor:\s*"Yellow"/.test(initiative), 'Change Action requires Yellow Agility');
-ok(/system\.combatMods\.selfPenaltyCS"[^\n]*value:\s*"-1"/.test(initiative), 'successful Change Action creates the -1CS effect');
+ok(/requiredColor: CHANGE_ACTION\.requiredColor/.test(initiative) && /showAbilityFeatDialog\(actor, CHANGE_ACTION\.ability/.test(initiative), 'Change Action ability and colour come from the kernel CHANGE_ACTION');
+ok(/system\.combatMods\.selfPenaltyCS"[^\n]*value: String\(CHANGE_ACTION\.penaltyCS\)/.test(initiative), 'successful Change Action applies the kernel penaltyCS');
 ok(/transient \? Number\(options\.columnShift \|\| 0\)/.test(ability) && /transient \? false/.test(ability), 'transient Pre-Action FEATs do not inherit remembered CS/skip-dice state');
 ok(/selfPenaltyCS/.test(defense), 'defense FEATs apply actor self penalties');
 ok(/combatId: gate\.combat\.id/.test(dispatcher) && /combatId: combatant\.parent\?\.id/.test(initiative), 'player combatant updates are scoped to the correct combat document');
@@ -76,12 +76,13 @@ ok(!/setInitiative\(/.test(initiative), 'no per-combatant setInitiative calls');
 ok((initiative.match(/updateEmbeddedDocuments\("Combatant", initiativeOps\)/g) || []).length === 2, 'side and individual rolls each write initiative in one batched update');
 
 // Side modifier rulings (2026-09-03).
-ok(/_getSideInitiativeModifier\(/.test(initiative) && !/_getHighestIntuition|_getHighestTalentBonus/.test(initiative), 'side modifier is one character\'s own Int mod + own talent, side takes the max');
-ok(/const total = intMod \+ talent\.bonus;/.test(initiative), 'per-character effective modifier sums own Intuition modifier and own talent bonus');
+ok(/sideInitiativeModifier\(combatants\.map\(c => this\._initiativeFacts\(c\)\)\)/.test(initiative) && !/_getHighestIntuition|_getHighestTalentBonus/.test(initiative), 'side modifier comes from the kernel sideInitiativeModifier over character facts');
+ok(/resolveSideInitiative\(\{/.test(initiative) && !/roll\.total === 1 \? 1/.test(initiative) && /initiativeTotal\(roll\.total, intMod \+ talent\.bonus\)/.test(initiative), 'natural 1, totals and tie come from the kernel');
 ok(!/\$\{source\} \(assumed\)/.test(initiative), 'legacy "+1 (assumed)" talent bonus is gone');
-ok(/if \(!game\.settings\.get\("msh-faserip", "useRawTurnPhases"\)\) return \{ bonus: 0, source: "" \};/.test(initiative), 'talent bonuses require the declared context');
+ok(/facts\.context = \{ unarmed: q\.unarmed === true, specialtyWeapon: q\.weaponSpecialist === true \};/.test(initiative) && /if \(game\.settings\.get\("msh-faserip", "useRawTurnPhases"\)\) \{/.test(initiative), 'declared context is supplied to the kernel only with RAW Turn Sequence on');
 ok(/name\.includes\("enhanced sense"\) && this\._isHearingPower\(p\)/.test(initiative), 'Enhanced Senses substitutes for Intuition only for the hearing variant');
-ok(/Tie — reroll/.test(initiative) && /setTimeout\(\(\) => this\.rollSideInitiative\(combat\), 1000\)/.test(initiative), 'side initiative ties re-roll');
+ok(/if \(resolved\.reroll\) \{/.test(initiative) && /setTimeout\(\(\) => this\.rollSideInitiative\(combat\), 1000\)/.test(initiative), 'side initiative ties re-roll');
+ok(/from "\.\.\/lib\/faserip-rules\/faserip-initiative\.js"/.test(read('scripts/rules/rules-reference.js')) && /return initiativeModifier\(intuitionValue\);/.test(read('scripts/rules/rules-reference.js')), 'rules-reference getInitiativeModifier delegates to the kernel');
 
 // RAW workflow rulings (2026-09-03): defences resolve before attacks,
 // Change Action is pre-action only, Ready-driven Declare window.
@@ -97,5 +98,25 @@ ok(/data-action="ready"/.test(initiative) && /action === "ready"/.test(initiativ
 ok(/_postJudgeEvent/.test(initiative) && /Pre-Action Event/.test(initiative), 'Judge Event button posts a pre-action event card');
 ok(/this\.isRolling = true;\s*const rawPhases/.test(initiative), 'side roll claims isRolling before awaiting default declarations');
 ok(/lastDefenseAutoRoll/.test(initiative) && /lastDefenseShift/.test(initiative), 'defence CS / auto-roll remembered per actor');
+
+// Settings pass (2026-09-03): retired settings must not be registered or read.
+const allSrc = [initiative, dispatcher, gmUtils, ability, defense, ...attackFiles,
+  read('scripts/init.js'), read('scripts/gm-tools.js'),
+  read('scripts/modules/effects/ongoing-engine.js'), read('scripts/modules/effects/effect-engine.js'),
+  read('scripts/modules/effects/poison-engine.js'), read('scripts/dev/runtime-regression-tests.js')].join('\n');
+for (const key of ['useTalentInitBonuses', 'showPhaseReminder', 'autoLogCombat', 'combatLogs', 'turnSeconds']) {
+  ok(!new RegExp(`["']${key}["']`).test(allSrc), `retired setting ${key} is neither registered nor read`);
+}
+ok(/export const TURN_SECONDS = 6;/.test(read('scripts/modules/recovery-timing.js')), 'turn length is the RAW six-second constant');
+ok(/name: "RAW Turn Sequence \(Declare → Initiative → Actions\)"/.test(initiative), 'RAW master switch is labelled as the turn sequence');
+ok(/"Auto-Roll Initiative Each Round \(non-RAW\)"/.test(initiative) && /"Roll Initiative When Players Are Ready \(RAW\)"/.test(initiative), 'auto-roll settings name their mode');
+
+// Swap Side (2026-09-03).
+const panel = read('scripts/combat-panel.js');
+ok(/static async swapSide\(/.test(initiative) && /"flags\.msh-faserip\.sideOverride": newSide/.test(initiative), 'Swap Side persists a sideOverride flag');
+ok(/const correct = this\._resolveSide\(c\);/.test(initiative) && /getFlag\("msh-faserip", "sideOverride"\) \?\? this\._determineSide/.test(initiative), '_ensureSideFlags honours the override over actor type / disposition');
+ok(/getCombatantContextOptions/.test(initiative) && /getCombatTrackerEntryContext/.test(initiative), 'context entries registered for v12 and v13+ trackers');
+ok(/FaseripInitiative\.swapSide\(combatant\)/.test(panel) && /clearSideOverride\(combatant\)/.test(panel), 'combat panel menu routes through the same swap/reset');
+ok(/update\.initiative = newSide === "pc" \? data\.pcInit : data\.npcInit;/.test(initiative), 'mid-round swap takes the new side\'s initiative total');
 
 console.log(`initiative/declaration workflow tests passed (${n} assertions)`);
