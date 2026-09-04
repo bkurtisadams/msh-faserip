@@ -1,9 +1,13 @@
+// tools/test-initiative-declaration-workflow.mjs v2.1.0 - 2026-09-03
+// Initiative modifier certification plus source-wiring assertions for the
+// v3 two-state RAW workflow. Run from the repo root:
+//   node tools/test-initiative-declaration-workflow.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getInitiativeModifier } from '../scripts/rules/rules-reference.js';
-import { authorizeRawAction, authorizeRawMovement, RAW_PHASES, canClosePreAction } from '../scripts/rules/raw-combat-state.js';
+import { RAW_PHASES, normalizeRawPhase } from '../scripts/rules/raw-combat-state.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -22,50 +26,58 @@ const attackFiles = [
 let n = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); n++; };
 
-for (const [value, expected] of [[10,0],[11,1],[20,1],[21,2],[30,2],[31,3],[40,3],[41,4],[50,4],[51,5],[75,5],[76,6],[100,6]]) {
+// Initiative modifier table (Advanced Set, keyed on Intuition rank number;
+// the printed 75 overlap is treated as +5, see rules-reference.js).
+for (const [value, expected] of [[0,0],[10,0],[11,1],[20,1],[21,2],[30,2],[31,3],[40,3],[41,4],[50,4],[51,5],[75,5],[76,6],[100,6],[150,6]]) {
   assert.equal(getInitiativeModifier(value), expected, `initiative modifier at ${value}`); n++;
 }
 
-// Behavior-level smoke assertions using the pure state machine.
-const base = { initiativeMode:'side', side:'pc', goesFirst:'pc', round:2, declaration:{type:'attack',label:'Attack'}, actorName:'Hero' };
-assert.equal(authorizeRawAction({ ...base, phase:RAW_PHASES.PREACTION, actionType:'blunt-attack' }).ok, false); n++;
-assert.equal(authorizeRawAction({ ...base, phase:RAW_PHASES.ACTIONS_WINNER, actionType:'blunt-attack' }).ok, true); n++;
-assert.equal(authorizeRawAction({ ...base, phase:RAW_PHASES.ACTIONS_WINNER, actionType:'blunt-attack', actionState:{round:2,combatActionUsed:true} }).ok, false); n++;
-assert.equal(authorizeRawMovement({ ...base, phase:RAW_PHASES.PREACTION }).ok, false); n++;
-assert.equal(authorizeRawMovement({ ...base, phase:RAW_PHASES.ACTIONS_WINNER }).ok, true); n++;
-assert.equal(canClosePreAction({ phase:RAW_PHASES.PREACTION, pendingCount:0, initiativeMode:'side', goesFirst:'pc' }).ok, true); n++;
-assert.equal(canClosePreAction({ phase:RAW_PHASES.PREACTION, pendingCount:2, initiativeMode:'side', goesFirst:'pc' }).ok, false); n++;
+// Two-state model.
+ok(Object.keys(RAW_PHASES).length === 2, 'RAW state machine has exactly two states');
+ok(normalizeRawPhase('preaction') === RAW_PHASES.ACTIONS, 'legacy preaction collapses onto actions');
+ok(/static PHASE_DECLARE = "declare"/.test(initiative) && /static PHASE_ACTIONS = "actions"/.test(initiative), 'controller exposes the two states only');
+ok(!/PHASE_PREACTION|ACTIONS_WINNER|ACTIONS_LOSER|canClosePreAction|_advanceFromPreAction/.test(initiative), 'no v2 phase machinery survives in the controller');
 
-// Integration wiring.
+// RAW initiative wiring.
 ok(/raw-combat-state\.js/.test(initiative), 'initiative controller imports the pure RAW state machine');
-ok(/preMoveToken/.test(initiative) && /authorizeTokenMovement/.test(initiative), 'token movement is phase-gated through Foundry v14 preMoveToken and the RAW controller');
+ok(/preMoveToken/.test(initiative) && /authorizeTokenMovement/.test(initiative), 'token movement is gated through preMoveToken and the RAW controller');
 ok(/mshRawMovementBypass/.test(initiative), 'forced/admin movement has an explicit bypass hook');
 ok(/authorizeRawAction/.test(dispatcher), 'action dispatcher delegates phase/declaration decisions to the RAW controller');
-ok(!/setCombatPhase/.test(dispatcher), 'actions cannot implicitly close Pre-Action');
-ok(!/setCombatPhase/.test(gmUtils), 'obsolete player-to-GM implicit Pre-Action bridge is removed');
 ok(/combatActionUsed/.test(dispatcher) && /markRawCombatActionUsed/.test(dispatcher), 'combat action is consumed after committed dispatch');
 ok(attackFiles.every(src => /rawActionCancelled/.test(src)), 'all primary attack dialogs report cancellation so cancel does not spend the action');
-ok(/actionState/.test(initiative) && /"actionState"/.test(initiative), 'round reset clears action-consumption state');
-ok(/for \(const flag of \["preActionResolved", "changeActionAttempted", "actionState"\]\)/.test(initiative), 'round reset clears only round-scoped results');
-ok(!/for \(const flag of \["declaredAction", "preActionResolved"/.test(initiative), 'round reset preserves unchanged declarations for the next Initiative');
-ok(/declaredAction = \{ \.\.\.choice, label: meta\.label, round: combat\.round \}/.test(initiative), 'new declarations are stamped with the round for carried-plan UI');
-ok(/initiative:\s*null/.test(initiative) && /-=goesFirst/.test(initiative), 'new RAW round clears prior tracker initiative and side-result flags');
-ok(/_findFirstWinnerTurn/.test(initiative) && /_isInitiativeEligible\(x\.c\)/.test(initiative), 'winner cursor calculation ignores KO/ineligible stale initiative rows');
-ok(/if \(rawPhases\) \{\s*await this\._setPhase\(combat, this\.PHASE_PREACTION\);\s*\} else/s.test(initiative), 'RAW initiative enters Pre-Action without positioning the action cursor');
-ok(/btn\.disabled = pending\.length > 0/.test(initiative), 'GM Begin Actions waits for required Pre-Action FEATs');
-ok(/_advanceFromPreAction/.test(initiative) && /canClosePreAction/.test(initiative), 'GM Begin Actions uses explicit validated Pre-Action close logic');
-ok(/One atomic document update is important here/.test(initiative) && /flags\.msh-faserip\.turnPhase/.test(initiative), 'phase close and cursor positioning are written atomically');
-ok(/btn\.type = "button"/.test(initiative), 'phase buttons are explicit non-submit buttons in the live tracker');
-ok(!/GM override: advance with unresolved Pre-Action FEATs/.test(initiative), 'Pre-Action has no skip-required-roll force button');
-ok(/Required rolls complete · Change Action\/Judge window remains open/.test(initiative), 'empty Pre-Action remains an explicit GM-controlled window');
-ok(/_showNpcPlanDialog/.test(initiative) && /Private NPC Plans/.test(initiative), 'GM has private bulk NPC planning');
-ok(/rollBtn\.disabled = !prog\.allComplete/.test(initiative), 'initiative waits for all eligible tracker combatants by default');
-ok(/Undeclared combatants cannot take voluntary actions this round/.test(initiative), 'GM force-roll override states the undeclared-action consequence');
-ok(/requiredColor:\s*"Yellow"/.test(initiative), 'Change Action still requires Yellow Agility');
-ok(/system\.combatMods\.selfPenaltyCS"[^\n]*value:\s*"-1"/.test(initiative), 'successful Change Action still creates -1CS effect');
+ok(/_applyDefaultDeclarations/.test(initiative) && /defaulted: true/.test(initiative), 'undeclared combatants default to Attack at initiative');
+ok(/_autoResolveMultiFeats/.test(initiative), 'Automatic Multiple Attacks FEATs resolve without dice');
+ok(/requiredColor:\s*"Yellow"/.test(initiative), 'Change Action requires Yellow Agility');
+ok(/system\.combatMods\.selfPenaltyCS"[^\n]*value:\s*"-1"/.test(initiative), 'successful Change Action creates the -1CS effect');
 ok(/transient \? Number\(options\.columnShift \|\| 0\)/.test(ability) && /transient \? false/.test(ability), 'transient Pre-Action FEATs do not inherit remembered CS/skip-dice state');
-ok(/selfPenaltyCS/.test(defense), 'defense FEATs continue to apply actor self penalties');
+ok(/selfPenaltyCS/.test(defense), 'defense FEATs apply actor self penalties');
 ok(/combatId: gate\.combat\.id/.test(dispatcher) && /combatId: combatant\.parent\?\.id/.test(initiative), 'player combatant updates are scoped to the correct combat document');
 ok(/combatId \? game\.combats\?\.get/.test(gmUtils), 'GM combatant-flag bridge resolves the requested combat');
+
+// Round reset: one combat.update, round-scoped flags only, declarations kept.
+const resetBlock = initiative.slice(initiative.indexOf('Hooks.on("combatRound"'), initiative.indexOf('Hooks.on("createCombatant"'));
+ok(/"flags\.msh-faserip\.turnPhase": this\.PHASE_DECLARE/.test(resetBlock), 'round reset returns to Declaration inside the flag-clear update');
+ok(!/_setPhase/.test(initiative), 'no separate phase write remains');
+ok(/"flags\.msh-faserip\.preActionResolved": null/.test(resetBlock) && /"flags\.msh-faserip\.actionState": null/.test(resetBlock) && /"flags\.msh-faserip\.changeActionAttempted": null/.test(resetBlock), 'round reset clears round-scoped results');
+ok(!/"flags\.msh-faserip\.declaredAction": null/.test(resetBlock), 'round reset preserves declarations for the next Initiative');
+ok(/initiative:\s*null/.test(resetBlock) && /"flags\.msh-faserip\.goesFirst": null/.test(resetBlock), 'round reset clears tracker initiative and side-result flags');
+ok(!/\.-=[A-Za-z]/.test(initiative), 'no deprecated "-=" flag deletions');
+
+// Auto-roll entry points.
+const startBlock = initiative.slice(initiative.indexOf('Hooks.on("combatStart"'), initiative.indexOf('Hooks.on("preMoveToken"'));
+ok(!/useRawTurnPhases/.test(startBlock), 'round-1 auto-roll applies in every FASERIP mode, not only RAW phases');
+ok(/autoRerollInitiative/.test(startBlock), 'round-1 auto-roll honours the Auto Reroll setting');
+
+// Batched tracker writes.
+ok(!/setInitiative\(/.test(initiative), 'no per-combatant setInitiative calls');
+ok((initiative.match(/updateEmbeddedDocuments\("Combatant", initiativeOps\)/g) || []).length === 2, 'side and individual rolls each write initiative in one batched update');
+
+// Side modifier rulings (2026-09-03).
+ok(/_getSideInitiativeModifier\(/.test(initiative) && !/_getHighestIntuition|_getHighestTalentBonus/.test(initiative), 'side modifier is one character\'s own Int mod + own talent, side takes the max');
+ok(/const total = intMod \+ talent\.bonus;/.test(initiative), 'per-character effective modifier sums own Intuition modifier and own talent bonus');
+ok(!/\$\{source\} \(assumed\)/.test(initiative), 'legacy "+1 (assumed)" talent bonus is gone');
+ok(/if \(!game\.settings\.get\("msh-faserip", "useRawTurnPhases"\)\) return \{ bonus: 0, source: "" \};/.test(initiative), 'talent bonuses require the declared context');
+ok(/name\.includes\("enhanced sense"\) && this\._isHearingPower\(p\)/.test(initiative), 'Enhanced Senses substitutes for Intuition only for the hearing variant');
+ok(/Tie — reroll/.test(initiative) && /setTimeout\(\(\) => this\.rollSideInitiative\(combat\), 1000\)/.test(initiative), 'side initiative ties re-roll');
 
 console.log(`initiative/declaration workflow tests passed (${n} assertions)`);

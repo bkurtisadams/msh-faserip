@@ -1,3 +1,17 @@
+// faserip-initiative.js v3.3.0 - 2026-09-03
+// v3.3.0: Side initiative modifier rulings (2026-09-03): each character's
+//         effective modifier is own Intuition modifier + own talent bonus and
+//         the side takes the highest — no cross-character stacking. Talent
+//         bonuses need the declared attack context (RAW phases); the legacy
+//         "+1 (assumed)" is dropped. Enhanced Senses substitutes for Intuition
+//         only when the power is the hearing variant. Ties keep re-rolling.
+// faserip-initiative.js v3.2.1 - 2026-09-03
+// v3.2.1: Auto-roll round 1 in every FASERIP mode (combatStart was gated on RAW
+//         phases, so legacy Side-Based never rolled round 1). Batch tracker
+//         initiative writes into one updateEmbeddedDocuments per roll (was one
+//         setInitiative per combatant). RAW round reset is one combat.update.
+//         Setting hints describe the two-state model; side mode hint says the
+//         declaration workflow is a separate setting.
 // faserip-initiative.js v3.2.0 - 2026-08-21
 // v3.2.0: Saved per-character FEAT details. The Multi declaration stores a
 //         standing CS modifier (e.g. Counter-Strike's +3CS Ultimate Skill) and
@@ -83,13 +97,6 @@ export class FaseripInitiative {
     return normalizeRawPhase(combat?.getFlag("msh-faserip", "turnPhase"));
   }
 
-  static async _setPhase(combat, phase) {
-    if (!combat) return false;
-    await combat.update({ "flags.msh-faserip.turnPhase": phase }, { mshNoTimeAdvance: true });
-    ui.combat?.render(true);
-    return this._getPhase(combat) === phase;
-  }
-
   /**
    * Movement multiplier from RAW action declaration.
    * Returns null when no cap should be applied (RAW phases off, no combat,
@@ -124,7 +131,7 @@ export class FaseripInitiative {
   static registerSettings() {
     game.settings.register("msh-faserip", "initiativeMode", {
       name: "Initiative Mode",
-      hint: "Side-Based (RAW): one roll per side + Intuition modifier. Individual FASERIP: each character rolls 1d10 + their own Intuition modifier. Standard Foundry: default Foundry individual initiative (no FASERIP modifiers).",
+      hint: "Side-Based (RAW): one roll per side + Intuition modifier; winners act first. Individual FASERIP: each character rolls 1d10 + their own Intuition modifier. Standard Foundry: default Foundry individual initiative (no FASERIP modifiers). Action declarations and phase gates are a separate setting (Use RAW Turn Phases); with it off, any mode is roll-and-act with no declarations.",
       scope: "world",
       config: true,
       type: String,
@@ -148,7 +155,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "showPhaseReminder", {
       name: "Show Turn Phase Reminder",
-      hint: "Show the turn sequence (Declaration → Initiative → Pre-Action → Actions) on initiative chat cards.",
+      hint: "Show the turn sequence (declared FEATs → winners act → losers act → End Round) on initiative chat cards.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -157,7 +164,7 @@ export class FaseripInitiative {
 
     game.settings.register("msh-faserip", "useTalentInitBonuses", {
       name: "Apply Talent Initiative Bonuses",
-      hint: "Include Martial Arts E (+1 when unarmed) and Weapons Specialist (+1 with the specialty weapon). With RAW declarations enabled, the declared attack context controls whether the bonus applies.",
+      hint: "Include Martial Arts E (+1 when unarmed) and Weapons Specialist (+1 with the specialty weapon). The declared attack context decides whether a bonus applies, so bonuses only apply with Use RAW Turn Phases on; without declarations no bonus is assumed.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -301,7 +308,6 @@ export class FaseripInitiative {
       // Reset to declaration phase on new round (RAW mode)
       if (rawPhases) {
         this._dbg("combatRound: RAW reset to Declaration", { round: combat.round });
-        await this._setPhase(combat, this.PHASE_DECLARE);
         // Clear only state that is truly scoped to the completed round. The
         // intended action is deliberately retained. At the table, an unchanged
         // declaration need not be re-entered every six seconds; clicking Initiative
@@ -318,6 +324,7 @@ export class FaseripInitiative {
         }));
         if (clearOps.length) await combat.updateEmbeddedDocuments("Combatant", clearOps);
         await combat.update({
+          "flags.msh-faserip.turnPhase": this.PHASE_DECLARE,
           "flags.msh-faserip.pcInitiative": null,
           "flags.msh-faserip.npcInitiative": null,
           "flags.msh-faserip.pcModifier": null,
@@ -364,17 +371,17 @@ export class FaseripInitiative {
     Hooks.on("createCombatant", this._onCreateCombatant.bind(this));
 
     // Foundry fires combatStart (not combatRound) for round 1, so auto-roll
-    // needs its own entry point at the start of combat.
+    // needs its own entry point at the start of combat. Applies in every
+    // FASERIP mode; RAW phases only change what the roll gates afterwards.
     Hooks.on("combatStart", async (combat) => {
       if (!game.user.isGM || !this._isFaseripMode()) return;
-      if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return;
       if (!game.settings.get("msh-faserip", "autoRerollInitiative")) return;
       this._dbg("combatStart: auto-roll");
       try {
         if (this._isSideMode()) await this.rollSideInitiative(combat);
         else await this.rollIndividualInitiative(combat);
       } catch (err) {
-        console.error("[FASERIP ERROR] RAW auto-roll on combat start failed", err);
+        console.error("[FASERIP ERROR] auto-roll on combat start failed", err);
       }
     });
 
@@ -467,13 +474,10 @@ export class FaseripInitiative {
     const hasWpnSpec = talents.some(t => /weapons? specialist/i.test(`${t.name} ${t.system?.specialty || ""}`));
     if (!hasMAE && !hasWpnSpec) return { bonus: 0, source: "" };
 
-    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
-    if (!rawPhases) {
-      // Legacy/non-declaration mode cannot know the chosen attack context. Keep
-      // the historical +1 benefit, but never stack MA-E and Weapon Specialist.
-      const source = [hasMAE ? "MA-E" : "", hasWpnSpec ? "Wpn Spec" : ""].filter(Boolean).join("/");
-      return { bonus: 1, source: `${source} (assumed)` };
-    }
+    // Both talents are conditional on the attack context (unarmed / specialist
+    // weapon). Without declarations that context is unknown, so no bonus is
+    // assumed (ruling 2026-09-03).
+    if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return { bonus: 0, source: "" };
 
     const decl = combatant.getFlag("msh-faserip", "declaredAction");
     const q = decl?.qualifiers || {};
@@ -512,8 +516,9 @@ export class FaseripInitiative {
           source = "Combat Sense";
         }
       }
-      // Enhanced Senses: replaces Intuition for initiative (hearing variant)
-      if (name.includes("enhanced sense")) {
+      // Enhanced Senses: only the hearing variant replaces Intuition for
+      // initiative. Match hearing in the name or the power's own text fields.
+      if (name.includes("enhanced sense") && this._isHearingPower(p)) {
         if (pVal > best) {
           best = pVal;
           source = "Enh Senses";
@@ -521,6 +526,14 @@ export class FaseripInitiative {
       }
     }
     return { value: best, source, name: combatant.name };
+  }
+
+  static _isHearingPower(power) {
+    const sys = power.system || {};
+    const text = [power.name, sys.specialty, sys.subtype, sys.variant, sys.type, sys.description]
+      .filter(v => typeof v === "string").join(" ")
+      .replace(/<[^>]*>/g, " ").toLowerCase();
+    return /\b(hearing|hear|auditory|sonic|ultrasonic)\b/.test(text);
   }
 
   // --- Intuition modifier table ---
@@ -1015,17 +1028,16 @@ export class FaseripInitiative {
         return;
       }
 
-      // Highest Intuition per side
-      const pcHighest = this._getHighestIntuition(pcCombatants);
-      const npcHighest = this._getHighestIntuition(npcCombatants);
-
-      // Intuition modifiers
-      const pcMod = this._getModifierForIntuition(pcHighest.intuition);
-      const npcMod = this._getModifierForIntuition(npcHighest.intuition);
-
-      // Talent bonuses (highest on each side)
-      const pcTalent = this._getHighestTalentBonus(pcCombatants);
-      const npcTalent = this._getHighestTalentBonus(npcCombatants);
+      // Side modifier: each character's own Intuition modifier + own talent
+      // bonus; the side uses its highest (ruling 2026-09-03).
+      const pcBest = this._getSideInitiativeModifier(pcCombatants);
+      const npcBest = this._getSideInitiativeModifier(npcCombatants);
+      const pcHighest = { name: pcBest.name, intuition: pcBest.intuition, source: pcBest.source };
+      const npcHighest = { name: npcBest.name, intuition: npcBest.intuition, source: npcBest.source };
+      const pcMod = pcBest.intMod;
+      const npcMod = npcBest.intMod;
+      const pcTalent = pcBest.talent;
+      const npcTalent = npcBest.talent;
 
       // Roll
       const pcRoll = await (new Roll("1d10")).evaluate();
@@ -1040,7 +1052,7 @@ export class FaseripInitiative {
       if (pcTotal > npcTotal) goesFirst = "pc";
       else if (npcTotal > pcTotal) goesFirst = "npc";
       else {
-        // Tie — reroll
+        // Tie — reroll (ruling 2026-09-03: the book is silent; ties re-roll).
         ChatMessage.create({
           user: game.user.id,
           speaker: ChatMessage.getSpeaker({ alias: "Initiative" }),
@@ -1075,21 +1087,18 @@ export class FaseripInitiative {
         await game.dice3d.showForRoll(npcRoll, game.user, true);
       }
 
-      // Clear stale tracker initiative first so ineligible/KO combatants never
-      // retain a prior-round number beside the current result.
-      const trackedInitiativeReset = this._trackedCombatants(combat).map(c => ({ _id: c.id, initiative: null }));
-      if (trackedInitiativeReset.length) await combat.updateEmbeddedDocuments("Combatant", trackedInitiativeReset);
-
-      // Assign tracker initiative values
+      // One tracker write: eligible combatants take their side's total,
+      // everyone else (KO, dead, defeated) is cleared so no prior-round
+      // number survives beside the current result.
+      const winningIds = new Set((goesFirst === "pc" ? pcCombatants : npcCombatants).map(c => c.id));
+      const losingIds = new Set((goesFirst === "pc" ? npcCombatants : pcCombatants).map(c => c.id));
       const winnerInit = goesFirst === "pc" ? pcTotal : npcTotal;
       const loserInit = goesFirst === "pc" ? npcTotal : pcTotal;
-      const winningSide = goesFirst === "pc" ? pcCombatants : npcCombatants;
-      const losingSide = goesFirst === "pc" ? npcCombatants : pcCombatants;
-
-      const ops = [];
-      for (const c of winningSide) ops.push(combat.setInitiative(c.id, winnerInit));
-      for (const c of losingSide) ops.push(combat.setInitiative(c.id, loserInit));
-      await Promise.all(ops);
+      const initiativeOps = this._trackedCombatants(combat).map(c => ({
+        _id: c.id,
+        initiative: winningIds.has(c.id) ? winnerInit : losingIds.has(c.id) ? loserInit : null
+      }));
+      if (initiativeOps.length) await combat.updateEmbeddedDocuments("Combatant", initiativeOps);
 
       // Ensure side flags
       await this._ensureSideFlags(combat);
@@ -1159,8 +1168,7 @@ export class FaseripInitiative {
       const combatantIds = (ids?.length ? ids.filter(id => trackedIds.has(id)) : Array.from(trackedIds))
         .filter(id => this._isInitiativeEligible(combat.combatants.get(id)));
       const results = [];
-      const trackedInitiativeReset = this._trackedCombatants(combat).map(c => ({ _id: c.id, initiative: null }));
-      if (trackedInitiativeReset.length) await combat.updateEmbeddedDocuments("Combatant", trackedInitiativeReset);
+      const totals = new Map();
 
       for (const id of combatantIds) {
         const c = combat.combatants.get(id);
@@ -1176,7 +1184,7 @@ export class FaseripInitiative {
         }
 
         const total = roll.total === 1 ? 1 : roll.total + intMod + talent.bonus;
-        await combat.setInitiative(c.id, total);
+        totals.set(c.id, total);
 
         results.push({
           name: c.name,
@@ -1190,6 +1198,17 @@ export class FaseripInitiative {
           side: this._getCombatantSide(c)
         });
       }
+
+      // One tracker write. Full roll: rolled combatants take their total and
+      // every other tracked row (KO, dead) is cleared of stale values. Targeted
+      // reroll (ids supplied): only the requested rows change.
+      const initiativeOps = ids?.length
+        ? Array.from(totals, ([id, total]) => ({ _id: id, initiative: total }))
+        : this._trackedCombatants(combat).map(c => ({
+            _id: c.id,
+            initiative: totals.has(c.id) ? totals.get(c.id) : null
+          }));
+      if (initiativeOps.length) await combat.updateEmbeddedDocuments("Combatant", initiativeOps);
 
       // Ensure side flags
       await this._ensureSideFlags(combat);
@@ -1223,22 +1242,19 @@ export class FaseripInitiative {
 
   // --- Helpers ---
 
-  static _getHighestIntuition(combatants) {
-    let best = { name: "None", intuition: 0, source: "Int" };
+  // Per-character effective initiative modifier (own Intuition modifier + own
+  // talent bonus); the side takes the highest. Ties keep the earlier
+  // combatant. Never combines one character's Intuition with another's talent.
+  static _getSideInitiativeModifier(combatants) {
+    let best = { name: "None", intuition: 0, source: "Int", intMod: 0, talent: { bonus: 0, source: "" }, total: 0 };
     for (const c of combatants) {
       const eff = this._getEffectiveIntuition(c);
-      if (eff.value > best.intuition) {
-        best = { name: c.name, intuition: eff.value, source: eff.source };
+      const intMod = this._getModifierForIntuition(eff.value);
+      const talent = this._getInitiativeTalentBonus(c);
+      const total = intMod + talent.bonus;
+      if (total > best.total || (total === best.total && eff.value > best.intuition)) {
+        best = { name: c.name, intuition: eff.value, source: eff.source, intMod, talent, total };
       }
-    }
-    return best;
-  }
-
-  static _getHighestTalentBonus(combatants) {
-    let best = { bonus: 0, source: "" };
-    for (const c of combatants) {
-      const t = this._getInitiativeTalentBonus(c);
-      if (t.bonus > best.bonus) best = t;
     }
     return best;
   }
