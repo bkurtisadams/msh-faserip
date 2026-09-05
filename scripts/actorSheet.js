@@ -7,6 +7,8 @@
 //          and higher for a week). Same behaviour as before, now certified.
 //          RULED 2026-09-05: a bank-loan purchase (one rank above Resources)
 //          has no purchase FEAT of its own; the FEATs are the monthly payments.
+//          Loan note fixed: payment two ranks below the ITEM for its rank-number
+//          months (was two below Resources for index+1 months).
 // actorSheet.js v2.9.2 - 2026-08-04
 // v2.9.2: Restore Actor-drop routing lost in the V14 _onDrop port. The
 //         override returned false for data.type "Actor", so the vehicle
@@ -5594,7 +5596,7 @@ html.find('.headquarters-row').each((i, row) => {
           const reqPillCls = { "Automatic":"is-auto","Green":"is-green","Yellow":"is-yellow" }[req.color] || "is-green";
           const loanNote = (loan && success)
             ? `<div style="padding:7px 12px;font-size:12px;background:#fffde7;border-top:1px solid #ffd54f;color:#6b5d00;line-height:1.4;">
-                 <b>Bank loan approved.</b> Monthly ${ranks[Math.max(0,resIdx-2)]} Resource FEAT for ${itemIdx+1} months. Miss a payment and the bank reclaims it.</div>`
+                 <b>Bank loan approved.</b> Monthly ${ranks[Math.max(0,itemIdx-2)]} Resource FEAT for ${game.msh?.getRankValue?.(itemRank) ?? (itemIdx+1)} months. Miss a payment and the bank reclaims it.</div>`
             : "";
 
           const card = `
