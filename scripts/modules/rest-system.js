@@ -1,4 +1,18 @@
-// scripts/modules/rest-system.js v1.5.0 - 2026-08-20
+// scripts/modules/rest-system.js v1.6.0 - 2026-09-05
+// v1.6.0: Slice 7b — Recovery / Healing / consciousness / stabilization onto
+//         the faserip-rules damage kernel. Wake FEAT via regainConsciousnessFeat
+//         (hard-coded 45/75/95 fallback ladder deleted); Recovery and Healing
+//         amounts via recoveryAmount / healingPerHour / applyHealing; timing
+//         from RECOVERY_DELAY_TURNS x TURN_SECONDS, HEALING_INTERVAL_TURNS,
+//         STABILIZE_UNCONSCIOUS_HOURS, ENDURANCE_RANK_HEAL_DAYS. RULED
+//         2026-09-05: the Endurance rank number while ranks are lost is the
+//         HIGHEST of the reduced rank — enduranceNumber() reads the actor's
+//         stored number first; healImpairedEndurance steps via
+//         enduranceRestoreStep (intermediate ranks highest, original rank
+//         gets its original number back from the originalEnduranceValue flag).
+//         RULED 2026-09-05: a knockout forfeits only that damage's Recovery —
+//         recordDamage clears wasKnockedOut on any hit that leaves the
+//         character conscious (previousHealth > 0 and Health > 0).
 // v1.5.0: Centralize NPC recovery/dying output policy, quiet routine NPC bookkeeping,
 //         fix repeatable manual hourly Healing, and correct Recovery wording.
 //         Manual Healing now keys from max(last damage, last manual heal) instead of
@@ -115,7 +129,27 @@ import { safeActorSetFlag } from "../gm-utils.js";
 import { RANKS_ORDERED, rankValue } from "../rules/rules-reference.js";
 import { getCurrentGameDate } from "./effects/ongoing-engine.js";
 import { computeDuration } from "./effects/effect-engine.js";
-import { healingSecondsRemaining } from "./recovery-timing.js";
+import { healingSecondsRemaining, TURN_SECONDS } from "./recovery-timing.js";
+import {
+  recoveryAmount, healingPerHour, applyHealing, regainConsciousnessFeat,
+  enduranceRestoreStep, RECOVERY_DELAY_TURNS, HEALING_INTERVAL_TURNS,
+  STABILIZE_UNCONSCIOUS_HOURS, ENDURANCE_RANK_HEAL_DAYS,
+} from "../lib/faserip-rules/faserip-damage.js";
+import { kernelKeyFor, foundryNameFor } from "../kernel/adapter.js";
+
+const HEALING_INTERVAL_SECONDS = HEALING_INTERVAL_TURNS * TURN_SECONDS;
+const RECOVERY_DELAY_SECONDS = RECOVERY_DELAY_TURNS * TURN_SECONDS;
+
+// RAW "Endurance rank number": the character's own number (which is the
+// highest of the reduced rank while ranks are lost), falling back to the
+// rank's standard number when the stored value is unusable.
+export function enduranceNumber(actor) {
+  const v = Number(actor?.system?.abilities?.endurance?.value);
+  if (Number.isFinite(v) && v > 0) return v;
+  return rankValue(actor?.system?.abilities?.endurance?.rank || "") || 10;
+}
+
+const rollRange = ({ min, max }) => min + Math.floor(Math.random() * (max - min + 1));
 
 const SCOPE = getFlagScope();
 
@@ -365,12 +399,13 @@ export class RestSystem {
       };
     }
 
-    // Per rules p.32: Recovery only applies "provided the character is not knocked
-    // unconscious." If KO'd, only hourly Healing applies after waking.
+    // RAW: Recovery applies "provided the character is not knocked unconscious".
+    // RULED 2026-09-05: the knockout forfeits that damage's Recovery only;
+    // the flag clears on the next hit taken while conscious (recordDamage).
     if (actor.getFlag(SCOPE, "wasKnockedOut")) {
       return {
         canRest: false,
-        reason: "Recovery unavailable — was knocked unconscious. Heals via Healing (hourly) instead."
+        reason: "No Recovery from the damage that knocked you out — only hourly Healing until you are hit again while conscious."
       };
     }
 
@@ -393,17 +428,16 @@ export class RestSystem {
       };
     }
 
-    // RAW p.32: Recovery lands 10 turns after damage. 1 turn = 1 round = 6s,
-    // so 10 turns = 60 seconds of WORLD time — not 60 seconds at the table.
-    // Matches the Healing gate below, which already reads worldTime.
+    // RAW p.32: Recovery lands 10 turns after damage, measured in WORLD time
+    // (RECOVERY_DELAY_TURNS x TURN_SECONDS), not seconds at the table.
     const lastDamageWorldTime = actor.getFlag(SCOPE, "lastDamageWorldTime");
     if (lastDamageWorldTime != null) {
       const worldNow = game.time?.worldTime ?? 0;
       const timeSinceDamage = worldNow - lastDamageWorldTime;
-      const tenTurns = 60; // 10 turns x 6s
+      const tenTurns = RECOVERY_DELAY_SECONDS;
       
       if (timeSinceDamage < tenTurns) {
-        const remaining = Math.ceil((tenTurns - timeSinceDamage) / 6);
+        const remaining = Math.ceil((tenTurns - timeSinceDamage) / TURN_SECONDS);
         return { 
           canRest: false, 
           reason: `Must wait ${remaining} more turn(s) since last damage (10 turns total)` 
@@ -427,13 +461,11 @@ export class RestSystem {
       return { success: false, message: check.reason, healed: 0 };
     }
 
-    const endRank = actor.system?.abilities?.endurance?.rank || "";
-    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance rank number
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const maxHealth = actor.system?.attributes?.health?.max ?? 0;
     
-    const healAmount = Math.min(enduranceValue, maxHealth - currentHealth);
-    const newHealth = currentHealth + healAmount;
+    const newHealth = applyHealing({ current: currentHealth, max: maxHealth, amount: recoveryAmount(enduranceNumber(actor)) });
+    const healAmount = newHealth - currentHealth;
 
     // Apply healing
     await actor.update({
@@ -509,7 +541,7 @@ export class RestSystem {
       worldNow,
       lastDamageWorldTime,
       lastHealingWorldTime,
-      intervalSeconds: 3600
+      intervalSeconds: HEALING_INTERVAL_SECONDS
     });
 
     if (remainingSeconds == null) {
@@ -539,16 +571,13 @@ export class RestSystem {
       return { success: false, message: check.reason, healed: 0 };
     }
 
-    const endRank = actor.system?.abilities?.endurance?.rank || "";
-    const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance rank number
     const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
-    const multiplier = hasMedicalCare ? 2 : 1;
     
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const maxHealth = actor.system?.attributes?.health?.max ?? 0;
     
-    const healAmount = Math.min(enduranceValue * multiplier, maxHealth - currentHealth);
-    const newHealth = currentHealth + healAmount;
+    const newHealth = applyHealing({ current: currentHealth, max: maxHealth, amount: healingPerHour(enduranceNumber(actor), { medicalCare: hasMedicalCare }) });
+    const healAmount = newHealth - currentHealth;
 
     // Apply healing
     await actor.update({
@@ -682,32 +711,17 @@ static async attemptRegainConsciousness(actor) {
       return { success: false, message: msg };
     }
 
-    // Roll Endurance FEAT vs Kill column
+    // Endurance FEAT, green succeeds (RULED 2026-09-05); Health on waking =
+    // Endurance rank number (the impaired number while ranks are lost).
     const enduranceRank = actor.system?.abilities?.endurance?.rank || "Typical";
-    
-    // Import the universal table function
-    let color, roll;
-    if (game.msh?.rollUniversalTable) {
-      roll = Math.floor(Math.random() * 100) + 1;
-      color = game.msh.rollUniversalTable(enduranceRank, roll);
-    } else {
-      // Fallback if universal table not available
-      roll = Math.floor(Math.random() * 100) + 1;
-      if (roll <= 45) color = "white";
-      else if (roll <= 75) color = "green";
-      else if (roll <= 95) color = "yellow";
-      else color = "red";
-    }
-
-    const colorLower = color.toLowerCase();
-    
-    // Success on Green or better (Green/Yellow/Red)
-    const success = (colorLower !== "white");
+    const enduranceKey = kernelKeyFor(enduranceRank) ?? "TY";
+    const roll = Math.floor(Math.random() * 100) + 1;
+    const feat = regainConsciousnessFeat({ enduranceRank: enduranceKey, enduranceNumber: enduranceNumber(actor), roll });
+    const color = feat.color ?? (feat.success ? "green" : "white");
+    const success = feat.success;
     
     if (success) {
-      // Wake up with Health = Endurance rank number
-      const endRank = actor.system?.abilities?.endurance?.rank || "";
-      const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
+      const enduranceValue = feat.wakeHealth;
       await actor.update({
         "system.attributes.health.value": enduranceValue
       });
@@ -787,7 +801,7 @@ static async attemptRegainConsciousness(actor) {
       
     } else {
       // Failed - remain unconscious for 1-10 more rounds
-      const rounds = Math.floor(Math.random() * 10) + 1;
+      const rounds = rollRange(feat.retryTurns);
 
       // Create a new Unconscious effect. During active combat this is a RAW
       // round duration; outside combat the shared duration helper converts the
@@ -911,7 +925,7 @@ static async attemptRegainConsciousness(actor) {
     // Only apply unconscious if at 0 HP — conscious dying characters (health > 0)
     // are stabilized but remain conscious (rules p.31: unconscious only at 0 HP).
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-    const hours = Math.floor(Math.random() * 10) + 1;
+    const hours = rollRange(STABILIZE_UNCONSCIOUS_HOURS);
     if (currentHealth <= 0) {
       const unconsciousEffect = {
         name: `Unconscious (${hours} hours)`,
@@ -1042,8 +1056,7 @@ static async attemptRegainConsciousness(actor) {
     // Check if enough time has passed (world time in seconds)
     const now = game.time.worldTime;
     const dayInSeconds = 86400;
-    const weekInSeconds = 7 * dayInSeconds;
-    const requiredTime = medicalCare ? dayInSeconds : weekInSeconds;
+    const requiredTime = (medicalCare ? ENDURANCE_RANK_HEAL_DAYS.hospital : ENDURANCE_RANK_HEAL_DAYS.normal) * dayInSeconds;
     const timeSinceHealing = now - lastHealed;
     
     if (timeSinceHealing < requiredTime) {
@@ -1073,8 +1086,15 @@ static async attemptRegainConsciousness(actor) {
       return { success: false, message: `${actor.name}'s Endurance is already at maximum (${originalEndurance})` };
     }
 
-    const newRank = rankNames[newRankIndex];
-    const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+    // RULED 2026-09-05: intermediate ranks carry the highest number of the
+    // rank; the original rank gets the pre-damage number back.
+    const step = enduranceRestoreStep({
+      rankKey: kernelKeyFor(currentEndurance),
+      originalRankKey: kernelKeyFor(originalEndurance),
+      originalNumber: actor.getFlag(SCOPE, "originalEnduranceValue") ?? (game.msh?.getRankValue?.(originalEndurance) ?? 0),
+    });
+    const newRank = step.atCap ? originalEndurance : foundryNameFor(step.rank, "dash");
+    const newValue = step.number;
     const newHealthMax = (actor.system.abilities.fighting.value || 0) +
                          (actor.system.abilities.agility.value || 0) +
                          (actor.system.abilities.strength.value || 0) +
@@ -1089,8 +1109,10 @@ static async attemptRegainConsciousness(actor) {
 
     // Check if fully healed
     if (newRankIndex >= originalRankIndex) {
-      // Remove Impaired Endurance effect
+      // Remove Impaired Endurance effect and the pre-damage Endurance record
       await actor.deleteEmbeddedDocuments("ActiveEffect", [impairedEffect.id], { mshIntentional: true });
+      await actor.unsetFlag(SCOPE, "originalEndurance");
+      await actor.unsetFlag(SCOPE, "originalEnduranceValue");
       
       const message = `${actor.name}'s Endurance fully restored to ${originalEndurance}!`;
       
@@ -1163,13 +1185,22 @@ static async attemptRegainConsciousness(actor) {
  * automatically as worldTime advances, per RAW "Endurance rank number
  * in HP per hour after last damage."
  * @param {Actor} actor - The actor taking damage
+ * @param {object} [opts]
+ * @param {number} [opts.previousHealth] - Health before this damage; when both
+ *   it and the current Health are above 0 this is a conscious hit and the
+ *   knockout Recovery gate is cleared (RULED 2026-09-05).
  */
-export async function recordDamage(actor) {
+export async function recordDamage(actor, { previousHealth = null } = {}) {
   const now = Date.now();
   const worldNow = game.time?.worldTime ?? 0;
   await safeActorSetFlag(actor, SCOPE, "lastDamageTime", now);
   await safeActorSetFlag(actor, SCOPE, "lastDamageWorldTime", worldNow);
   try { await actor.unsetFlag(SCOPE, "lastHealingWorldTime"); } catch (_e) {}
+
+  const healthNow = actor.system?.attributes?.health?.value ?? 0;
+  if (previousHealth != null && previousHealth > 0 && healthNow > 0 && actor.getFlag(SCOPE, "wasKnockedOut")) {
+    try { await actor.unsetFlag(SCOPE, "wasKnockedOut"); } catch (_e) {}
+  }
 
   // Interrupt all ongoing effects that are damage-sensitive (Regeneration etc.)
   try {
@@ -1274,14 +1305,12 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   }
 
   const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
-  const multiplier = hasMedicalCare ? 2 : 1;
-  const endRank = actor.system?.abilities?.endurance?.rank || "";
-  const enduranceValue = rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10); // RAW: Endurance rank number
+  const healPerHour = healingPerHour(enduranceNumber(actor), { medicalCare: hasMedicalCare });
 
   const config = {
     type: "heal",
     stat: "health",
-    formula: enduranceValue * multiplier,
+    formula: healPerHour,
     rate: 1,
     cycle: "hour",
     count: -1,
@@ -1303,11 +1332,11 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
     await existing.update({
       disabled: false,
       [`flags.${SCOPE}.medicalCare`]: hasMedicalCare,
-      name: `Healing (${enduranceValue * multiplier} HP/hour${hasMedicalCare ? ', medical' : ''})`
+      name: `Healing (${healPerHour} HP/hour${hasMedicalCare ? ', medical' : ''})`
     });
   } else {
     await actor.createEmbeddedDocuments("ActiveEffect", [{
-      name: `Healing (${enduranceValue * multiplier} HP/hour${hasMedicalCare ? ', medical' : ''})`,
+      name: `Healing (${healPerHour} HP/hour${hasMedicalCare ? ', medical' : ''})`,
       img: "icons/svg/regen.svg",
       origin: actor.uuid,
       disabled: false,
@@ -1322,7 +1351,7 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   }
 
   if (game.settings.get(SCOPE, "debugMode")) {
-    console.log(`FASERIP | Healing registered for ${actor.name}: ${enduranceValue * multiplier} HP/hour, start=${worldNow}`);
+    console.log(`FASERIP | Healing registered for ${actor.name}: ${healPerHour} HP/hour, start=${worldNow}`);
   }
 }
 

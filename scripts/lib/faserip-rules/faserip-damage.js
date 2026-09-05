@@ -1,14 +1,20 @@
-// faserip-rules damage v0.8.1
+// faserip-rules damage v0.9.0
+// v0.9.0: Life, Death, and Health — regain-consciousness FEAT, impaired
+//         Endurance number (highest of the reduced rank), stabilization by
+//         aid, Shift 0 disabilities, robot reactivation, Recovery gate and
+//         timing constants. Certified against the Advanced Set passage.
+// v0.8.1: Charging to-hit/miss helpers and the Material Strength examples
+//         (previously vendored in msh-faserip only).
 // Damage computation, defenses, dying, and recovery.
 // Certified against Players Book combat, Powers in Combat, and
 // Life/Death/Health prose.
 
 import {
   rankForNumber, rankByKey, rankDistance, shiftRank,
-  requiredColor, colorForRoll, colorAtLeast, RANKS,
+  requiredColor, colorForRoll, colorAtLeast, resolveFeat, RANKS,
 } from './faserip-kernel.js';
 
-export const DAMAGE_VERSION = '0.8.1';
+export const DAMAGE_VERSION = '0.9.0';
 export const DAMAGE_CERTIFIED = true;
 
 // --- Damage by attack form ---------------------------------------------
@@ -184,31 +190,107 @@ export function resolveResistance({ resistanceNumber, intensityNumber, roll, kar
 export const KARMA_STABILIZE_ONE_ROUND = 50;
 export const KARMA_EXTRA_ENDURANCE_FEAT = 200;
 
+// 0 Health: unconscious for 1-10 rounds, then an Endurance FEAT on the
+// Kill column (see effects resolveKill). "No effect" = Stunned 1-10 rounds
+// and may regain consciousness; "Endurance Loss" begins the spiral.
+export const ZERO_HEALTH_UNCONSCIOUS_ROUNDS = { min: 1, max: 10 };
+export const STUN_ROUNDS = { min: 1, max: 10 };
+
 // One Endurance rank lost per turn while dying. Loss is temporary; for
 // further Endurance checks the number is the highest of the new rank.
-// Slipping below Shift 0 is death.
+// Reaching Shift 0 is not yet death; slipping below Shift 0 is.
+export function impairedEnduranceNumber(rankKey) {
+  const r = rankByKey(rankKey);
+  return r.max === Infinity ? r.standard : r.max;
+}
+
 export function enduranceLossStep(rankKey) {
   if (rankKey === 'SH0') return { dead: true, rank: null, numberForChecks: null };
   const i = RANKS.findIndex(r => r.key === rankKey);
   if (i < 1) throw new Error(`Unknown rank key: ${rankKey}`);
   const next = RANKS[i - 1];
-  return { dead: false, rank: next.key, numberForChecks: next.max === 0 ? 0 : next.max };
+  return { dead: false, rank: next.key, numberForChecks: impairedEnduranceNumber(next.key) };
 }
 
-// A character with lost Endurance ranks acts at -2CS until restored.
+// Aid of any kind (first aid, summoning help, pulling to safety, checking
+// on the character) halts the loss. The character stays unconscious for
+// 1-10 more hours if at 0 Health.
+export const STABILIZE_UNCONSCIOUS_HOURS = { min: 1, max: 10 };
+export function stabilizationOutcome({ health }) {
+  return health > 0
+    ? { lossHalted: true, unconscious: false, hours: null }
+    : { lossHalted: true, unconscious: true, hours: STABILIZE_UNCONSCIOUS_HOURS };
+}
+
+// Regaining consciousness: a Stunned character wakes in 1-10 turns. A
+// 0-Health character is unconscious 1-10 turns, then rolls an Endurance
+// FEAT (no Intensity stated: green). Failure: still unconscious, check
+// again in 1-10 turns. Success: conscious with Health equal to the
+// Endurance rank number (the impaired number while ranks are lost).
+export const WAKE_RETRY_TURNS = { min: 1, max: 10 };
+export function regainConsciousnessFeat({ enduranceRank, enduranceNumber, roll, karma = 0, karmaAllowed = true, shifts = [] }) {
+  const feat = resolveFeat({ rank: enduranceRank, shifts, intensity: null, roll, karma, karmaAllowed });
+  return { ...feat, wakeHealth: feat.success ? enduranceNumber : null, retryTurns: feat.success ? null : WAKE_RETRY_TURNS };
+}
+
+// A character with lost Endurance ranks acts at -2CS until restored: one
+// rank per week normally, one per day in hospital or under a doctor's
+// care; never above the pre-damage number.
 export const IMPAIRED_ABILITY_SHIFT = -2;
 export const ENDURANCE_RANK_HEAL_DAYS = { normal: 7, hospital: 1 };
+export function enduranceRestoreStep({ rankKey, originalRankKey, originalNumber }) {
+  if (rankKey === originalRankKey) return { restored: false, atCap: true, rank: rankKey, number: originalNumber };
+  const next = shiftRank(rankKey, 1);
+  if (rankDistance(next.key, originalRankKey) <= 0) {
+    return { restored: true, atCap: true, rank: originalRankKey, number: originalNumber };
+  }
+  return { restored: true, atCap: false, rank: next.key, number: impairedEnduranceNumber(next.key) };
+}
+
+// Disabilities: at Shift 0 Endurance, each physical ability above Good
+// makes a green FEAT; failure reduces it to the next lower printed
+// (standard) number, recoverable only by experience.
+export const DISABILITY_ABILITIES = ['fighting', 'agility', 'strength', 'endurance'];
+export function disabilityCheck({ abilityRank, roll, karma = 0, karmaAllowed = true }) {
+  if (rankDistance('GD', abilityRank) <= 0) return { atRisk: false, impaired: false, rank: abilityRank, number: rankByKey(abilityRank).standard };
+  const feat = resolveFeat({ rank: abilityRank, intensity: null, roll, karma, karmaAllowed });
+  if (feat.success) return { atRisk: true, impaired: false, rank: abilityRank, number: rankByKey(abilityRank).standard, feat };
+  const lower = shiftRank(abilityRank, -1);
+  return { atRisk: true, impaired: true, rank: lower.key, number: lower.standard, feat };
+}
+
+// Robots at 0 Health with all Endurance ranks lost are not dead: a Reason
+// FEAT of Intensity equal to the robot's highest Ability or Power rank
+// rebuilds it (no Karma on return); reactivation takes days equal to the
+// highest Power rank number (Vision: 10D = 100 days).
+export function robotReactivation({ highestRankKey, highestPowerNumber }) {
+  return { reasonIntensity: highestRankKey, days: highestPowerNumber, karmaOnReturn: 0 };
+}
 
 // --- Recovery and healing ----------------------------------------------
 
 // Recovery: Endurance rank number regained 10 turns after damage, once
-// per day, only if conscious and not damaged again in the interval.
+// per day, provided the character was not knocked unconscious and was not
+// damaged again in the interval (then only Healing is possible).
+export const RECOVERY_DELAY_TURNS = 10;
+export const RECOVERY_PER_DAY = 1;
 export function recoveryAmount(enduranceNumber) {
   return enduranceNumber;
 }
 
-// Healing: Endurance rank number per hour after last damage; doubled by
-// bedrest and medical supervision. Health never exceeds maximum.
+export function recoveryAllowed({ conscious, knockedOut = false, damagedAgain = false, usedToday = false, turnsSinceDamage = RECOVERY_DELAY_TURNS }) {
+  if (!conscious) return { allowed: false, reason: 'unconscious' };
+  if (knockedOut) return { allowed: false, reason: 'knocked unconscious' };
+  if (damagedAgain) return { allowed: false, reason: 'damaged again' };
+  if (usedToday) return { allowed: false, reason: 'once per day' };
+  if (turnsSinceDamage < RECOVERY_DELAY_TURNS) return { allowed: false, reason: 'ten turns', turnsRemaining: RECOVERY_DELAY_TURNS - turnsSinceDamage };
+  return { allowed: true, reason: null };
+}
+
+// Healing: Endurance rank number in the hour (600 turns) after last
+// damage, measured from the latest damage; doubled by bedrest and
+// medical supervision. Health never exceeds maximum.
+export const HEALING_INTERVAL_TURNS = 600;
 export function healingPerHour(enduranceNumber, { medicalCare = false } = {}) {
   return enduranceNumber * (medicalCare ? 2 : 1);
 }

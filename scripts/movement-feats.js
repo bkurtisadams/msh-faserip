@@ -1,4 +1,15 @@
-// movement-feats.js v1.8.0 - 2026-06-11
+// movement-feats.js v1.9.0 - 2026-09-04
+// v1.9.0: Slice 7a — movement FEATs onto the faserip-rules kernel. Colours via
+//         kernel colorForRoll, column shifts via the shared kernel shiftRank.
+//         Fixed against faserip-movement v0.7.2: extended leap is +1 area
+//         (132'), not double distance; exhaustion ladder (green/yellow/red/rest
+//         at 1x/2x/3x/4x Endurance turns, rest 1-10/2-20/3-30); Speed FEAT
+//         white = trip (Slam, continues forward); drowning ladder
+//         (green/yellow/red on successive turns past breath hold); teleport
+//         passengers keyed on prior trips (red/yellow/green), failure =
+//         unconscious 1-10 rounds; teleport into solid = material strength
+//         damage x1 (RULED 2026-08-31), success = bounce clear + unconscious
+//         1-10, failure = unconscious + Endurance loss.
 // v1.8.0: Add Swim Speed +1 FEAT (Yellow Strength) mirroring the Run dialog —
 //         new radio option plus Strength-based resolution and +1-area result.
 // v1.7.1: Fix teleport distance table to use Air speed (areas = max teleport distance)
@@ -17,14 +28,17 @@
 // Extracted from actorSheet.js to reduce file size
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
-import { RANKS_ORDERED as RANKS, RANK_ABBR, rankValue } from './rules/rules-reference.js';
+import { RANKS_ORDERED as RANKS, RANK_ABBR, rankValue, shiftRank as sharedShiftRank } from './rules/rules-reference.js';
 import { checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
+import { colorForRoll } from './lib/faserip-rules/faserip-kernel.js';
+import {
+  AREA_YARDS, exhaustionCheck, exhaustionExempt, drowningFeatColor,
+  teleportPassengerFeatColor, teleportIntoObjectDamage
+} from './lib/faserip-rules/faserip-movement.js';
+import { kernelKeyFor } from './kernel/adapter.js';
 
-// Exhaustion-immune ranks
-const EXHAUSTION_IMMUNE_RANKS = [
-  "Unearthly", "Shift-X", "Shift X", "Shift-Y", "Shift Y", 
-  "Shift-Z", "Shift Z", "Class 1000", "Class 3000", "Class 5000"
-];
+// Exhaustion immunity: kernel rule (Unearthly+ Endurance)
+const isExhaustionImmuneRank = (rankName) => exhaustionExempt({ enduranceNumber: rankValue(rankName) });
 
 // Rank abbreviations — alias the canonical RANK_ABBR for local usage
 const RANK_ABBREV = RANK_ABBR;
@@ -37,12 +51,27 @@ function abbrevRank(rank) {
  * Apply column shifts to a rank
  */
 function applyColumnShift(rank, shift) {
-  if (shift === 0) return rank;
-  const index = RANKS.indexOf(rank);
-  if (index === -1) return rank;
-  const newIndex = Math.min(Math.max(index + shift, 0), RANKS.length - 1);
-  return RANKS[newIndex];
+  return shift ? sharedShiftRank(rank, shift) : rank;
 }
+
+function featColor(rankName, total) {
+  const key = kernelKeyFor(rankName);
+  if (!key) return game.msh.rollUniversalTable(rankName, total);
+  return colorForRoll(key, Math.min(Math.max(Number(total) || 0, 1), 100));
+}
+
+const cap = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : c;
+
+function exhaustionStage(turnsFlatOut, enduranceValue) {
+  const n = Math.max(1, Number(enduranceValue) || 1);
+  const turns = Math.max(0, Number(turnsFlatOut) || 0);
+  const ex = exhaustionCheck(turns, n);
+  if (!ex.check) return { auto: 'none', requirement: null, failure: null, note: `No check yet — first Green check after ${n} turns flat out (${turns} so far)` };
+  if (ex.check === 'rest') return { auto: 'rest', requirement: null, failure: `Must rest ${ex.restDice} turns`, note: `${turns} turns flat out ≥ 4×${n} — automatic rest` };
+  return { auto: null, requirement: cap(ex.check), failure: `Must rest ${ex.restDice} turns`, note: `${turns} turns flat out (Endurance ${n}): ${cap(ex.check)} check` };
+}
+
+const AREA_FEET = AREA_YARDS * 3;
 
 /**
  * Check if a FEAT result meets the requirement
@@ -197,7 +226,7 @@ export class MovementFeats {
           <label style="display: block; font-weight: bold; margin-bottom: 5px;">Target Distance:</label>
           <label style="display: block; margin: 3px 0;"><input type="radio" name="leapDistance" value="half" ${savedDistance === 'half' ? 'checked' : ''}> Half distance (Automatic - no roll)</label>
           <label style="display: block; margin: 3px 0; color: #2e7d32;"><input type="radio" name="leapDistance" value="full" ${savedDistance === 'full' ? 'checked' : ''}> Full distance (Green FEAT)</label>
-          <label style="display: block; margin: 3px 0; color: #c62828;"><input type="radio" name="leapDistance" value="extended" ${savedDistance === 'extended' ? 'checked' : ''}> Extended +1 area (Red FEAT)</label>
+          <label style="display: block; margin: 3px 0; color: #c62828;"><input type="radio" name="leapDistance" value="extended" ${savedDistance === 'extended' ? 'checked' : ''}> Extended — one additional area (+132') (Red FEAT)</label>
         </div>
         
         <div style="margin-bottom: 10px;">
@@ -295,14 +324,10 @@ export class MovementFeats {
     }
     
     // Calculate actual distance
-    let multiplier;
-    switch (distance) {
-      case 'half': multiplier = 0.5; break;
-      case 'extended': multiplier = 2; break;
-      default: multiplier = 1;
-    }
-    const actualFeet = Math.floor(distanceFeet * multiplier);
-    const actualFloors = distanceFloors ? (distanceFloors * multiplier).toFixed(1) : null;
+    const actualFeet = distance === 'half' ? Math.floor(distanceFeet / 2)
+      : distance === 'extended' ? distanceFeet + AREA_FEET
+      : distanceFeet;
+    const actualFloors = distanceFloors ? (actualFeet / 15).toFixed(1) : null;
     
     // Determine FEAT requirement
     let featRequirement, isAutomatic = false;
@@ -323,7 +348,7 @@ export class MovementFeats {
     
     // Display text
     const directionDisplay = direction.charAt(0).toUpperCase() + direction.slice(1);
-    const distanceDisplay = distance === 'half' ? 'Half' : distance === 'extended' ? 'Extended' : 'Full';
+    const distanceDisplay = distance === 'half' ? 'Half' : distance === 'extended' ? `Extended (+1 area, ${AREA_FEET}')` : 'Full';
     const floorInfo = actualFloors ? ` (${actualFloors} floors)` : '';
     const sourceLabel = leapingInfo.name; // "Strength" or power name
     const isPower = leapingInfo.id !== 'strength';
@@ -373,7 +398,7 @@ export class MovementFeats {
     let karmaUsed = 0;
     
     if (spendKarma && getAvailableKarma(this.actor) > 0) {
-      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const initialColor = featColor(effectiveRank, roll.total);
       const karmaResult = await showKarmaDecisionDialog(
         this.actor,
         roll.total,
@@ -385,7 +410,7 @@ export class MovementFeats {
       karmaUsed = karmaResult.karmaSpent;
     }
     
-    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    const resultColor = featColor(effectiveRank, cappedTotal);
     const featSuccess = checkFeatSuccess(resultColor, featRequirement);
     const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
     
@@ -444,7 +469,7 @@ export class MovementFeats {
     const cruisingInfo = FaseripActor.getCruisingFlight(flyAreas);
     const acceleration = this.actor.suggestedMovement;
     const exhaustionThreshold = this.actor.exhaustionThreshold;
-    const isExhaustionImmune = EXHAUSTION_IMMUNE_RANKS.includes(enduranceRank);
+    const isExhaustionImmune = isExhaustionImmuneRank(enduranceRank);
     
     // Saved settings
     const savedFeatType = this.actor.getFlag("msh-faserip", "lastFlyFeatType") || "normal";
@@ -508,8 +533,9 @@ export class MovementFeats {
             <label style="padding: 3px; background: ${savedFeatType === 'dive-pullout' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Agility FEAT to pull out of a dive.&#10;Failure: Continue diving.">
               <input type="radio" name="flyFeatType" value="dive-pullout" ${savedFeatType === 'dive-pullout' ? 'checked' : ''}> Dive Pullout <span style="color: #666;">(Agi)</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Endurance FEAT after ${exhaustionThreshold} turns at max speed.&#10;Failure: Must rest 1-10 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
+            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Endurance FEAT after turns flat out: Green after ${exhaustionThreshold}, Yellow after ${exhaustionThreshold * 2}, Red after ${exhaustionThreshold * 3}, automatic rest after ${exhaustionThreshold * 4}.&#10;Failure: rest 1-10 / 2-20 / 3-30 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
               <input type="radio" name="flyFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(End)</span>
+              <input type="number" name="flyExhaustTurns" value="${exhaustionThreshold}" min="0" style="width: 42px; margin-left: 4px;" title="Turns flown flat out" ${isExhaustionImmune ? 'disabled' : ''}> <span style="color: #666;">turns</span>
             </label>
           </div>
         </div>
@@ -543,6 +569,7 @@ export class MovementFeats {
             const spendKarma = html.find('#spend-karma').is(':checked');
             const actionsWhileFlying = html.find('[name="actionsWhileFlying"]').is(':checked');
             const lowAltitude = html.find('[name="lowAltitude"]').is(':checked');
+            const turnsFlatOut = parseInt(html.find('[name="flyExhaustTurns"]').val()) || 0;
             const saveSettings = html.find('[name="saveSettings"]').is(':checked');
             const skipDice = html.find('[name="skipDice"]').is(':checked');
             
@@ -554,7 +581,7 @@ export class MovementFeats {
               await this.actor.setFlag("msh-faserip", "lastFlySkipDiceRoll", skipDice);
             }
             
-            await this._executeFlyFeat(featType, columnShift, spendKarma, skipDice, actionsWhileFlying, lowAltitude, currentSpeed, flightInfo, cruisingInfo);
+            await this._executeFlyFeat(featType, columnShift, spendKarma, skipDice, actionsWhileFlying, lowAltitude, currentSpeed, flightInfo, cruisingInfo, turnsFlatOut);
           }
         },
         cancel: { label: "Cancel" }
@@ -579,7 +606,7 @@ export class MovementFeats {
   /**
    * Execute a Fly FEAT roll
    */
-  async _executeFlyFeat(featType, columnShift, spendKarma, skipDice, actionsWhileFlying, lowAltitude, currentSpeed, flightInfo, cruisingInfo) {
+  async _executeFlyFeat(featType, columnShift, spendKarma, skipDice, actionsWhileFlying, lowAltitude, currentSpeed, flightInfo, cruisingInfo, turnsFlatOut = this.actor.exhaustionThreshold) {
     const agilityAbility = this.actor.system.abilities?.agility;
     const enduranceAbility = this.actor.system.abilities?.endurance;
     const agilityRank = agilityAbility?.rank || "Typical";
@@ -591,16 +618,21 @@ export class MovementFeats {
     const abilityRank = isExhaustionCheck ? enduranceRank : agilityRank;
     const abilityValue = isExhaustionCheck ? enduranceValue : agilityValue;
     const abilityName = isExhaustionCheck ? 'Endurance' : 'Agility';
+    const exStage = isExhaustionCheck ? exhaustionStage(turnsFlatOut, enduranceValue) : null;
     
     const featTypeInfo = {
       'normal': { name: 'Normal Flight', failure: null },
-      'sharp-turn': { name: 'Sharp Turn (>90°)', failure: 'Continue in original direction' },
-      'landing': { name: 'Landing at Speed', failure: 'Slam result' },
-      'low-altitude': { name: 'Low Altitude Maneuver', failure: 'Lose control' },
-      'dive-pullout': { name: 'Pull Out of Dive', failure: 'Continue diving' },
-      'exhaustion': { name: 'Exhaustion Check', failure: 'Must rest 1-10 turns' }
+      'sharp-turn': { name: 'Sharp Turn (>90°)', failure: 'Continue in original direction', requirement: 'Green' },
+      'landing': { name: 'Landing at Speed', failure: 'Slam result', requirement: 'Green' },
+      'low-altitude': { name: 'Low Altitude Maneuver', failure: 'Lose control', requirement: 'Green' },
+      'dive-pullout': { name: 'Pull Out of Dive', failure: 'Continue diving', requirement: 'Green' },
+      'exhaustion': { name: 'Exhaustion Check', failure: exStage?.failure, requirement: exStage?.requirement }
     };
     const featInfo = featTypeInfo[featType] || featTypeInfo['normal'];
+    if (isExhaustionCheck && exStage.auto) {
+      await this._postAutoExhaustion('Flight', exStage, enduranceRank, enduranceValue);
+      return;
+    }
     
     const cruisingAreas = cruisingInfo?.areas || Math.max(1, flightInfo.areas - 2);
     const isAtMax = currentSpeed >= flightInfo.areas;
@@ -669,7 +701,7 @@ export class MovementFeats {
     let karmaUsed = 0;
     
     if (spendKarma && getAvailableKarma(this.actor) > 0) {
-      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const initialColor = featColor(effectiveRank, roll.total);
       const karmaResult = await showKarmaDecisionDialog(
         this.actor,
         roll.total,
@@ -681,13 +713,14 @@ export class MovementFeats {
       karmaUsed = karmaResult.karmaSpent;
     }
     
-    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const featSuccess = ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
+    const resultColor = featColor(effectiveRank, cappedTotal);
+    const featSuccess = checkFeatSuccess(resultColor, featInfo.requirement);
     const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
     
     let modifierNotes = [];
     if (actionsWhileFlying) modifierNotes.push('Actions while flying (-50% speed)');
     if (lowAltitude) modifierNotes.push(`Low altitude (max ${flightInfo.groundAreas} areas)`);
+    if (exStage) modifierNotes.push(exStage.note);
     
     const content = `
       <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
@@ -698,6 +731,7 @@ export class MovementFeats {
           <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
           ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
           ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
+          <div>Required: <span style="color: ${featInfo.requirement === 'Red' ? '#c62828' : featInfo.requirement === 'Yellow' ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
           <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -824,7 +858,7 @@ export class MovementFeats {
     const exhaustionThreshold = this.actor.exhaustionThreshold;
     
     // Check for exhaustion immunity (Unearthly+ Endurance)
-    const isExhaustionImmune = EXHAUSTION_IMMUNE_RANKS.includes(enduranceRank);
+    const isExhaustionImmune = isExhaustionImmuneRank(enduranceRank);
     
     const cruisingAreas = cruisingInfo?.areas || Math.max(1, runAreas - 2);
     const cruisingMph = cruisingInfo?.mph || (cruisingAreas * 15);
@@ -879,11 +913,12 @@ export class MovementFeats {
             <label style="padding: 3px; background: ${savedFeatType === 'normal' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Normal movement at current speed. No roll required.">
               <input type="radio" name="runFeatType" value="normal" ${savedFeatType === 'normal' ? 'checked' : ''}> Normal <span style="color: #666;">(no roll)</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'speed' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Strength FEAT to move +1 area beyond max speed.&#10;Failure: No bonus speed.">
+            <label style="padding: 3px; background: ${savedFeatType === 'speed' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Strength FEAT to move +1 area beyond max speed.&#10;Green: No bonus speed.&#10;White: Trips — Slam result, continues forward.">
               <input type="radio" name="runFeatType" value="speed" ${savedFeatType === 'speed' ? 'checked' : ''}> Speed +1 <span style="color: #666;">(Yel Str)</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Green Endurance FEAT after ${exhaustionThreshold} turns at max speed.&#10;Failure: Must rest 1-10 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
-              <input type="radio" name="runFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(Grn End)</span>
+            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Endurance FEAT after turns flat out: Green after ${exhaustionThreshold}, Yellow after ${exhaustionThreshold * 2}, Red after ${exhaustionThreshold * 3}, automatic rest after ${exhaustionThreshold * 4}.&#10;Failure: rest 1-10 / 2-20 / 3-30 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
+              <input type="radio" name="runFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(End)</span>
+              <input type="number" name="runExhaustTurns" value="${exhaustionThreshold}" min="0" style="width: 42px; margin-left: 4px;" title="Turns moved flat out" ${isExhaustionImmune ? 'disabled' : ''}> <span style="color: #666;">turns</span>
             </label>
           </div>
         </div>
@@ -918,6 +953,7 @@ export class MovementFeats {
             const spendKarma = html.find('#spend-karma').is(':checked');
             const actionsWhileRunning = html.find('[name="actionsWhileRunning"]').is(':checked');
             const turning = html.find('[name="turning"]').is(':checked');
+            const turnsFlatOut = parseInt(html.find('[name="runExhaustTurns"]').val()) || 0;
             const saveSettings = html.find('[name="saveSettings"]').is(':checked');
             const skipDice = html.find('[name="skipDice"]').is(':checked');
             
@@ -937,7 +973,7 @@ export class MovementFeats {
             // Lightning Speed: turning penalty doesn't apply
             const effectiveTurning = runInfo.isLightningSpeed ? false : turning;
             
-            await this._executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, effectiveTurning, currentSpeed, runInfo, newCruising, exhaustionThreshold);
+            await this._executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, effectiveTurning, currentSpeed, runInfo, newCruising, exhaustionThreshold, turnsFlatOut);
           }
         },
         cancel: { label: "Cancel" }
@@ -998,7 +1034,7 @@ export class MovementFeats {
   /**
    * Execute a Run FEAT roll
    */
-  async _executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, turning, currentSpeed, runInfo, cruisingAreas, exhaustionThreshold) {
+  async _executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, turning, currentSpeed, runInfo, cruisingAreas, exhaustionThreshold, turnsFlatOut = exhaustionThreshold) {
     const enduranceAbility = this.actor.system.abilities?.endurance;
     const strengthAbility = this.actor.system.abilities?.strength;
     const enduranceRank = enduranceAbility?.rank || "Typical";
@@ -1018,13 +1054,17 @@ export class MovementFeats {
     const abilityValue = isSpeedFeat ? strengthValue : enduranceValue;
     const abilityName = isSpeedFeat ? 'Strength' : 'Endurance';
     
-    // FEAT type info
+    const exStage = isExhaustionCheck ? exhaustionStage(turnsFlatOut, enduranceValue) : null;
     const featTypeInfo = {
       'normal': { name: 'Normal Movement', failure: null },
       'speed': { name: 'Speed FEAT', failure: 'No bonus speed', requirement: 'Yellow' },
-      'exhaustion': { name: 'Exhaustion Check', failure: 'Must rest 1-10 turns', requirement: 'Green' }
+      'exhaustion': { name: 'Exhaustion Check', failure: exStage?.failure, requirement: exStage?.requirement }
     };
     const featInfo = featTypeInfo[featType] || featTypeInfo['normal'];
+    if (isExhaustionCheck && exStage.auto) {
+      await this._postAutoExhaustion('Running', exStage, enduranceRank, enduranceValue);
+      return;
+    }
     
     const isAtMax = currentSpeed >= maxSpeed;
     const isAboveCruising = currentSpeed > cruisingAreas;
@@ -1107,7 +1147,7 @@ export class MovementFeats {
     let karmaUsed = 0;
     
     if (spendKarma && getAvailableKarma(this.actor) > 0) {
-      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const initialColor = featColor(effectiveRank, roll.total);
       const karmaResult = await showKarmaDecisionDialog(
         this.actor,
         roll.total,
@@ -1119,31 +1159,24 @@ export class MovementFeats {
       karmaUsed = karmaResult.karmaSpent;
     }
     
-    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    
-    // Check success based on FEAT type
-    let featSuccess;
-    if (isSpeedFeat) {
-      // Speed FEAT requires Yellow
-      featSuccess = ['yellow', 'red'].includes(resultColor.toLowerCase());
-    } else {
-      // Exhaustion requires Green
-      featSuccess = ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
-    }
-    
+    const resultColor = featColor(effectiveRank, cappedTotal);
+    const featSuccess = checkFeatSuccess(resultColor, featInfo.requirement);
     const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
     
     // Build modifier notes
     let modifierNotes = [];
     if (actionsWhileRunning) modifierNotes.push('Actions while moving (-50%)');
     if (turning) modifierNotes.push('Turning >90° (-50%)');
+    if (exStage) modifierNotes.push(exStage.note);
     
     // Success/failure text
     let resultText;
     if (isSpeedFeat) {
       resultText = featSuccess 
         ? `SUCCESS — Speed +1 area (${effectiveSpeed + 1} areas total)`
-        : `FAILED — No bonus speed (${effectiveSpeed} areas)`;
+        : resultColor.toLowerCase() === 'white'
+          ? `TRIPS — Slam result, continues forward (${effectiveSpeed} areas)`
+          : `FAILED — No bonus speed (${effectiveSpeed} areas)`;
     } else {
       resultText = featSuccess 
         ? 'SUCCESS — No exhaustion'
@@ -1160,7 +1193,7 @@ export class MovementFeats {
           <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
           ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
           ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
-          <div>Required: <span style="color: ${isSpeedFeat ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
+          <div>Required: <span style="color: ${featInfo.requirement === 'Red' ? '#c62828' : featInfo.requirement === 'Yellow' ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
           <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -1272,7 +1305,7 @@ export class MovementFeats {
     // Exhaustion threshold and immunity
     const exhaustionThreshold = this.actor.exhaustionThreshold;
     const breathHoldTurns = enduranceValue; // Can hold breath for Endurance rank# turns
-    const isExhaustionImmune = EXHAUSTION_IMMUNE_RANKS.includes(enduranceRank);
+    const isExhaustionImmune = isExhaustionImmuneRank(enduranceRank);
     
     // Cruising speed (if Swimming power)
     const cruisingAreas = isSwimmingPower ? Math.max(1, swimAreas - 2) : 1;
@@ -1328,14 +1361,16 @@ export class MovementFeats {
             <label style="padding: 3px; background: ${savedFeatType === 'normal' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Normal swimming at current speed. No roll required.">
               <input type="radio" name="swimFeatType" value="normal" ${savedFeatType === 'normal' ? 'checked' : ''}> Normal <span style="color: #666;">(no roll)</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'speed' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Strength FEAT to move +1 area beyond max swim speed.&#10;Failure: No bonus speed.">
+            <label style="padding: 3px; background: ${savedFeatType === 'speed' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Strength FEAT to move +1 area beyond max swim speed.&#10;Green: No bonus speed.&#10;White: Trips — Slam result, continues forward.">
               <input type="radio" name="swimFeatType" value="speed" ${savedFeatType === 'speed' ? 'checked' : ''}> Speed +1 <span style="color: #666;">(Yel Str)</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Green Endurance FEAT after ${exhaustionThreshold} turns at max speed.&#10;Failure: Must rest 1-10 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
-              <input type="radio" name="swimFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(Grn End)</span>
+            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Endurance FEAT after turns flat out: Green after ${exhaustionThreshold}, Yellow after ${exhaustionThreshold * 2}, Red after ${exhaustionThreshold * 3}, automatic rest after ${exhaustionThreshold * 4}.&#10;Failure: rest 1-10 / 2-20 / 3-30 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
+              <input type="radio" name="swimFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(End)</span>
+              <input type="number" name="swimExhaustTurns" value="${exhaustionThreshold}" min="0" style="width: 42px; margin-left: 4px;" title="Turns swum flat out" ${isExhaustionImmune ? 'disabled' : ''}> <span style="color: #666;">turns</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'drowning' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Endurance FEAT when out of breath (after ${breathHoldTurns} turns underwater).&#10;White: Drowning (lose 1 End rank/turn).&#10;Green+: Survive, check again next turn.">
-              <input type="radio" name="swimFeatType" value="drowning" ${savedFeatType === 'drowning' ? 'checked' : ''}> Drowning <span style="color: #666;">(End FEAT)</span>
+            <label style="padding: 3px; background: ${savedFeatType === 'drowning' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Breath lasts ${breathHoldTurns} turns (Endurance rank number). Then Endurance FEATs: Green the 1st turn past, Yellow the 2nd, Red the 3rd and after.&#10;Failure: Drowning begins.">
+              <input type="radio" name="swimFeatType" value="drowning" ${savedFeatType === 'drowning' ? 'checked' : ''}> Drowning <span style="color: #666;">(End)</span>
+              <input type="number" name="swimDrownTurns" value="1" min="1" style="width: 42px; margin-left: 4px;" title="Turns past breath hold"> <span style="color: #666;">past</span>
             </label>
           </div>
         </div>
@@ -1370,6 +1405,8 @@ export class MovementFeats {
             const spendKarma = html.find('#spend-karma').is(':checked');
             const actionsWhileSwimming = html.find('[name="actionsWhileSwimming"]').is(':checked');
             const underwater = html.find('[name="underwater"]').is(':checked');
+            const turnsFlatOut = parseInt(html.find('[name="swimExhaustTurns"]').val()) || 0;
+            const turnsPastBreath = parseInt(html.find('[name="swimDrownTurns"]').val()) || 1;
             const saveSettings = html.find('[name="saveSettings"]').is(':checked');
             const skipDice = html.find('[name="skipDice"]').is(':checked');
             
@@ -1385,7 +1422,7 @@ export class MovementFeats {
               await this.actor.setFlag("msh-faserip", "lastSwimSkipDiceRoll", skipDice);
             }
             
-            await this._executeSwimFeat(featType, columnShift, spendKarma, skipDice, actionsWhileSwimming, underwater, currentSpeed, swimInfo, breathHoldTurns, exhaustionThreshold);
+            await this._executeSwimFeat(featType, columnShift, spendKarma, skipDice, actionsWhileSwimming, underwater, currentSpeed, swimInfo, breathHoldTurns, exhaustionThreshold, turnsFlatOut, turnsPastBreath);
           }
         },
         cancel: { label: "Cancel" }
@@ -1435,7 +1472,7 @@ export class MovementFeats {
   /**
    * Execute a Swim FEAT roll
    */
-  async _executeSwimFeat(featType, columnShift, spendKarma, skipDice, actionsWhileSwimming, underwater, currentSpeed, swimInfo, breathHoldTurns, exhaustionThreshold) {
+  async _executeSwimFeat(featType, columnShift, spendKarma, skipDice, actionsWhileSwimming, underwater, currentSpeed, swimInfo, breathHoldTurns, exhaustionThreshold, turnsFlatOut = exhaustionThreshold, turnsPastBreath = 1) {
     const enduranceAbility = this.actor.system.abilities?.endurance;
     const enduranceRank = enduranceAbility?.rank || "Typical";
     const enduranceValue = enduranceAbility?.value || 6;
@@ -1453,14 +1490,21 @@ export class MovementFeats {
     const cruisingAreas = swimInfo.id === 'normal' ? 1 : Math.max(1, swimInfo.areas - 2);
     const isAboveCruising = currentSpeed > cruisingAreas;
     
-    // FEAT type info
+    const isExhaustionCheck = featType === 'exhaustion';
+    const isDrowning = featType === 'drowning';
+    const exStage = isExhaustionCheck ? exhaustionStage(turnsFlatOut, enduranceValue) : null;
+    const drownColor = isDrowning ? cap(drowningFeatColor(Math.max(1, turnsPastBreath))) : null;
     const featTypeInfo = {
       'normal': { name: 'Normal Swimming', failure: null },
       'speed': { name: 'Speed FEAT', failure: 'No bonus speed', requirement: 'Yellow' },
-      'exhaustion': { name: 'Exhaustion Check', failure: 'Must rest 1-10 turns', requirement: 'Green' },
-      'drowning': { name: 'Drowning Check', failure: 'Drowning! Lose 1 Endurance rank/turn', requirement: 'Green' }
+      'exhaustion': { name: 'Exhaustion Check', failure: exStage?.failure, requirement: exStage?.requirement },
+      'drowning': { name: 'Drowning Check', failure: 'Drowning begins', requirement: drownColor }
     };
     const featInfo = featTypeInfo[featType] || featTypeInfo['normal'];
+    if (isExhaustionCheck && exStage.auto) {
+      await this._postAutoExhaustion('Swimming', exStage, enduranceRank, enduranceValue);
+      return;
+    }
     
     // Handle normal swimming (no roll)
     if (featType === 'normal') {
@@ -1527,7 +1571,7 @@ export class MovementFeats {
     let karmaUsed = 0;
     
     if (spendKarma && getAvailableKarma(this.actor) > 0) {
-      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const initialColor = featColor(effectiveRank, roll.total);
       const karmaResult = await showKarmaDecisionDialog(
         this.actor,
         roll.total,
@@ -1539,11 +1583,8 @@ export class MovementFeats {
       karmaUsed = karmaResult.karmaSpent;
     }
     
-    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    // Speed FEAT requires Yellow; exhaustion/drowning require Green.
-    const featSuccess = isSpeedFeat
-      ? ['yellow', 'red'].includes(resultColor.toLowerCase())
-      : ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
+    const resultColor = featColor(effectiveRank, cappedTotal);
+    const featSuccess = checkFeatSuccess(resultColor, featInfo.requirement);
     const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
 
     // Effective speed for Speed FEAT reporting (actions-while-swimming halves it)
@@ -1554,6 +1595,8 @@ export class MovementFeats {
     let modifierNotes = [];
     if (actionsWhileSwimming) modifierNotes.push('Actions while swimming (-50%)');
     if (underwater) modifierNotes.push('Underwater');
+    if (exStage) modifierNotes.push(exStage.note);
+    if (isDrowning) modifierNotes.push(`Breath ${breathHoldTurns} turns; turn ${turnsPastBreath} past hold: ${drownColor} check`);
     
     const sourceNote = swimInfo.id === 'normal' 
       ? 'Normal Swimming' 
@@ -1569,7 +1612,7 @@ export class MovementFeats {
           <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
           ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
           ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
-          <div>Required: <span style="color: ${isSpeedFeat ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
+          <div>Required: <span style="color: ${featInfo.requirement === 'Red' ? '#c62828' : featInfo.requirement === 'Yellow' ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
           <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -1580,7 +1623,9 @@ export class MovementFeats {
           ${isSpeedFeat
             ? (featSuccess
                 ? `SUCCESS — Speed +1 area (${speedFeatEffective + 1} areas total)`
-                : `FAILED — No bonus speed (${speedFeatEffective} areas)`)
+                : resultColor.toLowerCase() === 'white'
+                  ? `TRIPS — Slam result, continues forward (${speedFeatEffective} areas)`
+                  : `FAILED — No bonus speed (${speedFeatEffective} areas)`)
             : (featSuccess ? 'SUCCESS' : `FAILED — ${featInfo.failure}`)}
         </div>
       </div>
@@ -1675,6 +1720,10 @@ export class MovementFeats {
     const savedCarryingPassengers = this.actor.getFlag("msh-faserip", "lastTeleportCarryingPassengers") || false;
     const savedBlindTeleport = this.actor.getFlag("msh-faserip", "lastTeleportBlindTeleport") || false;
     const skipDiceRoll = this.actor.getFlag("msh-faserip", "lastTeleportSkipDiceRoll") || false;
+    const savedPriorTrips = this.actor.getFlag("msh-faserip", "lastTeleportPriorTrips") ?? 0;
+    const savedSolidMaterial = this.actor.getFlag("msh-faserip", "lastTeleportSolidMaterial") || "Good";
+    const materialOptions = RANKS.filter(r => r !== 'Shift-0' && !r.startsWith('Class') && r !== 'Beyond')
+      .map(r => `<option value="${r}" ${savedSolidMaterial === r ? 'selected' : ''}>${r} (${rankValue(r)})</option>`).join('');
     
     // Get initial teleport info
     const initialInfo = this._getTeleportInfoFromSelection(savedTeleportRank);
@@ -1721,14 +1770,17 @@ export class MovementFeats {
             <label style="padding: 3px; background: ${savedFeatType === 'normal' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Power rank FEAT to teleport.&#10;Failure: Arrive but disoriented (no action next round).">
               <input type="radio" name="teleportFeatType" value="normal" ${savedFeatType === 'normal' ? 'checked' : ''}> Normal <span style="color: #666;">(Power)</span>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'passenger' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Green Endurance FEAT for willing passengers.&#10;Failure: Disoriented 1-10 rounds.">
-              <input type="radio" name="teleportFeatType" value="passenger" ${savedFeatType === 'passenger' ? 'checked' : ''}> Passenger <span style="color: #666;">(Grn End)</span>
+            <label style="padding: 3px; background: ${['passenger', 'unwilling'].includes(savedFeatType) ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Unpracticed passenger Endurance FEAT: Red on the first trip, Yellow the second, Green the third and after.&#10;Failure: Unconscious 1-10 rounds.">
+              <input type="radio" name="teleportFeatType" value="passenger" ${['passenger', 'unwilling'].includes(savedFeatType) ? 'checked' : ''}> Passenger <span style="color: #666;">(End)</span>
+              <select name="teleportPriorTrips" style="margin-left: 4px; font-size: 0.9em;" title="Passenger's prior teleport trips">
+                <option value="0" ${Number(savedPriorTrips) === 0 ? 'selected' : ''}>1st trip (Red)</option>
+                <option value="1" ${Number(savedPriorTrips) === 1 ? 'selected' : ''}>2nd trip (Yel)</option>
+                <option value="2" ${Number(savedPriorTrips) >= 2 ? 'selected' : ''}>3rd+ (Grn)</option>
+              </select>
             </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'unwilling' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Endurance FEAT for unwilling targets teleported from area.&#10;Failure: Disoriented 1-10 rounds.">
-              <input type="radio" name="teleportFeatType" value="unwilling" ${savedFeatType === 'unwilling' ? 'checked' : ''}> Unwilling <span style="color: #666;">(Yel End)</span>
-            </label>
-            <label style="padding: 3px; background: ${savedFeatType === 'solid' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Endurance FEAT when teleporting into solid object.&#10;Failure: 2x material strength damage.&#10;Success: Random 'port, unconscious 1-10 rounds.">
+            <label style="padding: 3px; background: ${savedFeatType === 'solid' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Teleporting into an object: damage equal to its material strength, Body Armor gives no protection (RULED 2026-08-31).&#10;Endurance FEAT — Success: bounce clear, unconscious 1-10 rounds.&#10;Failure: unconscious, Endurance loss toward death.">
               <input type="radio" name="teleportFeatType" value="solid" ${savedFeatType === 'solid' ? 'checked' : ''}> Into Solid <span style="color: #666;">(End)</span>
+              <select name="teleportSolidMaterial" style="margin-left: 4px; font-size: 0.9em;" title="Material strength of the object">${materialOptions}</select>
             </label>
           </div>
         </div>
@@ -1762,6 +1814,8 @@ export class MovementFeats {
             const spendKarma = html.find('#spend-karma').is(':checked');
             const carryingPassengers = html.find('[name="carryingPassengers"]').is(':checked');
             const blindTeleport = html.find('[name="blindTeleport"]').is(':checked');
+            const priorTrips = parseInt(html.find('[name="teleportPriorTrips"]').val()) || 0;
+            const solidMaterial = html.find('[name="teleportSolidMaterial"]').val() || 'Good';
             const saveSettings = html.find('[name="saveSettings"]').is(':checked');
             const skipDice = html.find('[name="skipDice"]').is(':checked');
             
@@ -1775,9 +1829,11 @@ export class MovementFeats {
               await this.actor.setFlag("msh-faserip", "lastTeleportCarryingPassengers", carryingPassengers);
               await this.actor.setFlag("msh-faserip", "lastTeleportBlindTeleport", blindTeleport);
               await this.actor.setFlag("msh-faserip", "lastTeleportSkipDiceRoll", skipDice);
+              await this.actor.setFlag("msh-faserip", "lastTeleportPriorTrips", priorTrips);
+              await this.actor.setFlag("msh-faserip", "lastTeleportSolidMaterial", solidMaterial);
             }
             
-            await this._executeTeleportFeat(featType, columnShift, spendKarma, skipDice, carryingPassengers, blindTeleport, teleportInfo);
+            await this._executeTeleportFeat(featType, columnShift, spendKarma, skipDice, carryingPassengers, blindTeleport, teleportInfo, priorTrips, solidMaterial);
           }
         },
         cancel: { label: "Cancel" }
@@ -1813,16 +1869,17 @@ export class MovementFeats {
   /**
    * Execute a Teleport FEAT roll
    */
-  async _executeTeleportFeat(featType, columnShift, spendKarma, skipDice, carryingPassengers, blindTeleport, teleportInfo) {
+  async _executeTeleportFeat(featType, columnShift, spendKarma, skipDice, carryingPassengers, blindTeleport, teleportInfo, priorTrips = 0, solidMaterial = 'Good') {
     const enduranceAbility = this.actor.system.abilities?.endurance;
     const enduranceRank = enduranceAbility?.rank || "Typical";
     const enduranceValue = enduranceAbility?.value || 6;
     
     // Determine which ability/rank to use based on FEAT type
     const isNormalTeleport = featType === 'normal';
-    const isPassenger = featType === 'passenger';
-    const isUnwilling = featType === 'unwilling';
+    const isPassenger = featType === 'passenger' || featType === 'unwilling';
     const isIntoSolid = featType === 'solid';
+    const passengerColor = isPassenger ? cap(teleportPassengerFeatColor(priorTrips)) : null;
+    const solidDamage = isIntoSolid ? teleportIntoObjectDamage(rankValue(solidMaterial)) : 0;
     
     // Normal teleport uses power rank, others use Endurance
     const abilityRank = isNormalTeleport ? teleportInfo.rank : enduranceRank;
@@ -1839,23 +1896,18 @@ export class MovementFeats {
       },
       'passenger': { 
         name: 'Passenger Endurance', 
-        failure: 'Disoriented 1-10 rounds', 
-        requirement: 'Green',
+        failure: 'Unconscious 1-10 rounds', 
+        requirement: passengerColor,
         successNote: 'Passenger unaffected'
-      },
-      'unwilling': { 
-        name: 'Unwilling Target', 
-        failure: 'Disoriented 1-10 rounds', 
-        requirement: 'Yellow',
-        successNote: 'Target resists disorientation'
       },
       'solid': { 
         name: 'Teleport into Solid', 
-        failure: 'Takes 2× material strength damage!', 
+        failure: `Unconscious — Endurance loss begins (dying); ${solidDamage} damage (${solidMaterial} material, no Body Armor)`, 
         requirement: 'Green',
-        successNote: 'Random teleport — unconscious 1-10 rounds'
+        successNote: `Bounces clear — unconscious 1-10 rounds; ${solidDamage} damage (${solidMaterial} material, no Body Armor)`
       }
     };
+    featTypeInfo['unwilling'] = featTypeInfo['passenger'];
     const featInfo = featTypeInfo[featType] || featTypeInfo['normal'];
     
     // Apply column shifts
@@ -1878,7 +1930,7 @@ export class MovementFeats {
     let karmaUsed = 0;
     
     if (spendKarma && getAvailableKarma(this.actor) > 0) {
-      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const initialColor = featColor(effectiveRank, roll.total);
       const karmaResult = await showKarmaDecisionDialog(
         this.actor,
         roll.total,
@@ -1890,17 +1942,8 @@ export class MovementFeats {
       karmaUsed = karmaResult.karmaSpent;
     }
     
-    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    
-    // Check success based on FEAT type
-    let featSuccess;
-    if (isUnwilling) {
-      // Unwilling requires Yellow
-      featSuccess = ['yellow', 'red'].includes(resultColor.toLowerCase());
-    } else {
-      // Normal, Passenger, Into Solid require Green
-      featSuccess = ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
-    }
+    const resultColor = featColor(effectiveRank, cappedTotal);
+    const featSuccess = checkFeatSuccess(resultColor, featInfo.requirement);
     
     const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
     
@@ -1908,6 +1951,7 @@ export class MovementFeats {
     let modifierNotes = [];
     if (carryingPassengers) modifierNotes.push('Carrying passengers');
     if (blindTeleport) modifierNotes.push('Blind teleport');
+    if (isPassenger) modifierNotes.push(priorTrips <= 0 ? 'First trip' : priorTrips === 1 ? 'Second trip' : 'Practiced passenger (3+ trips)');
     
     // For into solid, success is still bad (random port + unconscious)
     const resultText = featSuccess 
@@ -1916,7 +1960,7 @@ export class MovementFeats {
     
     // Special: roll disorientation duration for failures that cause it
     let disorientRoll = '';
-    if (!featSuccess && (isPassenger || isUnwilling)) {
+    if (!featSuccess && isPassenger) {
       const disorientDuration = Math.floor(Math.random() * 10) + 1;
       disorientRoll = ` (${disorientDuration} rounds)`;
     }
@@ -1935,7 +1979,7 @@ export class MovementFeats {
           <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
           ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
           ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
-          <div>Required: <span style="color: ${isUnwilling ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
+          <div>Required: <span style="color: ${featInfo.requirement === 'Red' ? '#c62828' : featInfo.requirement === 'Yellow' ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
           <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -1948,6 +1992,29 @@ export class MovementFeats {
       </div>
     `;
     
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: content
+    });
+  }
+
+  async _postAutoExhaustion(mode, exStage, enduranceRank, enduranceValue) {
+    const rest = exStage.auto === 'rest';
+    const content = `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${this.actor.name} - Exhaustion Check (${mode})</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Endurance: ${enduranceRank} (${enduranceValue})</div>
+          <div style="color: #666; font-size: 0.85em;">${exStage.note}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${rest ? '#F44336' : '#4CAF50'}; color: white;">
+          ${rest ? `EXHAUSTED — ${exStage.failure.toUpperCase()}` : 'NO CHECK NEEDED'}
+        </div>
+      </div>
+    `;
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content: content

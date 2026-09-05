@@ -1,4 +1,12 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.9 - 2026-08-01
+// scripts/modules/effects/ongoing-engine.js v1.9.0 - 2026-09-05
+// v1.9.0: Slice 7b — dying spiral onto faserip-rules damage. RULED
+//         2026-09-05: a reduced Endurance rank's number is the HIGHEST of
+//         that rank (Ex -> Gd counts as 15, not 10) — applyDyingOngoing and
+//         _processDyingRoundInner take the number from enduranceLossStep;
+//         restoreOneEnduranceRank and executeEnduranceGain step via
+//         enduranceRestoreStep (intermediate ranks highest, original rank
+//         gets its pre-damage number back from the new originalEnduranceValue
+//         actor flag). Health/max-Health recomputation unchanged (ERRATA OPEN).
 // v1.7.9: Poison integration. processOneEffect hard-skips "poison" (owned by
 //         poison-engine.js processPoisonRound). _processDyingRoundInner defers
 //         its rank step when the endRankLoss flag shows poison already took
@@ -107,6 +115,25 @@ import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect, safeActorUpdateEffect } from "../../gm-utils.js";
 import { RANKS_ORDERED, stepRank } from "../../rules/rules-reference.js";
 import { TURN_SECONDS } from "../recovery-timing.js";
+import { enduranceLossStep, enduranceRestoreStep } from "../../lib/faserip-rules/faserip-damage.js";
+import { kernelKeyFor, foundryNameFor } from "../../kernel/adapter.js";
+
+// Reduced-rank Endurance number per RULED 2026-09-05 (highest of the rank).
+function _dyingStep(rankName) {
+  const key = kernelKeyFor(rankName);
+  if (!key) return { rank: game.msh?.nextLowerRankName?.(rankName) ?? "Shift-0", value: 0 };
+  const step = enduranceLossStep(key);
+  if (step.dead) return { rank: "Shift-0", value: 0 };
+  return { rank: foundryNameFor(step.rank, "dash"), value: step.numberForChecks };
+}
+
+function _restoreStep(actor, scope, currentRank, originalRank) {
+  const cur = kernelKeyFor(currentRank), orig = kernelKeyFor(originalRank);
+  if (!cur || !orig) return null;
+  const originalNumber = actor.getFlag(scope, "originalEnduranceValue") ?? (game.msh?.getRankValue?.(originalRank) ?? 0);
+  const step = enduranceRestoreStep({ rankKey: cur, originalRankKey: orig, originalNumber });
+  return { ...step, rankName: step.atCap ? originalRank : foundryNameFor(step.rank, "dash") };
+}
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -872,19 +899,19 @@ async function _processDyingRoundInner(actor, dyingAE, scope, effectiveWorldTime
   // ── Step endurance down ──────────────────────────────────────────
   // Per rules: Health = F+A+S+E. When Endurance rank drops, both current and max Health
   // decrease by the difference in rank values.
-  const nextName = game.msh?.nextLowerRankName?.(curName) ?? "Shift-0";
-  const nextValue = game.msh?.getRankValue?.(nextName) ?? 0;
-  const enduranceLoss = curValue - nextValue;
+  const { rank: nextName, value: nextValue } = _dyingStep(curName);
+  const enduranceLoss = Math.max(0, curValue - nextValue);
   const currentHealth = actor.system?.attributes?.health?.value ?? 0;
   const newHealth = Math.max(0, currentHealth - enduranceLoss);
   const newMaxHealth = _recalcMaxHealth(actor, nextValue);
 
-  // Store original endurance on first dying tick
+  // Store original endurance (rank and number) on first dying tick
   let originalRank = dyingAE.getFlag(scope, "originalEndurance")
     || actor.getFlag(scope, "originalEndurance");
   if (!originalRank) {
     originalRank = curName;
     await actor.setFlag(scope, "originalEndurance", originalRank);
+    await actor.setFlag(scope, "originalEnduranceValue", curValue);
     await dyingAE.setFlag(scope, "originalEndurance", originalRank);
     console.log(`[FASERIP:DYING] Stored original Endurance for ${actor.name}: ${originalRank}`);
   }
@@ -1035,6 +1062,8 @@ async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycl
       if (config.autoDisable !== false) {
         await ae.update({ disabled: true });
       }
+      await actor.unsetFlag(scope, "originalEndurance");
+      await actor.unsetFlag(scope, "originalEnduranceValue");
       await sendOngoingChat(actor, effectName, "stat.gain",
         `<strong>${actor.name}</strong>'s Endurance fully restored — no more -2CS penalty!`
       );
@@ -1050,8 +1079,9 @@ async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycl
     const capIdx = RANKS_ORDERED.findIndex(r => r === originalEnd);
     const nextIdx = (curIdx >= 0 && curIdx < RANKS_ORDERED.length - 1) ? curIdx + 1 : curIdx;
     const clampedIdx = capIdx >= 0 ? Math.min(nextIdx, capIdx) : nextIdx;
-    const newRank = RANKS_ORDERED[clampedIdx] ?? currentRank;
-    const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+    const restore = _restoreStep(actor, scope, currentRank, originalEnd);
+    const newRank = restore?.rankName ?? RANKS_ORDERED[clampedIdx] ?? currentRank;
+    const newValue = restore?.number ?? game.msh?.getRankValue?.(newRank) ?? 0;
     const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
     const enduranceDelta = Math.max(0, newValue - currentValue);
 
@@ -1327,15 +1357,15 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
   const originalEndurance = existingOriginal || currentEndurance;
   if (!existingOriginal) {
     await safeActorSetFlag(actor, scope, "originalEndurance", originalEndurance);
+    await safeActorSetFlag(actor, scope, "originalEnduranceValue", currentEnduranceValue);
   }
 
   // ── Immediate first rank loss (per rules: dying = immediate Endurance reduction) ──
   let firstLossRank = currentEndurance;
 
   if (!skipImmediateLoss) {
-    const nextRank = game.msh?.nextLowerRankName?.(currentEndurance) ?? "Shift-0";
-    const nextValue = game.msh?.getRankValue?.(nextRank) ?? 0;
-    const enduranceLoss = currentEnduranceValue - nextValue;
+    const { rank: nextRank, value: nextValue } = _dyingStep(currentEndurance);
+    const enduranceLoss = Math.max(0, currentEnduranceValue - nextValue);
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const newHealth = Math.max(0, currentHealth - enduranceLoss);
 
@@ -1652,10 +1682,11 @@ export async function restoreOneEnduranceRank(actor, { originalRankCap = null, s
   if (curIdx < 0) return { restored: false, reason: "rank-not-in-order" };
 
   const nextIdx = Math.min(curIdx + 1, capIdx >= 0 ? capIdx : curIdx + 1);
-  const newRank = RANKS_ORDERED[nextIdx] ?? currentRank;
+  const restore = _restoreStep(actor, scope, currentRank, cap);
+  const newRank = restore?.rankName ?? RANKS_ORDERED[nextIdx] ?? currentRank;
   if (newRank === currentRank) return { restored: false, atCap: true, oldRank: currentRank, newRank };
 
-  const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+  const newValue = restore?.number ?? game.msh?.getRankValue?.(newRank) ?? 0;
   const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
   const enduranceDelta = Math.max(0, newValue - currentValue);
 
@@ -1669,6 +1700,11 @@ export async function restoreOneEnduranceRank(actor, { originalRankCap = null, s
     "system.attributes.health.value": newHealth,
     "system.attributes.health.max": newMaxHealth,
   });
+
+  if (newRank === cap) {
+    await actor.unsetFlag(scope, "originalEndurance");
+    await actor.unsetFlag(scope, "originalEnduranceValue");
+  }
 
   const sourceLabel = source ? ` (${source})` : "";
   await sendOngoingChat(actor, `Endurance Restored${sourceLabel}`, "stat.gain",

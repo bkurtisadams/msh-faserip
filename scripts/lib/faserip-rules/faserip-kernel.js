@@ -1,3 +1,7 @@
+// faserip-rules kernel v0.2.8
+// v0.2.8: ERRATA — Life, Death, and Health rulings (impaired Endurance
+//         number, regain-consciousness FEAT colour, Recovery knockout gate;
+//         spiral Health reading OPEN). Implemented in faserip-damage.js v0.9.0.
 // faserip-rules kernel v0.2.7
 // v0.2.7: ERRATA — initiative rulings (modifier table overlap, per-character
 //         side modifier, talent context, Enhanced Hearing, ties, pre-action
@@ -16,7 +20,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.7';
+export const KERNEL_VERSION = '0.2.8';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -218,6 +222,10 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'RULED 2026-09-05: While Endurance ranks are lost (dying, or impaired afterwards) the Endurance rank number is the HIGHEST number of the current reduced rank (Life, Death, and Health: "for further Endurance checks the rank number is considered to be the highest for that rank"), e.g. Excellent -> Good counts as 15, not 10. That number is the one used for Endurance FEATs, Health on waking, Recovery and Healing amounts until the original rank and number return. msh-faserip previously used the standard number of the reduced rank (fixed-bug).',
+  'RULED 2026-09-05: Regaining consciousness from 0 Health is an Endurance FEAT with no stated Intensity, so green succeeds (any non-white). Failure re-checks in 1-10 turns; success wakes with Health equal to the Endurance rank number.',
+  'RULED 2026-09-05: Recovery "provided the character is not knocked unconscious" forfeits only the Recovery of the damage that caused the knockout; the once-per-day limit is a separate clause and no other Recovery is lost. msh-faserip clears its knockout gate on the next hit taken while conscious. Kernel recoveryAllowed takes knockedOut as a caller-supplied flag.',
+  'OPEN 2026-09-05: The Life and Death passage says the Endurance loss is temporary and speaks only to the FEAT number; it never says Health or maximum Health change during the spiral. msh-faserip (v1.7.0 ruling) recomputes Health = F+A+S+E as ranks are lost and restored. Judge to confirm or drop that recomputation.',
   'NOTE: Initiative Modifier table is keyed on the highest Intuition rank NUMBER on the side (0-10 +0, 11-20 +1, 21-30 +2, 31-40 +3, 41-50 +4, 51-75 +5, 76+ +6). The PDF text drops the table; the printed rows overlap at 75, resolved as 75 → +5 and +6 from 76. Implemented in faserip-initiative.js.',
   'RULED 2026-09-03: Side initiative modifier — each character\'s effective modifier is own Intuition modifier plus own talent bonus, and the side uses the highest. One character\'s Intuition is never combined with another character\'s Martial Arts E / Weapons Specialist bonus.',
   'RULED 2026-09-03: Martial Arts E (+1 unarmed) and Weapons Specialist (+1 with the specialty weapon) initiative bonuses apply only when the declared attack context is known; with no declaration no bonus is assumed. They never stack past +1.',

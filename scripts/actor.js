@@ -1,3 +1,6 @@
+// actor.js v1.8.0 - 2026-09-04
+// v1.8.0: MOVEMENT_DATA (land/air/leaping/rankNumbers) derived from the
+//         faserip-rules movement kernel instead of hand-copied tables.
 // actor.js v1.7.0 - 2026-08-01
 // v1.7.0: Resources use canonical standard rank numbers; preserve Shift-0
 //         value 0 and remove the conflicting local rank-range table.
@@ -25,6 +28,8 @@
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
 
 import { RANKS_ORDERED, normalizeRank, rankValueForStorage } from "./rules/rules-reference.js";
+import { RANKS as KERNEL_RANKS } from "./lib/faserip-rules/faserip-kernel.js";
+import { LONG_DISTANCE, LEAP_TABLE, AREA_YARDS, FLOOR_FEET } from "./lib/faserip-rules/faserip-movement.js";
 import { computeKarmaTotals } from "./karma-rules.js";
 
 export class FaseripActor extends Actor {
@@ -238,78 +243,31 @@ export class FaseripActor extends Actor {
     return Math.max(0, (k?.lifetime || 0) - spent - (k?.advancement || 0));
   }
 
-  // Movement data tables
-  static MOVEMENT_DATA = {
-    // Land/Water speed by rank: { areas/round, mph }
-    landSpeed: {
-      "Feeble": { areas: 1, mph: 15 },
-      "Poor": { areas: 2, mph: 30 },
-      "Typical": { areas: 3, mph: 45 },
-      "Good": { areas: 4, mph: 60 },
-      "Excellent": { areas: 5, mph: 75 },
-      "Remarkable": { areas: 6, mph: 90 },
-      "Incredible": { areas: 7, mph: 105 },
-      "Amazing": { areas: 8, mph: 120 },
-      "Monstrous": { areas: 9, mph: 135 },
-      "Unearthly": { areas: 10, mph: 150 },
-      "Shift-X": { areas: 12, mph: 180 },
-      "Shift X": { areas: 12, mph: 180 },
-      "Shift-Y": { areas: 14, mph: 210 },
-      "Shift Y": { areas: 14, mph: 210 },
-      "Shift-Z": { areas: 16, mph: 240 },
-      "Shift Z": { areas: 16, mph: 240 },
-      "Class 1000": { areas: 32, mph: 480 },
-      "Class 3000": { areas: 50, mph: 750 },
-      "Class 5000": { areas: 100, mph: 1500 }
-    },
-    // Air speed by rank: { areas/round, mph, groundAreas (for low altitude) }
-    // Shift-Z mph is 3750 per the printed Advanced Set table (not areas×15).
-    airSpeed: {
-      "Feeble": { areas: 2, mph: 30, groundAreas: 1 },
-      "Poor": { areas: 4, mph: 60, groundAreas: 2 },
-      "Typical": { areas: 6, mph: 90, groundAreas: 3 },
-      "Good": { areas: 8, mph: 120, groundAreas: 4 },
-      "Excellent": { areas: 10, mph: 150, groundAreas: 5 },
-      "Remarkable": { areas: 15, mph: 225, groundAreas: 6 },
-      "Incredible": { areas: 20, mph: 300, groundAreas: 7 },
-      "Amazing": { areas: 25, mph: 375, groundAreas: 8 },
-      "Monstrous": { areas: 30, mph: 450, groundAreas: 9 },
-      "Unearthly": { areas: 40, mph: 600, groundAreas: 10 },
-      "Shift-X": { areas: 50, mph: 750, groundAreas: 12 },
-      "Shift-Y": { areas: 100, mph: 1500, groundAreas: 14 },
-      "Shift-Z": { areas: 200, mph: 3750, groundAreas: 16 }
-    },
-    // Leaping by Strength rank: feet and fractional areas/floors (1 area = 132', 1 floor = 15')
-    leaping: {
-      "Feeble": { upFeet: 2, acrossFeet: 2, downFeet: 3, upFloors: 0.1, acrossAreas: 0, downFloors: 0.2 },
-      "Poor": { upFeet: 4, acrossFeet: 4, downFeet: 8, upFloors: 0.3, acrossAreas: 0, downFloors: 0.5 },
-      "Typical": { upFeet: 6, acrossFeet: 6, downFeet: 9, upFloors: 0.4, acrossAreas: 0, downFloors: 0.6 },
-      "Good": { upFeet: 10, acrossFeet: 10, downFeet: 15, upFloors: 0.7, acrossAreas: 0.1, downFloors: 1 },
-      "Excellent": { upFeet: 20, acrossFeet: 20, downFeet: 30, upFloors: 1.3, acrossAreas: 0.2, downFloors: 2 },
-      "Remarkable": { upFeet: 30, acrossFeet: 30, downFeet: 45, upFloors: 2, acrossAreas: 0.2, downFloors: 3 },
-      "Incredible": { upFeet: 40, acrossFeet: 40, downFeet: 60, upFloors: 2.7, acrossAreas: 0.3, downFloors: 4 },
-      "Amazing": { upFeet: 50, acrossFeet: 50, downFeet: 75, upFloors: 3.3, acrossAreas: 0.4, downFloors: 5 },
-      "Monstrous": { upFeet: 75, acrossFeet: 75, downFeet: 105, upFloors: 5, acrossAreas: 0.6, downFloors: 7 },
-      "Unearthly": { upFeet: 100, acrossFeet: 100, downFeet: 150, upFloors: 6.7, acrossAreas: 0.8, downFloors: 10 },
-      "Shift-X": { upFeet: 150, acrossFeet: 150, downFeet: 225, upFloors: 10, acrossAreas: 1.1, downFloors: 15 },
-      "Shift X": { upFeet: 150, acrossFeet: 150, downFeet: 225, upFloors: 10, acrossAreas: 1.1, downFloors: 15 },
-      "Shift-Y": { upFeet: 200, acrossFeet: 200, downFeet: 300, upFloors: 13.3, acrossAreas: 1.5, downFloors: 20 },
-      "Shift Y": { upFeet: 200, acrossFeet: 200, downFeet: 300, upFloors: 13.3, acrossAreas: 1.5, downFloors: 20 },
-      "Shift-Z": { upFeet: 500, acrossFeet: 500, downFeet: 750, upFloors: 33.3, acrossAreas: 3.8, downFloors: 50 },
-      "Shift Z": { upFeet: 500, acrossFeet: 500, downFeet: 750, upFloors: 33.3, acrossAreas: 3.8, downFloors: 50 },
-      "Class 1000": { upFeet: 1000, acrossFeet: 1000, downFeet: 1500, upFloors: 66.7, acrossAreas: 7.6, downFloors: 100 },
-      "Class 3000": { upFeet: 3000, acrossFeet: 3000, downFeet: 4500, upFloors: 200, acrossAreas: 22.7, downFloors: 300 },
-      "Class 5000": { upFeet: 5000, acrossFeet: 5000, downFeet: 7500, upFloors: 333.3, acrossAreas: 37.9, downFloors: 500 }
-    },
-    // Rank numbers for exhaustion calculations
-    rankNumbers: {
-      "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
-      "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
-      "Unearthly": 100, "Shift-X": 150, "Shift X": 150, "Shift-Y": 200, 
-      "Shift Y": 200, "Shift-Z": 500, "Shift Z": 500,
-      "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
+  // Movement data tables — derived from the faserip-rules kernel (Long
+  // Distance Movement and Leaping tables). Hyphen and space rank names both
+  // resolve. 1 area = 132', 1 floor = 15'.
+  static MOVEMENT_DATA = (() => {
+    const r1 = (n) => Math.round(n * 10) / 10;
+    const names = (key) => {
+      const n = normalizeRank(KERNEL_RANKS.find(r => r.key === key).name);
+      return n.includes('-') ? [n, n.replace('-', ' ')] : [n];
+    };
+    const landSpeed = {}, airSpeed = {}, leaping = {}, rankNumbers = {};
+    for (const r of KERNEL_RANKS) {
+      const ld = LONG_DISTANCE[r.key];
+      const lp = LEAP_TABLE[r.key];
+      for (const n of names(r.key)) {
+        if (ld) landSpeed[n] = { areas: ld.land, mph: ld.landMph };
+        if (ld && typeof ld.air === 'number' && !n.includes(' ')) airSpeed[n] = { areas: ld.air, mph: ld.airMph, groundAreas: ld.land };
+        if (lp) leaping[n] = {
+          upFeet: lp.up, acrossFeet: lp.across, downFeet: lp.down,
+          upFloors: r1(lp.up / FLOOR_FEET), acrossAreas: r1(lp.across / (AREA_YARDS * 3)), downFloors: r1(lp.down / FLOOR_FEET)
+        };
+        if (r.key !== 'SH0' && Number.isFinite(r.standard)) rankNumbers[n] = r.standard;
+      }
     }
-  };
+    return { landSpeed, airSpeed, leaping, rankNumbers };
+  })();
 
   // Rank order for calculating "N ranks lower" cruising speed — uses canonical list
   static RANK_ORDER = RANKS_ORDERED;

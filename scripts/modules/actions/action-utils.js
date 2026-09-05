@@ -1,3 +1,7 @@
+// action-utils.js v1.12.2 - 2026-09-05
+// v1.12.2: recordDamage receives previousHealth so a conscious hit clears the
+//          Recovery knockout gate (RULED 2026-09-05; the combat path returned
+//          before init.js's clearing logic and locked Recovery out for good).
 // action-utils.js v1.12.1 - 2026-09-03
 // v1.12.1: scanMentalDefenses honours a granted Psi-Screen effect
 //          (flags.msh-faserip.psiScreenGrant from psi-screen-action.js).
@@ -2030,7 +2034,7 @@ export async function applyDamageToTargets({
 
         // Record damage timestamp for rest system
         if (before > after && typeof recordDamage === "function") {
-          await recordDamage(targetActor);
+          await recordDamage(targetActor, { previousHealth: before });
         }
 
         // Schedule absorption temp-HP cliff decay (post-update so the AE
