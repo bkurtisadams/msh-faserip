@@ -1,3 +1,6 @@
+// scripts/modules/actions/force-action.js v3.5.0 - 2026-09-05
+// v3.5.0: Power range penalty via the range kernel (powerRangePenalty); LOS
+//         ranks show "LOS" instead of Infinity. Same arithmetic as before.
 // scripts/modules/actions/force-action.js v3.4.0 - 2026-09-05
 // v3.4.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // scripts/modules/actions/force-action.js v3.3.4 - 2026-07-09
@@ -34,7 +37,7 @@
 // v2.0.0: Refactor - dialog only, delegates resolution to _executeSingleAttack
 // v1.6.0: Refactor chat card to use unified card builder utilities
 // v1.5.0: Add support for equipment items with Force (F) damage type
-import { RangedAttackAction } from "./ranged-attack-action.js";
+import { RangedAttackAction, powerRangePenalty, rangeLabel } from "./ranged-attack-action.js";
 import { 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
@@ -178,7 +181,7 @@ export class ForceAction extends RangedAttackAction {
     // Build CS row via shared utility (manual input + range + ? reference)
     const initialRangePenalty = (() => {
       const maxRange = this._getPowerRangeInAreas(initialPowerRank);
-      return (savedRange > maxRange && maxRange > 0) ? -(savedRange - maxRange) : 0;
+      return (savedRange > maxRange && maxRange > 0) ? powerRangePenalty(initialPowerRank, savedRange) : 0;
     })();
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
@@ -270,7 +273,7 @@ export class ForceAction extends RangedAttackAction {
           <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
           <input type="number" name="range" value="${savedRange}" min="0" class="frp-pull-input" style="width:36px;">
           <span style="color:#777;">areas</span>
-          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${this._getPowerRangeInAreas(initialPowerRank)}</span>)</span>
+          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${rangeLabel(this._getPowerRangeInAreas(initialPowerRank))}</span>)</span>
           <span id="range-penalty-display" style="margin-left:auto;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#c62828;"></span>
         </div>
       </div>
@@ -367,7 +370,7 @@ export class ForceAction extends RangedAttackAction {
             }
             const maxRange = this._getPowerRangeInAreas(currentRank);
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
-            if (rangeVal > maxRange && maxRange > 0) return -(rangeVal - maxRange);
+            if (rangeVal > maxRange && maxRange > 0) return powerRangePenalty(currentRank, rangeVal);
             return 0;
           };
           _csState = wireCSPanel(html, {
@@ -550,13 +553,13 @@ export class ForceAction extends RangedAttackAction {
 
             // Update max range hint based on power rank
             const powerMaxRange = this._getPowerRangeInAreas(currentRank);
-            html.find('#max-range-hint').text(powerMaxRange);
+            html.find('#max-range-hint').text(rangeLabel(powerMaxRange));
 
             // Range penalty — update CS panel and range info display
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const $rangePenalty = html.find('#range-penalty-display');
             if (rangeVal > powerMaxRange && powerMaxRange > 0) {
-              const penalty = -(rangeVal - powerMaxRange);
+              const penalty = powerRangePenalty(currentRank, rangeVal);
               $rangePenalty.text(`${penalty}CS`).css('color', '#e65100');
               _csState.setRange(penalty);
             } else {

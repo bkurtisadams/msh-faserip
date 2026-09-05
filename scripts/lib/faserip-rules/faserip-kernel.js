@@ -1,3 +1,6 @@
+// faserip-rules kernel v0.2.9
+// v0.2.9: ERRATA — Range Modifiers rulings for the new faserip-range.js
+//         module (weapon and thrown penalties, the Unearthly-blast example).
 // faserip-rules kernel v0.2.8
 // v0.2.8: ERRATA — Life, Death, and Health rulings (impaired Endurance
 //         number, regain-consciousness FEAT colour, Recovery knockout gate;
@@ -20,7 +23,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.8';
+export const KERNEL_VERSION = '0.2.9';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -222,6 +225,9 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'RULED 2026-09-05: Weapon range penalty is the text as written: -1CS to hit for each area to the target, the attacker\'s own area counting as 0 (a Rifle at 4 areas is -4CS). Replaces msh-faserip shooting v1.3.0\'s -1CS per area beyond the first.',
+  'RULED 2026-09-05: Thrown items take the same -1CS per area as weapons; the Strength throwing-range table only caps how far a thrown item travels. The text gives thrown items a maximum range and is silent on a penalty; this is a Judge extension of the weapon rule.',
+  'NOTE 2026-09-05: The Range Modifiers example says Unearthly fire blasts reach 6 areas before the -1CS-per-area penalty begins, but the Power Rank Range Table gives Unearthly 60 areas; the example\'s arithmetic (7 areas Good, 8 Typical with Excellent Agility) fits an Excellent power. The table governs; faserip-range.js certifies the mechanic with an Excellent power.',
   'RULED 2026-09-05: While Endurance ranks are lost (dying, or impaired afterwards) the Endurance rank number is the HIGHEST number of the current reduced rank (Life, Death, and Health: "for further Endurance checks the rank number is considered to be the highest for that rank"), e.g. Excellent -> Good counts as 15, not 10. That number is the one used for Endurance FEATs, Health on waking, Recovery and Healing amounts until the original rank and number return. msh-faserip previously used the standard number of the reduced rank (fixed-bug).',
   'RULED 2026-09-05: Regaining consciousness from 0 Health is an Endurance FEAT with no stated Intensity, so green succeeds (any non-white). Failure re-checks in 1-10 turns; success wakes with Health equal to the Endurance rank number.',
   'RULED 2026-09-05: Recovery "provided the character is not knocked unconscious" forfeits only the Recovery of the damage that caused the knockout; the once-per-day limit is a separate clause and no other Recovery is lost. msh-faserip clears its knockout gate on the next hit taken while conscious. Kernel recoveryAllowed takes knockedOut as a caller-supplied flag.',

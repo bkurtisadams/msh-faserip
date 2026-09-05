@@ -1,3 +1,7 @@
+// scripts/modules/actions/grenade-action.js v3.5.0 - 2026-09-05
+// v3.5.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
+//   own area 0, via the range kernel (thrownRangePenalty); Strength range is
+//   the cap. Replaces the free first area. LOS caps render as "LOS".
 // scripts/modules/actions/grenade-action.js v3.4.0 - 2026-08-02
 // v3.4.0: Initial-blast saves resolve in PARALLEL (Promise.all) so each
 //   caught hero's karma declaration window (area-hazard-behavior v1.3.0,
@@ -33,7 +37,7 @@
 // v2.3.0: Fix range penalty off-by-one. Fix Kill result logic for frag/energy.
 // v2.2.0: Template placement happens BEFORE roll.
 
-import { RangedAttackAction } from "./ranged-attack-action.js";
+import { RangedAttackAction, thrownRangePenalty, rangeLabel } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
 import {
   getAbilityInfo,
@@ -244,7 +248,7 @@ export class GrenadeAction extends RangedAttackAction {
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
           <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Throw</div>
           <div style="font-weight:600;">Agility: ${ability.rank} (${ability.value})</div>
-          <div style="color:#666;font-size:.85em;">Max range: ${maxRange} areas</div>
+          <div style="color:#666;font-size:.85em;">Max range: ${rangeLabel(maxRange)} areas</div>
         </div>
       </div>
 
@@ -256,8 +260,8 @@ export class GrenadeAction extends RangedAttackAction {
 
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
         <label style="font-weight:600;">Range:</label>
-        <input type="number" name="range" value="${savedRange}" min="1" max="${maxRange}" style="width:60px;padding:3px;text-align:center;box-sizing:border-box;">
-        <span style="color:#666;font-size:.85em;">areas (max ${maxRange})</span>
+        <input type="number" name="range" value="${savedRange}" min="1" ${Number.isFinite(maxRange) ? `max="${maxRange}"` : ""} style="width:60px;padding:3px;text-align:center;box-sizing:border-box;">
+        <span style="color:#666;font-size:.85em;">areas (max ${rangeLabel(maxRange)})</span>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
@@ -305,7 +309,7 @@ export class GrenadeAction extends RangedAttackAction {
                 return resolve(null);
               }
 
-              const rangeModifier = -(Math.max(0, range - 1));
+              const rangeModifier = thrownRangePenalty(range, strRank); // RULED 2026-09-05
               const totalShift = shift + rangeModifier;
 
               await actor.setFlag("msh-faserip", "lastGrenadeRange", range);

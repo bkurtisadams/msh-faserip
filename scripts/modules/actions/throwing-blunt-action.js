@@ -1,3 +1,7 @@
+// scripts/modules/actions/throwing-blunt-action.js v3.4.0 - 2026-09-05
+// v3.4.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
+//         own area 0, via the range kernel (thrownRangePenalty); Strength
+//         range is the cap. Replaces the free first area.
 // scripts/modules/actions/throwing-blunt-action.js v3.3.0 - 2026-09-05
 // v3.3.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // scripts/modules/actions/throwing-blunt-action.js v3.2.5 - 2026-07-04
@@ -25,7 +29,7 @@
 //         calc all route through the new local helper.
 // v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
-import { RangedAttackAction } from "./ranged-attack-action.js";
+import { RangedAttackAction, thrownRangePenalty, rangeLabel } from "./ranged-attack-action.js";
 import {
   setupKarmaControlHandlers,
   extractKarmaFromDialog,
@@ -180,7 +184,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // Build CS row via shared utility (manual input + range + ? reference)
-    const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
+    const initialRangePenalty = thrownRangePenalty(savedRange, strRank);
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
@@ -253,7 +257,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
           <input type="number" name="range" value="${savedRange}" min="0" readonly class="frp-pull-input" style="width:36px;">
           <span style="color:#777;">areas</span>
-          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${maxThrowRange}</span>)</span>
+          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${rangeLabel(maxThrowRange)}</span>)</span>
           <span id="range-penalty-display" style="margin-left:auto;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#c62828;"></span>
         </div>
       </div>
@@ -424,7 +428,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           const _getCurrentRangePenalty = () => {
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             if (rangeVal > maxThrowRange) return 0;
-            return rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
+            return thrownRangePenalty(rangeVal, strRank); // -1CS per area to the target (RULED 2026-09-05)
           };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
@@ -465,7 +469,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
               _csState.setRange(0);
             } else {
-              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
+              const penalty = thrownRangePenalty(rangeVal, strRank); // -1CS per area to the target (RULED 2026-09-05)
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
               _csState.setRange(penalty);
             }

@@ -1,3 +1,7 @@
+// shooting-action.js v3.14.0 - 2026-09-05
+// v3.14.0: RULED 2026-09-05 weapon range penalty as written: -1CS per area to
+//          the target, own area 0 (Rifle at 4 areas = -4CS), via the range
+//          kernel (weaponRangePenalty). Replaces v1.3.0's free first area.
 // shooting-action.js v3.13.0 - 2026-09-05
 // v3.13.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // shooting-action.js v3.12.0 - 2026-09-02
@@ -128,7 +132,7 @@
 //         Range/movement/obstacle modifiers now applied via situational tags feeding CS total.
 // v2.0.0: Complete dialog redesign to match blunt-attack-action.js structure
 
-import { RangedAttackAction } from "./ranged-attack-action.js";
+import { RangedAttackAction, weaponRangePenalty } from "./ranged-attack-action.js";
 import { 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
@@ -311,7 +315,7 @@ export class ShootingAction extends RangedAttackAction {
     }).join('');
 
     // === Build CS row via shared utility (manual input + range + ? reference) ===
-    const initialRangePenalty = (initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) ? 0 : (savedRange > 1 ? -(savedRange - 1) : 0);
+    const initialRangePenalty = (initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) ? 0 : weaponRangePenalty(savedRange);
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
@@ -488,7 +492,7 @@ export class ShootingAction extends RangedAttackAction {
             const weapon = shootingWeapons.find(i => i.id === weaponId);
             const maxRange = weapon?.system?.range || 15;
             if (rangeVal > maxRange) return 0; // out of range — handled separately
-            return rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
+            return weaponRangePenalty(rangeVal); // -1CS per area to the target (RAW)
           };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
@@ -553,7 +557,7 @@ export class ShootingAction extends RangedAttackAction {
               $rangePenalty.text('Heat-Seeker (no penalty)').css('color', '#1565c0');
               _csState.setRange(0);
             } else {
-              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0; // -1CS per area beyond the first (RAW)
+              const penalty = weaponRangePenalty(rangeVal); // -1CS per area to the target (RAW)
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
               _csState.setRange(penalty);
             }
