@@ -1,5 +1,16 @@
-// scripts/modules/actions/cs-modifiers.js v3.5.0 - 2026-05-23
+// scripts/modules/actions/cs-modifiers.js v3.6.0 - 2026-09-05
 // Manual CS input with base rank, optional range penalty, and ? reference panel.
+// v3.6.0: Automatic situational modifiers (HOUSE 2026-09-05). AUTO_SITUATIONAL
+//         is a registry of detectors run against the attacker and target
+//         tokens; detectAutoSituational() returns the ones that apply, gated
+//         by the new world setting autoSituationalModifiers (default on).
+//         First entry: Higher Ground +1CS when the attacker's elevation exceeds
+//         the target's by at least one grid square (one story at 0.1 area per
+//         square), or the attacker is flying over a non-flying target.
+//         buildCSRow({ autoMods }) prefills the CS input and Reason with them
+//         when the dialog has nothing remembered; the player can still edit
+//         both, so the v3.0.0 manual model stands. Registered from this module
+//         so init.js is untouched. resolveAttackerToken() shared helper.
 // v3.5.0: Hide the "+ Range N" CS-row term entirely when the penalty is 0
 //         (initial build and live recalc), so 0 no longer shows "+ Range 0".
 //         Affects every ranged dialog that shares buildCSRow.
@@ -18,6 +29,82 @@
 // v3.0.0: Strip all talent/power auto-detection. CS is fully manual.
 
 import { shiftRank } from "./action-utils.js";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Automatic situational modifiers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SETTING_AUTO_SIT = "autoSituationalModifiers";
+
+Hooks.once("init", () => {
+  game.settings.register("msh-faserip", SETTING_AUTO_SIT, {
+    name: "Automatic situational modifiers",
+    hint: "Pre-fill attack dialogs with situational column shifts the system can read from the tokens (e.g. Higher Ground when the attacker is a story or more above the target). Always editable in the dialog.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+});
+
+export function autoSituationalEnabled() {
+  try { return game.settings.get("msh-faserip", SETTING_AUTO_SIT) !== false; }
+  catch (_e) { return true; }
+}
+
+/** The attacker's token: a controlled token of this actor, else its first active token. */
+export function resolveAttackerToken(actor) {
+  if (!actor || !canvas?.tokens) return null;
+  const controlled = canvas.tokens.controlled?.find(t => t.actor?.id === actor.id);
+  if (controlled) return controlled;
+  const active = actor.getActiveTokens?.(true) ?? [];
+  return active[0] ?? canvas.tokens.placeables?.find(t => t.actor?.id === actor.id) ?? null;
+}
+
+const tokenDoc = t => t?.document ?? t;
+const elevationOf = t => Number(tokenDoc(t)?.elevation ?? 0) || 0;
+const isFlying = t => (tokenDoc(t)?.movementAction ?? "walk") === "fly";
+/** One grid square in scene distance units; one story at Kurt's 0.1 area/square. */
+const oneSquare = () => Number(canvas?.scene?.grid?.distance ?? 1) || 1;
+
+// Each detector gets { attacker, target, context } (tokens, context is
+// 'ranged' | 'charging' | 'melee') and returns true when the modifier applies.
+export const AUTO_SITUATIONAL = [
+  {
+    id: "higherGround",
+    label: "Higher Ground",
+    cs: 1,
+    contexts: ["ranged", "charging"],
+    detect({ attacker, target }) {
+      if (!attacker || !target) return false;
+      const diff = elevationOf(attacker) - elevationOf(target);
+      if (diff >= oneSquare()) return true;
+      return isFlying(attacker) && !isFlying(target) && diff >= 0;
+    },
+  },
+];
+
+/**
+ * Situational modifiers the tokens justify for this attack.
+ * @returns {Array<{id,label,cs}>}
+ */
+export function detectAutoSituational({ attacker, target, context = "ranged" } = {}) {
+  if (!autoSituationalEnabled()) return [];
+  const out = [];
+  for (const mod of AUTO_SITUATIONAL) {
+    if (!mod.contexts.includes(context)) continue;
+    try {
+      if (mod.detect({ attacker, target, context })) out.push({ id: mod.id, label: mod.label, cs: mod.cs });
+    } catch (_e) { /* a detector must never break a dialog */ }
+  }
+  return out;
+}
+
+/** Sum and joined label for a set of auto modifiers. */
+export function summarizeAutoMods(mods) {
+  const cs = mods.reduce((a, m) => a + m.cs, 0);
+  return { cs, reason: mods.map(m => m.label).join(", ") };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reference data — displayed in the help panel, never auto-applied
@@ -113,7 +200,11 @@ export const CS_REFERENCE = {
 //   or:    CS [__]               Good (10) → Remarkable (30)  [?]   (when no range)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRange = false, savedReason = '' }) {
+export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRange = false, savedReason = '', autoMods = [] }) {
+  // Auto-detected situational modifiers prefill an otherwise empty CS row.
+  if (autoMods.length && !savedCS && !savedReason) {
+    ({ cs: savedCS, reason: savedReason } = summarizeAutoMods(autoMods));
+  }
   const csInputCls = savedCS > 0 ? ' pos' : savedCS < 0 ? ' neg' : '';
   const net = savedCS + rangePenalty;
   const effectiveRank = shiftRank(abilityRank, net);

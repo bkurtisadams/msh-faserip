@@ -1,3 +1,6 @@
+// scripts/modules/actions/charging-action.js v3.2.0 - 2026-09-05
+// v3.2.0: Automatic situational modifiers — Higher Ground pre-selected in the
+//         sit dropdown when the tokens justify it (cs-modifiers v3.6.0).
 // scripts/modules/actions/charging-action.js v3.1.0 - 2026-09-02
 // v3.1.0: Kernel slice 5g. Character target: Ch column via the shared
 //         _executeSingleAttack kernel gate (Slam / Stun tokens, cap allowed).
@@ -84,6 +87,7 @@ import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { chargeDamageParts, chargeToHitShift, resolveChargeImpact } from "../../lib/faserip-rules/faserip-damage.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import { detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 /**
  * ChargingAction - Endurance-based attack combining movement and combat
  * Rules:
@@ -627,6 +631,15 @@ export class ChargingAction extends AttackAction {
           $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
           $sel.val('');
         });
+
+        // ── Automatic situational modifiers (cs-modifiers v3.6.0): pre-select
+        //    what the tokens justify, through the same handler as a manual pick.
+        for (const mod of detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "charging" })) {
+          const $opt = html.find(`#sit-select option[data-label="${mod.label}"]`);
+          if (!$opt.length) continue;
+          $opt.prop('selected', true);
+          html.find('#sit-select').trigger('change');
+        }
 
         // ── Situational modifier: remove tag ──
         html.find('#sit-tags').on('click', '.tag-x', function() {

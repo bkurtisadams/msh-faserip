@@ -1,3 +1,5 @@
+// shooting-action.js v3.13.0 - 2026-09-05
+// v3.13.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // shooting-action.js v3.12.0 - 2026-09-02
 // v3.12.0: Kernel slice 5h. Sh column via the shared kernel gate. Ammo variants
 //          on the certified kernel ammo module: AP shot shift, Rubber Shot
@@ -166,7 +168,7 @@ import { AreaTemplate } from "./area-template.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
 export class ShootingAction extends RangedAttackAction {
@@ -310,12 +312,14 @@ export class ShootingAction extends RangedAttackAction {
 
     // === Build CS row via shared utility (manual input + range + ? reference) ===
     const initialRangePenalty = (initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) ? 0 : (savedRange > 1 ? -(savedRange - 1) : 0);
+    const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
-      showRange: true
+      showRange: true,
+      autoMods
     });
 
     // === Dialog HTML — v3.2 Mods Panel Layout ===

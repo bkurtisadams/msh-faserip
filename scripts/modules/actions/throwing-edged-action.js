@@ -1,3 +1,5 @@
+// scripts/modules/actions/throwing-edged-action.js v3.5.0 - 2026-09-05
+// v3.5.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // scripts/modules/actions/throwing-edged-action.js v3.4.0 - 2026-09-02
 // v3.4.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
 //         shifts). Weapon AP read through shared getItemArmorPiercingCS and
@@ -52,7 +54,7 @@ import {
   getItemArmorPiercingCS
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -187,12 +189,14 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
     // Build CS row via shared utility (manual input + range + ? reference)
     const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
+    const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
-      showRange: true
+      showRange: true,
+      autoMods
     });
 
     // ── Dialog HTML — v3 Compact Layout ──

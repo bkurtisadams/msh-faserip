@@ -1,3 +1,5 @@
+// scripts/modules/actions/throwing-blunt-action.js v3.3.0 - 2026-09-05
+// v3.3.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // scripts/modules/actions/throwing-blunt-action.js v3.2.5 - 2026-07-04
 // v3.2.5: Use shared action-utils derivePowerDamage() (honors damageSource;
 //         replaces the local ||-chain that ignored the Damage Source select).
@@ -46,7 +48,7 @@ import {
   derivePowerDamage
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -179,12 +181,14 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     // Build CS row via shared utility (manual input + range + ? reference)
     const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
+    const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
-      showRange: true
+      showRange: true,
+      autoMods
     });
 
     // ── Dialog HTML — v3 Compact Layout ──
