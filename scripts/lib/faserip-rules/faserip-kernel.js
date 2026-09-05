@@ -1,3 +1,6 @@
+// faserip-rules kernel v0.2.10
+// v0.2.10: ERRATA — Popularity and Resource FEAT rulings/notes for the new
+//          faserip-popularity.js, faserip-resources.js and faserip-feats.js.
 // faserip-rules kernel v0.2.9
 // v0.2.9: ERRATA — Range Modifiers rulings for the new faserip-range.js
 //         module (weapon and thrown penalties, the Unearthly-blast example).
@@ -23,7 +26,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.9';
+export const KERNEL_VERSION = '0.2.10';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -225,6 +228,10 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'NOTE 2026-09-05: Popularity FEATs — the Iron Man/DOD example calls a Neutral request "green on the Shift 0 column" though Neutral targets require yellow, and the Spider-Man/Jameson example rolls on Incredible (40) without the +2CS the table grants when the target benefits. The rules text governs in both: Neutral is yellow, benefit is +2CS.',
+  'RULED 2026-09-05: Resource FEATs — an item three ranks below Resources is bought automatically, one or two below needs green, equal needs yellow; this is the general FEAT rule applied to Resources. The Tony Stark example (Excellent Resources paying for a Typical night out, two ranks below, with no roll) is in error; Typical is a green FEAT for Excellent Resources.',
+  'RULED 2026-09-05: Bank Loan — a character may buy up to one rank above Resources through a lender with no purchase FEAT; the FEATs are the monthly payments (two ranks below the item, for the item\'s rank number in months). Replaces msh-faserip\'s house yellow FEAT on the loan purchase.',
+  'NOTE 2026-09-05: msh-faserip contact-action.js uses a "Suspicious" disposition for the book\'s Unfriendly (red); the kernel uses the book term.',
   'RULED 2026-09-05: Weapon range penalty is the text as written: -1CS to hit for each area to the target, the attacker\'s own area counting as 0 (a Rifle at 4 areas is -4CS). Replaces msh-faserip shooting v1.3.0\'s -1CS per area beyond the first.',
   'RULED 2026-09-05: Thrown items take the same -1CS per area as weapons; the Strength throwing-range table only caps how far a thrown item travels. The text gives thrown items a maximum range and is silent on a penalty; this is a Judge extension of the weapon rule.',
   'NOTE 2026-09-05: The Range Modifiers example says Unearthly fire blasts reach 6 areas before the -1CS-per-area penalty begins, but the Power Rank Range Table gives Unearthly 60 areas; the example\'s arithmetic (7 areas Good, 8 Typical with Excellent Agility) fits an Excellent power. The table governs; faserip-range.js certifies the mechanic with an Excellent power.',

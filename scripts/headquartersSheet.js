@@ -1,3 +1,10 @@
+// headquartersSheet.js v3.1.0 - 2026-09-05
+// v3.1.0: HQ purchase Resource FEAT onto the faserip-rules resources kernel.
+//         Purchase colour via purchaseColor; bank-loan terms via bankLoan —
+//         fixed-bugs: monthly payment is two ranks below the ITEM (was two
+//         below Resources) for as many months as the item's rank NUMBER (was
+//         rank index + 1); the loan purchase itself has no FEAT (RULED
+//         2026-09-05, was a house yellow FEAT).
 // headquartersSheet.js v3.0.3 - 2026-05-06
 // v3.0.3: Apply locationModifier (Rich +1CS / Secluded -1CS) to purchase cost as well
 //         as rent. Per the rulebook ("Cost is presented in two values..."), the modifier
@@ -25,6 +32,8 @@
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { RANKS_ORDERED as RANKS } from './rules/rules-reference.js';
+import { purchaseColor, bankLoan as kernelBankLoan } from './lib/faserip-rules/faserip-resources.js';
+import { kernelKeyFor, foundryNameFor } from './kernel/adapter.js';
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -588,10 +597,10 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
             }
 
             let featColorNeeded;
-            const diff = resourceIdx - itemIdx;
-            if (diff >= 3) featColorNeeded = "Automatic";
-            else if (diff >= 1) featColorNeeded = "Green";
-            else featColorNeeded = "Yellow";
+            const pc = purchaseColor({ resourceRank: kernelKeyFor(resourceRank), itemRank: kernelKeyFor(itemRank) });
+            if (!pc.allowed) featColorNeeded = "Automatic";         // one rank up via bank loan: no purchase FEAT (RULED 2026-09-05)
+            else if (pc.automatic) featColorNeeded = "Automatic";
+            else featColorNeeded = pc.needed === "green" ? "Green" : "Yellow";
 
             const roll = new Roll("1d100");
             await roll.evaluate();
@@ -612,8 +621,9 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
             let bankLoanHtml = '';
             let loanUpdates = {};
             if (bankLoan && success) {
-              const loanPaymentRank = RANKS[Math.max(0, resourceIdx - 2)];
-              const loanMonths = itemIdx + 1;
+              const loanTerms = kernelBankLoan({ resourceRank: kernelKeyFor(resourceRank), itemRank: kernelKeyFor(itemRank) });
+              const loanPaymentRank = foundryNameFor(loanTerms.paymentRank, "dash");
+              const loanMonths = loanTerms.months;
               bankLoanHtml = `
                 <div style="padding:5px 10px;font-size:0.9em;background:#fffde7;border:1px solid #ffd54f;margin-top:5px;">
                   <strong>Bank loan approved</strong> — ${loanPaymentRank}/month for ${loanMonths} months.

@@ -1,3 +1,12 @@
+// actorSheet.js v2.10.0 - 2026-09-05
+// v2.10.0: Resource FEATs onto the faserip-rules resources kernel.
+//          _resourceFeatRequirement delegates to purchaseColor (three below
+//          automatic, one or two below green, equal yellow, above not allowed);
+//          _getResourceLockStatus delegates to resourceFeatAvailable and
+//          purchaseBlockedByFailure (once per week; a failure bars that rank
+//          and higher for a week). Same behaviour as before, now certified.
+//          RULED 2026-09-05: a bank-loan purchase (one rank above Resources)
+//          has no purchase FEAT of its own; the FEATs are the monthly payments.
 // actorSheet.js v2.9.2 - 2026-08-04
 // v2.9.2: Restore Actor-drop routing lost in the V14 _onDrop port. The
 //         override returned false for data.type "Actor", so the vehicle
@@ -187,6 +196,8 @@ import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHard
          effectiveRepairReason, requiredColorVsIntensity, colorMeets,
          seedApplicableRanks } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
+import { purchaseColor, resourceFeatAvailable, purchaseBlockedByFailure, RESOURCE_FEAT_INTERVAL_DAYS } from "./lib/faserip-rules/faserip-resources.js";
+import { kernelKeyFor as _resKernelKey } from "./kernel/adapter.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
 
@@ -5429,11 +5440,13 @@ html.find('.headquarters-row').each((i, row) => {
   _resourceFeatRequirement(resIdx, itemIdx, loan) {
     if (itemIdx > resIdx + (loan ? 1 : 0))
       return { color: "Impossible", cls: "is-impossible", hint: "above your Resource rank" };
-    const diff = resIdx - itemIdx;
-    if (diff >= 3) return { color: "Automatic", cls: "is-auto", hint: "3+ ranks under \u2014 no roll" };
-    if (diff >= 1) return { color: "Green", cls: "is-green", hint: `${diff} rank${diff>1?"s":""} under Resources` };
-    if (diff === 0) return { color: "Yellow", cls: "is-yellow", hint: "equal to Resources" };
-    return { color: "Yellow", cls: "is-yellow", hint: "+1 via bank loan" };
+    const resKey = _resKernelKey(_RANKS[resIdx]), itemKey = _resKernelKey(_RANKS[itemIdx]);
+    const p = (resKey && itemKey) ? purchaseColor({ resourceRank: resKey, itemRank: itemKey }) : null;
+    if (!p) return { color: "Impossible", cls: "is-impossible", hint: "unknown rank" };
+    if (!p.allowed) return { color: "Automatic", cls: "is-auto", hint: "+1 via bank loan \u2014 no purchase FEAT (RULED 2026-09-05)" };
+    if (p.automatic) return { color: "Automatic", cls: "is-auto", hint: "3+ ranks under \u2014 no roll" };
+    if (p.needed === "green") return { color: "Green", cls: "is-green", hint: `${p.gap} rank${p.gap>1?"s":""} under Resources` };
+    return { color: "Yellow", cls: "is-yellow", hint: "equal to Resources" };
   }
 
   // Weekly lockout from worldTime + per-actor flags. Setting-gated.
@@ -5441,17 +5454,23 @@ html.find('.headquarters-row').each((i, row) => {
   _getResourceLockStatus() {
     if (!game.settings.get("msh-faserip", "enforceResourceLockout"))
       return { enabled: false, locked: false };
-    const WEEK = 604800; // 7 game-days in seconds
+    const WEEK = RESOURCE_FEAT_INTERVAL_DAYS * 86400; // 7 game-days in seconds
     let now;
     try { now = game.msh.getCampaignDateTime().elapsedSeconds; }
     catch { now = game.time.worldTime; }
     const f = this.actor.getFlag("msh-faserip", "resourceFeat") || {};
-    if (Number.isFinite(f.lastAttemptWT) && now - f.lastAttemptWT < WEEK)
-      return { enabled: true, locked: true, scope: "week",
-               daysLeft: Math.ceil((f.lastAttemptWT + WEEK - now) / 86400) };
-    if (Number.isFinite(f.lastFailWT) && Number.isFinite(f.lastFailIdx) && now - f.lastFailWT < WEEK)
-      return { enabled: true, locked: true, scope: "fail", lockedIdx: f.lastFailIdx,
-               daysLeft: Math.ceil((f.lastFailWT + WEEK - now) / 86400) };
+    if (Number.isFinite(f.lastAttemptWT)) {
+      const a = resourceFeatAvailable({ lastFeatAt: f.lastAttemptWT, now });
+      if (!a.available)
+        return { enabled: true, locked: true, scope: "week", daysLeft: Math.ceil(a.secondsRemaining / 86400) };
+    }
+    if (Number.isFinite(f.lastFailWT) && Number.isFinite(f.lastFailIdx)) {
+      const failedKey = _resKernelKey(_RANKS[f.lastFailIdx]);
+      // The failed rank itself is barred; callers compare lockedIdx for higher ranks.
+      if (failedKey && purchaseBlockedByFailure({ failedRank: failedKey, failedAt: f.lastFailWT, itemRank: failedKey, now }))
+        return { enabled: true, locked: true, scope: "fail", lockedIdx: f.lastFailIdx,
+                 daysLeft: Math.ceil((f.lastFailWT + WEEK - now) / 86400) };
+    }
     return { enabled: true, locked: false };
   }
 

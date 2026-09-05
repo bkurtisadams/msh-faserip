@@ -1,3 +1,14 @@
+// contact-action.js v1.1.0 - 2026-09-05
+// v1.1.0: Popularity FEATs onto the faserip-rules popularity kernel. Required
+//         colour and column come from popularityFeat(): Friendly green,
+//         Neutral yellow, Suspicious (book: Unfriendly) red, Hostile impossible;
+//         the column is the Popularity number's rank shifted by the six
+//         request modifiers (new checkboxes: target benefits +2, in danger -3,
+//         Good value -1, Remarkable value -2, may not be returned -2, unique -3).
+//         Fixed-bug: negative Popularity is a yellow FEAT on the |Popularity|
+//         column regardless of disposition, with only the benefit modifier
+//         (was: disposition bumped one step). Kept, not in this passage: the
+//         mutant -1CS and the negative-Popularity Karma cost.
 // contact-action.js v1.0.0 - 2026-03-18
 // Migrated from actorSheet.js inline contact-roll handler and rolls.js FaseripRolls.rollContact.
 // Standalone contact popularity FEAT dialog.
@@ -6,6 +17,45 @@ import { rollUniversalTable } from "../dice/universal-table.js";
 import { shiftRank } from "../../rules/rules-reference.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
+import { popularityFeat, REQUEST_MODIFIERS } from "../../lib/faserip-rules/faserip-popularity.js";
+import { foundryNameFor } from "../../kernel/adapter.js";
+
+// Dialog disposition labels -> kernel dispositions ("Suspicious" is the book's Unfriendly).
+const DISP_KERNEL = { Friendly: "friendly", Neutral: "neutral", Suspicious: "unfriendly", Hostile: "hostile" };
+const TITLE = { green: "Green", yellow: "Yellow", red: "Red" };
+
+const REQUEST_OPTIONS = [
+  { key: "targetBenefits",     label: "Target benefits" },
+  { key: "targetInDanger",     label: "Target placed in danger" },
+  { key: "valueUpToGood",      label: "Item up to Good value" },
+  { key: "valueUpToRemarkable", label: "Item up to Remarkable value" },
+  { key: "mayNotBeReturned",   label: "May not be returned" },
+  { key: "unique",             label: "Item is unique" },
+];
+
+/**
+ * Kernel Popularity FEAT for this contact: required colour, column (rank
+ * name) after the request shifts, and the negative-Popularity flags.
+ */
+function featSpec(storedDisposition, heroPopularity, request) {
+  const spec = popularityFeat({
+    popularity: Number(heroPopularity) || 0,
+    disposition: DISP_KERNEL[storedDisposition] ?? "friendly",
+    request,
+    isContact: true,
+  });
+  return {
+    ...spec,
+    required: spec.allowed ? TITLE[spec.needed] : "Impossible",
+    columnName: foundryNameFor(spec.column, "dash"),
+  };
+}
+
+function readRequest(html) {
+  const request = {};
+  for (const o of REQUEST_OPTIONS) request[o.key] = html.find(`[name="req-${o.key}"]`).is(":checked");
+  return request;
+}
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -43,24 +93,6 @@ const TYPE_OBLIGATION = {
 };
 
 // ── Helpers ────────────────────────────────────────────────
-
-function getDisposition(storedDisposition, heroPopularity) {
-  const storedIdx = DISP_ORDER.indexOf(storedDisposition);
-  const effIdx = heroPopularity < 0
-    ? Math.min(storedIdx + 1, DISP_ORDER.length - 1)
-    : storedIdx;
-  return DISP_ORDER[effIdx] ?? "Friendly";
-}
-
-function getRequiredColor(disposition) {
-  switch (disposition) {
-    case "Friendly":   return "Green";
-    case "Neutral":    return "Yellow";
-    case "Suspicious": return "Red";
-    case "Hostile":    return "Impossible";
-    default:           return "Green";
-  }
-}
 
 function getBannerColors(color) {
   switch (color.toLowerCase()) {
@@ -103,8 +135,9 @@ export async function rollContact(actor, contact) {
   const resourceLevel = CONTACT_RESOURCE_LEVELS[contactType] ?? "Typical";
 
   const storedDisposition   = contact.system.disposition || "Friendly";
-  const effectiveDisposition = getDisposition(storedDisposition, heroPopularity);
-  const requiredFeatColor    = getRequiredColor(effectiveDisposition);
+  const savedRequest = contact.getFlag("msh-faserip", "lastRequest") || {};
+  const spec0 = featSpec(storedDisposition, heroPopularity, savedRequest);
+  const requiredFeatColor    = spec0.required;
 
   const actionOptionsHTML = ACTION_OPTIONS.map(o =>
     `<option value="${o.value}" ${o.value === savedActionType ? "selected" : ""}>${o.label}</option>`
@@ -119,10 +152,15 @@ export async function rollContact(actor, contact) {
   const obligationCopy = TYPE_OBLIGATION[contactType];
   const negPopCost0 = heroPopularity < 0 ? Math.abs(heroPopularity) : 0;
 
-  // Initial preview of effective rank (CS + mutant penalty)
-  let effRank0 = heroPopularityRank;
+  // Initial preview of effective rank (kernel column incl. request shifts + CS + mutant penalty)
+  let effRank0 = spec0.columnName;
   if (savedColumnShift !== 0) effRank0 = shiftRank(effRank0, savedColumnShift);
   if (isMutantPenaltyActive) effRank0 = shiftRank(effRank0, -1);
+
+  const requestOptionsHTML = REQUEST_OPTIONS.map(o => {
+    const cs = REQUEST_MODIFIERS[o.key];
+    return `<label style="display:inline-flex;align-items:center;gap:3px;margin:0;font-size:11px;"><input type="checkbox" name="req-${o.key}" ${savedRequest[o.key] ? "checked" : ""} style="margin:0;"> ${o.label} <span style="font-family:'Oswald',sans-serif;font-weight:600;color:${cs > 0 ? '#2e7d32' : '#c62828'};">${cs > 0 ? '+' : ''}${cs}</span></label>`;
+  }).join("");
 
   const dialogContent = `
   <div class="frp-dlg" style="font-family:'Barlow Condensed',Arial,sans-serif;">
@@ -156,6 +194,11 @@ export async function rollContact(actor, contact) {
       <select name="storedDisposition" style="padding:2px 5px;border:1px solid #b8b8b8;border-radius:2px;background:#fff;font-family:inherit;font-size:12px;height:auto;">${dispOptionsHTML}</select>
       <span id="disp-shift-note" style="font-size:11px;font-style:italic;"></span>
       <span style="margin-left:auto;font-size:10px;color:#777;">(this roll only)</span>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:4px 10px;padding:4px 6px;border:1px solid #d8cfb8;border-radius:2px;background:#faf8f2;margin-bottom:6px;">
+      <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#6a0000;letter-spacing:0.5px;text-transform:uppercase;width:100%;">Nature of the request <span id="request-shift-note" style="font-family:inherit;color:#555;text-transform:none;letter-spacing:0;"></span></span>
+      ${requestOptionsHTML}
     </div>
 
     <div id="required-strip" style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${reqStyles0.bg};border:1px solid ${reqStyles0.border};border-radius:2px;margin-bottom:6px;color:${reqStyles0.text};">
@@ -198,8 +241,10 @@ export async function rollContact(actor, contact) {
           const saveSettings = html.find('[name="saveSettings"]').is(":checked");
           const skipDice     = html.find('[name="skipDice"]').is(":checked");
 
-          const liveEffDisp  = getDisposition(liveStored, heroPopularity);
-          const liveReqColor = getRequiredColor(liveEffDisp);
+          const liveRequest  = readRequest(html);
+          const liveSpec     = featSpec(liveStored, heroPopularity, liveRequest);
+          const liveEffDisp  = liveStored;
+          const liveReqColor = liveSpec.required;
 
           // Defensive: Hostile disposition → roll cannot succeed (button is also disabled)
           if (liveReqColor === "Impossible") {
@@ -210,13 +255,16 @@ export async function rollContact(actor, contact) {
           if (saveSettings) {
             await contact.setFlag("msh-faserip", "lastActionType", actionType);
             await contact.setFlag("msh-faserip", "lastColumnShift", columnShift);
+            await contact.setFlag("msh-faserip", "lastRequest", liveRequest);
             await contact.setFlag("msh-faserip", "skipDiceRoll", skipDice);
           }
 
-          // Effective rank: CS + mutant penalty
-          let effectiveRank = heroPopularityRank;
+          // Effective rank: kernel column (Popularity rank + request shifts) + manual CS + mutant penalty
+          let effectiveRank = liveSpec.columnName;
           if (columnShift !== 0) effectiveRank = shiftRank(effectiveRank, columnShift);
           if (isMutantPenaltyActive) effectiveRank = shiftRank(effectiveRank, -1);
+          const requestLabels = REQUEST_OPTIONS.filter(o => liveRequest[o.key] && (!liveSpec.negative || o.key === "targetBenefits"))
+            .map(o => `${o.label} ${REQUEST_MODIFIERS[o.key] > 0 ? "+" : ""}${REQUEST_MODIFIERS[o.key]}`).join(", ");
 
           // Roll
           const roll = new Roll("1d100");
@@ -264,7 +312,8 @@ export async function rollContact(actor, contact) {
               </div>
               <div style="padding:5px 10px;font-size:0.9em;">
                 <div><strong>Popularity:</strong> ${heroPopularityRank} (${heroPopularity})</div>
-                <div><strong>Disposition:</strong> ${liveEffDisp}${liveStored !== liveEffDisp ? ` (stored ${liveStored}, shifted –pop)` : ""}</div>
+                <div><strong>Disposition:</strong> ${liveEffDisp}${liveSpec.negative ? " (negative Popularity: yellow FEAT)" : ""}</div>
+                ${requestLabels ? `<div><strong>Request:</strong> ${requestLabels} (${liveSpec.shift > 0 ? "+" : ""}${liveSpec.shift}CS)</div>` : ""}
                 ${isMutantPenaltyActive ? '<div style="color:#aa0000;"><strong>Mutant penalty:</strong> –1 CS</div>' : ""}
                 ${columnShift !== 0 ? `<div><strong>Column shift:</strong> ${columnShift > 0 ? "+" : ""}${columnShift}</div>` : ""}
                 <div><strong>Effective rank:</strong> ${effectiveRank}</div>
@@ -298,16 +347,20 @@ export async function rollContact(actor, contact) {
       const $effRank   = html.find('#effective-rank-preview');
       const $rollBtn   = $(dlg.element).find('button[data-action="roll"]');
 
+      const $reqShiftNote = html.find('#request-shift-note');
+      const $reqBoxes  = html.find('[name^="req-"]');
+
       function recompute() {
         const stored = $stored.val();
-        const eff    = getDisposition(stored, heroPopularity);
-        const req    = getRequiredColor(eff);
+        const spec   = featSpec(stored, heroPopularity, readRequest(html));
+        const req    = spec.required;
 
-        if (eff !== stored) {
-          $shiftNote.text(`→ ${eff} (–pop)`).css("color", "#c62828");
+        if (spec.negative) {
+          $shiftNote.text("negative Popularity: yellow FEAT, Contacts only").css("color", "#c62828");
         } else {
           $shiftNote.text("").css("color", "");
         }
+        $reqShiftNote.text(spec.shift !== 0 ? `(${spec.shift > 0 ? "+" : ""}${spec.shift}CS${spec.negative ? ", benefit only" : ""})` : "");
 
         const rs = REQ_COLOR_STYLES[req] || REQ_COLOR_STYLES.Green;
         $reqStrip.css({ background: rs.bg, "border-color": rs.border, color: rs.text });
@@ -322,7 +375,7 @@ export async function rollContact(actor, contact) {
         }
 
         const cs = parseInt($shift.val()) || 0;
-        let er = heroPopularityRank;
+        let er = spec.columnName;
         if (cs !== 0) er = shiftRank(er, cs);
         if (isMutantPenaltyActive) er = shiftRank(er, -1);
         $effRank.text(er);
@@ -330,6 +383,7 @@ export async function rollContact(actor, contact) {
 
       $stored.on("change", recompute);
       $shift.on("input change", recompute);
+      $reqBoxes.on("change", recompute);
       recompute();
     }
   });
