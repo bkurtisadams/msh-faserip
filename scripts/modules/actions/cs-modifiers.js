@@ -4,9 +4,11 @@
 //         is a registry of detectors run against the attacker and target
 //         tokens; detectAutoSituational() returns the ones that apply, gated
 //         by the new world setting autoSituationalModifiers (default on).
-//         First entry: Higher Ground +1CS when the attacker's elevation exceeds
-//         the target's by at least one grid square (one story at 0.1 area per
-//         square), or the attacker is flying over a non-flying target.
+//         First entry: Higher Ground +1CS on ranged attacks (Shooting, Throwing,
+//         Energy, Force) when the attacker's elevation exceeds the target's by
+//         at least one grid square (one story at 0.1 area per square), or the
+//         attacker is flying over a non-flying target. Not charging: a charge
+//         is run along the ground.
 //         buildCSRow({ autoMods }) prefills the CS input and Reason with them
 //         when the dialog has nothing remembered; the player can still edit
 //         both, so the v3.0.0 manual model stands. Registered from this module
@@ -74,7 +76,7 @@ export const AUTO_SITUATIONAL = [
     id: "higherGround",
     label: "Higher Ground",
     cs: 1,
-    contexts: ["ranged", "charging"],
+    contexts: ["ranged"],
     detect({ attacker, target }) {
       if (!attacker || !target) return false;
       const diff = elevationOf(attacker) - elevationOf(target);

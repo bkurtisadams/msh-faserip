@@ -1,3 +1,5 @@
+// scripts/modules/actions/energy-action.js v3.6.0 - 2026-09-05
+// v3.6.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // scripts/modules/actions/energy-action.js v3.5.0 - 2026-09-02
 // v3.5.0: Kernel slice 5e. Energy Generation (name/type/canReduceEffect)
 //         resolves as choice.freeEffectReduction — the power-specific
@@ -103,7 +105,7 @@ import {
 } from "./action-utils.js";
 
 import { RANK_ABBR, POWER_RANGE } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 import { isAuraMaintained } from "./nullify.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -254,12 +256,14 @@ export class EnergyAction extends RangedAttackAction {
       const maxRange = this._getPowerRangeInAreas(initialPowerRank);
       return (savedRange > maxRange && maxRange > 0) ? -(savedRange - maxRange) : 0;
     })();
+    const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
       abilityRank: initialDisplayRank,
       rangePenalty: initialRangePenalty,
-      showRange: true
+      showRange: true,
+      autoMods
     });
 
     // Build power source <select> options

@@ -1,3 +1,5 @@
+// scripts/modules/actions/force-action.js v3.4.0 - 2026-09-05
+// v3.4.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
 // scripts/modules/actions/force-action.js v3.3.4 - 2026-07-09
 // v3.3.4: Use derivePowerDamage() for the initial source damage display too,
 //         including equipment force weapons routed through the Force dialog.
@@ -56,7 +58,7 @@ import {
 } from "./action-utils.js";
 
 import { RANK_ABBR, POWER_RANGE } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
 export class ForceAction extends RangedAttackAction {
@@ -178,12 +180,14 @@ export class ForceAction extends RangedAttackAction {
       const maxRange = this._getPowerRangeInAreas(initialPowerRank);
       return (savedRange > maxRange && maxRange > 0) ? -(savedRange - maxRange) : 0;
     })();
+    const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
       savedReason,
       abilityRank: initialDisplayRank,
       rangePenalty: initialRangePenalty,
-      showRange: true
+      showRange: true,
+      autoMods
     });
 
     // Build power source <select> options
