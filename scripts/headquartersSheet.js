@@ -1,3 +1,9 @@
+// headquartersSheet.js v3.2.0 - 2026-09-05
+// v3.2.0: HQ Resource FEATs (purchase, rent, loan payment) share the hero's
+//         weekly resourceFeat ledger with the actor sheet (setting-gated by
+//         enforceResourceLockout; GM proceeds with a notice). A missed loan
+//         payment is recorded on the HQ item (flags.msh-faserip.loanMissed);
+//         repossession stays the Judge's call.
 // headquartersSheet.js v3.1.0 - 2026-09-05
 // v3.1.0: HQ purchase Resource FEAT onto the faserip-rules resources kernel.
 //         Purchase colour via purchaseColor; bank-loan terms via bankLoan —
@@ -32,7 +38,7 @@
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { RANKS_ORDERED as RANKS } from './rules/rules-reference.js';
-import { purchaseColor, bankLoan as kernelBankLoan } from './lib/faserip-rules/faserip-resources.js';
+import { purchaseColor, bankLoan as kernelBankLoan, resourceFeatAvailable, purchaseBlockedByFailure } from './lib/faserip-rules/faserip-resources.js';
 import { kernelKeyFor, foundryNameFor } from './kernel/adapter.js';
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -596,6 +602,28 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
               return ui.notifications.warn("Cost rank exceeds Resources" + (bankLoan ? " even with bank loan" : "") + ".");
             }
 
+            // Weekly ledger shared with the actor sheet's Resource FEATs.
+            let ledgerNow = null;
+            const ledgerOn = (() => { try { return game.settings.get("msh-faserip", "enforceResourceLockout"); } catch { return false; } })();
+            if (ledgerOn) {
+              try { ledgerNow = game.msh.getCampaignDateTime().elapsedSeconds; } catch { ledgerNow = game.time?.worldTime ?? 0; }
+              const f = hero.getFlag("msh-faserip", "resourceFeat") || {};
+              let lockedWhy = null;
+              if (Number.isFinite(f.lastAttemptWT)) {
+                const a = resourceFeatAvailable({ lastFeatAt: f.lastAttemptWT, now: ledgerNow });
+                if (!a.available) lockedWhy = `a Resource FEAT was made this week (${Math.ceil(a.secondsRemaining / 86400)} day(s) left)`;
+              }
+              if (!lockedWhy && Number.isFinite(f.lastFailWT) && Number.isFinite(f.lastFailIdx)) {
+                const failedKey = kernelKeyFor(RANKS[f.lastFailIdx]), itemKey = kernelKeyFor(itemRank);
+                if (failedKey && itemKey && purchaseBlockedByFailure({ failedRank: failedKey, failedAt: f.lastFailWT, itemRank: itemKey, now: ledgerNow }))
+                  lockedWhy = `a ${RANKS[f.lastFailIdx]} purchase failed this week (no ${RANKS[f.lastFailIdx]}-or-higher attempt)`;
+              }
+              if (lockedWhy) {
+                if (!game.user.isGM) return ui.notifications.warn(`Resource FEAT locked: ${lockedWhy}.`);
+                ui.notifications.info(`GM override: ${lockedWhy}.`);
+              }
+            }
+
             let featColorNeeded;
             const pc = purchaseColor({ resourceRank: kernelKeyFor(resourceRank), itemRank: kernelKeyFor(itemRank) });
             if (!pc.allowed) featColorNeeded = "Automatic";         // one rank up via bank loan: no purchase FEAT (RULED 2026-09-05)
@@ -663,6 +691,15 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
               speaker: ChatMessage.getSpeaker({ actor: hero }),
               content: chatContent
             });
+
+            if (ledgerOn && ledgerNow != null) {
+              const upd = { lastAttemptWT: ledgerNow };
+              if (!success) { upd.lastFailWT = ledgerNow; upd.lastFailIdx = itemIdx; }
+              await hero.setFlag("msh-faserip", "resourceFeat", foundry.utils.mergeObject(hero.getFlag("msh-faserip", "resourceFeat") || {}, upd));
+            }
+            if (isLoan && !success) {
+              await hqItem.setFlag("msh-faserip", "loanMissed", ((hqItem.getFlag("msh-faserip", "loanMissed") || 0) + 1));
+            }
 
             // Stamp rent/loan payment on success
             if (isPayment && success) {

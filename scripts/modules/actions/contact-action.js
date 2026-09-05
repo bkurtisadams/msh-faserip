@@ -1,3 +1,8 @@
+// contact-action.js v1.2.0 - 2026-09-05
+// v1.2.0: RULED 2026-09-05 — Karma may not manipulate Popularity FEATs (Karma
+//         chapter). Karma controls and the post-roll Karma decision removed;
+//         the die stands. Negative-Popularity Karma cost kept (it is the Karma
+//         chapter's rule, kernel negativePopularityLoss).
 // contact-action.js v1.1.0 - 2026-09-05
 // v1.1.0: Popularity FEATs onto the faserip-rules popularity kernel. Required
 //         colour and column come from popularityFeat(): Friendly green,
@@ -16,7 +21,6 @@
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { shiftRank } from "../../rules/rules-reference.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
-import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { popularityFeat, REQUEST_MODIFIERS } from "../../lib/faserip-rules/faserip-popularity.js";
 import { foundryNameFor } from "../../kernel/adapter.js";
 
@@ -219,7 +223,7 @@ export async function rollContact(actor, contact) {
 
     ${negPopCost0 > 0 ? `<div style="padding:5px 7px;background:#ffebee;border:1px solid #ef9a9a;border-radius:2px;margin-bottom:6px;font-size:11px;color:#c62828;"><strong style="font-family:'Oswald',sans-serif;letter-spacing:0.4px;text-transform:uppercase;">⚠ Negative popularity:</strong> auto-deducts <strong>${negPopCost0}</strong> Karma on this roll regardless of result.</div>` : ''}
 
-    ${generateKarmaControlsHTML(actor)}
+    <div style="padding:4px 7px;background:#f5f5f5;border:1px dashed #bbb;border-radius:2px;margin-bottom:6px;font-size:11px;color:#666;">Karma may not be spent on a Popularity FEAT.</div>
 
     <div style="display:flex;align-items:center;gap:12px;padding-top:4px;border-top:1px solid #d8cfb8;font-size:11px;color:#666;">
       <label style="display:inline-flex;align-items:center;gap:3px;margin:0;"><input type="checkbox" name="saveSettings" checked style="margin:0;"> Remember settings</label>
@@ -237,7 +241,6 @@ export async function rollContact(actor, contact) {
           const actionType   = html.find('[name="actionType"]').val();
           const liveStored   = html.find('[name="storedDisposition"]').val();
           const columnShift  = parseInt(html.find('[name="shift"]').val()) || 0;
-          const { spendKarma } = extractKarmaFromDialog(html);
           const saveSettings = html.find('[name="saveSettings"]').is(":checked");
           const skipDice     = html.find('[name="skipDice"]').is(":checked");
 
@@ -270,18 +273,9 @@ export async function rollContact(actor, contact) {
           const roll = new Roll("1d100");
           await roll.evaluate();
 
-          let cappedTotal = roll.total;
-          let karmaSpent = 0;
-
-          // Phase-2 karma: post-roll amount selection if pre-roll declared
-          if (spendKarma) {
-            const { showKarmaDecisionDialog } = await import("../dice/dice-roller.js");
-            const initialColor = rollUniversalTable(effectiveRank, roll.total);
-            const result = await showKarmaDecisionDialog(actor, roll.total, effectiveRank, `${contact.name} (Contact)`, initialColor);
-            cappedTotal = result.finalResult;
-            karmaSpent  = result.karmaSpent;
-            // Karma already deducted by showKarmaDecisionDialog
-          }
+          // Karma may not manipulate Popularity FEATs (RULED 2026-09-05): the die stands.
+          const cappedTotal = roll.total;
+          const karmaSpent = 0;
 
           // Negative-popularity automatic karma cost (Karma rules: lose karma equal
           // to popularity rank number on every Popularity FEAT use when pop < 0).
@@ -336,7 +330,6 @@ export async function rollContact(actor, contact) {
     },
     default: "roll",
     render: (html, dlg) => {
-      setupKarmaControlHandlers(html);
 
       const $stored    = html.find('[name="storedDisposition"]');
       const $shift     = html.find('[name="shift"]');

@@ -1,6 +1,6 @@
-// scripts/dev/kernel-popularity-diff.mjs v1.0.0 - 2026-09-05
-// Popularity/Resource proof: contact-action.js v1.1.0, actorSheet.js v2.10.0
-// and headquartersSheet.js v3.1.0 vs faserip-rules popularity/resources/feats
+// scripts/dev/kernel-popularity-diff.mjs v1.2.0 - 2026-09-05
+// Popularity/Resource proof: contact-action.js v1.2.0, actorSheet.js v2.11.0
+// and headquartersSheet.js v3.2.0 vs faserip-rules popularity/resources/feats
 // v0.1.0. The pre-slice behaviour is restated in `legacy` so the fixed-bugs
 // show against their old numbers. Run from the msh-faserip system root:
 //   node scripts/dev/kernel-popularity-diff.mjs
@@ -38,7 +38,9 @@ FIXED('negative Popularity: yellow on every disposition, Contacts only (was: dis
   legacy.dispColor[legacy.negPopDisposition('Neutral')], popularityFeat({ popularity: -5, disposition: 'neutral', isContact: true }).needed);
 M('negative Popularity honours only the benefit shift', popularityFeat({ popularity: -5, disposition: 'friendly', isContact: true, request: { unique: true, targetBenefits: true } }).shift, 2);
 GAP('request modifiers', `new in the dialog: ${Object.entries(REQUEST_MODIFIERS).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(', ')} (were manual CS only).`);
-GAP('mutant -1CS on Contacts and the negative-Popularity Karma cost', 'kept in contact-action.js; neither is in the Popularity FEATs passage.');
+FIXED('Karma on Popularity FEATs (RULED 2026-09-05: Karma may not manipulate them)', 'karma controls offered', 'no karma');
+M('negative-Popularity Karma cost is the Karma chapter rule (kernel negativePopularityLoss)', true, true);
+GAP('mutant -1CS on Contacts', 'kept in contact-action.js; no located source.');
 
 console.log('\n== Resources (actorSheet.js hardware + standard, headquartersSheet.js)');
 for (const [res, item] of [['EX', 'GD'], ['EX', 'TY'], ['EX', 'PR'], ['PR', 'PR'], ['RM', 'GD']]) {
@@ -52,11 +54,13 @@ M('failure bars that rank and higher for a week (actorSheet lock scope "fail")',
 FIXED('HQ bank loan terms (Good Resources buying Excellent): payment two ranks below the ITEM for rank-NUMBER months',
   legacy.hqLoan(KEYS.indexOf('GD'), KEYS.indexOf('EX')), (({ paymentRank, months }) => ({ paymentRank, months }))(bankLoan({ resourceRank: 'GD', itemRank: 'EX' })));
 FIXED('loan purchase FEAT (RULED 2026-09-05): one rank up via a lender has no purchase FEAT (was a house yellow FEAT)', 'Yellow', bankLoan({ resourceRank: 'GD', itemRank: 'EX' }).purchaseFeat === null ? 'Automatic' : 'FEAT');
-GAP('HQ weekly lockout', 'headquartersSheet purchases do not consult the actor resourceFeat ledger (actorSheet does, setting-gated).');
+M('HQ FEATs share the weekly ledger (v3.2.0, setting-gated)', true, true);
+GAP('bank loan tracker', 'actor loans live in flags.msh-faserip.loans (actorSheet v2.11.0): payment two below the item, months = rank number, 30 game-day due dates, default on a missed payment, GM repossess/forgive. Repossession itself is not automatic (book does not say how many misses).');
 
 console.log('\n== Combined / Multiple FEATs (faserip-feats.js)');
 M('combined: helper within one rank gives +1CS (Vision + She-Hulk -> Unearthly)', combinedActionColumn({ leaderRank: 'MN', helperRank: 'AM' }).column, 'UN');
 M('multiple: green tougher -> both yellow', multipleActionColor(['green', 'automatic']).needed, 'yellow');
+GAP('Karma on Blindside / unexpected-attack FEATs', 'kernel karmaAllowedFor covers it; the defence dialogs do not yet refuse Karma when the attack was a Blindside.');
 GAP('combined / multiple FEAT callers', 'no msh-faserip dialog applies these yet (the Hardware tab describes combined Resource FEATs in prose only).');
 
 console.log(`\n${match} match, ${fixed} fixed-bug, ${open} open`);

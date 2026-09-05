@@ -1,9 +1,12 @@
+// faserip-rules resources v0.1.1
+// v0.1.1: Karma may not manipulate Resource FEATs (Karma chapter):
+//         resolveResourceFeat ignores karma and reports karmaAllowed false.
 // faserip-rules resources v0.1.0
 // Resource FEATs (Advanced Set): purchase colour by rank gap, the once-per-
 // week rule, failure lockout, and the Bank Loan option.
 import { rankByKey, rankDistance, shiftRank, colorForRoll, colorAtLeast } from './faserip-kernel.js';
 
-export const RESOURCES_VERSION = '0.1.0';
+export const RESOURCES_VERSION = '0.1.1';
 export const RESOURCES_CERTIFIED = true;
 
 export const RESOURCE_FEAT_INTERVAL_DAYS = 7;
@@ -45,14 +48,15 @@ export function purchaseBlockedByFailure({ failedRank, failedAt, itemRank, now, 
   return rankDistance(failedRank, itemRank) >= 0; // item at or above the failed rank
 }
 
-/** Resolve a Resource FEAT roll (Karma allowed, capped at 100). */
-export function resolveResourceFeat({ resourceRank, itemRank, roll, karma = 0 }) {
+/** Resolve a Resource FEAT roll. Karma may not manipulate it: the die stands. */
+export const RESOURCE_KARMA_ALLOWED = false;
+export function resolveResourceFeat({ resourceRank, itemRank, roll }) {
   const p = purchaseColor({ resourceRank, itemRank });
-  if (!p.allowed) return { ...p, success: false, color: null };
-  if (p.automatic) return { ...p, success: true, color: null };
-  const total = Math.min(100, roll + karma);
+  if (!p.allowed) return { ...p, success: false, color: null, karmaAllowed: RESOURCE_KARMA_ALLOWED };
+  if (p.automatic) return { ...p, success: true, color: null, karmaAllowed: RESOURCE_KARMA_ALLOWED };
+  const total = Math.min(100, Math.max(1, roll));
   const color = colorForRoll(resourceRank, total);
-  return { ...p, roll, karma, total, color, success: colorAtLeast(color, p.needed) };
+  return { ...p, roll, karma: 0, karmaAllowed: RESOURCE_KARMA_ALLOWED, total, color, success: colorAtLeast(color, p.needed) };
 }
 
 /**

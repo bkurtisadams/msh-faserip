@@ -1,3 +1,7 @@
+// faserip-rules karma v0.6.0
+// v0.6.0: FEATs Karma may not manipulate: Resource FEATs, Popularity FEATs,
+//         and FEATs forced by a Blindside or an unexpected attack (unless
+//         forewarned). KARMA_FORBIDDEN_FEATS + karmaAllowedFor().
 // faserip-rules karma v0.5.0
 // v0.5.0: RULED 2026-09-03 — Power Stunt mastery at 10 SUCCESSES: the FEAT
 //         ladder counts successful uses; the tenth success masters the stunt
@@ -18,8 +22,17 @@
 
 import { rankForNumber, rankDistance, shiftRank, rankByKey } from './faserip-kernel.js';
 
-export const KARMA_VERSION = '0.5.0';
+export const KARMA_VERSION = '0.6.0';
 export const KARMA_CERTIFIED = true;
+
+// Certain FEATs may not be manipulated by Karma: Resource FEATs, Popularity
+// FEATs, and FEATs resulting from being Blindsided or suffering an unexpected
+// attack (allowed again if the character had previous warning).
+export const KARMA_FORBIDDEN_FEATS = ['resource', 'popularity', 'blindsided', 'unexpected-attack'];
+export function karmaAllowedFor(featKind, { forewarned = false } = {}) {
+  if (!KARMA_FORBIDDEN_FEATS.includes(featKind)) return true;
+  return forewarned && (featKind === 'blindsided' || featKind === 'unexpected-attack');
+}
 
 // --- Awards and losses --------------------------------------------------
 

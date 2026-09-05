@@ -1,3 +1,7 @@
+// faserip-rules kernel v0.2.11
+// v0.2.11: ERRATA — Karma may not manipulate Resource or Popularity FEATs
+//          (Karma chapter); Blindside/unexpected-attack FEATs likewise unless
+//          forewarned. faserip-karma v0.6.0 karmaAllowedFor().
 // faserip-rules kernel v0.2.10
 // v0.2.10: ERRATA — Popularity and Resource FEAT rulings/notes for the new
 //          faserip-popularity.js, faserip-resources.js and faserip-feats.js.
@@ -26,7 +30,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.10';
+export const KERNEL_VERSION = '0.2.11';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -228,6 +232,8 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'RULED 2026-09-05: Karma may not manipulate Resource FEATs or Popularity FEATs (Karma chapter: "Certain FEATs may not be manipulated by Karma"). Nor FEATs resulting from a Blindside or an unexpected attack, unless the character had previous warning. msh-faserip contact-action.js previously offered Karma on Popularity FEATs (fixed-bug).',
+  'NOTE 2026-09-05: The Karma cost the contact dialog charges when using negative Popularity (Karma equal to the Popularity rank number) is the Karma chapter\'s rule, carried by faserip-karma negativePopularityLoss; only the Contacts mutant -1CS remains without a located source.',
   'NOTE 2026-09-05: Popularity FEATs — the Iron Man/DOD example calls a Neutral request "green on the Shift 0 column" though Neutral targets require yellow, and the Spider-Man/Jameson example rolls on Incredible (40) without the +2CS the table grants when the target benefits. The rules text governs in both: Neutral is yellow, benefit is +2CS.',
   'RULED 2026-09-05: Resource FEATs — an item three ranks below Resources is bought automatically, one or two below needs green, equal needs yellow; this is the general FEAT rule applied to Resources. The Tony Stark example (Excellent Resources paying for a Typical night out, two ranks below, with no roll) is in error; Typical is a green FEAT for Excellent Resources.',
   'RULED 2026-09-05: Bank Loan — a character may buy up to one rank above Resources through a lender with no purchase FEAT; the FEATs are the monthly payments (two ranks below the item, for the item\'s rank number in months). Replaces msh-faserip\'s house yellow FEAT on the loan purchase.',

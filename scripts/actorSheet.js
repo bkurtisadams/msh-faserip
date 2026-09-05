@@ -1,3 +1,14 @@
+// actorSheet.js v2.11.0 - 2026-09-05
+// v2.11.0: Bank loan tracker. Loan purchases from the Resource FEAT dialog are
+//          recorded on the actor (flags.msh-faserip.loans: item, payment rank
+//          two below the item, months = item rank number, taken/last-paid
+//          world time). The dialog lists active loans with due dates (30 game
+//          days per payment), overdue and default states, and a Pay button
+//          that rolls the payment FEAT through the kernel (purchaseColor),
+//          decrements on success, marks default on failure (repossession is
+//          the Judge's call: GM Repossess/Forgive links). Payment FEATs share
+//          the weekly resourceFeat ledger. Header Resources link shows a loan
+//          badge (red when a payment is overdue or a loan is in default).
 // actorSheet.js v2.10.0 - 2026-09-05
 // v2.10.0: Resource FEATs onto the faserip-rules resources kernel.
 //          _resourceFeatRequirement delegates to purchaseColor (three below
@@ -198,8 +209,10 @@ import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHard
          effectiveRepairReason, requiredColorVsIntensity, colorMeets,
          seedApplicableRanks } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
-import { purchaseColor, resourceFeatAvailable, purchaseBlockedByFailure, RESOURCE_FEAT_INTERVAL_DAYS } from "./lib/faserip-rules/faserip-resources.js";
-import { kernelKeyFor as _resKernelKey } from "./kernel/adapter.js";
+import { purchaseColor, resourceFeatAvailable, purchaseBlockedByFailure, bankLoan as _kernelBankLoan, RESOURCE_FEAT_INTERVAL_DAYS } from "./lib/faserip-rules/faserip-resources.js";
+import { kernelKeyFor as _resKernelKey, foundryNameFor as _resFoundryName } from "./kernel/adapter.js";
+
+const LOAN_PAYMENT_INTERVAL_SECONDS = 30 * 86400; // one game month per payment
 
 const DialogV2 = foundry.applications.api.DialogV2;
 
@@ -4819,6 +4832,7 @@ html.find('.headquarters-row').each((i, row) => {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // RESOURCE BUTTON method
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    this._renderLoanBadge(html);
     html.find('.resources-header-link').click(ev => {
       ev.preventDefault();
       const useRP = game.settings.get("msh-faserip", "useResourcePoints");
@@ -5476,6 +5490,193 @@ html.find('.headquarters-row').each((i, row) => {
     return { enabled: true, locked: false };
   }
 
+  // ── Bank loans (flags.msh-faserip.loans) ─────────────────────────────────
+  _loanNow() {
+    try { return game.msh.getCampaignDateTime().elapsedSeconds; }
+    catch { return game.time?.worldTime ?? 0; }
+  }
+
+  _getLoans() {
+    const loans = this.actor.getFlag("msh-faserip", "loans");
+    return Array.isArray(loans) ? loans : [];
+  }
+
+  async _setLoans(loans) {
+    await this.actor.setFlag("msh-faserip", "loans", loans);
+  }
+
+  /** Due state of one loan at world time `now`. */
+  _loanStatus(loan, now = this._loanNow()) {
+    const due = (loan.lastPaidAt ?? loan.takenAt ?? now) + LOAN_PAYMENT_INTERVAL_SECONDS;
+    const daysToDue = Math.ceil((due - now) / 86400);
+    return {
+      due,
+      daysToDue,
+      overdue: daysToDue < 0,
+      defaulted: !!loan.defaulted,
+      label: loan.defaulted ? "IN DEFAULT" : daysToDue < 0 ? `OVERDUE ${-daysToDue}d` : daysToDue === 0 ? "DUE TODAY" : `due in ${daysToDue}d`,
+    };
+  }
+
+  _renderLoanBadge(html) {
+    const $link = html.find('.resources-header-link');
+    if (!$link.length) return;
+    $link.find('.res-loan-badge').remove();
+    const loans = this._getLoans();
+    if (!loans.length) return;
+    const now = this._loanNow();
+    const bad = loans.some(l => { const s = this._loanStatus(l, now); return s.overdue || s.defaulted; });
+    const title = loans.map(l => `${l.desc}: ${l.paymentRank}/month, ${l.remaining} of ${l.months} left (${this._loanStatus(l, now).label})`).join("\n");
+    $link.append(`<span class="res-loan-badge" title="${title.replace(/"/g, '&quot;')}" style="margin-left:6px;padding:0 5px;border-radius:8px;font-size:10px;font-weight:700;letter-spacing:.3px;background:${bad ? '#c62828' : '#6b5d00'};color:#fff;">${loans.length} loan${loans.length > 1 ? 's' : ''}</span>`);
+  }
+
+  /** Record a loan taken in the Resource FEAT dialog. Terms from the kernel. */
+  async _recordLoan({ desc, itemRank, resourceRank }) {
+    const terms = _kernelBankLoan({ resourceRank: _resKernelKey(resourceRank), itemRank: _resKernelKey(itemRank) });
+    if (!terms.allowed) return null;
+    const now = this._loanNow();
+    const loan = {
+      id: foundry.utils.randomID(),
+      desc, itemRank,
+      paymentRank: _resFoundryName(terms.paymentRank, "dash"),
+      months: terms.months, remaining: terms.months,
+      takenAt: now, lastPaidAt: now, missed: 0, defaulted: false,
+    };
+    await this._setLoans([...this._getLoans(), loan]);
+    return loan;
+  }
+
+  _loansSectionHtml(ranks) {
+    const loans = this._getLoans();
+    if (!loans.length) return "";
+    const now = this._loanNow();
+    const isGM = game.user.isGM;
+    const rows = loans.map(l => {
+      const s = this._loanStatus(l, now);
+      const color = s.defaulted ? "#c62828" : s.overdue ? "#e65100" : "#555";
+      return `<div class="frp-loan-row" data-loan-id="${l.id}" style="display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px solid #e6e2d6;font-size:12px;">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;"><b>${l.desc}</b> <span style="color:#888;">(${l.itemRank})</span></span>
+        <span style="color:#555;white-space:nowrap;">${l.paymentRank}/mo \u00b7 ${l.remaining}/${l.months}</span>
+        <span style="color:${color};font-weight:600;white-space:nowrap;min-width:78px;text-align:right;">${s.label}</span>
+        <button type="button" class="frp-loan-pay frp-btn-roll" style="padding:1px 8px;font-size:11px;" ${s.defaulted ? 'disabled' : ''}>Pay</button>
+        ${isGM ? `<a class="frp-loan-repossess" title="Repossess: remove this loan and its item" style="color:#c62828;font-size:11px;">\u2716</a>` : ""}
+        ${isGM && s.defaulted ? `<a class="frp-loan-forgive" title="Forgive the missed payment" style="color:#2e7d32;font-size:11px;">\u21ba</a>` : ""}
+      </div>`;
+    }).join("");
+    return `<div class="frp-box" style="padding:4px 8px;">
+      <div class="frp-box-label" style="margin:0 0 2px 0;">Bank Loans <span style="font-weight:400;color:#888;">\u00b7 one payment FEAT per game month</span></div>
+      ${rows}
+    </div>`;
+  }
+
+  /** Roll one monthly payment FEAT for a loan (kernel colour, weekly ledger, karma history). */
+  async _payLoan(loanId, { override = false } = {}) {
+    const loans = this._getLoans();
+    const idx = loans.findIndex(l => l.id === loanId);
+    if (idx < 0) return;
+    const loan = loans[idx];
+    const resourceRank = this.actor.system.attributes.resources.rank;
+    const resourceValue = this.actor.system.attributes.resources.value;
+    const lock = this._getResourceLockStatus();
+    const ranks = this._resourceRanks();
+    const payIdx = ranks.indexOf(loan.paymentRank);
+    if (lock.enabled && lock.locked && !override &&
+        (lock.scope === "week" || (lock.scope === "fail" && payIdx >= lock.lockedIdx))) {
+      return ui.notifications.warn(`Resource FEATs are locked this week (${lock.daysLeft} day${lock.daysLeft > 1 ? "s" : ""} left).`);
+    }
+    const pc = purchaseColor({ resourceRank: _resKernelKey(resourceRank), itemRank: _resKernelKey(loan.paymentRank) });
+    const needed = !pc.allowed ? "Yellow" : pc.automatic ? "Automatic" : pc.needed === "green" ? "Green" : "Yellow";
+
+    const roll = new Roll("1d100");
+    await roll.evaluate();
+    const resultColor = game.msh.rollUniversalTable(resourceRank, roll.total);
+    const rcl = resultColor.toLowerCase();
+    let success = false;
+    if (needed === "Automatic") success = true;
+    else if (needed === "Green") success = ["green", "yellow", "red"].includes(rcl);
+    else success = ["yellow", "red"].includes(rcl);
+
+    const now = this._loanNow();
+    const updated = foundry.utils.deepClone(loans);
+    let outcome;
+    if (success) {
+      updated[idx].remaining = Math.max(0, (updated[idx].remaining ?? 1) - 1);
+      updated[idx].lastPaidAt = now;
+      updated[idx].defaulted = false;
+      if (updated[idx].remaining === 0) { updated.splice(idx, 1); outcome = "PAID OFF"; }
+      else outcome = `PAID \u2014 ${updated[idx].remaining} payment${updated[idx].remaining > 1 ? "s" : ""} left`;
+    } else {
+      updated[idx].missed = (updated[idx].missed ?? 0) + 1;
+      updated[idx].defaulted = true;
+      outcome = "MISSED \u2014 the bank may reclaim the item (Judge decides)";
+    }
+    await this._setLoans(updated);
+
+    const bannerBg = { white: "#f8f8f8", green: "#00a94e", yellow: "#fef102", red: "#ee1e25" }[rcl] || "#ccc";
+    const bannerFg = ["white", "yellow"].includes(rcl) ? "#222" : "#fff";
+    const card = `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;overflow:hidden;color:#333;">
+        <div style="padding:7px 12px;border-bottom:1px solid #d8d8d0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <strong style="color:#8b0000;font-size:14px;letter-spacing:.3px;">Loan Payment</strong>
+          <span style="color:#888;font-size:12px;">${loan.desc} (${loan.itemRank})</span></div>
+        <div style="padding:6px 12px;display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e2da;">
+          <span><span style="color:#888;">Resources:</span> <b>${resourceRank} (${resourceValue})</b></span>
+          <span><span style="color:#888;">Payment:</span> <b>${loan.paymentRank}</b> \u00b7 needs <b>${needed}</b></span></div>
+        <div style="text-align:center;font-weight:bold;font-size:15px;letter-spacing:1.5px;padding:7px 10px;background:${bannerBg};color:${bannerFg};">${resultColor.toUpperCase()} (${roll.total})</div>
+        <div style="padding:7px 12px;text-align:center;font-weight:bold;font-size:13px;letter-spacing:.5px;color:${success ? '#1b5e20' : '#c62828'};">${success ? "\u2713" : "\u2717"} ${outcome}</div>
+      </div>`;
+    const msg = { speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: card, rolls: [roll] };
+    try { ChatMessage.applyMode(msg, game.settings.get("core", "messageMode")); }
+    catch { try { ChatMessage.applyRollMode(msg, game.settings.get("core", "rollMode")); } catch {} }
+    await ChatMessage.create(msg);
+
+    if (lock.enabled) {
+      const upd = { lastAttemptWT: now };
+      if (!success) { upd.lastFailWT = now; upd.lastFailIdx = payIdx; }
+      await this.actor.setFlag("msh-faserip", "resourceFeat",
+        foundry.utils.mergeObject(this.actor.getFlag("msh-faserip", "resourceFeat") || {}, upd));
+    }
+    const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+    history.push({
+      timestamp: new Date().toISOString(), realDate: new Date().toLocaleDateString(), gameDate: "",
+      amount: 0, type: "Resource FEAT",
+      description: `Loan payment: ${loan.desc} (${loan.paymentRank}) - ${success ? "PAID" : "MISSED"}`,
+    });
+    if (typeof game.msh?.runAsGM === "function") {
+      game.msh.runAsGM({ operation: "update", targetActorUuid: this.actor.uuid, args: [{ "system.karma.history": history }] });
+    } else {
+      await this.actor.update({ "system.karma.history": history });
+    }
+    this.render(false);
+  }
+
+  _bindLoanRows(html, dlg) {
+    html.find(".frp-loan-pay").on("click", async ev => {
+      const id = $(ev.currentTarget).closest(".frp-loan-row").data("loan-id");
+      const override = html.find("#res-ovr").length ? html.find("#res-ovr").is(":checked") : false;
+      await this._payLoan(id, { override });
+      if (!isDialogDetached(dlg)) dlg.close();
+    });
+    html.find(".frp-loan-repossess").on("click", async ev => {
+      const id = $(ev.currentTarget).closest(".frp-loan-row").data("loan-id");
+      const loan = this._getLoans().find(l => l.id === id);
+      if (!loan) return;
+      const ok = await Dialog.confirm({ title: "Repossess", content: `<p>The bank takes back <b>${loan.desc}</b>. Remove the loan?</p>` });
+      if (!ok) return;
+      await this._setLoans(this._getLoans().filter(l => l.id !== id));
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: `<div style="padding:6px 10px;border:1px solid #c0c0c0;background:#f5f5f0;"><b style="color:#8b0000;">Repossessed:</b> ${loan.desc} (${loan.itemRank}) \u2014 the bank reclaims it.</div>` });
+      $(ev.currentTarget).closest(".frp-loan-row").remove();
+      this.render(false);
+    });
+    html.find(".frp-loan-forgive").on("click", async ev => {
+      const id = $(ev.currentTarget).closest(".frp-loan-row").data("loan-id");
+      const loans = this._getLoans().map(l => l.id === id ? { ...l, defaulted: false, lastPaidAt: this._loanNow() } : l);
+      await this._setLoans(loans);
+      if (!isDialogDetached(dlg)) dlg.close();
+      this._onResourceRoll();
+    });
+  }
+
   _onResourceRoll() {
     const ranks = this._resourceRanks();
     const resourceRank = this.actor.system.attributes.resources.rank;
@@ -5534,6 +5735,7 @@ html.find('.headquarters-row').each((i, row) => {
         <div class="frp-need-line"><span class="frp-need-label">Needs:</span>
           <span id="res-pill" class="frp-feat-pill ${initReq.cls}">${initReq.color.toUpperCase()}</span>
           <span id="res-hint" class="hint">${initReq.hint}</span></div>
+        ${this._loansSectionHtml(ranks)}
         <div class="frp-foot">
           <div class="frp-foot-btns">
             <button id="res-roll" class="frp-btn-roll">Roll</button>
@@ -5573,6 +5775,7 @@ html.find('.headquarters-row').each((i, row) => {
         refresh();
 
         html.find("#res-cancel").on("click", () => dlg.close());
+        self._bindLoanRows(html, dlg);
         $roll.off("click.frp").on("click.frp", async () => {
           if ($roll.prop("disabled")) return;
           const itemRank = $item.val();
@@ -5627,6 +5830,8 @@ html.find('.headquarters-row').each((i, row) => {
           try { ChatMessage.applyMode(resMsg, game.settings.get("core", "messageMode")); }
           catch { try { ChatMessage.applyRollMode(resMsg, game.settings.get("core", "rollMode")); } catch {} }
           await ChatMessage.create(resMsg);
+
+          if (loan && success) await self._recordLoan({ desc, itemRank, resourceRank });
 
           if (lock.enabled) {
             let now;

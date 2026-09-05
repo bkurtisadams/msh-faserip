@@ -1,10 +1,13 @@
+// faserip-rules popularity v0.1.1
+// v0.1.1: Karma may not manipulate Popularity FEATs (Karma chapter):
+//         resolvePopularityFeat ignores karma and reports karmaAllowed false.
 // faserip-rules popularity v0.1.0
 // Popularity FEATs (Advanced Set): dispositions, request column shifts,
 // negative Popularity, failure consequences. Secret and public identities
 // carry separate Popularity numbers; the caller passes the one in play.
 import { rankForNumber, shiftRank, requiredColor, colorForRoll, colorAtLeast, RANKS } from './faserip-kernel.js';
 
-export const POPULARITY_VERSION = '0.1.0';
+export const POPULARITY_VERSION = '0.1.1';
 export const POPULARITY_CERTIFIED = true;
 
 export const DISPOSITIONS = ['friendly', 'neutral', 'unfriendly', 'hostile'];
@@ -70,12 +73,13 @@ export function popularityFeat({ popularity, disposition, request = {}, isContac
   return { allowed: true, negative, baseRank, column, shift, needed, disposition, consequence: FAILURE_CONSEQUENCE[disposition] };
 }
 
-/** Resolve a rolled Popularity FEAT. Karma is added to the roll, capped at 100. */
-export function resolvePopularityFeat({ popularity, disposition, request = {}, isContact = false, roll, karma = 0 }) {
+/** Resolve a rolled Popularity FEAT. Karma may not manipulate it: the die stands. */
+export const POPULARITY_KARMA_ALLOWED = false;
+export function resolvePopularityFeat({ popularity, disposition, request = {}, isContact = false, roll }) {
   const feat = popularityFeat({ popularity, disposition, request, isContact });
-  if (!feat.allowed) return { ...feat, roll, success: false, color: null };
-  const total = Math.min(100, roll + karma);
+  if (!feat.allowed) return { ...feat, roll, success: false, color: null, karmaAllowed: POPULARITY_KARMA_ALLOWED };
+  const total = Math.min(100, Math.max(1, roll));
   const color = colorForRoll(feat.column, total);
   const success = colorAtLeast(color, feat.needed);
-  return { ...feat, roll, karma, total, color, success, consequence: success ? null : feat.consequence };
+  return { ...feat, roll, karma: 0, karmaAllowed: POPULARITY_KARMA_ALLOWED, total, color, success, consequence: success ? null : feat.consequence };
 }
