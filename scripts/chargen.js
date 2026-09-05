@@ -1,6 +1,12 @@
-// chargen.js v2.0.0 - 2026-09-05 - Marvel Super Heroes Random Character Generation
+// chargen.js v2.0.1 - 2026-09-05 - Marvel Super Heroes Random Character Generation
 // Based on the Advanced Set rules
 //
+// v2.0.1: step-by-step mode survives a sheet re-render. Form-control events
+//   inside .chargen-container no longer bubble to the sheet form (Foundry's
+//   submit-on-change was re-rendering the sheet and rebuilding the tab from
+//   the template as soon as an origin was picked), and ChargenUIManager.attach()
+//   rebinds to fresh HTML and redraws the current step; actorSheet's
+//   _initChargenTab should call attach(html) on re-renders.
 // v2.0.0 (Slice 8): every generation table now derives from the faserip-rules
 //   chargen kernel (origins, Random Ranks columns 1-5, Ability Modifier,
 //   Powers/Talents/Contacts counts, category tables, power and talent lists
@@ -1137,12 +1143,25 @@ export class ChargenUIManager {
     this.renderStep(0);
   }
 
+  // Called by the sheet on every render: rebind to the new HTML and, if a
+  // generation is in progress, redraw the current step over the template.
+  attach(html) {
+    this.html = html;
+    this._boundEvents = false;
+    this.bindEvents();
+    if (this.generator && this.currentStep > 0) this.renderStep(this.currentStep);
+  }
+
   bindEvents() {
     if (this._boundEvents) return;
     this._boundEvents = true;
 
     const container = this.html.find('.chargen-container');
     if (!container.length) return;
+
+    // The generator keeps its own state; its controls must not reach the
+    // sheet form, whose submit-on-change re-renders the whole sheet.
+    container.on('change input submit', 'input, select, textarea', ev => ev.stopPropagation());
 
     container.on('click', '.chargen-start', () => this.startGeneration());
     container.on('click', '.chargen-quick-random', () => this.quickRandomCharacter());
