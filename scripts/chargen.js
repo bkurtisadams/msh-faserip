@@ -1,6 +1,18 @@
-// chargen.js - Marvel Super Heroes Random Character Generation
+// chargen.js v2.0.0 - 2026-09-05 - Marvel Super Heroes Random Character Generation
 // Based on the Advanced Set rules
 //
+// v2.0.0 (Slice 8): every generation table now derives from the faserip-rules
+//   chargen kernel (origins, Random Ranks columns 1-5, Ability Modifier,
+//   Powers/Talents/Contacts counts, category tables, power and talent lists
+//   with their slot costs). Fixed-bugs vs the kernel: Law-Enforcement is a
+//   two-slot talent; the secret-ID side of Popularity never starts below 0
+//   (Lodestone -5/0); random power and talent picks roll the printed d10
+//   sub-table instead of a uniform pick; every pick is held to the initial
+//   Power/Talent count with starred entries costing two (bonus Powers exempt).
+//   Hi-Tech Resources keep the Example 3
+//   reading (Good + modifier roll) while the kernel ERRATA stays OPEN.
+//   "Normal" (column 2, no Powers) remains a system extension.
+//   Proof: scripts/dev/kernel-chargen-diff.mjs.
 // 2026-05-15: _buildUpdates now seeds system.karma.lifetime and a
 //   "Starting karma (chargen)" entry in system.karma.history at the value
 //   of s.karma (R+I+P). Required so actor.prepareDerivedData's
@@ -9,6 +21,29 @@
 
 import { POWER_DATA, TALENT_DATA, CONTACT_DATA } from './chargen-data.js';
 import { stepRank, RANKS_ORDERED, RANK_RANGES, RANK_VALUES } from './rules/rules-reference.js';
+import {
+  ORIGIN_TABLE as KERNEL_ORIGIN_TABLE, RANDOM_RANKS, abilityModifier, PTC_TABLE,
+  POWER_CATEGORY_TABLE, TALENT_CATEGORY_TABLE, POWER_LIST, TALENT_LIST,
+  rollPower as kernelRollPower, rollTalent as kernelRollTalent, initialPopularity,
+} from './lib/faserip-rules/faserip-chargen.js';
+import { rankByKey } from './lib/faserip-rules/faserip-kernel.js';
+
+// Kernel keys <-> the display names this module and its templates use.
+const ORIGIN_LABEL = {
+  'altered-human': "Altered Human", 'mutant': "Mutant", 'hi-tech': "Hi-Tech", 'robot': "Robot", 'alien': "Alien",
+};
+export const ORIGIN_SLUG = Object.fromEntries(Object.entries(ORIGIN_LABEL).map(([k, v]) => [v, k]));
+const CATEGORY_LABEL = {
+  'resistances': "Resistances", 'senses': "Senses", 'movement': "Movement",
+  'matter-control': "Matter Control", 'energy-control': "Energy Control", 'body-control': "Body Control",
+  'distance-attacks': "Distance Attacks", 'mental-powers': "Mental Powers",
+  'body-alterations-offensive': "Body Alterations/Offensive", 'body-alterations-defensive': "Body Alterations/Defensive",
+  'weapon-skills': "Weapon Skills", 'fighting-skills': "Fighting Skills", 'professional-skills': "Professional Skills",
+  'scientific-skills': "Scientific Skills", 'mystic-mental-skills': "Mystic and Mental Skills", 'other-skills': "Other Skills",
+};
+const CATEGORY_SLUG = Object.fromEntries(Object.entries(CATEGORY_LABEL).map(([k, v]) => [v, k]));
+const rankLabel = key => rankByKey(key).name.replace(" ", "-");
+const bandTable = (rows, map) => rows.map(r => ({ roll: [r.lo, r.hi], ...map(r) }));
 
 // Ability Modifier Table rule: "no ability may be modified in any fashion
 // below Feeble or above Monstrous"
@@ -23,353 +58,57 @@ export const RANKS = RANKS_ORDERED.filter(n => n !== "Beyond").map(name => ({
   standard: RANK_VALUES[name]
 }));
 
-// Origin table
-const ORIGIN_TABLE = [
-  { roll: [1, 30], origin: "Altered Human" },
-  { roll: [31, 60], origin: "Mutant" },
-  { roll: [61, 90], origin: "Hi-Tech" },
-  { roll: [91, 95], origin: "Robot" },
-  { roll: [96, 100], origin: "Alien" }
-];
+// Origin table (kernel ORIGIN_TABLE)
+const ORIGIN_TABLE = bandTable(KERNEL_ORIGIN_TABLE, r => ({ origin: ORIGIN_LABEL[r.origin] }));
 
-// Column 1: Altered Humans, Mutants
-const COLUMN_1 = [
-  { roll: [1, 5], rank: "Feeble" },
-  { roll: [6, 10], rank: "Poor" },
-  { roll: [11, 20], rank: "Typical" },
-  { roll: [21, 40], rank: "Good" },
-  { roll: [41, 60], rank: "Excellent" },
-  { roll: [61, 80], rank: "Remarkable" },
-  { roll: [81, 96], rank: "Incredible" },
-  { roll: [97, 100], rank: "Amazing" }
-];
+// Random Ranks columns (kernel RANDOM_RANKS). 1: Altered Humans, Mutants.
+// 2: Normal Folks. 3: High Technology. 4: Robots and all Power ranks. 5: Aliens.
+const rankColumn = n => bandTable(RANDOM_RANKS[n], r => ({ rank: rankLabel(r.rank) }));
+const COLUMN_1 = rankColumn(1);
+const COLUMN_2 = rankColumn(2);
+const COLUMN_3 = rankColumn(3);
+const COLUMN_4 = rankColumn(4);
+const COLUMN_5 = rankColumn(5);
 
-// Column 2: Normal Folks (not used for heroes but shown for reference)
-const COLUMN_2 = [
-  { roll: [1, 5], rank: "Feeble" },
-  { roll: [6, 25], rank: "Poor" },
-  { roll: [26, 75], rank: "Typical" },
-  { roll: [76, 95], rank: "Good" },
-  { roll: [96, 100], rank: "Excellent" }
-];
+// Ability Modifier Table, as bands, from the kernel function. Column 6
+// (Battlesuit Modification) is the same table.
+const ABILITY_MODIFIER = (() => {
+  const bands = [];
+  for (let d = 1; d <= 100; d++) {
+    const mod = abilityModifier(d);
+    if (bands.length && bands[bands.length - 1].mod === mod) bands[bands.length - 1].roll[1] = d;
+    else bands.push({ roll: [d, d], mod });
+  }
+  return bands;
+})();
+const COLUMN_6 = ABILITY_MODIFIER;
 
-// Column 3: High Technology
-const COLUMN_3 = [
-  { roll: [1, 5], rank: "Feeble" },
-  { roll: [6, 10], rank: "Poor" },
-  { roll: [11, 40], rank: "Typical" },
-  { roll: [41, 80], rank: "Good" },
-  { roll: [81, 95], rank: "Excellent" },
-  { roll: [96, 100], rank: "Remarkable" }
-];
+// Powers, Talents, Contacts initial/max (kernel PTC_TABLE)
+const POWERS_TABLE = bandTable(PTC_TABLE, r => ({ ...r.powers }));
+const TALENTS_TABLE = bandTable(PTC_TABLE, r => ({ ...r.talents }));
+const CONTACTS_TABLE = bandTable(PTC_TABLE, r => ({ ...r.contacts }));
 
-// Column 4: Robots & Power Ranks
-const COLUMN_4 = [
-  { roll: [1, 5], rank: "Feeble" },
-  { roll: [6, 10], rank: "Poor" },
-  { roll: [11, 15], rank: "Typical" },
-  { roll: [16, 40], rank: "Good" },
-  { roll: [41, 50], rank: "Excellent" },
-  { roll: [51, 70], rank: "Remarkable" },
-  { roll: [71, 90], rank: "Incredible" },
-  { roll: [91, 98], rank: "Amazing" },
-  { roll: [99, 100], rank: "Monstrous" }
-];
+// Category tables (kernel)
+const POWER_CATEGORIES = bandTable(POWER_CATEGORY_TABLE, r => ({ category: CATEGORY_LABEL[r.category] }));
+const TALENT_CATEGORIES = bandTable(TALENT_CATEGORY_TABLE, r => ({ category: CATEGORY_LABEL[r.category] }));
 
-// Column 5: Aliens
-const COLUMN_5 = [
-  { roll: [1, 10], rank: "Feeble" },
-  { roll: [11, 20], rank: "Poor" },
-  { roll: [21, 30], rank: "Typical" },
-  { roll: [31, 40], rank: "Good" },
-  { roll: [41, 60], rank: "Excellent" },
-  { roll: [61, 70], rank: "Remarkable" },
-  { roll: [71, 80], rank: "Incredible" },
-  { roll: [81, 95], rank: "Amazing" },
-  { roll: [96, 100], rank: "Monstrous" }
-];
+// Read-only view of the derived tables for scripts/dev/kernel-chargen-diff.mjs.
+export const CHARGEN_TABLES = Object.freeze({
+  ORIGIN_TABLE, COLUMN_1, COLUMN_2, COLUMN_3, COLUMN_4, COLUMN_5, COLUMN_6, ABILITY_MODIFIER,
+  POWERS_TABLE, TALENTS_TABLE, CONTACTS_TABLE, POWER_CATEGORIES, TALENT_CATEGORIES,
+});
 
-// Column 6: Battlesuit Modification
-const COLUMN_6 = [
-  { roll: [1, 15], mod: -1 },
-  { roll: [16, 50], mod: 0 },
-  { roll: [51, 70], mod: 1 },
-  { roll: [71, 85], mod: 2 },
-  { roll: [86, 95], mod: 3 },
-  { roll: [96, 100], mod: 4 }
-];
+// Power and Talent listings by category (kernel POWER_LIST / TALENT_LIST).
+// star = two-slot entry; d10 = printed sub-table band, null for choose-only.
+const displayList = list => Object.fromEntries(
+  Object.entries(list).map(([slug, entries]) => [
+    CATEGORY_LABEL[slug],
+    entries.map(e => ({ name: e.name, star: e.slots === 2, d10: e.d10 })),
+  ])
+);
+export const POWER_LISTS = displayList(POWER_LIST);
+export const TALENT_LISTS = displayList(TALENT_LIST);
 
-// Ability Modifier Table
-const ABILITY_MODIFIER = [
-  { roll: [1, 15], mod: -1 },
-  { roll: [16, 50], mod: 0 },
-  { roll: [51, 70], mod: 1 },
-  { roll: [71, 85], mod: 2 },
-  { roll: [86, 95], mod: 3 },
-  { roll: [96, 100], mod: 4 }
-];
-
-// Powers, Talents, Contacts initial/max
-const POWERS_TABLE = [
-  { roll: [1, 20], initial: 2, max: 4 },
-  { roll: [21, 60], initial: 3, max: 4 },
-  { roll: [61, 90], initial: 4, max: 4 },
-  { roll: [91, 100], initial: 5, max: 5 }
-];
-
-const TALENTS_TABLE = [
-  { roll: [1, 20], initial: 1, max: 6 },
-  { roll: [21, 60], initial: 2, max: 5 },
-  { roll: [61, 90], initial: 3, max: 4 },
-  { roll: [91, 100], initial: 4, max: 4 }
-];
-
-const CONTACTS_TABLE = [
-  { roll: [1, 20], initial: 0, max: 4 },
-  { roll: [21, 60], initial: 1, max: 4 },
-  { roll: [61, 90], initial: 2, max: 4 },
-  { roll: [91, 100], initial: 3, max: 4 }
-];
-
-// Power Categories
-const POWER_CATEGORIES = [
-  { roll: [1, 5], category: "Resistances" },
-  { roll: [6, 10], category: "Senses" },
-  { roll: [11, 15], category: "Movement" },
-  { roll: [16, 25], category: "Matter Control" },
-  { roll: [26, 40], category: "Energy Control" },
-  { roll: [41, 55], category: "Body Control" },
-  { roll: [56, 70], category: "Distance Attacks" },
-  { roll: [71, 75], category: "Mental Powers" },
-  { roll: [76, 90], category: "Body Alterations/Offensive" },
-  { roll: [91, 100], category: "Body Alterations/Defensive" }
-];
-
-// Talent Categories
-const TALENT_CATEGORIES = [
-  { roll: [1, 20], category: "Weapon Skills" },
-  { roll: [21, 45], category: "Fighting Skills" },
-  { roll: [46, 65], category: "Professional Skills" },
-  { roll: [66, 85], category: "Scientific Skills" },
-  { roll: [86, 90], category: "Mystic and Mental Skills" },
-  { roll: [91, 100], category: "Other Skills" }
-];
-
-// Power listings by category
-export const POWER_LISTS = {
-  "Resistances": [
-    { name: "Resistance to Fire and Heat", star: false },
-    { name: "Resistance to Cold", star: false },
-    { name: "Resistance to Electricity", star: false },
-    { name: "Resistance to Radiation", star: false },
-    { name: "Resistance to Toxins", star: false },
-    { name: "Resistance to Corrosives", star: false },
-    { name: "Resistance to Emotion Attacks", star: false },
-    { name: "Resistance to Mental Attacks", star: false },
-    { name: "Resistance to Magical Attacks", star: false },
-    { name: "Resistance to Disease", star: false },
-    { name: "Invulnerability", star: true }
-  ],
-  "Senses": [
-    { name: "Protected Senses", star: false },
-    { name: "Enhanced Senses", star: false },
-    { name: "Infravision", star: false },
-    { name: "Cosmic Awareness", star: true },
-    { name: "Combat Sense", star: true },
-    { name: "Computer Links", star: false },
-    { name: "Emotion Detection", star: false },
-    { name: "Energy Detection", star: false },
-    { name: "Magic Detection", star: false },
-    { name: "Magnetic Detection", star: false },
-    { name: "Mutant Detection", star: false },
-    { name: "Psionic Detection", star: false },
-    { name: "Astral Detection", star: false },
-    { name: "Tracking Ability", star: false }
-  ],
-  "Movement": [
-    { name: "Flight", star: false },
-    { name: "Gliding", star: false },
-    { name: "Leaping", star: false },
-    { name: "Wall-Crawling", star: false },
-    { name: "Lightning Speed", star: false },
-    { name: "Teleportation", star: true },
-    { name: "Levitation", star: false },
-    { name: "Swimming", star: false },
-    { name: "Climbing", star: false },
-    { name: "Digging", star: false },
-    { name: "Dimensional Travel", star: true }
-  ],
-  "Matter Control": [
-    { name: "Earth Control", star: false },
-    { name: "Air Control", star: false },
-    { name: "Fire Control", star: false },
-    { name: "Water Control", star: false },
-    { name: "Weather Control", star: false },
-    { name: "Density Manipulation - Others", star: false },
-    { name: "Body Transformation - Others", star: false },
-    { name: "Animal Transformation - Others", star: false }
-  ],
-  "Energy Control": [
-    { name: "Magnetic Manipulation", star: false },
-    { name: "Electrical Manipulation", star: false },
-    { name: "Light Manipulation", star: false },
-    { name: "Sound Manipulation", star: false },
-    { name: "Darkforce Manipulation", star: false },
-    { name: "Gravity Manipulation", star: false },
-    { name: "Probability Manipulation", star: true },
-    { name: "Nullifying Power", star: true },
-    { name: "Energy Reflection", star: false },
-    { name: "Time Control", star: true }
-  ],
-  "Body Control": [
-    { name: "Growth", star: false },
-    { name: "Shrinking", star: false },
-    { name: "Density Manipulation - Self", star: false },
-    { name: "Phasing", star: false },
-    { name: "Invisibility", star: false },
-    { name: "Plasticity", star: false },
-    { name: "Elongation", star: false },
-    { name: "Shape-Shifting", star: false },
-    { name: "Imitation", star: false },
-    { name: "Body Transformation - Self", star: true },
-    { name: "Animal Transformation - Self", star: false },
-    { name: "Raise Lowest Ability", star: false },
-    { name: "Blending", star: false },
-    { name: "Power Absorption", star: false },
-    { name: "Alter Ego", star: false }
-  ],
-  "Distance Attacks": [
-    { name: "Projectile Missile", star: false },
-    { name: "Ensnaring Missile", star: false },
-    { name: "Ice Generation", star: false },
-    { name: "Fire Generation", star: false },
-    { name: "Energy Generation", star: false },
-    { name: "Sound Generation", star: false },
-    { name: "Stunning Missile", star: false },
-    { name: "Corrosive Missile", star: false },
-    { name: "Slashing Missile", star: false },
-    { name: "Nullifier Missile", star: false },
-    { name: "Darkforce Generation", star: false }
-  ],
-  "Mental Powers": [
-    { name: "Telepathy", star: false },
-    { name: "Image Generation", star: true },
-    { name: "Telekinesis", star: false },
-    { name: "Mind Control", star: true },
-    { name: "Emotion Control", star: true },
-    { name: "Force Field Generation", star: false },
-    { name: "Animal Communication and Control", star: false },
-    { name: "Mechanical Intuition", star: false },
-    { name: "Animal Empathy", star: false },
-    { name: "Empathy", star: false },
-    { name: "Psi-Screen", star: false },
-    { name: "Mental Probe", star: false },
-    { name: "Animate Drawings", star: false },
-    { name: "Possession", star: true },
-    { name: "Transferral", star: true },
-    { name: "Astral Projection", star: false },
-    { name: "Psionic Attack", star: false },
-    { name: "Precognition", star: true },
-    { name: "Postcognition", star: false },
-    { name: "Plant Control", star: false },
-    { name: "Ultimate Skill", star: false }
-  ],
-  "Body Alterations/Offensive": [
-    { name: "Extra Body Parts", star: false },
-    { name: "Extra Attacks", star: false },
-    { name: "Energy Touch", star: false },
-    { name: "Paralyzing Touch", star: false },
-    { name: "Claws", star: false },
-    { name: "Rotting Touch", star: false },
-    { name: "Corrosive Touch", star: false },
-    { name: "Health-Drain Touch", star: true },
-    { name: "Blinding Touch", star: false }
-  ],
-  "Body Alterations/Defensive": [
-    { name: "Body Armor", star: false },
-    { name: "Water Breathing", star: false },
-    { name: "Absorption", star: false },
-    { name: "Regeneration", star: false },
-    { name: "Solar Regeneration", star: false },
-    { name: "Recovery", star: false },
-    { name: "Life Support", star: false },
-    { name: "Pheromones", star: false },
-    { name: "Damage Transfer", star: false },
-    { name: "Healing", star: false },
-    { name: "Immortality", star: true }
-  ]
-};
-
-// Talent listings by category
-export const TALENT_LISTS = {
-  "Weapon Skills": [
-    { name: "Guns", star: false },
-    { name: "Thrown Weapons", star: false },
-    { name: "Bows", star: false },
-    { name: "Blunt Weapons", star: false },
-    { name: "Sharp Weapons", star: false },
-    { name: "Oriental Weapons", star: false },
-    { name: "Marksman", star: true },
-    { name: "Weapons Master", star: true },
-    { name: "Weapons Specialist", star: true }
-  ],
-  "Fighting Skills": [
-    { name: "Martial Arts A", star: false },
-    { name: "Martial Arts B", star: false },
-    { name: "Martial Arts C", star: false },
-    { name: "Martial Arts D", star: false },
-    { name: "Martial Arts E", star: false },
-    { name: "Wrestling", star: false },
-    { name: "Thrown Objects", star: false },
-    { name: "Tumbling", star: false },
-    { name: "Acrobatics", star: false }
-  ],
-  "Professional Skills": [
-    { name: "Medicine", star: true },
-    { name: "Law", star: false },
-    { name: "Law-Enforcement", star: false },
-    { name: "Pilot", star: false },
-    { name: "Military", star: false },
-    { name: "Business/Finance", star: false },
-    { name: "Journalism", star: false },
-    { name: "Engineering", star: false },
-    { name: "Crime", star: false },
-    { name: "Psychiatry", star: false },
-    { name: "Detective/Espionage", star: false }
-  ],
-  "Scientific Skills": [
-    { name: "Chemistry", star: false },
-    { name: "Biology", star: false },
-    { name: "Geology", star: false },
-    { name: "Genetics", star: false },
-    { name: "Archeology", star: false },
-    { name: "Physics", star: false },
-    { name: "Computers", star: false },
-    { name: "Electronics", star: false }
-  ],
-  "Mystic and Mental Skills": [
-    { name: "Trance", star: false },
-    { name: "Mesmerism and Hypnosis", star: false },
-    { name: "Sleight of Hand", star: false },
-    { name: "Resist Domination", star: false },
-    { name: "Mystic Origin", star: true },
-    { name: "Occult Lore", star: false }
-  ],
-  "Other Skills": [
-    { name: "Artist", star: false },
-    { name: "Languages", star: false },
-    { name: "First Aid", star: false },
-    { name: "Repair/Tinkering", star: false },
-    { name: "Trivia", star: false },
-    { name: "Performer", star: false },
-    { name: "Animal Training", star: true },
-    { name: "Heir to Fortune", star: true },
-    { name: "Student", star: true },
-    { name: "Leadership", star: true }
-  ]
-};
-
-// Contact types
 export const CONTACT_TYPES = [
   "Medicine", "Law", "Law-Enforcement", "Military", "Business World",
   "Journalism", "Crime", "Engineering", "Psychiatry", "Detective/Espionage",
@@ -719,28 +458,28 @@ export class CharacterGenerator {
       modShift: result.mod
     };
 
-    let basePop = 10;
-    if (this.state.origin === "Mutant" || this.state.origin === "Robot" || this.state.origin === "Normal") {
-      basePop = 0;
+    this.state.popularity = this.computePopularity(!!this.state.hasSecretId);
+    if (this.state.popularity.hero === 0 && !this.state.hasSecretId) {
       this.log(`${this.state.origin}: Starting Popularity is 0`);
     }
+  }
 
-    this.state.popularity = { hero: basePop, secretId: basePop };
+  // Kernel initialPopularity: 10 base (0 for mutants and robots), -5 for a
+  // secret ID on the hero side; the secret side never starts below 0.
+  // "Normal" is a system extension and starts at 0 like a robot.
+  computePopularity(secretId) {
+    const slug = ORIGIN_SLUG[this.state.origin] ?? (this.state.origin === "Normal" ? "robot" : "altered-human");
+    const pop = initialPopularity({ origin: slug, secretId });
+    return { hero: pop.hero, secretId: pop.secret ?? pop.hero };
   }
 
   setSecretId(hasSecret) {
     if (this.state.hasSecretId === hasSecret) return;
-    
-    if (hasSecret && !this.state.hasSecretId) {
-      this.state.popularity.hero -= 5;
-      this.state.popularity.secretId -= 5;
-      this.log("Secret ID: Popularity reduced by 5");
-    } else if (!hasSecret && this.state.hasSecretId) {
-      this.state.popularity.hero += 5;
-      this.state.popularity.secretId += 5;
-      this.log("Secret ID removed: Popularity restored");
-    }
     this.state.hasSecretId = hasSecret;
+    this.state.popularity = this.computePopularity(hasSecret);
+    this.log(hasSecret
+      ? `Secret ID: Popularity ${this.state.popularity.hero} (hero) / ${this.state.popularity.secretId} (secret ID)`
+      : `Secret ID removed: Popularity ${this.state.popularity.hero}`);
   }
 
   rollSpecialAbilityCounts() {
@@ -847,10 +586,14 @@ export class CharacterGenerator {
       return false;
     }
 
-    if (power.star) {
-      const slotsUsed = this.state.powersData.chosen.reduce((acc, p) => acc + (p.star ? 2 : 1), 0);
-      if (slotsUsed + 2 > this.state.powersData.initial) {
-        this.log(`Cannot choose ${powerName}: requires 2 slots`);
+    // Starred entries count as two of the character's initial Powers; a
+    // bonus Power granted by another Power sits outside that count.
+    const isBonusSlot = categoryIndex !== null && !!this.state.powersData.categories[categoryIndex]?.bonus;
+    if (!isBonusSlot) {
+      const slotsUsed = calcSlotsUsed(this.state.powersData.chosen.filter(p => !p.isBonus));
+      const cost = power.star ? 2 : 1;
+      if (slotsUsed + cost > this.state.powersData.initial) {
+        this.log(`Cannot choose ${powerName}: ${power.star ? "requires 2 slots" : "no Power slots remain"}`);
         return false;
       }
     }
@@ -974,15 +717,32 @@ export class CharacterGenerator {
     }
   }
 
+  // Random pick: roll the printed d10 sub-table (kernel rollPower). Re-roll a
+  // duplicate a few times, then fall back to any unchosen rollable entry.
+  // A rolled two-slot entry is re-rolled when fewer than two slots remain.
+  _rollListEntry(kernelRoll, list, category, chosenNames, slotsRemaining = Infinity) {
+    const slug = CATEGORY_SLUG[category];
+    if (!slug) return null;
+    for (let i = 0; i < 10; i++) {
+      const d10 = Math.floor(Math.random() * 10) + 1;
+      const entry = kernelRoll(slug, d10);
+      if (chosenNames.includes(entry.name)) continue;
+      if (entry.slots === 2 && slotsRemaining < 2) continue;
+      return { ...entry, star: entry.slots === 2, d10Roll: d10 };
+    }
+    const available = list.filter(e => e.d10 && !chosenNames.includes(e.name) && !(e.star && slotsRemaining < 2));
+    return available.length ? available[Math.floor(Math.random() * available.length)] : null;
+  }
+
   autoPickPower(category) {
     const powerList = POWER_LISTS[category];
     if (!powerList) return false;
 
     const chosenNames = this.state.powersData.chosen.map(p => p.name);
-    const available = powerList.filter(p => !p.star && !chosenNames.includes(p.name));
-    if (available.length === 0) return false;
-
-    const power = available[Math.floor(Math.random() * available.length)];
+    const slotsRemaining = this.state.powersData.initial - calcSlotsUsed(this.state.powersData.chosen);
+    const power = this._rollListEntry(kernelRollPower, powerList, category, chosenNames, slotsRemaining);
+    if (!power) return false;
+    if (power.d10Roll) this.log(`${category}: d10 ${power.d10Roll} → ${power.name}`);
     return this.choosePower(category, power.name);
   }
 
@@ -1008,10 +768,12 @@ export class CharacterGenerator {
       return false;
     }
 
-    if (talent.star) {
-      const slotsUsed = this.state.talentsData.chosen.reduce((acc, t) => acc + (t.star ? 2 : 1), 0);
-      if (slotsUsed + 2 > this.state.talentsData.initial) {
-        this.log(`Cannot choose ${talentName}: requires 2 slots`);
+    // Starred entries count as two of the character's initial Talents.
+    {
+      const slotsUsed = calcSlotsUsed(this.state.talentsData.chosen);
+      const cost = talent.star ? 2 : 1;
+      if (slotsUsed + cost > this.state.talentsData.initial) {
+        this.log(`Cannot choose ${talentName}: ${talent.star ? "requires 2 slots" : "no Talent slots remain"}`);
         return false;
       }
     }
@@ -1059,10 +821,10 @@ export class CharacterGenerator {
     if (!talentList) return false;
 
     const chosenNames = this.state.talentsData.chosen.map(t => t.name);
-    const available = talentList.filter(t => !t.star && !chosenNames.includes(t.name));
-    if (available.length === 0) return false;
-
-    const talent = available[Math.floor(Math.random() * available.length)];
+    const slotsRemaining = this.state.talentsData.initial - calcSlotsUsed(this.state.talentsData.chosen);
+    const talent = this._rollListEntry(kernelRollTalent, talentList, category, chosenNames, slotsRemaining);
+    if (!talent) return false;
+    if (talent.d10Roll) this.log(`${category}: d10 ${talent.d10Roll} → ${talent.name}`);
     return this.chooseTalent(category, talent.name);
   }
 
@@ -1557,7 +1319,11 @@ export class ChargenUIManager {
       const pickFrom = nonStarred.length > 0 ? nonStarred : available;
       if (pickFrom.length === 0) continue;
       
-      const power = pickFrom[Math.floor(Math.random() * pickFrom.length)];
+      // Printed d10 sub-table first (kernel rollPower); uniform fallback only
+      // when every rollable entry is already taken.
+      const rolled = this.generator._rollListEntry(kernelRollPower, powerList, entry.category, chosenNames, slotsRemaining);
+      const power = rolled ?? pickFrom[Math.floor(Math.random() * pickFrom.length)];
+      if (rolled?.d10Roll) this.generator.log(`${entry.category}: d10 ${rolled.d10Roll} → ${rolled.name}`);
       this.generator.choosePower(entry.category, power.name, entry.index);
     }
     this.updateDisplay();
@@ -1590,7 +1356,9 @@ export class ChargenUIManager {
       const pickFrom = nonStarred.length > 0 ? nonStarred : available;
       if (pickFrom.length === 0) continue;
       
-      const talent = pickFrom[Math.floor(Math.random() * pickFrom.length)];
+      const rolled = this.generator._rollListEntry(kernelRollTalent, talentList, entry.category, chosenNames, slotsRemaining);
+      const talent = rolled ?? pickFrom[Math.floor(Math.random() * pickFrom.length)];
+      if (rolled?.d10Roll) this.generator.log(`${entry.category}: d10 ${rolled.d10Roll} → ${rolled.name}`);
       this.generator.chooseTalent(entry.category, talent.name, entry.index);
     }
     this.updateDisplay();
