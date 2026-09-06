@@ -1,3 +1,12 @@
+// edged-attack-action.js v3.7.0 - 2026-09-05
+// v3.7.0: Karma effect reduction. Edged results may not be pulled for
+//         free (Players Book, Modifying Results in Combat), so the
+//         dialog now offers a result cap that attack-action prices at
+//         EFFECT_REDUCTION_COST per colour through the kernel. The
+//         control is disabled below that cost. No damage pull: EA is
+//         reduceDamage false in the kernel.
+//         Also declares Blindside: a checked box marks the target as
+//         blindsided so its Slam/Stun/Kill FEAT refuses Karma (RAW).
 // edged-attack-action.js v3.6.1 - 2026-09-02
 // v3.6.1: Fix ReferenceErrors — weapon dropdown builder still called the
 //         retired local getArmorPiercing, and initialAPLabel still read the
@@ -91,6 +100,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { executePenetrationFeat } from "./breaking-feat.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 
 export class EdgedAttackAction extends AttackAction {
@@ -230,6 +240,10 @@ export class EdgedAttackAction extends AttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
+    // Edged results may not be pulled freely; one colour step costs 50 Karma.
+    const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip","lastEdgedResultCap")) || "none") : "none";
+    const canPayReduction = availableKarma >= EFFECT_REDUCTION_COST;
+
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
       savedCS: savedColumnShift,
@@ -310,18 +324,30 @@ export class EdgedAttackAction extends AttackAction {
         </div>
       </div>
 
-      <!-- Options: Multi / Karma — edged can x2/x3 (Slugfest) but NOT adjacent -->
+      <!-- Options: Multi / Pull / Karma — edged can x2/x3 (Slugfest) but NOT adjacent -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${multiEnabled ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${(!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>
           <label><input type="radio" name="multiCount" value="3" ${savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
         </div>
+        <div class="frp-opt-row${savedResultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label title="${canPayReduction ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${savedResultCap !== 'none' ? 'checked' : ''} ${canPayReduction ? '' : 'disabled'}> <span class="frp-opt-label orange">Pull</span></label>
+          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(savedResultCap === 'none' || !canPayReduction) ? 'disabled' : ''}>
+            <option value="yellow" ${savedResultCap === 'yellow' ? 'selected' : ''}>Cap at Stun</option>
+            <option value="green" ${savedResultCap === 'green' ? 'selected' : ''}>Cap at Hit</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
+        </div>
         <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
           ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
+        </div>
+        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
+          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
+          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
         </div>
       </div>
 
@@ -417,10 +443,18 @@ export class EdgedAttackAction extends AttackAction {
               src = "natural"; itemId = "";
             }
 
+            const pullEffectEnabled = $dlg('#pull-effect-enabled').is(':checked');
+            const resultCap = pullEffectEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
+
             const natRank = $dlg('[name="natRank"]').val() || savedNatRank;
             const natDmg = Number($dlg('[name="natDmg"]').val() || game.msh.getRankValue(natRank));
             const shift = _csState.get().totalShift;
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+            // RAW: FEATs forced by a Blindside or an unexpected attack may not
+            // be modified by Karma. Declared here, carried to the target's
+            // Slam/Stun/Kill check through the attack prefill.
+            const blindside = html.find('#blindside-attack').is(':checked');
             const karma = karmaToSpend;
 
             const multiEnabled = $dlg('#multi-enabled').is(':checked');
@@ -471,7 +505,8 @@ export class EdgedAttackAction extends AttackAction {
                 lastEdgedMultiAttacks: multiAttacks,
                 lastEdgedAttackCount: attackCount,
                 lastEdgedMultiAdjacent: multiAdjacent,
-                lastEdgedReason: _csState.get().reason
+                lastEdgedReason: _csState.get().reason,
+                lastEdgedResultCap: resultCap
               });
               if (src === "weapon") {
                 flagUpdate.lastEdgedItemId = itemId;
@@ -483,10 +518,12 @@ export class EdgedAttackAction extends AttackAction {
 
             _resolved = true;
             resolve({
+              blindside,
               src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice,
               weaponMat, weaponName, damage, note, weapon: sourceItem, sourceItemType,
               armorPiercingCS: apCS, bypassForceField: bypassFF,
-              multiAttacks, attackCount, multiAdjacent, csNotes
+              multiAttacks, attackCount, multiAdjacent, csNotes,
+              resultCap
             });
             dlg.close();
           });
@@ -585,6 +622,12 @@ export class EdgedAttackAction extends AttackAction {
           }
 
           // Karma toggle — inactive styling
+          html.find('#pull-effect-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="resultCap"]').prop('disabled', !this.checked);
+          });
+
           html.find('#spend-karma').on('change', function() {
             $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
           });

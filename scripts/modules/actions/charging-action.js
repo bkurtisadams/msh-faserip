@@ -1,3 +1,6 @@
+// charging-action.js v3.2.0 - 2026-09-05
+// v3.2.0: Blindside declaration carried to the target's Slam/Stun/Kill
+//         FEAT, which then refuses the Karma offer (RAW).
 // scripts/modules/actions/charging-action.js v3.2.0 - 2026-09-05
 // v3.2.0: Automatic situational modifiers — Higher Ground pre-selected in the
 //         sit dropdown when the tokens justify it (cs-modifiers v3.6.0).
@@ -356,6 +359,10 @@ export class ChargingAction extends AttackAction {
           <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
         ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
       </div>
+      <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
+        <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
+        <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
+      </div>
     </div>
 
     <!-- Effect preview grid -->
@@ -426,6 +433,11 @@ export class ChargingAction extends AttackAction {
           const areas = Math.max(1, Number($('[name="areas"]').val() || 1));
           const shift = Number($('[name="shift"]').val() || 0);
           const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+          // RAW: FEATs forced by a Blindside or an unexpected attack may not
+          // be modified by Karma. Declared here, carried to the target's
+          // Slam/Stun/Kill check through the attack prefill.
+          const blindside = html.find('#blindside-attack').is(':checked');
           const karma = karmaToSpend;
           const targetType = String($('[name="targetType"]:checked').val() || "character");
           const skipDice = !!$('#msh-skip-dice').is(':checked');
@@ -488,6 +500,7 @@ export class ChargingAction extends AttackAction {
 
           _resolved = true;
           resolve({
+            blindside,
             areas, shift, karma, spendKarma, skipDice,
             targetType, targetBArank, targetBAvalue,
             objectMaterial, objectDesc,

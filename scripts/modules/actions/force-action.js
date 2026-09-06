@@ -1,3 +1,6 @@
+// force-action.js v3.6.0 - 2026-09-05
+// v3.6.0: Blindside declaration carried to the target's Slam/Stun/Kill
+//         FEAT, which then refuses the Karma offer (RAW).
 // scripts/modules/actions/force-action.js v3.5.0 - 2026-09-05
 // v3.5.0: Power range penalty via the range kernel (powerRangePenalty); LOS
 //         ranks show "LOS" instead of Infinity. Same arithmetic as before.
@@ -303,6 +306,10 @@ export class ForceAction extends RangedAttackAction {
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
           ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
         </div>
+        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
+          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
+          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
+        </div>
       </div>
 
       <!-- Effect preview grid -->
@@ -456,6 +463,11 @@ export class ForceAction extends RangedAttackAction {
             const manualCS = csData.manualCS;
 
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+            // RAW: FEATs forced by a Blindside or an unexpected attack may not
+            // be modified by Karma. Declared here, carried to the target's
+            // Slam/Stun/Kill check through the attack prefill.
+            const blindside = html.find('#blindside-attack').is(':checked');
             const karma = karmaToSpend;
             const usePowerToHit = !!$dlg('#pwr-hit-toggle').is(':checked');
 
@@ -498,6 +510,7 @@ export class ForceAction extends RangedAttackAction {
 
             _resolved = true;
             resolve({
+              blindside,
               powerName, powerDamage, powerRank, powerId, prettyRange,
               shift, karma, spendKarma, range, skipDice: skipDice, usePowerToHit,
               totalShift: shift,

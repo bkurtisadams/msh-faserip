@@ -1,3 +1,11 @@
+// shooting-action.js v3.15.0 - 2026-09-05
+// v3.15.0: Karma effect reduction. Shooting results may not be pulled for
+//          free (Players Book, Modifying Results in Combat); the dialog
+//          now offers a result cap that attack-action prices through the
+//          kernel at EFFECT_REDUCTION_COST per colour, disabled below
+//          that cost. No damage pull: Sh is reduceDamage false.
+//          Also declares Blindside: a checked box marks the target as
+//          blindsided so its Slam/Stun/Kill FEAT refuses Karma (RAW).
 // shooting-action.js v3.14.0 - 2026-09-05
 // v3.14.0: RULED 2026-09-05 weapon range penalty as written: -1CS per area to
 //          the target, own area 0 (Rifle at 4 areas = -4CS), via the range
@@ -173,6 +181,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
+import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
 export class ShootingAction extends RangedAttackAction {
@@ -299,6 +308,10 @@ export class ShootingAction extends RangedAttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
+    // Shooting results may not be pulled freely; one colour step costs 50 Karma.
+    const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingResultCap")) || "none") : "none";
+    const canPayReduction = availableKarma >= EFFECT_REDUCTION_COST;
+
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // === Build weapon damage source <select> ===
@@ -409,7 +422,7 @@ export class ShootingAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Options: Multi / Aim / Karma -->
+      <!-- Options: Multi / Aim / Pull / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${multiEnabled ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
@@ -424,11 +437,23 @@ export class ShootingAction extends RangedAttackAction {
           </select>
           <span style="font-size:10px;color:#888;margin-left:auto;">Bullseye effect</span>
         </div>
+        <div class="frp-opt-row${savedResultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label title="${canPayReduction ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${savedResultCap !== 'none' ? 'checked' : ''} ${canPayReduction ? '' : 'disabled'}> <span class="frp-opt-label orange">Pull</span></label>
+          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(savedResultCap === 'none' || !canPayReduction) ? 'disabled' : ''}>
+            <option value="yellow" ${savedResultCap === 'yellow' ? 'selected' : ''}>Cap at ${effects.yellow}</option>
+            <option value="green" ${savedResultCap === 'green' ? 'selected' : ''}>Cap at ${effects.green}</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
+        </div>
         <div class="frp-opt-row${!hasKarma ? ' inactive' : ' inactive'}">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
           ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
+        </div>
+        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
+          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
+          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
         </div>
       </div>
 
@@ -603,6 +628,11 @@ export class ShootingAction extends RangedAttackAction {
             const cs = _csState.get();
 
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+            // RAW: FEATs forced by a Blindside or an unexpected attack may not
+            // be modified by Karma. Declared here, carried to the target's
+            // Slam/Stun/Kill check through the attack prefill.
+            const blindside = html.find('#blindside-attack').is(':checked');
             const karma = karmaToSpend;
             const range = Number($dlg('[name="range"]').val() || 1);
             const variantType = $dlg('[name="variantType"]').val() || weapon.system?.variantType || "standard";
@@ -616,6 +646,10 @@ export class ShootingAction extends RangedAttackAction {
             // Aim tactic — Bullseye-effect reinterpretation (Tactics, RAW)
             const aimEnabled = $dlg('#aim-enabled').is(':checked');
             const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
+
+            // Kill-capable column: the cap is priced by the kernel downstream.
+            const pullEffectEnabled = $dlg('#pull-effect-enabled').is(':checked');
+            const resultCap = pullEffectEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
 
             // Weapon stats + AP
             const weaponRange = weapon.system?.range || 15;
@@ -640,6 +674,7 @@ export class ShootingAction extends RangedAttackAction {
                 lastShootingAttackCount: attackCount,
                 lastShootingVariant: variantType,
                 lastShootingAim: aimMode,
+                lastShootingResultCap: resultCap,
                 lastShootingReason: cs.reason
               });
             }
@@ -654,6 +689,7 @@ export class ShootingAction extends RangedAttackAction {
 
             _resolved = true;
             resolve({
+              blindside,
               weapon,
               weaponDamage,
               weaponRange,
@@ -668,6 +704,7 @@ export class ShootingAction extends RangedAttackAction {
               variantType,
               canisterSubType,
               aimMode,
+              resultCap,
               csNotes: cs.csNotes,
               armorPiercingCS: _apInfo.apCS,
               bypassForceField: _apInfo.bypassFF,
@@ -731,6 +768,13 @@ export class ShootingAction extends RangedAttackAction {
             const $row = $(this).closest('.frp-opt-row');
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="aimMode"]').prop('disabled', !this.checked);
+          });
+
+          // Result cap toggle (50 Karma per colour, priced downstream)
+          html.find('#pull-effect-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="resultCap"]').prop('disabled', !this.checked);
           });
 
           // Karma toggle

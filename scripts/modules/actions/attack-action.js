@@ -1,3 +1,11 @@
+// attack-action.js v1.14.0 - 2026-09-05
+// v1.14.0: Blindside declaration carried to the target. A dialog that sets
+//          choice.blindside stamps it on both the chip prefill and the
+//          inline consolidated prefill, so check-action.js refuses the
+//          Karma offer on the resulting Slam/Stun/Kill FEAT (RAW: FEATs
+//          resulting from a Blindside or an unexpected attack may not be
+//          modified by Karma). Gate existed since check-action v1.x with
+//          nothing to set it.
 // attack-action.js v1.13.0 - 2026-09-02
 // v1.13.0: Kernel slice 5h — Shooting (Sh) added to KERNEL_ATTACK_COLUMNS;
 //          legacy shooting follow-up case retired. choice.effectColumn lets a
@@ -1522,6 +1530,7 @@ export class AttackAction extends BaseAction {
             targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
             damage: Number(penetratingDamage) || 0,
             prefillData: {
+              blindside: !!choice.blindside,
               dmgThrough: Number(penetratingDamage) || 0,
               attackerStrength: getStrengthInfo(actor)?.value || 10,
               attackerStrengthRank: getStrengthInfo(actor)?.rank || "Typical",
@@ -1573,6 +1582,7 @@ export class AttackAction extends BaseAction {
         
         // Common prefill data
         const inlinePrefill = {
+          blindside: !!choice.blindside,
           dmgThrough: penetratingDamage,
           targetName: targetName,
           targetEndRank: targetEndRank,

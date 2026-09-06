@@ -1,3 +1,11 @@
+// scripts/modules/actions/defense-action.js v2.2.0 - 2026-09-05
+// v2.2.0: opts.blindside refuses the Karma offer. RAW: FEATs resulting
+//         from a Blindside or an unexpected attack may not be modified by
+//         Karma unless the character was forewarned. The dialog replaces
+//         the Karma row with a Blindside notice, and when the caller does
+//         not know, the roller may declare it with a Blindside checkbox that
+//         closes the Karma controls. _readDialog forces the amount to zero
+//         either way.
 // scripts/modules/actions/defense-action.js v2.1.0 - 2026-09-03
 // v2.1.0: opts.autoRoll skips the dialog: roll with the saved CS, no Karma,
 //         dice shown, evadeTarget from the declaration. Used by the tracker to
@@ -124,6 +132,9 @@ export class DefenseAction extends BaseAction {
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
+    // RAW: a FEAT forced by a Blindside or an unexpected attack may not be
+    // modified by Karma unless the character had previous warning.
+    const blindsided = !!this.opts?.blindside;
     const savedShift = Number(this.opts.shift ?? 0);
 
     // ------- Dialog -------
@@ -161,10 +172,14 @@ export class DefenseAction extends BaseAction {
 
       <!-- Karma -->
       <div class="frp-box frp-opts-box">
-        <div class="frp-opt-row${hasKarma ? ' inactive' : ' inactive'}">
-          ${hasKarma ? `
+        <div class="frp-opt-row inactive">
+          ${blindsided ? `
+            <span class="frp-opt-label red">Blindside</span>
+            <span style="font-size:12px;color:#999;margin-left:6px;">no Karma on this FEAT</span>
+          ` : hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
+            <label style="margin-left:auto;" title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-declared"> <span class="frp-opt-label red">Blindside</span></label>
           ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
         </div>
       </div>
@@ -197,6 +212,15 @@ export class DefenseAction extends BaseAction {
         content: dialogHtml,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
+
+          // Declaring a Blindside here closes the Karma controls for this roll.
+          html.find('#blindside-declared').on('change', function() {
+            const off = !!this.checked;
+            const $k = html.find('#spend-karma');
+            if (off) $k.prop('checked', false);
+            $k.prop('disabled', off);
+            html.find('[name="karmaToSpend"], [name="karma"]').prop('disabled', off);
+          });
           const $dialog = html.closest('.dialog');
 
           $dialog.find('.dialog-buttons').hide();
@@ -463,8 +487,12 @@ export class DefenseAction extends BaseAction {
 
   _readDialog(actionType, html) {
     const shift   = Number(html.find('[name="shift"]').val() || 0);
-    const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-    const karma   = karmaToSpend;
+    const _k = extractKarmaFromDialog(html);
+    // Blindsided defenders roll plain: the control is not rendered, and the
+    // amount is forced to zero in case a saved value reaches this path.
+    const _blind  = !!this.opts?.blindside || !!html.find('#blindside-declared').is(':checked');
+    const spendKarma = _blind ? false : _k.spendKarma;
+    const karma   = _blind ? 0 : _k.karmaToSpend;
     const skipDice= !!html.find('[name="skipDice"]').is(':checked');
 
     if (actionType === "evading") {

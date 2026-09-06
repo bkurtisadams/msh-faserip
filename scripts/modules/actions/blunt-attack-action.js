@@ -1,3 +1,7 @@
+// blunt-attack-action.js v1.5.0 - 2026-09-05
+// v1.5.0: Blindside declaration. A checked box marks the target as
+//         blindsided, so the Slam/Stun/Kill FEAT it forces refuses the
+//         Karma offer (RAW: Modifying Results in Combat / Spending Karma).
 // blunt-attack-action.js v3.9.1 - 2026-09-01
 // v3.9.1: Remembered settings written in ONE actor.update instead of 14
 //         sequential setFlag calls (each was a full document update + sheet
@@ -483,6 +487,10 @@ export class BluntAttackAction extends AttackAction {
           ` : `<span style="font-size:11px;color:#999;">No karma</span>`}
           </span>
         </div>
+        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
+          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
+          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
+        </div>
       </div>
 
       <!-- Effect preview grid -->
@@ -612,6 +620,11 @@ export class BluntAttackAction extends AttackAction {
             const objectRank   = $dlg('[name="objectRank"]').val() || "Excellent";
             const objectValue  = parseInt($dlg('[name="objectValue"]').val() || 20);
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+            // RAW: FEATs forced by a Blindside or an unexpected attack may not
+            // be modified by Karma. Declared here, carried to the target's
+            // Slam/Stun/Kill check through the attack prefill.
+            const blindside = html.find('#blindside-attack').is(':checked');
             const karma        = karmaToSpend;
             
             const pullEnabled  = $dlg('#pull-punch-enabled').is(':checked');
@@ -702,6 +715,7 @@ export class BluntAttackAction extends AttackAction {
             // For blunt, main CS IS the Fighting CS — use it for the FEAT
             const effFightRank = shiftRank(fightingAbility.rank, cs.totalShift);
             resolve({
+              blindside,
               src, itemId, objectName, objectRank, objectValue,
               shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,

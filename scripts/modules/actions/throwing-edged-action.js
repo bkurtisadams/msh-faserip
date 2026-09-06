@@ -1,3 +1,14 @@
+// throwing-edged-action.js v3.7.0 - 2026-09-05
+// v3.7.0: RULED 2026-09-05 — thrown edged counts as an Edged Attack for
+//         Modifying Results in Combat, so the effect may be pulled only
+//         by spending EFFECT_REDUCTION_COST per colour. Fixed-bug: the
+//         Slashing Missile guard already reached for [name="resultCap"]
+//         but no such control was ever rendered and the dialog resolved
+//         with a hardcoded "none", so the cap could never be taken. The
+//         control now exists and is disabled below the cost; the damage
+//         pull stays free (TE is reduceDamage true).
+//         Also declares Blindside: a checked box marks the target as
+//         blindsided so its Slam/Stun/Kill FEAT refuses Karma (RAW).
 // scripts/modules/actions/throwing-edged-action.js v3.6.0 - 2026-09-05
 // v3.6.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
 //         own area 0, via the range kernel (thrownRangePenalty); Strength
@@ -59,6 +70,7 @@ import {
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
+import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -158,6 +170,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const savedPullEnabled = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedPullEnabled")) || false) : false;
     const savedPulledDamage = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedPulledDamage")) || 0) : 0;
     const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedReason")) || "") : "";
+    const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowEdgedResultCap")) || "none") : "none";
 
     // Build weapon options for carried select
     const weaponOptions = thrownEdged.map(i => {
@@ -188,6 +201,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
+    // RULED 2026-09-05: thrown edged is an Edged Attack for Modifying Results
+    // in Combat — the effect is reducible only by spending Karma per colour.
+    const canPayReduction = availableKarma >= EFFECT_REDUCTION_COST;
 
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
@@ -273,19 +289,31 @@ export class ThrowingEdgedAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Options: Pull (damage only) / Karma -->
+      <!-- Options: Pull damage (free) / Pull effect (Karma) / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!savedPullEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}> <span class="frp-opt-label orange">Pull</span></label>
           <span style="font-size:11px;color:#777;">to</span>
           <input type="number" class="frp-pull-input" name="pulledDamage" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : initialDamage}" min="0" max="${initialDamage}" ${!savedPullEnabled ? 'disabled' : ''}>
-          <span style="font-size:11px;color:#888;margin-left:auto;">effect cannot be reduced</span>
+          <span style="font-size:11px;color:#888;margin-left:auto;">damage only</span>
+        </div>
+        <div class="frp-opt-row${savedResultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label title="${canPayReduction ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${savedResultCap !== 'none' ? 'checked' : ''} ${canPayReduction ? '' : 'disabled'}> <span class="frp-opt-label orange">Effect</span></label>
+          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(savedResultCap === 'none' || !canPayReduction) ? 'disabled' : ''}>
+            <option value="yellow" ${savedResultCap === 'yellow' ? 'selected' : ''}>Cap at Stun</option>
+            <option value="green" ${savedResultCap === 'green' ? 'selected' : ''}>Cap at Hit</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
         </div>
         <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
           ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
+        </div>
+        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
+          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
+          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
         </div>
       </div>
 
@@ -389,6 +417,8 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               if (w2 && isThrowingEdgedPower(w2)) {
                 $pullChk.prop('checked', false).prop('disabled', true);
                 $pullInput.prop('disabled', true);
+                html.find('#pull-effect-enabled').prop('checked', false).prop('disabled', true)
+                  .closest('.frp-opt-row').addClass('inactive');
                 $resCap.val('none').prop('disabled', true);
                 $pullChk.closest('.frp-opt-row').addClass('inactive');
               } else {
@@ -448,6 +478,13 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             } else {
               $pulledDamage.val($pulledDamage.attr('max')).prop('disabled', true);
             }
+          });
+
+          // Effect cap toggle (50 Karma per colour, priced downstream)
+          html.find('#pull-effect-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="resultCap"]').prop('disabled', !this.checked);
           });
 
           // Karma toggle
@@ -516,6 +553,11 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             const cs = _csState.get();
             const shift = cs.totalShift;
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+            // RAW: FEATs forced by a Blindside or an unexpected attack may not
+            // be modified by Karma. Declared here, carried to the target's
+            // Slam/Stun/Kill check through the attack prefill.
+            const blindside = html.find('#blindside-attack').is(':checked');
             const range = Number($dlg('[name="range"]').val() || 1);
 
             // Range validation
@@ -529,6 +571,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
             const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
 
+            const pullEffectEnabled = $dlg('#pull-effect-enabled').is(':checked');
+            const resultCap = pullEffectEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
+
             // Save settings — single document update
             const flagUpdate = { csNotes };
             if (rememberSettings) {
@@ -541,13 +586,15 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 lastThrowEdgedRange: range,
                 lastThrowEdgedPullEnabled: pullEnabled,
                 lastThrowEdgedPulledDamage: pulledDamage,
-                lastThrowEdgedReason: cs.reason
+                lastThrowEdgedReason: cs.reason,
+                lastThrowEdgedResultCap: resultCap
               });
             }
             await actor.update({ "flags.msh-faserip": flagUpdate });
 
             _resolved = true;
             resolve({
+              blindside,
               weaponId, weaponName, weaponDamage,
               totalShift: shift, shift,
               range,
@@ -555,7 +602,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               shiftBreakdown: { manual: cs.manualCS, range: cs.rangePenalty, csNotes },
               armorPiercingCS: weaponAPCS,
               damageType: weaponDamageType,
-              pulledDamage, resultCap: "none"
+              pulledDamage, resultCap
             });
             dlg.close();
           });
