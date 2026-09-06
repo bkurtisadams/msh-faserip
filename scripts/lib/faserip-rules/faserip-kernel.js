@@ -1,3 +1,7 @@
+// faserip-rules kernel v0.2.12
+// v0.2.12: ERRATA — Poisons and Toxins (Judge's Book) with the msh-faserip
+//          Judge rulings PR1-PR5 imported; faserip-poisons.js v0.1.0 and
+//          faserip-intensities.js v0.1.0 (Judge's Book Intensity Tables).
 // faserip-rules kernel v0.2.11
 // v0.2.11: ERRATA — Karma may not manipulate Resource or Popularity FEATs
 //          (Karma chapter); Blindside/unexpected-attack FEATs likewise unless
@@ -30,7 +34,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.11';
+export const KERNEL_VERSION = '0.2.12';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -232,6 +236,13 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'RULED 2026-09-05 (PR1, Judge, 2026-08): poison unconsciousness (1-10 rounds) and the re-FEAT window (1-10 turns) are separate rolls; one turn is one round for this purpose (TURN_SECONDS). Consistent with the Judge\'s Book text.',
+  'RULED 2026-09-05 (PR2, Judge, 2026-08): Endurance ranks lost to poison do not by themselves impose the -2CS Impaired Abilities penalty; the lowered rank is the penalty. Departs from Life, Death, and Health ("a character who has lost Endurance ranks has a -2CS"), kept as the Judge\'s ruling. The lost ranks still heal per Impaired Abilities (one per week, one per day under care) and count at the highest number of the reduced rank.',
+  'RULED 2026-09-05 (PR3): the poison FEAT is the standard intensity ladder — Endurance (or Resistance to Toxins) against the toxin Intensity: three or more ranks above automatic, one or two above green, equal yellow, below red. Consistent with the Judge\'s Book.',
+  'RULED 2026-09-05 (PR4, Judge, 2026-08): a second exposure while already poisoned has no separate effect; the Judge may raise the effective Intensity for a massive dose. The book is silent.',
+  'RULED 2026-09-05 (PR5, Judge, 2026-08): carrier toxins (venomous bites, poisoned blades) transfer only when the attack deals damage past armor; the exposure FEAT is the save and is never rolled twice. Contact and inhaled poisons ignore armor. The book is silent on delivery.',
+  'NOTE 2026-09-05: Judge\'s Book — poison losses override other Endurance losses and a character loses at most one Endurance rank per round from any cause; reaching Shift 0 by poison is death (the dying spiral kills only below Shift 0). msh-faserip poison-engine.js matches on all three.',
+  'NOTE 2026-09-05: Judge\'s Book Intensity Tables print "Making 2 attacks/round" for both Remarkable and Amazing Fighting FEATs; the Amazing line is likely 3 attacks. Carried as printed with a note in faserip-intensities.js.',
   'RULED 2026-09-05: Karma may not manipulate Resource FEATs or Popularity FEATs (Karma chapter: "Certain FEATs may not be manipulated by Karma"). Nor FEATs resulting from a Blindside or an unexpected attack, unless the character had previous warning. msh-faserip contact-action.js previously offered Karma on Popularity FEATs (fixed-bug).',
   'NOTE 2026-09-05: The Karma cost the contact dialog charges when using negative Popularity (Karma equal to the Popularity rank number) is the Karma chapter\'s rule, carried by faserip-karma negativePopularityLoss; only the Contacts mutant -1CS remains without a located source.',
   'NOTE 2026-09-05: Popularity FEATs — the Iron Man/DOD example calls a Neutral request "green on the Shift 0 column" though Neutral targets require yellow, and the Spider-Man/Jameson example rolls on Incredible (40) without the +2CS the table grants when the target benefits. The rules text governs in both: Neutral is yellow, benefit is +2CS.',

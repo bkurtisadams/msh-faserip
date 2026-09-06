@@ -1,4 +1,12 @@
-// faserip-rules karma v0.6.0
+// faserip-rules karma v0.7.0
+// v0.7.0: Karma chapter pass (2026-09-05). Award timing, pool by-laws
+//         (no advancement from a pool, one pool per hero, reform only after
+//         the next session, optional lock), declared-amount rule for Building
+//         Things, optional 5-point increments, advancement fund rules (one
+//         fund at a time, quiet time only) and the rationale thresholds,
+//         charity appearance prerequisites, Popularity advancement's charity
+//         window. All values already in the module re-confirmed against the
+//         text; no changes to existing numbers.
 // v0.6.0: FEATs Karma may not manipulate: Resource FEATs, Popularity FEATs,
 //         and FEATs forced by a Blindside or an unexpected attack (unless
 //         forewarned). KARMA_FORBIDDEN_FEATS + karmaAllowedFor().
@@ -22,7 +30,7 @@
 
 import { rankForNumber, rankDistance, shiftRank, rankByKey } from './faserip-kernel.js';
 
-export const KARMA_VERSION = '0.6.0';
+export const KARMA_VERSION = '0.7.0';
 export const KARMA_CERTIFIED = true;
 
 // Certain FEATs may not be manipulated by Karma: Resource FEATs, Popularity
@@ -126,7 +134,36 @@ export function applyDeathPenalty({ current, advancementFund = 0, immortal = fal
   return { current: 0, advancementFund: immortal ? 0 : advancementFund };
 }
 
+// Awards are made at the end of a battle (never while any hero is still in
+// or about to be in combat), at the completion of a task, and at the end of
+// the adventure or session. Crime, rescue and disaster awards and losses
+// land as soon as they occur. Gaming awards go to individuals only.
+export const AWARD_TIMING = {
+  battleEnd: true, taskComplete: true, sessionEnd: true,
+  immediate: ['stopCrime', 'rescue', 'preventDisaster', 'commitCrime', 'death'],
+  gamingAwardsIndividualOnly: true,
+};
+
+// Charity appearances: the charity accepts on a red Popularity FEAT; at most
+// one appearance per week per hero or group counts.
+export const CHARITY_APPEARANCE = { popularityFeatColor: 'red', maxPerWeek: 1 };
+
 // --- Karma pools --------------------------------------------------------
+
+// Pool by-laws: two or more consenting heroes; pool Karma manipulates rolls
+// and builds things but never buys advancement; a hero belongs to one pool
+// at a time; a dissolved pool cannot re-form until after the next session;
+// permanent pools may be drawn on by members who are not present. Optional
+// locking pool: nothing may be withdrawn, use is limited to die rolls,
+// dissolved only by unanimous vote.
+export const POOL_RULES = {
+  minMembers: 2,
+  advancementFromPool: false,
+  poolsPerHero: 1,
+  reformAfterNextSession: true,
+  permanentPoolAbsentDraw: true,
+  lock: { optional: true, withdrawals: false, useLimitedToDieRolls: true, dissolveUnanimous: true },
+};
 
 export const LEADERSHIP_POOL_BONUS = 50;
 
@@ -151,8 +188,23 @@ export function poolKillWipe() {
 // --- Spending -----------------------------------------------------------
 
 export const MIN_KARMA_DECLARATION = 10;   // declared spends cost at least 10
+export const KARMA_INCREMENT_OPTION = 5;   // optional rule: spend in increments of 5
 export const EFFECT_REDUCTION_COST = 50;   // per color, Kill-capable columns
+export const EFFECT_REDUCTION_COLUMNS = ['edged', 'shooting', 'energy']; // attacks that cannot be pulled without Karma
 export const POWER_STUNT_COST = 100;
+
+// The declared spend: at least 10 (or the remainder if less), the amount
+// need not be named up front, and the 10 is spent even if the roll already
+// succeeded or no amount could save it (Examples 2 and 3).
+export function declaredKarmaSpend({ reserve, wanted = null }) {
+  const minimum = Math.min(MIN_KARMA_DECLARATION, reserve);
+  const amount = wanted == null ? minimum : Math.min(reserve, Math.max(minimum, wanted));
+  return { minimum, amount };
+}
+
+// Building Things is the one roll where the amount must be fixed before the
+// dice; an undeclared amount is taken as 10.
+export const BUILD_KARMA = { amountBeforeRoll: true, undeclaredDefault: 10 };
 
 // Power stunt FEAT by prior SUCCESSES (RULED 2026-09-03): none red; one to
 // three yellow; four to nine green; ten successes = mastered, automatic.
@@ -165,6 +217,26 @@ export function powerStuntRequiredColor(successes) {
 }
 
 // --- Advancement --------------------------------------------------------
+
+// One Advancement fund per hero at a time, for one of the seven purposes;
+// after a purchase the remainder may move to another purpose. Funds are
+// added in quiet time, never mid-combat or mid-adventure, and are untouched
+// by negative modifiers.
+export const ADVANCEMENT_FUND_RULES = {
+  purposes: ['ability', 'resource', 'popularity', 'power', 'powerAddition', 'talentAddition', 'contactAddition'],
+  fundsAtOnce: 1,
+  quietTimeOnly: true,
+  immuneToLosses: true,
+};
+
+// Rationales: an ability may rise to Excellent freely; beyond Excellent, or
+// more than one rank above the original, the Judge may ask why. Powers need
+// one for any increase past the first rank gained; new Powers and Talents
+// always need one.
+export function abilityAdvancementNeedsRationale({ originalRankKey, newRankKey }) {
+  return rankDistance('EX', newRankKey) > 0 || rankDistance(originalRankKey, newRankKey) > 1;
+}
+export const POPULARITY_ADVANCEMENT_CHARITY_WINDOW_DAYS = 21;
 
 // Raising a rank number by one costs multiplier x current number. The
 // purchase that crosses into the next rank (Cresting) adds the crest fee

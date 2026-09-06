@@ -1,3 +1,11 @@
+// scripts/modules/effects/ongoing-engine.js v1.10.0 - 2026-09-05
+// v1.10.0: Poisons onto the kernel. loseOneEnduranceRank (poison / Healing-
+//          power failure path) now takes the reduced rank's HIGHEST number
+//          from enduranceLossStep and records originalEndurance /
+//          originalEnduranceValue on the first loss, so the Impaired Endurance
+//          heal path can restore it. New export ensureImpairedEnduranceEffect
+//          (shared creation of the Impaired Endurance record; penaltyCS 0 for
+//          poison per PR2, -2 for dying).
 // scripts/modules/effects/ongoing-engine.js v1.9.0 - 2026-09-05
 // v1.9.0: Slice 7b — dying spiral onto faserip-rules damage. RULED
 //         2026-09-05: a reduced Endurance rank's number is the HIGHEST of
@@ -1732,14 +1740,21 @@ export async function loseOneEnduranceRank(actor, { source = "" } = {}) {
   if (curIdx < 0) return { lost: false, reason: "rank-not-in-order" };
   if (curIdx === 0) return { lost: false, atFloor: true, oldRank: currentRank, newRank: currentRank };
 
-  const newRank = RANKS_ORDERED[curIdx - 1];
-  const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+  // RULED 2026-09-05: a reduced rank's number is the HIGHEST of that rank.
+  const { rank: newRank, value: newValue } = _dyingStep(currentRank);
   const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
   const enduranceDelta = Math.max(0, currentValue - newValue);
 
   const newMaxHealth = _recalcMaxHealth(actor, newValue);
   const currentHealth = actor.system?.attributes?.health?.value ?? 0;
   const newHealth = Math.max(0, Math.min(newMaxHealth, currentHealth - enduranceDelta));
+
+  // Remember the pre-loss rank and number for the Impaired Endurance heal path.
+  const scope = SCOPE();
+  if (!actor.getFlag(scope, "originalEndurance")) {
+    await safeActorSetFlag(actor, scope, "originalEndurance", currentRank);
+    await safeActorSetFlag(actor, scope, "originalEnduranceValue", currentValue);
+  }
 
   await actor.update({
     "system.abilities.endurance.rank": newRank,
@@ -1755,6 +1770,40 @@ export async function loseOneEnduranceRank(actor, { source = "" } = {}) {
   );
 
   return { lost: true, oldRank: currentRank, newRank, belowFeeble: newRank === "Shift-0" };
+}
+
+/**
+ * Ensure an Impaired Endurance record exists for lost ranks so the weekly /
+ * daily heal path (rest-system healImpairedEndurance) can restore them.
+ * penaltyCS: -2 for dying (Impaired Abilities), 0 for poison (PR2).
+ */
+export async function ensureImpairedEnduranceEffect(actor, { originalRank, currentRank, penaltyCS = -2, source = "" } = {}) {
+  const scope = SCOPE();
+  if (!actor || !originalRank || !currentRank || originalRank === currentRank) return null;
+  const existing = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+  const name = `Impaired Endurance (${currentRank} of ${originalRank})${source ? ` — ${source}` : ""}`;
+  if (existing) {
+    await existing.update({ name, [`flags.${scope}.currentEndurance`]: currentRank });
+    return existing;
+  }
+  const [ae] = await actor.createEmbeddedDocuments("ActiveEffect", [{
+    name,
+    img: "icons/svg/blood.svg",
+    origin: actor.uuid,
+    statuses: ["impaired-endurance"],
+    duration: { expiry: "roundEnd" },
+    flags: {
+      [scope]: {
+        isImpairedEndurance: true,
+        originalEndurance: originalRank,
+        currentEndurance: currentRank,
+        lastHealed: game.time?.worldTime ?? 0,
+        medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
+      },
+    },
+    changes: penaltyCS ? [{ key: "system.combatMods.selfPenaltyCS", mode: "add", value: String(penaltyCS) }] : [],
+  }]);
+  return ae ?? null;
 }
 
 // Expose game-date helper for action handlers that need oncePerDay gating.

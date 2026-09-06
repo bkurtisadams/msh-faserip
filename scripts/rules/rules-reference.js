@@ -1,3 +1,6 @@
+// rules-reference.js v2.1.1 - 2026-09-05
+// v2.1.1: TOXINS.spiderVenom Typical -> Excellent per the Judge's Book Intensity
+//         Table (RULED 2026-09-05: a black widow is deadly).
 // rules-reference.js v2.1.0 - 2026-09-04
 // v2.1.0: getInitiativeModifier delegates to the kernel initiative module
 //         (initiativeModifier); same values, 75 → +5 ruling now in ERRATA.
@@ -3105,7 +3108,7 @@ export const TOXINS = {
   knockoutEx:   { name: "Knockout Drug",              intensity: "Excellent",  delivery: "injected", notes: "Kraven's darts, gas grenades." },
   snakeVenomGd: { name: "Snake Venom",                intensity: "Good",       delivery: "injected", notes: "Venomous snake bite. GM addition for Kraven's lair (module snakes are constrictors)." },
   snakeVenomEx: { name: "Snake Venom (potent)",       intensity: "Excellent",  delivery: "injected", notes: "Krait, mamba, sea snake." },
-  spiderVenom:  { name: "Spider Venom",               intensity: "Typical",    delivery: "injected", notes: "Widow/recluse class." },
+  spiderVenom:  { name: "Spider Venom",               intensity: "Excellent",  delivery: "injected", notes: "Widow/recluse class. Judge's Book Intensity Table: Spider venom Excellent (RULED 2026-09-05)." },
   cyanide:      { name: "Cyanide",                    intensity: "Remarkable", delivery: "ingested", notes: "Fast-acting industrial poison." },
   arsenic:      { name: "Arsenic",                    intensity: "Excellent",  delivery: "ingested", notes: "Classic slow poison." },
   nerveAgent:   { name: "Nerve Agent",                intensity: "Incredible", delivery: "inhaled",  notes: "Military-grade. Gas mask negates." },

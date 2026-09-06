@@ -1,3 +1,10 @@
+// scripts/modules/effects/poison-engine.js v1.3.0 - 2026-09-05
+// v1.3.0: Poisons onto the faserip-rules poisons kernel (PR1-PR5 now in the
+//         kernel ERRATA). Fixed-bug: when a poison halts with Endurance ranks
+//         still lost, an Impaired Endurance record is now created (no -2CS per
+//         PR2) so the ranks heal per Impaired Abilities — before, a halted
+//         poison left the lost ranks with no way back. Rank numbers follow the
+//         highest-of-rank rule via loseOneEnduranceRank (ongoing-engine v1.10.0).
 // scripts/modules/effects/poison-engine.js v1.2.0 - 2026-08-01
 // v1.2.0: Target Save panel is the authoring surface. Carrier detection
 //         reads requiresSave + save.onFail.effect "poisoned" (power; toxin
@@ -51,7 +58,8 @@
 //         chat button, wired in chat-hooks.js v1.7.4).
 
 import { applyUnconscious } from "./effect-engine.js";
-import { loseOneEnduranceRank, registerOngoingEffect } from "./ongoing-engine.js";
+import { loseOneEnduranceRank, registerOngoingEffect, ensureImpairedEnduranceEffect } from "./ongoing-engine.js";
+import { POISON_IMPAIRED_SHIFT } from "../../lib/faserip-rules/faserip-poisons.js";
 import { determineFeatRequirement, checkFeatSuccess } from "../actions/ability-feat-dialog.js";
 import { TOXINS } from "../../rules/rules-reference.js";
 import { safeActorSetFlag } from "../../gm-utils.js";
@@ -395,6 +403,13 @@ async function _poisonDeath(actor, poisonAE, scope) {
 export async function haltPoison(actor, { reason = "" } = {}) {
   const scope = SCOPE();
   const poisonAE = actor.effects.find(e => e.flags?.[scope]?.ongoingId === "poison");
+  // Lost ranks must heal per Impaired Abilities: leave an Impaired Endurance
+  // record (no -2CS — PR2) if the poison took any ranks.
+  const originalRank = poisonAE?.flags?.[scope]?.originalEndurance || actor.getFlag(scope, "originalEndurance");
+  const currentRank = actor.system?.abilities?.endurance?.rank;
+  if (originalRank && currentRank && originalRank !== currentRank) {
+    try { await ensureImpairedEnduranceEffect(actor, { originalRank, currentRank, penaltyCS: POISON_IMPAIRED_SHIFT, source: "poison" }); } catch (_e) {}
+  }
   if (poisonAE) { try { await poisonAE.delete({ mshIntentional: true }); } catch (_e) {} }
   try { await actor.unsetFlag(scope, "ongoing.poison"); } catch (_e) {}
   if (reason) {
