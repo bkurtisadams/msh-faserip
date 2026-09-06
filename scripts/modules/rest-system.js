@@ -1,4 +1,6 @@
-// scripts/modules/rest-system.js v1.6.0 - 2026-09-05
+// scripts/modules/rest-system.js v1.6.1 - 2026-09-05
+// v1.6.1: healImpairedEndurance restores max Health by the Endurance delta
+//         (relativeMaxHealth, RULED 2026-09-05) instead of F+A+S+E.
 // v1.6.0: Slice 7b — Recovery / Healing / consciousness / stabilization onto
 //         the faserip-rules damage kernel. Wake FEAT via regainConsciousnessFeat
 //         (hard-coded 45/75/95 fallback ladder deleted); Recovery and Healing
@@ -127,7 +129,7 @@
 import { getFlagScope } from "./actions/flags.js";
 import { safeActorSetFlag } from "../gm-utils.js";
 import { RANKS_ORDERED, rankValue } from "../rules/rules-reference.js";
-import { getCurrentGameDate } from "./effects/ongoing-engine.js";
+import { getCurrentGameDate, relativeMaxHealth } from "./effects/ongoing-engine.js";
 import { computeDuration } from "./effects/effect-engine.js";
 import { healingSecondsRemaining, TURN_SECONDS } from "./recovery-timing.js";
 import {
@@ -1095,10 +1097,8 @@ static async attemptRegainConsciousness(actor) {
     });
     const newRank = step.atCap ? originalEndurance : foundryNameFor(step.rank, "dash");
     const newValue = step.number;
-    const newHealthMax = (actor.system.abilities.fighting.value || 0) +
-                         (actor.system.abilities.agility.value || 0) +
-                         (actor.system.abilities.strength.value || 0) +
-                         newValue;
+    // RULED 2026-09-05: max Health moves by the Endurance delta (relative).
+    const newHealthMax = relativeMaxHealth(actor, newValue);
 
     // Update actor Endurance rank, value, and derived health max
     await actor.update({

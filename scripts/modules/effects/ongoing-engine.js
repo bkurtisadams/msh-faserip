@@ -1,4 +1,7 @@
-// scripts/modules/effects/ongoing-engine.js v1.10.0 - 2026-09-05
+// scripts/modules/effects/ongoing-engine.js v1.11.0 - 2026-09-05
+// v1.11.0: RULED 2026-09-05 — max Health tracks Endurance by DELTA (relative),
+//          replacing the absolute F+A+S+E recompute in every lose/restore path
+//          (_recalcMaxHealth -> relativeMaxHealth, exported for rest-system).
 // v1.10.0: Poisons onto the kernel. loseOneEnduranceRank (poison / Healing-
 //          power failure path) now takes the reduced rank's HIGHEST number
 //          from enduranceLossStep and records originalEndurance /
@@ -1503,11 +1506,17 @@ function _rateLabel(config) {
   return `${rate} ${cycle}s`;
 }
 
+// RULED 2026-09-05: maximum Health moves by the Endurance DELTA (relative),
+// not to a recomputed F+A+S+E. The sheet's own maximum is the anchor, so an
+// actor whose printed max is not the formula sum is not jumped to it on the
+// first lost rank (Screamwave: 90 became 95). Restores add the delta back.
+export function relativeMaxHealth(actor, newEnduranceValue) {
+  const curMax = Number(actor.system?.attributes?.health?.max) || 0;
+  const curEnd = Number(actor.system?.abilities?.endurance?.value) || 0;
+  return Math.max(0, curMax + (Number(newEnduranceValue) - curEnd));
+}
 function _recalcMaxHealth(actor, newEnduranceValue) {
-  const f = actor.system?.abilities?.fighting?.value ?? 0;
-  const a = actor.system?.abilities?.agility?.value ?? 0;
-  const s = actor.system?.abilities?.strength?.value ?? 0;
-  return f + a + s + newEnduranceValue;
+  return relativeMaxHealth(actor, newEnduranceValue);
 }
 
 // ─── Continuing damage convenience wrappers ───────────────────────────────────

@@ -1,3 +1,10 @@
+// scripts/modules/effects/poison-engine.js v1.3.2 - 2026-09-05
+// v1.3.2: Poison Spreads card states how many ranks remain above Shift 0.
+// v1.3.1: Fix ReferenceError in applyPoisonExposure — stampEndRankLoss was
+//         passed `effectiveNow`, a processPoisonRound local. Since v1.2.0 a
+//         failed exposure FEAT applied the KO and the rank loss, then threw
+//         before registering the poison effect, the Poisoned card and the
+//         re-FEAT window (the error was swallowed by the attack path).
 // scripts/modules/effects/poison-engine.js v1.3.0 - 2026-09-05
 // v1.3.0: Poisons onto the faserip-rules poisons kernel (PR1-PR5 now in the
 //         kernel ERRATA). Fixed-bug: when a poison halts with Endurance ranks
@@ -61,7 +68,7 @@ import { applyUnconscious } from "./effect-engine.js";
 import { loseOneEnduranceRank, registerOngoingEffect, ensureImpairedEnduranceEffect } from "./ongoing-engine.js";
 import { POISON_IMPAIRED_SHIFT } from "../../lib/faserip-rules/faserip-poisons.js";
 import { determineFeatRequirement, checkFeatSuccess } from "../actions/ability-feat-dialog.js";
-import { TOXINS } from "../../rules/rules-reference.js";
+import { TOXINS, RANKS_ORDERED } from "../../rules/rules-reference.js";
 import { safeActorSetFlag } from "../../gm-utils.js";
 import { TURN_SECONDS } from "../recovery-timing.js";
 
@@ -219,7 +226,7 @@ export async function applyPoisonExposure(actor, opts = {}) {
     lossNote = `<div style="margin-top:4px;font-size:.9em;color:#7a3d00;">Endurance rank already lost this turn — poison loss deferred to next FEAT window (max 1 rank/round).</div>`;
   } else {
     const loss = await loseOneEnduranceRank(actor, { source: `Poison: ${toxin.name}` });
-    if (loss.lost) await stampEndRankLoss(actor, "poison", effectiveNow);
+    if (loss.lost) await stampEndRankLoss(actor, "poison", game.time.worldTime);
     if (loss.belowFeeble || loss.newRank === "Shift-0") {
       // Shift-0 from the initial loss: death handled on next process tick per
       // RAW "reaches Shift 0 ... dies" — process immediately for clarity.
@@ -367,10 +374,12 @@ async function _processPoisonInner(actor, poisonAE, scope, pendingSeconds = 0, e
     [`flags.${scope}.windowTurns`]: windowTurns,
   });
 
+  const ranksLeft = Math.max(0, RANKS_ORDERED.indexOf(loss.newRank)); // Shift-0 is index 0
   await poisonChat(actor, "Poison Spreads",
     `<strong>${actor.name}</strong> fails to fight off ${toxinName}.
      <div style="margin-top:4px;font-size:.9em;color:#555;">${featLine(feat, intensityRank)}</div>
      <div style="margin-top:4px;">Endurance: <strong>${loss.oldRank}</strong> &rarr; <strong>${loss.newRank}</strong>. Next FEAT in ${windowTurns} turns.</div>
+     <div style="margin-top:4px;font-size:.9em;color:${ranksLeft <= 1 ? '#b71c1c' : '#7a3d00'};">${ranksLeft <= 0 ? 'Shift 0 — death on the next failure.' : `${ranksLeft} rank${ranksLeft === 1 ? '' : 's'} above Shift 0; ${ranksLeft === 1 ? 'one more failure reaches Shift 0 and death' : `${ranksLeft} more failures mean death`}.`}</div>
      ${antitoxinButton(actor)}`);
 
   return "stepped";
