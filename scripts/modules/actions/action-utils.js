@@ -1,3 +1,9 @@
+// action-utils.js v1.13.0 - 2026-09-05
+// v1.13.0: Parked sweep — the two per-call getBodyArmorValues debug logs
+//          are removed. They fired on every damage resolution for every
+//          target and printed nothing the damage card does not already
+//          show. The Blocking-armor log is kept: it fires only when a
+//          Block effect actually contributes.
 // action-utils.js v1.12.2 - 2026-09-05
 // v1.12.2: recordDamage receives previousHealth so a conscious hit clears the
 //          Recovery knockout gate (RULED 2026-09-05; the combat path returned
@@ -2489,13 +2495,6 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     bypassForceField = false
   } = opts;
 
-  console.log("FASERIP DEBUG | getBodyArmorValues called:", {
-    targetName: targetActor.name,
-    damageType: damageType,
-    ignoresNaturalArmor,
-    ignoresArtificialArmor,
-    bypassForceField
-  });
 
   let physicalArmor = 0;
   let energyArmor = 0;
@@ -2713,19 +2712,6 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
   // Force Field protection is applied downstream in calculateMitigation
   // (which runs even with bypassArmor: true — see mitigation.js bypass path).
   const applicable = isEnergy ? baEnergyArmor : baPhysicalArmor;
-
-  console.log("FASERIP DEBUG | getBodyArmorValues result:", {
-    targetName: targetActor.name,
-    damageType,
-    physicalArmor,
-    energyArmor,
-    physicalRank,
-    energyRank,
-    isForceField,
-    isEnergy,
-    blockingArmor: blockEligible ? blockingArmor : "N/A (ineligible)",
-    applicable
-  });
 
   // If ranks are missing, reverse-lookup from numeric values
 /* if (!physicalRank && physicalArmor > 0) {

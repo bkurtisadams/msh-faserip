@@ -1,3 +1,8 @@
+// karma-rules.js v1.1.1 - 2026-09-05
+// v1.1.1: Parked sweep — permitCrime no longer auto-sets -5. The permit
+//         loss equals the arrest award and so varies by crime class;
+//         -5 is correct only for theft, misdemeanors and other crimes.
+//         Now null (context-dependent), matching stopCrime/arrestCriminal.
 // karma-rules.js v1.1.0 - 2026-07-23
 // RAW category catalog for karma award line items. Each rule maps to a
 // category from the Advanced Set karma rules, with base amount, allowed
@@ -63,9 +68,13 @@ export const KARMA_RULES = {
     cap: null
   },
   permitCrime: {
+    // Permitting a crime costs what arresting it would have paid, so the
+    // amount is per crime class (-5 theft/misdemeanor/other, -10 destructive/
+    // robbery/national offense, -15 violent/local conspiracy, -20 national
+    // conspiracy, -25 global). No auto-set, as with Stop Crime and Arrest.
     label: "Permit Crime (penalty)",
     group: "Heroic Actions",
-    baseAmount: -5,
+    baseAmount: null,
     allowedScopes: ["individual"],
     cap: null
   },

@@ -1,3 +1,7 @@
+// rules-reference.js v2.1.2 - 2026-09-05
+// v2.1.2: POISON_RULES no longer restates Judge rulings PR1-PR5 in prose;
+//         the block points at the kernel ERRATA entries that now hold
+//         them. Display strings unchanged.
 // rules-reference.js v2.1.1 - 2026-09-05
 // v2.1.1: TOXINS.spiderVenom Typical -> Excellent per the Judge's Book Intensity
 //         Table (RULED 2026-09-05: a black widow is deadly).
@@ -3087,20 +3091,10 @@ export const POISON_RULES = {
   cap: "Max 1 Endurance rank lost per round, any cause. Poison losses take priority over dying/Kill losses.",
   halting: "Victim's own FEAT, or treater with First Aid/Medicine talent AND antitoxin. Untrained help cannot halt.",
   recovery: "Lost Endurance heals per Impaired Endurance: 1 rank/week, 1 rank/day with medical care.",
-  // GM RULINGS (Kurt):
-  // PR1: KO duration (1d10 rounds) and re-FEAT window (1d10 turns) are
-  //      separate rolls; turn = round for this purpose.
-  // PR2: No -2CS Impaired Endurance penalty from poison rank loss alone —
-  //      the lowered rank is the penalty. (Dying's -2CS is a dying rule.)
-  // PR3: FEAT color per FEAT_INTENSITY_RULES (green vs equal intensity does
-  //      not succeed; yellow needed at parity, standard intensity ladder).
-  // PR4: Repeat exposure while already poisoned is ignored in v1; GM may
-  //      raise effective Intensity manually for massive doses.
-  // PR5: Carrier toxins (bite/blade authored via the Target Save panel with
-  //      On Fail "Poisoned") require damage past armor to transfer. The
-  //      poison engine's exposure FEAT IS the save — never rolled twice.
-  //      Contact/inhaled poisons that ignore armor: Intensity action or
-  //      manual GM Tools exposure.
+  // Judge rulings PR1-PR5 were imported into the kernel ledger on
+  // 2026-09-05 and are no longer restated here. See the ERRATA entries
+  // dated 2026-09-05 (PR1-PR5) in scripts/lib/faserip-rules/faserip-kernel.js
+  // for the rulings and faserip-poisons.js for the mechanics they govern.
 };
 
 export const TOXINS = {

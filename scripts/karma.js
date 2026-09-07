@@ -1,3 +1,10 @@
+// karma.js v2.3.0 - 2026-09-05
+// v2.3.0: Parked sweep — Defeated Foe gate. The award is the opponent's
+//         highest rank NUMBER and is paid only for an ability or Power of
+//         Remarkable or higher; the dialog now asks for that rank, derives
+//         the amount through the kernel's foeDefeatAward, and refuses to
+//         record small fry. Previously the row's base amount was a flat 0
+//         with the number typed by hand and no threshold anywhere.
 // karma.js v1.15.0 - 2026-09-03
 // v1.15.0: Kernel slice 6c. Power / Resource / Popularity Advancement use the
 //          Ability Advancement sub-dialog (_onAdvancement(kind)): target picker
@@ -79,7 +86,7 @@ import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategor
 import { computeKarmaTotals } from "./karma-rules.js";
 import {
   CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS, SPECIAL_DEATH_LOSS,
-  ADVANCEMENT, rescueAward
+  ADVANCEMENT, rescueAward, foeDefeatAward
 } from "./lib/faserip-rules/faserip-karma.js";
 import { spendCost, advancementCost, SPEND_TYPE_KIND, TALENT_SOURCES } from "./karma-costs.js";
 
@@ -550,6 +557,11 @@ export class KarmaSheet extends DocumentSheet {
             <label>Heroes Splitting:</label>
             <input type="number" name="splitCount" value="${Math.max(teamCount, 2)}" min="2" max="20" />
           </div>
+          <div class="form-group karma-foe-section" style="display:none;">
+            <label>Foe's Highest Rank #:</label>
+            <input type="number" name="foeRank" value="0" min="0" />
+            <p class="notes karma-foe-note" style="margin:2px 0 0;font-size:0.85em;color:#666;"></p>
+          </div>
           <div class="karma-calculation" style="background:#f5f5f0; padding:8px; border-radius:4px; margin:6px 0; font-size:0.9em;">
             <div>Base: <span class="calc-base">0</span></div>
             <div>x<span class="calc-multiplier">${multiplier}</span> <span class="calc-cat" style="color:#666;font-size:0.85em;"></span> = <span class="calc-gross">0</span></div>
@@ -589,6 +601,20 @@ export class KarmaSheet extends DocumentSheet {
             const eventType = formData.get("eventType");
             const amount = Number(formData.get("amount"));
             const sendToPool = html.find('[name="sendToPool"]').is(':checked');
+
+            // Defeated Foe is gated on the opponent's rank, not on the typed
+            // amount: below Remarkable there is no award to record.
+            if (eventType === "Defeated Foe") {
+              const foeRank = Math.max(0, Number(formData.get("foeRank")) || 0);
+              if (foeDefeatAward(foeRank) === 0) {
+                ui.notifications.info(
+                  foeRank === 0
+                    ? "Defeated Foe needs the opponent's highest rank number."
+                    : `Defeated Foe not recorded — rank ${foeRank} is below Remarkable (small fry earn nothing).`
+                );
+                return;
+              }
+            }
 
             // Handle Death - Kill: set karma to 0
             if (eventType === "Death - Kill") {
@@ -653,7 +679,25 @@ export class KarmaSheet extends DocumentSheet {
         const groupMode = getGroupAwardMode();
         const recalc = () => {
           const type = html.find('[name="eventType"]').val();
-          const baseAmount = eventAmounts[type] || 0;
+          let baseAmount = eventAmounts[type] || 0;
+
+          // Defeated Foe: the award equals the opponent's highest rank
+          // number, and only for opponents with an ability or Power of
+          // Remarkable or higher — small fry pay nothing. foeDefeatAward
+          // owns the threshold.
+          const isFoe = type === "Defeated Foe";
+          html.find('.karma-foe-section').toggle(isFoe);
+          if (isFoe) {
+            const foeRank = Math.max(0, Number(html.find('[name="foeRank"]').val()) || 0);
+            baseAmount = foeDefeatAward(foeRank);
+            html.find('.karma-foe-note').text(
+              foeRank === 0
+                ? "Enter the opponent's highest ability or Power rank number."
+                : baseAmount === 0
+                  ? `${foeRank} is below Remarkable (26) — small fry, no award.`
+                  : `Award ${baseAmount} (the opponent's highest rank number).`
+            );
+          }
           const isGroup = html.find('[name="awardType"]:checked').val() === "group";
           const splitCount = Number(html.find('[name="splitCount"]').val()) || 2;
           const isIndividualOnly = alwaysIndividual.includes(type);
@@ -709,6 +753,7 @@ export class KarmaSheet extends DocumentSheet {
         html.find('[name="eventType"]').change(recalc);
         html.find('[name="awardType"]').change(recalc);
         html.find('[name="splitCount"]').on('input', recalc);
+        html.find('[name="foeRank"]').on('input', recalc);
         recalc();
       }
     }).render(true);
