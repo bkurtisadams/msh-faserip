@@ -1,4 +1,10 @@
-﻿// init.js v1.16.1 - 2026-09-04
+﻿// init.js v1.16.2 - 2026-09-05
+// v1.16.2: Parked sweep — retire the orphan actionHudButtonSize setting.
+//          Registered by v1.16.0 but never read anywhere in the system
+//          (confirmed by a tree-wide search of js/hbs/html); the HUD
+//          still sizes from the legacy columns/zoom pair. Registration
+//          removed; nothing else touched.
+// init.js v1.16.1 - 2026-09-04
 // v1.16.1: game.msh.explainInitiativeSides() console diagnostic.
 // init.js v1.16.0 - 2026-09-04
 // v1.16.0: Action HUD sizing settings: actionHudButtonSize (client, px); style
@@ -1492,15 +1498,6 @@ Hooks.once("init", async () => {
       config: false,
       type: Boolean,
       default: true
-    });
-
-    game.settings.register("msh-faserip", "actionHudButtonSize", {
-      name: "Action HUD: Button Size",
-      hint: "Minimum button size in pixels (32–128). Window width sets the column count; buttons grow to fill it. 0 = not yet migrated from the v3.3 columns/zoom model.",
-      scope: "client",
-      config: false,
-      type: Number,
-      default: 0
     });
 
     // Legacy (v3.3 sizing model). Read once by the action-hud migration.
