@@ -1,3 +1,12 @@
+// actorSheet.js v2.12.0 - 2026-09-05
+// v2.12.0: Parked sweep — the Health-area Recovery and Healing buttons
+//          refresh when the clock moves. Both are time-derived
+//          (lastRecoveryDate vs the game date, the one-hour healing
+//          cooldown) but only re-evaluated on a sheet render, so an
+//          open sheet stayed greyed after a CTT advance until it was
+//          closed and reopened. Hooks on updateWorldTime and on
+//          timeTracker.timeAdvanced (CTT fires before worldTime moves),
+//          both unregistered on close alongside the Universal Table hook.
 // actorSheet.js v2.11.0 - 2026-09-05
 // v2.11.0: Bank loan tracker. Loan purchases from the Resource FEAT dialog are
 //          recorded on the actor (flags.msh-faserip.loans: item, payment rank
@@ -1355,6 +1364,14 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       Hooks.off('msh-faserip.universalTableRoll', this._universalTableHookId);
       this._universalTableHookId = null;
     }
+    if (this._worldTimeHookId) {
+      Hooks.off("updateWorldTime", this._worldTimeHookId);
+      this._worldTimeHookId = null;
+    }
+    if (this._cttTimeHookId) {
+      Hooks.off("timeTracker.timeAdvanced", this._cttTimeHookId);
+      this._cttTimeHookId = null;
+    }
     // Close the detached Universal Table popout if open
     if (this._utTab?._popout?.rendered) {
       try { await this._utTab._popout.close({ _reattach: true }); } catch (_) {}
@@ -2650,6 +2667,21 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
   return false;
 });
 
+
+    // Recovery and Healing eligibility are time-derived (once per game day,
+    // one-hour healing cooldown), so an open sheet goes stale when the clock
+    // moves. Re-render on world time and on CTT's own advance, which fires
+    // before game.time.worldTime moves and so is not covered by the first.
+    if (!this._worldTimeHookId) {
+      this._worldTimeHookId = Hooks.on("updateWorldTime", () => {
+        if (this.rendered) this.render(false);
+      });
+    }
+    if (!this._cttTimeHookId) {
+      this._cttTimeHookId = Hooks.on("timeTracker.timeAdvanced", () => {
+        if (this.rendered) this.render(false);
+      });
+    }
 
     // Listen for universal table rolls so the in-sheet tab also highlights results
     if (!this._universalTableHookId) {

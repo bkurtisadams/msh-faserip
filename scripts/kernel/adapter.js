@@ -1,3 +1,10 @@
+// File: scripts/kernel/adapter.js v1.0.3 - 2026-09-05
+// v1.0.3: Parked sweep — drop the KERNEL_RANKS pass-through. The adapter
+//         imported the kernel RANKS array solely to re-export it, and no
+//         module ever imported it from here: rules-reference.js, actor.js
+//         and universal-table.js all take RANKS straight from
+//         faserip-kernel.js. The adapter's job is name/label
+//         normalization, not re-exporting kernel data.
 // File: scripts/kernel/adapter.js v1.0.2 - 2026-09-02
 // v1.0.2: compareRankNames(a, b) — sign of the rank distance between two
 //         Foundry rank names via the kernel (null when either is unknown).
@@ -9,7 +16,7 @@
 // Bridge between Foundry rank/label conventions and @graycloak/faserip-rules.
 // All Foundry rank-string variants normalize here and nowhere else.
 
-import { rankByKey, rankForNumber, rankDistance, RANKS as KERNEL_RANKS } from '../lib/faserip-rules/faserip-kernel.js';
+import { rankByKey, rankForNumber, rankDistance } from '../lib/faserip-rules/faserip-kernel.js';
 
 const NAME_TO_KEY = new Map();
 function reg(key, ...names) {
@@ -85,5 +92,3 @@ export const SUB_TABLE_LABELS = {
 export function labelForToken(token) {
   return RESULT_TOKEN_LABELS[token] ?? SUB_TABLE_LABELS[token] ?? token;
 }
-
-export { KERNEL_RANKS };
