@@ -1,3 +1,12 @@
+// faserip-initiative.js v4.1.2 - 2026-09-09
+// v4.1.2: Fixed-bug — the side rule read only the DOCUMENT type, so a
+//         villain built as a hero-type actor with system.characterType
+//         "villain" (Klaw) sat on the PC side and side initiative refused
+//         ("requires at least one eligible combatant on each side").
+//         _characterKind: the sheet's characterType (hero/villain) is the
+//         stated kind when set; the document type otherwise; "npc" falls
+//         through to token disposition, then ownership. explainSides names
+//         the source it used.
 // faserip-initiative.js v4.1.1 - 2026-09-04
 // v4.1.1: The stored side flag is a cache, not the source of truth. A stale
 //         value (written by an older determination rule, or before the actor
@@ -538,9 +547,20 @@ export class FaseripInitiative {
 
   // --- Combatant side assignment ---
 
+  // The sheet's characterType is what the Judge set; the document type is
+  // what the actor was created as. When they disagree the sheet wins.
+  static _characterKind(actor) {
+    const stated = String(actor?.system?.characterType ?? "").toLowerCase();
+    if (stated === "hero" || stated === "villain" || stated === "npc") return { kind: stated, source: "characterType" };
+    const type = actor?.type;
+    if (type === "hero" || type === "villain" || type === "npc") return { kind: type, source: "actor type" };
+    return { kind: null, source: null };
+  }
+
   static _determineSide(combatant) {
-    if (combatant.actor?.type === "hero") return "pc";
-    if (combatant.actor?.type === "villain") return "npc";
+    const { kind } = this._characterKind(combatant.actor);
+    if (kind === "hero") return "pc";
+    if (kind === "villain") return "npc";
     const disp = combatant.token?.disposition ?? combatant.actor?.prototypeToken?.disposition;
     if (disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY) return "pc";
     if (disp === CONST.TOKEN_DISPOSITIONS.HOSTILE) return "npc";
@@ -565,18 +585,19 @@ export class FaseripInitiative {
     if (!combat) return console.warn("[FASERIP] explainSides: no active combat");
     const rows = Array.from(combat.combatants).map(c => {
       const type = c.actor?.type ?? "(no actor)";
+      const { kind, source } = this._characterKind(c.actor);
       const disp = c.token?.disposition ?? c.actor?.prototypeToken?.disposition;
       const dispName = Object.entries(CONST.TOKEN_DISPOSITIONS).find(([, v]) => v === disp)?.[0] ?? String(disp);
       const override = c.getFlag("msh-faserip", "sideOverride") ?? null;
       const cached = c.getFlag("msh-faserip", "side") ?? null;
       const resolved = this._resolveSide(c);
       const reason = override ? "override (Swap Side)"
-        : type === "hero" ? "actor type hero"
-        : type === "villain" ? "actor type villain"
+        : kind === "hero" ? `${source} hero`
+        : kind === "villain" ? `${source} villain`
         : disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "token FRIENDLY"
         : disp === CONST.TOKEN_DISPOSITIONS.HOSTILE ? "token HOSTILE"
         : c.actor?.hasPlayerOwner ? "player-owned" : "not player-owned (fallback)";
-      return { name: c.name, actorType: type, disposition: dispName, playerOwned: !!c.actor?.hasPlayerOwner, override, cached, resolved, reason, initiative: c.initiative };
+      return { name: c.name, actorType: type, characterType: c.actor?.system?.characterType ?? null, disposition: dispName, playerOwned: !!c.actor?.hasPlayerOwner, override, cached, resolved, reason, initiative: c.initiative };
     });
     console.table(rows);
     return rows;
