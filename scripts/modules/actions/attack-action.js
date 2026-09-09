@@ -1,3 +1,10 @@
+// attack-action.js v1.15.0 - 2026-09-09
+// v1.15.0: Fixed-bug (CERT Dodging text, 2026-09-09): "A character may not
+//          dodge an unexpected attack ... (Blindsiding)". A Blindside attack
+//          (choice.blindside) now drops the target's Dodging shift from the
+//          defender breakdown and records "Blindside: dodge ignored" on the
+//          to-hit chips. Other defender shifts stand. The +2CS to-hit for
+//          Blindside stays the situational-dropdown pick it was.
 // attack-action.js v1.14.0 - 2026-09-05
 // v1.14.0: Blindside declaration carried to the target. A dialog that sets
 //          choice.blindside stamps it on both the chip prefill and the
@@ -1015,6 +1022,7 @@ export class AttackAction extends BaseAction {
     // Prefer specificTarget (set during multi-attack loops) over live game.user.targets
     let defenderShift = 0;
     let defenderEffects = [];
+    let blindsideDodgeIgnored = 0;
     const primaryTarget = choice?.specificTarget ?? this._selectPrimaryTarget();
     debugLog(`_executeSingleAttack: specificTarget=${choice?.specificTarget?.name ?? "NONE"}, primaryTarget=${primaryTarget?.name ?? "NONE"}, attackNumber=${attackNumber ?? "?"}`);
     const defenderActor = primaryTarget?.actor ?? null;
@@ -1049,6 +1057,17 @@ export class AttackAction extends BaseAction {
       const defenderShiftData = getDefenseShiftBreakdown(defenderActor, isRanged);
       defenderShift = defenderShiftData.total;
       defenderEffects = defenderShiftData.breakdown;
+      // RAW (Dodging): an unexpected attack cannot be dodged. A declared
+      // Blindside strips the Dodging entry from the defender's shift.
+      if (choice.blindside) {
+        const dodges = defenderEffects.filter(e => /dodg/i.test(String(e.name || "")));
+        if (dodges.length) {
+          const ignored = dodges.reduce((a, e) => a + (Number(e.shift) || 0), 0);
+          defenderShift -= ignored;
+          defenderEffects = defenderEffects.filter(e => !dodges.includes(e));
+          blindsideDodgeIgnored = ignored;
+        }
+      }
     }
     
     // Total effect shift (attacker bonus + defender penalty)
@@ -1680,6 +1699,7 @@ export class AttackAction extends BaseAction {
         for (const eff of defenderEffects) {
           parts.push(`${eff.name}: ${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)}`);
         }
+        if (blindsideDodgeIgnored) parts.push(`Blindside: Dodging (-${Math.abs(blindsideDodgeIgnored)}) ignored`);
         
         toHitChips = parts.flatMap(p => String(p).split(',').map(s => s.trim())).filter(Boolean);
         // Show the breakdown even when components cancel to a net 0 (e.g. Guns +1

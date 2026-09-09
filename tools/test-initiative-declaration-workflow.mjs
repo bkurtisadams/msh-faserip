@@ -1,3 +1,10 @@
+// tools/test-initiative-declaration-workflow.mjs v3.1.0 - 2026-09-09
+// v3.1.0: faserip-initiative.js 4.1.3 — side rule reads the sheet's
+//         characterType before the document type; single-side rounds open
+//         Actions without a roll (third batched initiative write); anchored
+//         power-name tests; dead useCustomInitiative migration gone. The
+//         sideOverride assertion is updated for the v4.1.1 _resolveSide
+//         shape (it had matched the pre-4.1.1 inline form).
 // tools/test-initiative-declaration-workflow.mjs v3.0.0 - 2026-09-04
 // Initiative modifier certification plus source-wiring assertions for the
 // v3 two-state RAW workflow. Run from the repo root:
@@ -73,14 +80,32 @@ ok(/"flags\.msh-faserip\.ready": null/.test(resetBlock), 'round reset clears Rea
 
 // Batched tracker writes.
 ok(!/setInitiative\(/.test(initiative), 'no per-combatant setInitiative calls');
-ok((initiative.match(/updateEmbeddedDocuments\("Combatant", initiativeOps\)/g) || []).length === 2, 'side and individual rolls each write initiative in one batched update');
+ok((initiative.match(/updateEmbeddedDocuments\("Combatant", initiativeOps\)/g) || []).length === 3, 'side, individual and single-side rounds each write initiative in one batched update');
 
 // Side modifier rulings (2026-09-03).
 ok(/sideInitiativeModifier\(combatants\.map\(c => this\._initiativeFacts\(c\)\)\)/.test(initiative) && !/_getHighestIntuition|_getHighestTalentBonus/.test(initiative), 'side modifier comes from the kernel sideInitiativeModifier over character facts');
 ok(/resolveSideInitiative\(\{/.test(initiative) && !/roll\.total === 1 \? 1/.test(initiative) && /initiativeTotal\(roll\.total, intMod \+ talent\.bonus\)/.test(initiative), 'natural 1, totals and tie come from the kernel');
 ok(!/\$\{source\} \(assumed\)/.test(initiative), 'legacy "+1 (assumed)" talent bonus is gone');
 ok(/facts\.context = \{ unarmed: q\.unarmed === true, specialtyWeapon: q\.weaponSpecialist === true \};/.test(initiative) && /if \(game\.settings\.get\("msh-faserip", "useRawTurnPhases"\)\) \{/.test(initiative), 'declared context is supplied to the kernel only with RAW Turn Sequence on');
-ok(/name\.includes\("enhanced sense"\) && this\._isHearingPower\(p\)/.test(initiative), 'Enhanced Senses substitutes for Intuition only for the hearing variant');
+ok(/\/\^enhanced senses\?\\b\/\.test\(name\) && this\._isHearingPower\(p\)/.test(initiative), 'Enhanced Senses substitutes for Intuition only for the hearing variant (name-anchored)');
+ok(/\/\^combat sense\\b\/\.test\(name\)/.test(initiative) && /\/\^unconscious\\b\/\.test\(n\)/.test(initiative), 'Combat Sense and Unconscious tests are anchored to the name start (no substring false positives)');
+
+// Side rule (fixed-bug 2026-09-09): the sheet's characterType is the stated
+// kind; the document type is the fallback; npc falls through to disposition.
+ok(/static _characterKind\(actor\)/.test(initiative) && /actor\?\.system\?\.characterType/.test(initiative), 'side rule reads system.characterType');
+const kindBlock = initiative.slice(initiative.indexOf('static _characterKind(actor)'), initiative.indexOf('static _determineSide(combatant)'));
+ok(kindBlock.indexOf('characterType') < kindBlock.indexOf('actor?.type'), 'characterType is consulted before the document type');
+ok(/const \{ kind \} = this\._characterKind\(combatant\.actor\);\s*if \(kind === "hero"\) return "pc";\s*if \(kind === "villain"\) return "npc";/.test(initiative), '_determineSide keys on the resolved kind');
+ok(/characterType: c\.actor\?\.system\?\.characterType/.test(initiative), 'explainSides reports characterType');
+
+// Single-side rounds (RAW: initiative is rolled only while both sides can
+// act) open Actions instead of refusing.
+ok(/static async _resolveSingleSideRound\(combat, side, actingCombatants\)/.test(initiative), 'single-side rounds have their own resolution path');
+ok(!/Side initiative requires at least one eligible combatant on each side/.test(initiative), 'the refusing warning is gone');
+const singleBlock = initiative.slice(initiative.indexOf('static async _resolveSingleSideRound'), initiative.indexOf('// --- Individual FASERIP Initiative ---'));
+ok(/"flags\.msh-faserip\.turnPhase": this\.PHASE_ACTIONS/.test(singleBlock) && /_autoResolveDeclaredFeats\(combat\)/.test(singleBlock), 'single-side round opens Actions and resolves declared FEATs like a roll');
+ok(/"flags\.msh-faserip\.pcInitiative": null, "flags\.msh-faserip\.npcInitiative": null/.test(singleBlock), 'single-side round clears the side roll flags (no initiative bar)');
+ok(!/static _migrateOldSettings|this\._migrateOldSettings\(\)|getItem\("msh-faserip\.useCustomInitiative"\)/.test(initiative), 'dead useCustomInitiative migration removed');
 ok(/if \(resolved\.reroll\) \{/.test(initiative) && /setTimeout\(\(\) => this\.rollSideInitiative\(combat\), 1000\)/.test(initiative), 'side initiative ties re-roll');
 ok(/from "\.\.\/lib\/faserip-rules\/faserip-initiative\.js"/.test(read('scripts/rules/rules-reference.js')) && /return initiativeModifier\(intuitionValue\);/.test(read('scripts/rules/rules-reference.js')), 'rules-reference getInitiativeModifier delegates to the kernel');
 
@@ -114,7 +139,7 @@ ok(/"Auto-Roll Initiative Each Round \(non-RAW\)"/.test(initiative) && /"Roll In
 // Swap Side (2026-09-03).
 const panel = read('scripts/combat-panel.js');
 ok(/static async swapSide\(/.test(initiative) && /"flags\.msh-faserip\.sideOverride": newSide/.test(initiative), 'Swap Side persists a sideOverride flag');
-ok(/const correct = this\._resolveSide\(c\);/.test(initiative) && /getFlag\("msh-faserip", "sideOverride"\) \?\? this\._determineSide/.test(initiative), '_ensureSideFlags honours the override over actor type / disposition');
+ok(/const correct = this\._resolveSide\(c\);/.test(initiative) && /_validSide\(combatant\.getFlag\("msh-faserip", "sideOverride"\)\) \?\? this\._determineSide\(combatant\)/.test(initiative), '_ensureSideFlags honours the override over the automatic rule (v4.1.1 _resolveSide)');
 ok(/getCombatantContextOptions/.test(initiative) && /getCombatTrackerEntryContext/.test(initiative), 'context entries registered for v12 and v13+ trackers');
 ok(/FaseripInitiative\.swapSide\(combatant\)/.test(panel) && /clearSideOverride\(combatant\)/.test(panel), 'combat panel menu routes through the same swap/reset');
 ok(/update\.initiative = newSide === "pc" \? data\.pcInit : data\.npcInit;/.test(initiative), 'mid-round swap takes the new side\'s initiative total');

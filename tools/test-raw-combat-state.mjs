@@ -1,4 +1,6 @@
-// tools/test-raw-combat-state.mjs v2.1.0 - 2026-09-03
+// tools/test-raw-combat-state.mjs v2.2.0 - 2026-09-09
+// v2.2.0: [CERT] Dodging text — a dodger may perform one other action that
+//         turn including an attack, may not charge, half move.
 // Pure-node tests for scripts/rules/raw-combat-state.js (two-state model).
 // Run from the repo root: node tools/test-raw-combat-state.mjs
 import assert from 'node:assert/strict';
@@ -63,6 +65,16 @@ test('Move Only / Other cannot attack', () => {
 test('Block / Evade cannot attack', () => {
   assert.equal(act({ declaration: { type: 'block', label: 'Block' }, actionType: 'blunt-attack' }).ok, false);
   assert.equal(act({ declaration: { type: 'evade', label: 'Evade' }, actionType: 'blunt-attack' }).ok, false);
+});
+test('[CERT Dodging] a dodger may make one other action including an attack, but may not charge', () => {
+  const dodge = { type: 'dodge', label: 'Dodge' };
+  const resolved = { round: 4, action: 'dodging' };
+  const r = act({ declaration: dodge, preActionResolved: resolved, actionType: 'blunt-attack' });
+  assert.equal(r.ok, true);
+  assert.equal(r.consumesCombatAction, true);
+  assert.equal(act({ declaration: dodge, preActionResolved: resolved, actionType: 'shooting' }).ok, true);
+  assert.equal(act({ declaration: dodge, preActionResolved: resolved, actionType: 'charging' }).ok, false);
+  assert.equal(act({ declaration: dodge, preActionResolved: resolved, actionType: 'blunt-attack', actionState: { round: 4, combatActionUsed: true } }).ok, false);
 });
 test('Block forbids movement; Dodge permits it', () => {
   assert.equal(authorizeRawMovement({ phase: RAW_PHASES.ACTIONS, declaration: { type: 'block' } }).ok, false);
