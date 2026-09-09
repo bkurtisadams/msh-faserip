@@ -1,3 +1,9 @@
+// scripts/modules/effects/defense-effects.js v1.8.0 - 2026-09-09
+// v1.8.0: Absorption AE drops convertsToHealth / canRedirect (RULED
+//         2026-09-09: Absorption always heals and its excess may always be
+//         redirected — the item flags absorptionConvertsToHealth and
+//         absorptionCanRedirect are retired). The AE label loses its
+//         [heals/redirect] suffix.
 // scripts/modules/effects/defense-effects.js v1.7.1 - 2026-08-05
 // v1.7.1: resolveForceFieldValues honors armorPhysical/armorEnergy overrides
 //         (nonzero wins over the generic full/-10 split) so split-value stat
@@ -197,8 +203,6 @@ function resolveAbsorptionValues(item) {
   return {
     absorptionType: sys.absorptionType || "",
     absorptionSpecific: sys.absorptionSpecific || "",
-    convertsToHealth: sys.absorptionConvertsToHealth === true,
-    canRedirect: sys.absorptionCanRedirect === true,
     rankValue: value,
     rank: sys.rank || getClosestRankName(value),
   };
@@ -344,11 +348,7 @@ function buildAbsorptionAE(item, values) {
   const scope = SCOPE();
   const typeLabel = values.absorptionSpecific
     || (values.absorptionType ? values.absorptionType.charAt(0).toUpperCase() + values.absorptionType.slice(1) : "Unknown");
-  const modeBits = [];
-  if (values.convertsToHealth) modeBits.push("heals");
-  if (values.canRedirect) modeBits.push("redirect");
-  const modeLabel = modeBits.length ? ` [${modeBits.join("/")}]` : "";
-  const label = `Absorption: ${typeLabel} (${values.rank}: ${values.rankValue})${modeLabel}`;
+  const label = `Absorption: ${typeLabel} (${values.rank}: ${values.rankValue})`;
 
   return {
     name: label,
@@ -365,8 +365,6 @@ function buildAbsorptionAE(item, values) {
         powerName: item.name,
         absorptionType: values.absorptionType,
         absorptionSpecific: values.absorptionSpecific,
-        convertsToHealth: values.convertsToHealth,
-        canRedirect: values.canRedirect,
         rankValue: values.rankValue,
         rank: values.rank,
         isForceField: false,

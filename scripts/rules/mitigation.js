@@ -1,3 +1,13 @@
+// scripts/rules/mitigation.js v3.8.0 - 2026-09-09
+// v3.8.0: Absorption onto the faserip-rules powers kernel (RULED 2026-09-09,
+//         RAW): applyAbsorptionFromAE asks absorption-pool.planAbsorption
+//         for the heal / pool / excess split and returns it on
+//         result.absorption for action-utils to write with the Health
+//         update. convertsToHealth (soak-only mode) and canRedirect
+//         retired — the book's Absorption always heals and its excess may
+//         always be redirected. The old fire-and-forget pendingRedirect
+//         setFlag (nothing ever read it) is gone; the redirect is banked by
+//         absorption-pool from the same event.
 // scripts/rules/mitigation.js v3.7.0 - 2026-09-02
 // v3.7.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
 //         shifts). Flat-value branch retired in both Body Armor layers; a
@@ -103,6 +113,7 @@
 
 import { getBodyArmorValues, applyArmorPiercingCS } from "../modules/actions/action-utils.js";
 import { defenseValue } from "../lib/faserip-rules/faserip-damage.js";
+import { planAbsorption } from "../modules/effects/absorption-pool.js";
 export { applyArmorPiercingCS };
 
 export function calculateMitigation(rawDamage, targetActor, options = {}) {
@@ -143,13 +154,10 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     absorbed: 0,
     layers: [],
     ffBreach: null,
-    // Absorption-specific fields surfaced to caller for race-free HP write:
-    //   absorptionHeal: total HP to add post-damage (only when convertsToHealth)
-    //   absorptionTempHPRank: ceiling for overheal above max
-    //   absorptionAeIds: source defense AE ids for ongoing-engine bookkeeping
-    absorptionHeal: 0,
-    absorptionTempHPRank: 0,
-    absorptionAeIds: [],
+    // Absorption event for the caller's Health write (absorption-pool.js
+    // planAbsorption result: absorbed, healed, poolGain, pool, redirect,
+    // poolExpiresRound, damageType, sourceItemId, rank, rankLabel) or null.
+    absorption: null,
     // Energy Reflection: blocked amount banked for the redirect workflow.
     //   { amount, damageType, aeId, reflectRangeRank } or null.
     reflectBank: null,
@@ -242,8 +250,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   }
 
   // ── Absorption — applies before BA/FF for matched damage type ──
-  // Per-hit cap = rank#. Absorbed → optionally heals + temp HP. Excess flows
-  // through normal mitigation. Pending-redirect bank for next-round.
+  // Up to the rank number is absorbed (heals first, then pools — kernel).
+  // Excess above the rank number flows through normal mitigation and is the
+  // amount available to redirect next round.
   if (aeDefenses.hasAbsorption) {
     const absLayer = applyAbsorptionFromAE(currentDamage, aeDefenses.absorption, {
       dmgTypeLower, isEnergyDamage, targetActor
@@ -253,12 +262,8 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
       currentDamage -= absLayer.absorbed;
       result.absorbed += absLayer.absorbed;
       result.layers.push(absLayer);
-      if (absLayer.healAmount > 0) {
-        result.absorptionHeal += absLayer.healAmount;
-        result.absorptionTempHPRank = Math.max(result.absorptionTempHPRank, absLayer.tempHPRank || 0);
-        if (absLayer.sourceAeId) result.absorptionAeIds.push(absLayer.sourceAeId);
-      }
     }
+    if (absLayer.plan) result.absorption = absLayer.plan;
   }
 
   // bypassArmor means body armor was already subtracted upstream (attack-action.js),
@@ -585,7 +590,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   //   absorptionType "energy" → any energy or energy-* damage
   //   absorptionSpecific (when present) → fuzzy substring match against full damage type
   //     (e.g. "electrical" matches "energy-electrical"). Specific overrides type.
-  let absRank = 0, absRankLabel = "", absConverts = false, absRedirect = false, absAeId = null, absMatched = "", absSpecific = "";
+  let absRank = 0, absRankLabel = "", absAeId = null, absItemId = "", absMatched = "", absSpecific = "";
   for (const ae of activeDefenses) {
     const f = ae.flags?.[scope];
     if (f?.defenseType !== "absorption") continue;
@@ -610,9 +615,8 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     if (rv > absRank) {
       absRank = rv;
       absRankLabel = f.rank || "";
-      absConverts = f.convertsToHealth === true;
-      absRedirect = f.canRedirect === true;
       absAeId = ae.id;
+      absItemId = f.powerItemId || getItemIdFromDefenseOngoingId(f.ongoingId || "");
       absMatched = at;
       absSpecific = f.absorptionSpecific || "";
     }
@@ -654,7 +658,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     armor: { physical: armorPhys, energy: armorEner, physicalRank: armorPR, energyRank: armorER },
     forceField: { physical: ffPhys, energy: ffEner, fullValue: ffFull, physicalRank: ffPR, energyRank: ffER, isPersonal: ffPersonal, aeId: ffAeId },
     resistance: { damageReduction: resDR, csBonus: resCS, hasImmunity: resImm, immunityThreshold: resImmThr, type: resType },
-    absorption: { rank: absRank, rankLabel: absRankLabel, convertsToHealth: absConverts, canRedirect: absRedirect, aeId: absAeId, matchedType: absMatched, specific: absSpecific },
+    absorption: { rank: absRank, rankLabel: absRankLabel, aeId: absAeId, itemId: absItemId, matchedType: absMatched, specific: absSpecific },
     reflection: { threshold: reflThreshold, rank: reflRank, rankValue: reflRankValue, aeId: reflAeId, matchedType: reflMatched },
   };
 }
@@ -874,11 +878,21 @@ function applyEnergyReflectionFromAE(damage, reflData, options) {
 }
 
 function applyAbsorptionFromAE(damage, absData, options) {
-  const { dmgTypeLower, isEnergyDamage, targetActor } = options;
+  const { dmgTypeLower, targetActor } = options;
   const rank = Number(absData.rank) || 0;
-  const absorbThisHit = Math.min(damage, rank);
 
-  const layer = {
+  let plan = null;
+  try {
+    plan = planAbsorption(targetActor, {
+      damage, rankNumber: rank, rank: absData.rankLabel, rankLabel: absData.rankLabel,
+      damageType: dmgTypeLower, sourceItemId: absData.itemId || null,
+    });
+  } catch (e) {
+    console.warn("[FASERIP MITIGATION] Absorption plan failed:", e);
+  }
+  const absorbThisHit = plan ? plan.absorbed : Math.min(damage, rank);
+
+  return {
     type: 'Absorption',
     absorbed: absorbThisHit,
     capacity: rank,
@@ -887,52 +901,12 @@ function applyAbsorptionFromAE(damage, absData, options) {
     source: "defense-ae",
     matchedType: absData.matchedType,
     matchedSpecific: absData.specific,
-    convertsToHealth: absData.convertsToHealth,
-    canRedirect: absData.canRedirect,
     sourceAeId: absData.aeId,
+    healed: plan?.healed || 0,
+    poolGain: plan?.poolGain || 0,
+    redirect: plan?.redirect || 0,
+    plan,
   };
-
-  if (absorbThisHit <= 0) return layer;
-
-  // Heal amount is the absorbed quantity; caller (action-utils.js applyDamage)
-  // applies it AFTER subtracting netDamage so the math is race-free and the
-  // temp-HP ceiling is checked against post-damage HP. We DO NOT write HP
-  // here. Caller is also responsible for scheduling the temp HP cliff decay
-  // via applyAbsorptionTempHPOngoing once it knows how much overflow exists.
-  if (absData.convertsToHealth) {
-    layer.healAmount = absorbThisHit;
-    layer.tempHPRank = rank;  // ceiling for overheal
-  }
-
-  // Redirect bank (flag-only, one round shelf life) — setFlag is independent
-  // of HP and safe to fire here.
-  if (absData.canRedirect && targetActor) {
-    try {
-      const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-      const inCombat = !!(game.combat && game.combat.round > 0);
-      const round = inCombat ? game.combat.round : null;
-      const pending = {
-        amount: absorbThisHit,
-        damageType: dmgTypeLower,
-        bankedRound: round,
-        expiresRound: inCombat ? round + 1 : null,
-        sourceAeId: absData.aeId,
-      };
-      targetActor.setFlag(scope, "pendingRedirect", pending);
-      layer.redirectBanked = absorbThisHit;
-      const expiryText = inCombat
-        ? `may redirect next round (expires end of round ${round + 1})`
-        : `may redirect on next action (no combat active — flag persists until cleared)`;
-      ChatMessage?.create?.({
-        speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-        content: `<div class="msh-card"><strong>${targetActor.name}</strong> absorbed <b>${absorbThisHit}</b> ${dmgTypeLower} — ${expiryText}.</div>`,
-      });
-    } catch (e) {
-      console.warn("[FASERIP MITIGATION] Absorption redirect bank failed:", e);
-    }
-  }
-
-  return layer;
 }
 
 function applyResistanceFromAE(damage, resData, options) {

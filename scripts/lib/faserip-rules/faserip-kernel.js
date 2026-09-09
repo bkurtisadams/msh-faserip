@@ -1,3 +1,15 @@
+// faserip-rules kernel v0.2.15
+// v0.2.15: ERRATA — Absorption heals before it pools (Judge, 2026-09-09),
+//          superseding the flat-pool ruling; faserip-powers.js v0.2.0.
+//          Fixed-bug: KERNEL_VERSION had stayed at 0.2.12 through two bumps.
+// faserip-rules kernel v0.2.14
+// v0.2.14: ERRATA — Appendix A Absorption rulings (Judge, 2026-09-05);
+//          faserip-powers.js v0.1.0 opens the power-mechanics module.
+// faserip-rules kernel v0.2.13
+// v0.2.13: ERRATA — thrown edged is an Edged Attack for Modifying Results
+//          in Combat (faserip-karma v0.7.1 EFFECT_REDUCTION_COLUMN_KEYS);
+//          relative-Health rationale restated from the rules rather than
+//          from a msh-faserip version and one actor.
 // faserip-rules kernel v0.2.12
 // v0.2.12: ERRATA — Poisons and Toxins (Judge's Book) with the msh-faserip
 //          Judge rulings PR1-PR5 imported; faserip-poisons.js v0.1.0 and
@@ -34,7 +46,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.12';
+export const KERNEL_VERSION = '0.2.15';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -255,7 +267,7 @@ export const ERRATA = [
   'RULED 2026-09-05: While Endurance ranks are lost (dying, or impaired afterwards) the Endurance rank number is the HIGHEST number of the current reduced rank (Life, Death, and Health: "for further Endurance checks the rank number is considered to be the highest for that rank"), e.g. Excellent -> Good counts as 15, not 10. That number is the one used for Endurance FEATs, Health on waking, Recovery and Healing amounts until the original rank and number return. msh-faserip previously used the standard number of the reduced rank (fixed-bug).',
   'RULED 2026-09-05: Regaining consciousness from 0 Health is an Endurance FEAT with no stated Intensity, so green succeeds (any non-white). Failure re-checks in 1-10 turns; success wakes with Health equal to the Endurance rank number.',
   'RULED 2026-09-05: Recovery "provided the character is not knocked unconscious" forfeits only the Recovery of the damage that caused the knockout; the once-per-day limit is a separate clause and no other Recovery is lost. msh-faserip clears its knockout gate on the next hit taken while conscious. Kernel recoveryAllowed takes knockedOut as a caller-supplied flag.',
-  'RULED 2026-09-05: While Endurance ranks are lost (dying or poison) and as they are restored, msh-faserip moves Health and maximum Health by the Endurance number DELTA (relative), not to a recomputed F+A+S+E. The passage is silent on Health during the spiral; this keeps the v1.7.0 intent that Health tracks Endurance without jumping an actor whose printed maximum is not the formula sum (Screamwave: max 90 rose to 95 under the absolute recompute).',
+  'RULED 2026-09-05: While Endurance ranks are lost (dying or poison) and as they are restored, Health and maximum Health move by the Endurance number DELTA, not to a recomputed F+A+S+E. Life, Death, and Health is silent on Health during the spiral, and Health is a sum taken at creation rather than a value the rules re-derive: a character whose printed maximum differs from the formula sum (deliberate Judge assignment, an earlier advancement, a template) would have that maximum silently rewritten by an absolute recompute, and would end the spiral with more Health than before it. Relative movement changes only what the lost ranks account for.',
   'NOTE: Initiative Modifier table is keyed on the highest Intuition rank NUMBER on the side (0-10 +0, 11-20 +1, 21-30 +2, 31-40 +3, 41-50 +4, 51-75 +5, 76+ +6). The PDF text drops the table; the printed rows overlap at 75, resolved as 75 → +5 and +6 from 76. Implemented in faserip-initiative.js.',
   'RULED 2026-09-03: Side initiative modifier — each character\'s effective modifier is own Intuition modifier plus own talent bonus, and the side uses the highest. One character\'s Intuition is never combined with another character\'s Martial Arts E / Weapons Specialist bonus.',
   'RULED 2026-09-03: Martial Arts E (+1 unarmed) and Weapons Specialist (+1 with the specialty weapon) initiative bonuses apply only when the declared attack context is known; with no declaration no bonus is assumed. They never stack past +1.',
@@ -284,11 +296,17 @@ export const ERRATA = [
   'RULED 2026-08-31: Universal Table color bands certified against table image; Class 1000/3000/5000/Beyond corrected from provisional values.',
   'RULED 2026-08-31: Rank 36 is Incredible. Players Book text (Rm 26-35, In 36-45) is authoritative; the table image printing Rm 26-36 / In 37-45 is wrong.',
   'RULED 2026-08-31: Throwing Blunt yellow result is Bullseye per prose; the table image printing yellow = Hit is wrong.',
+  'RULED 2026-09-05: Thrown edged weapons are Edged Attacks for Modifying Results in Combat, so their effect may be reduced only by spending 50 Karma per color. The rule names Edged Attack, Shooting and Energy; the Kill-capable columns those cover are EA, TE, Sh and En (faserip-karma EFFECT_REDUCTION_COLUMN_KEYS). Grenades carry an attack form for damage but resolve on a plain Agility FEAT with no effect column, so nothing there is reducible. msh-faserip rendered no result-cap control on EA, Sh or TE, leaving the paid reduction unreachable on every column that required it (fixed-bug).',
   'RULED 2026-08-31: Energy attacks — damage may be reduced but not the effect (Energy Attack section text is authoritative over the Pulling Punches summary); effect reduction only via 50 Karma per color as a Kill-capable column.',
   'NOTE: Blunt Attack effects paragraph duplicates the Stun line ("may in addition Slam"/"may in addition Stun"); table confirms Miss/Hit/Slam/Stun.',
   'RULED 2026-08-31: Commit Other Crimes is -10 Karma as the Summary Listing prints; the twice-the-listed rule does not override it.',
   'NOTE: Conspiracy example totals 185 but prints "55 points each" for three heroes; floor(185/3)=61. Kernel follows the stated split rule (100/3 -> 33 each), treating 55 as a book math error.',
   'NOTE: Karma Summary Listing prints Failing Commitment as -5; prose and the Reed Richards example say failure to show is -10 and leaving early is -5. Karma module encodes both per prose.',
+  'RULED 2026-09-05 (Judge): Absorption grants a temporary Health pool equal to the Power rank NUMBER, flat, whatever damage the absorbed attack carried — a 5-point shock and a 48-point bolt both give Amazing(48) Absorption 48. The book states the gain as \'the Power rank involved\' and its example (Health 100 -> 148) does not name the bolt\'s damage, so the flat reading is the one the arithmetic supports.',
+  'RULED 2026-09-09 (Judge), SUPERSEDES the flat-pool ruling above: the absorbed points are one budget that first heals existing damage up to max Health and only then raises Health above max as the pool (\'healing existing damage and even temporarily raising ... Health\'). Health 70/100 hit by a 5-point shock -> 75 and no pool; 70/100 absorbing 48 -> 100 real plus an 18-point pool; the book\'s 100 -> 148 example holds at full Health. The pool caps at the rank number; each absorption refreshes the one 10-round clock. The prior ruling read \'by the Power rank involved\' as a flat grant; it is the cap.',
+  'RULED 2026-09-05 (Judge): Absorption damage above the rank number is damage the absorber MUST take, against real Health; it may not be paid out of the pool the same attack grants. Amazing(48) at Health 100 hit for 60: real Health 88, pool 48, 136 displayed. The pool soaks only subsequent damage, so when it lapses the character stands at 88 — the 12 points really landed. Health loss thereafter comes off the pool first, then real Health (book text).',
+  'RULED 2026-09-05 (Judge): the Absorption pool caps at the Power rank number — a second absorption refreshes it rather than stacking — and one 10-round clock is refreshed by each absorption rather than a queue of staged expiries. The book is silent on repeat absorptions; without a cap a character standing in a storm accumulates without limit.',
+  'RULED 2026-09-05 (Judge): redirected Absorption excess resolves as the absorbed damage type on that type\'s own Battle Effects column at the absorber\'s Agility, for the excess amount, on the round after it was absorbed. The book gives the amount and the timing but names no attack form.',
   'RULED 2026-08-31: Teleporting into an object inflicts damage equal to the material strength (1x, Movement chapter text authoritative); the Appendix A power description saying twice is wrong. Body Armor gives no protection.',
   'RULED 2026-08-31: Fall impact resolves entirely as a Charging attack per the Charging rules (rebound mechanism); "damage equivalent to the distance" is descriptive, not an alternate formula.',
   'RULED 2026-08-31: Laser rifles are Energy attacks (Energy column, Body Armor at -20); the weapon table typing them "S" is wrong.',

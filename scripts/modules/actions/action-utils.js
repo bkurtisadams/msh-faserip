@@ -1,3 +1,13 @@
+// action-utils.js v1.14.0 - 2026-09-09
+// v1.14.0: Absorption onto the powers kernel (RULED 2026-09-09, RAW).
+//          applyDamageToTargets writes the kernel's heal + pool gain into
+//          health.value together with the actor's absorption pool flag in
+//          ONE update (absorption-pool.absorptionFlagData) so the pool hook
+//          can tell the absorbed hit from ordinary damage; the 0-Health and
+//          Kill checks now read REAL Health (value minus pool), since excess
+//          above the rank number lands on real Health while a pool is held.
+//          The temp-HP overheal block and the applyAbsorptionTempHPOngoing
+//          scheduling are gone with it.
 // action-utils.js v1.13.0 - 2026-09-05
 // v1.13.0: Parked sweep — the two per-call getBodyArmorValues debug logs
 //          are removed. They fired on every damage resolution for every
@@ -168,6 +178,7 @@
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
+import { absorptionFlagData, afterAbsorptionEvent, getAbsorptionPool } from "../effects/absorption-pool.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
@@ -1935,27 +1946,36 @@ export async function applyDamageToTargets({
         await postReflectPrompt(targetActor, mitResult.reflectBank, { attackerUuid });
       }
 
-      // Get health values
+      // Get health values. health.value is REAL Health plus any Absorption
+      // pool; the pool hook (absorption-pool.js) takes ordinary damage off
+      // the pool first, so the 0-Health checks below use the real part.
       const hpPath = "system.attributes.health.value";
       const before = Number(targetActor?.system?.attributes?.health?.value ?? 0);
       let after = Math.max(0, before - netDamage);
+      const heldPool = Math.min(before, Number(getAbsorptionPool(targetActor)?.pool ?? 0));
+      const absPlan = mitResult?.absorption || null;
+      // Ordinary damage comes off the pool first; an absorbed hit's excess
+      // bypasses the pool and lands on real Health (RULED 2026-09-05).
+      const realBefore = before - heldPool;
+      let realAfter = absPlan
+        ? Math.max(0, realBefore - netDamage)
+        : Math.max(0, realBefore - Math.max(0, netDamage - heldPool));
 
-      // ── Absorption heal (post-damage, race-free) ──
-      // Mitigation returned the heal amount; we apply it here in the same
-      // update pass as the damage subtraction. Overheal allowed up to
-      // max + tempHPRank ceiling. Temp overflow scheduled for cliff decay
-      // at round+10 via ongoing-engine.
-      let absorptionTempGained = 0;
-      if (mitResult && mitResult.absorptionHeal > 0) {
-        const maxHP = Number(targetActor?.system?.attributes?.health?.max ?? after);
-        const ceiling = maxHP + (mitResult.absorptionTempHPRank || 0);
-        const next = Math.min(ceiling, after + mitResult.absorptionHeal);
-        absorptionTempGained = Math.max(0, next - maxHP);
-        after = next;
+      // ── Absorption heal + pool (kernel plan, same update as the damage) ──
+      // Heal and excess are one arithmetic step (kernel: hp + healed -
+      // excess), so a hit on a downed absorber nets what the numbers say.
+      let absorptionUpdate = null;
+      if (absPlan && (absPlan.absorbed > 0 || absPlan.redirect > 0)) {
+        realAfter = Math.max(0, realBefore + (absPlan.healed || 0) - netDamage);
+        after = realAfter + absPlan.pool;
+        absorptionUpdate = absorptionFlagData(targetActor, absPlan);
       }
 
       // ===== HANDLE DAMAGE TO ALREADY 0 HP TARGET =====
-      if (before === 0 && netDamage > 0) {
+      // (an absorbed hit still heals a downed absorber, so it takes the
+      // normal update path; its excess does not re-trigger the 0-Health
+      // handling — GAP, Judge's call at the table)
+      if (realBefore === 0 && netDamage > 0 && !absorptionUpdate) {
         const fourColor = game.settings.get("msh-faserip", "fourColorRule");
         const { isLethalAttackForm } = await import("../../rules/kill-resolver.js");
         const isLethal = wasKillResult || forceKilling || isLethalAttackForm(attackForm);
@@ -2031,7 +2051,7 @@ export async function applyDamageToTargets({
         game.msh._combatDamageInProgress = true;
         try {
           await targetActor?.update(
-            { [hpPath]: after },
+            { [hpPath]: after, ...(absorptionUpdate ? { [Object.keys(absorptionUpdate)[0]]: Object.values(absorptionUpdate)[0] } : {}) },
             { healthChange: { old: before, new: after } }
           );
         } finally {
@@ -2043,21 +2063,6 @@ export async function applyDamageToTargets({
           await recordDamage(targetActor, { previousHealth: before });
         }
 
-        // Schedule absorption temp-HP cliff decay (post-update so the AE
-        // attaches to the actor with the new HP already written).
-        if (absorptionTempGained > 0) {
-          try {
-            const ongoing = await import("../effects/ongoing-engine.js");
-            const sourceAeId = mitResult?.absorptionAeIds?.[0] || null;
-            await ongoing.applyAbsorptionTempHPOngoing?.(targetActor, {
-              amount: absorptionTempGained,
-              expiresInRounds: 10,
-              sourceAeId,
-            });
-          } catch (e) {
-            console.warn("FASERIP | Absorption temp HP scheduling failed:", e);
-          }
-        }
       } else if (targetActor) {
         // Non-owner player: delegate to GM
         try {
@@ -2065,13 +2070,13 @@ export async function applyDamageToTargets({
             await game.msh.runAsGM({
               operation: "update",
               targetActorUuid: targetActor.uuid,
-              args: [{ [hpPath]: after }]
+              args: [{ [hpPath]: after, ...(absorptionUpdate ? { [Object.keys(absorptionUpdate)[0]]: Object.values(absorptionUpdate)[0] } : {}) }]
             });
           } else if (game.msh?.socket?.executeAsGM) {
             await game.msh.socket.executeAsGM("runGMCommand", {
               operation: "update",
               targetActorUuid: targetActor.uuid,
-              args: [{ [hpPath]: after }]
+              args: [{ [hpPath]: after, ...(absorptionUpdate ? { [Object.keys(absorptionUpdate)[0]]: Object.values(absorptionUpdate)[0] } : {}) }]
             });
           } else {
             console.warn("FASERIP | No GM helper available for applyDamageToTargets");
@@ -2084,8 +2089,14 @@ export async function applyDamageToTargets({
         // Note: recordDamage skipped for non-owner — GM's updateActor hook handles damage timestamps
       }
 
+      // Absorption card, pool AE and next-round redirect (after the write).
+      if (absorptionUpdate) {
+        try { await afterAbsorptionEvent(targetActor, absPlan, { attackerUuid }); }
+        catch (e) { console.warn("FASERIP | Absorption event post failed:", e); }
+      }
+
       // ===== HANDLE REDUCTION TO 0 HP =====
-      if (after === 0 && before > 0 && netDamage > 0) {
+      if (realAfter === 0 && realBefore > 0 && netDamage > 0) {
         console.log("💀 FASERIP | Target reduced to 0 HP:", targetName, { wasKillResult, forceKilling, attackForm });
         
         const fourColor = game.settings.get("msh-faserip", "fourColorRule");
@@ -2126,7 +2137,7 @@ export async function applyDamageToTargets({
       // the attacker must inflict some damage on the target."
       // Borderline ("one more point") rule: when damage exactly equals the
       // target's defenses (net 0), the Kill effect STILL applies.
-      else if (wasKillResult && after > 0
+      else if (wasKillResult && realAfter > 0
                && canEffectsApply(netDamage, { borderline: mitResult?.borderline === true })) {
         console.log("💀 FASERIP | Kill result with damage but target survived:", targetName);
         

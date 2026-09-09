@@ -1,3 +1,11 @@
+// scripts/modules/effects/ongoing-engine.js v1.12.0 - 2026-09-09
+// v1.12.0: Absorption onto the powers kernel. applyAbsorptionTempHPOngoing
+//          removed — it registered a stat.loss/health record that
+//          executeEffect never dispatched (fixed-bug: the temp HP never
+//          decayed); the pool now lives in absorption-pool.js with its own
+//          clock. executeHealthHeal heals REAL Health (health.value minus the
+//          held pool) so Regeneration keeps working while a pool is held
+//          instead of seeing value >= max and disabling itself.
 // scripts/modules/effects/ongoing-engine.js v1.11.0 - 2026-09-05
 // v1.11.0: RULED 2026-09-05 — max Health tracks Endurance by DELTA (relative),
 //          replacing the absolute F+A+S+E recompute in every lose/restore path
@@ -126,6 +134,7 @@ import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect, safeActorUpdateEffect } from "../../gm-utils.js";
 import { RANKS_ORDERED, stepRank } from "../../rules/rules-reference.js";
 import { TURN_SECONDS } from "../recovery-timing.js";
+import { splitHealth } from "./absorption-pool.js";
 import { enduranceLossStep, enduranceRestoreStep } from "../../lib/faserip-rules/faserip-damage.js";
 import { kernelKeyFor, foundryNameFor } from "../../kernel/adapter.js";
 
@@ -538,8 +547,8 @@ async function executeEffect(actor, ae, effectId, config, rawAmount, cycles, wor
 // ─── Effect executors ─────────────────────────────────────────────────────────
 
 async function executeHealthHeal(actor, ae, effectId, config, healPerCycle, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
-  const currentHP = actor.system?.attributes?.health?.value ?? 0;
-  const maxHP = actor.system?.attributes?.health?.max ?? 0;
+  // Heal the REAL Health; an Absorption pool rides on top unchanged.
+  const { real: currentHP, pool: heldPool, max: maxHP } = splitHealth(actor);
 
   // Already at max (or dead)
   if (currentHP <= 0) return;
@@ -557,7 +566,7 @@ async function executeHealthHeal(actor, ae, effectId, config, healPerCycle, cycl
   const totalHeal = Math.min(healPerCycle * cycles, cap - currentHP);
   const newHP = currentHP + totalHeal;
 
-  await actor.update({ "system.attributes.health.value": newHP });
+  await actor.update({ "system.attributes.health.value": newHP + heldPool });
 
   // Update timer state
   const newStartedAt = startedAt + (cycles * cycleSeconds);
@@ -1635,43 +1644,6 @@ export function listContinuingDamageEffects(actor) {
     }
   }
   return results;
-}
-
-// ─── Absorption temp HP cliff decay ──────────────────────────────────────────
-// RAW: extra Health dissipates in 10 rounds. Cliff implementation: schedule a
-// single HP-loss trigger at round+10 that strips the granted amount. Multiple
-// absorption events stack additively into a single ledger keyed by source AE.
-// On trigger, the engine subtracts the recorded amount from current HP (clamped
-// at 0). The AE is auto-disabled when ledger drains. Per-source so independent
-// absorptions decay on their own clocks.
-
-export async function applyAbsorptionTempHPOngoing(target, { amount, expiresInRounds = 10, sourceAeId = null } = {}) {
-  const actor = target?.actor ?? target;
-  if (!actor || !(amount > 0)) return null;
-
-  const effectId = sourceAeId
-    ? `absorptionTemp.${sourceAeId}`
-    : `absorptionTemp.${foundry.utils.randomID()}`;
-
-  return registerOngoingEffect(actor, effectId, {
-    type: "stat.loss",
-    stat: "health",
-    formula: amount,
-    rate: expiresInRounds,
-    cycle: "round",
-    count: 1,
-    gate: "none",
-    interruptOnDamage: false,
-    capAtMax: false,
-    autoDisable: true,
-    sourceAeId,
-  }, {
-    name: `Absorption Temp HP (${amount}, ${expiresInRounds}r)`,
-    img: "icons/svg/aura.svg",
-    disabled: false,
-    changes: [],
-    statuses: ["absorption-temp"],
-  });
 }
 
 // ─── Endurance rank restoration (one-shot helper) ────────────────────────────

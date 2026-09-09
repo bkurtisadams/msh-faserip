@@ -1,3 +1,9 @@
+// actorSheet.js v2.13.0 - 2026-09-09
+// v2.13.0: Absorption pool on the sheet. The Health area shows the held
+//          pool as a green "+N absorbed" tag beside the value (tooltip:
+//          real / max, dissipation round), the Healing button's
+//          at-max test reads REAL Health (absorption-pool.splitHealth), and
+//          the crisis row keys on real Health too.
 // actorSheet.js v2.12.0 - 2026-09-05
 // v2.12.0: Parked sweep — the Health-area Recovery and Healing buttons
 //          refresh when the clock moves. Both are time-derived
@@ -218,6 +224,7 @@ import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHard
          effectiveRepairReason, requiredColorVsIntensity, colorMeets,
          seedApplicableRanks } from "./rules/hardware-rules.mjs";
 import { getCurrentGameDate } from "./modules/effects/ongoing-engine.js";
+import { splitHealth, getAbsorptionPool } from "./modules/effects/absorption-pool.js";
 import { purchaseColor, resourceFeatAvailable, purchaseBlockedByFailure, bankLoan as _kernelBankLoan, RESOURCE_FEAT_INTERVAL_DAYS } from "./lib/faserip-rules/faserip-resources.js";
 import { kernelKeyFor as _resKernelKey, foundryNameFor as _resFoundryName } from "./kernel/adapter.js";
 
@@ -581,16 +588,20 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     context.isDying = !!dyingEffect;
 
     // Crisis row visibility: show Wake Up / Stabilize only when relevant
-    const currentHP = context.system?.attributes?.health?.value ?? 1;
+    // (real Health — an Absorption pool does not keep a character conscious)
+    const _hp = splitHealth(this.actor);
+    const currentHP = _hp.real;
     context.isInCrisis = context.isDying || currentHP === 0;
+    context.absorptionPool = _hp.pool;
+    context.realHealth = _hp.real;
 
     // Recovery button: disable if already used today
     const lastRecoveryDate = this.actor.getFlag(scope, "lastRecoveryDate");
     context.recoveryUsedToday = lastRecoveryDate === getCurrentGameDate();
 
     // Healing button: disable if health at max, no damage recorded, or still on 1-hour cooldown
-    const hpValue = context.system?.attributes?.health?.value ?? 0;
-    const hpMax = context.system?.attributes?.health?.max ?? 0;
+    const hpValue = _hp.real;
+    const hpMax = _hp.max;
     const lastDamageWorldTime = this.actor.getFlag(scope, "lastDamageWorldTime");
     const worldNow = game.time?.worldTime ?? 0;
     const timeSinceDamage = (lastDamageWorldTime != null) ? (worldNow - lastDamageWorldTime) : -1;
@@ -772,6 +783,26 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
         healthValueInput.attr('title', `Health (${currentHealth}) exceeds max (${currentHealthMax})`);
       }
     }
+  }
+
+  /**
+   * Show the held Absorption pool beside the Health value: "+N absorbed",
+   * with real / max and the dissipation round in the tooltip.
+   */
+  _applyAbsorptionIndicator(html) {
+    const f = getAbsorptionPool(this.actor);
+    const healthSection = html.find('.sec-col.health');
+    healthSection.find('.msh-absorption-tag').remove();
+    if (!f) return;
+    const { real, pool, max } = splitHealth(this.actor);
+    const input = healthSection.find('input[name="system.attributes.health.value"]');
+    if (!input.length) return;
+    const when = f.expiresRound != null ? `dissipates end of round ${f.expiresRound}` : "dissipates on the world clock";
+    const tag = $(`<span class="msh-absorption-tag" style="margin-left:4px;font-size:0.8em;font-weight:bold;color:#2e7d32;white-space:nowrap;">+${pool} absorbed</span>`)
+      .attr('title', `Health ${real}/${max} plus a ${pool}-point Absorption pool (${f.damageType || "absorbed"} energy, cap ${f.rankNumber ?? "?"}); ${when}. Other damage comes off the pool first.`);
+    input.after(tag);
+    input.css('cssText', 'background: #e8f5e9 !important; border-color: #66bb6a !important;');
+    input.attr('title', `${real} real + ${pool} absorbed`);
   }
 
   /**
@@ -2528,6 +2559,9 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
 
     // Apply visual indicators for Endurance impairment and health max reduction
     this._applyImpairmentIndicators(html);
+
+    // Absorption pool tag beside the Health value
+    this._applyAbsorptionIndicator(html);
 
     // Apply visual indicators for ability boosts/penalties from equipment Active Effects
     this._applyAbilityBoostIndicators(html);

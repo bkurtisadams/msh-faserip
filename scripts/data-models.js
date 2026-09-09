@@ -1,3 +1,6 @@
+// scripts/data-models.js v2.4.6 - 2026-09-09
+// v2.4.6: absorptionConvertsToHealth / absorptionCanRedirect keys removed
+//         from the power model (retired with RAW Absorption, 2026-09-09).
 // scripts/data-models.js v2.4.5 - 2026-08-02
 // v2.4.5: intensityDuration on equipment KEYS (dormant; template.json now
 //         carries the live default alongside the other intensity fields).
@@ -95,8 +98,7 @@ class FaseripVehicleActorData extends PermissiveDataModel {
 // ── Item types ──
 class FaseripPowerData extends PermissiveDataModel {
   static KEYS = [
-    "abilitySubstitution", "absorptionCanRedirect", "absorptionConvertsToHealth",
-    "absorptionSpecific", "absorptionType", "actionType", "activationType", "animal",
+    "abilitySubstitution", "absorptionSpecific", "absorptionType", "actionType", "activationType", "animal",
     "area", "areasPerRound", "armorEnergy", "armorEnergyCustom", "armorNature",
     "armorPhysical", "armorPhysicalCustom", "armorPiercing", "armorUseRankValue",
     "attackAbility", "attackType", "battleEffectsColumn", "bodyArmorType", "bodyDefensive",

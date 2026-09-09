@@ -548,8 +548,6 @@
       "isParalyzingTouch": false,
       "isBlindingTouch": false,
       "isImmortality": false,
-      "absorptionConvertsToHealth": false,
-      "absorptionCanRedirect": false,
       "isLifeSupport": false,
       "isMagic": false,
       "magic": {

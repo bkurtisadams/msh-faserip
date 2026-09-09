@@ -1,3 +1,9 @@
+// scripts/modules/rest-system.js v1.7.0 - 2026-09-09
+// v1.7.0: Recovery and Healing act on REAL Health (health.value minus any
+//         Absorption pool, absorption-pool.splitHealth) and write the pool
+//         back on top. Before, applyHealing's min(max, ...) clamp would have
+//         wiped a held pool and "Already at maximum Health" fired on the
+//         pooled value.
 // scripts/modules/rest-system.js v1.6.1 - 2026-09-05
 // v1.6.1: healImpairedEndurance restores max Health by the Endurance delta
 //         (relativeMaxHealth, RULED 2026-09-05) instead of F+A+S+E.
@@ -130,6 +136,7 @@ import { getFlagScope } from "./actions/flags.js";
 import { safeActorSetFlag } from "../gm-utils.js";
 import { RANKS_ORDERED, rankValue } from "../rules/rules-reference.js";
 import { getCurrentGameDate, relativeMaxHealth } from "./effects/ongoing-engine.js";
+import { splitHealth } from "./effects/absorption-pool.js";
 import { computeDuration } from "./effects/effect-engine.js";
 import { healingSecondsRemaining, TURN_SECONDS } from "./recovery-timing.js";
 import {
@@ -463,15 +470,14 @@ export class RestSystem {
       return { success: false, message: check.reason, healed: 0 };
     }
 
-    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-    const maxHealth = actor.system?.attributes?.health?.max ?? 0;
+    const { real: currentHealth, pool: heldPool, max: maxHealth } = splitHealth(actor);
     
     const newHealth = applyHealing({ current: currentHealth, max: maxHealth, amount: recoveryAmount(enduranceNumber(actor)) });
     const healAmount = newHealth - currentHealth;
 
-    // Apply healing
+    // Apply healing (the Absorption pool rides on top unchanged)
     await actor.update({
-      "system.attributes.health.value": newHealth
+      "system.attributes.health.value": newHealth + heldPool
     });
 
     // Mark recovery as used today (game day)
@@ -517,10 +523,9 @@ export class RestSystem {
       return { canHeal: false, reason: "No actor provided" };
     }
 
-    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-    const maxHealth = actor.system?.attributes?.health?.max ?? 0;
+    const { real: currentHealth, max: maxHealth } = splitHealth(actor);
 
-    // Already at max health
+    // Already at max health (the Absorption pool does not count)
     if (currentHealth >= maxHealth) {
       return { 
         canHeal: false, 
@@ -575,15 +580,14 @@ export class RestSystem {
 
     const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
     
-    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-    const maxHealth = actor.system?.attributes?.health?.max ?? 0;
+    const { real: currentHealth, pool: heldPool, max: maxHealth } = splitHealth(actor);
     
     const newHealth = applyHealing({ current: currentHealth, max: maxHealth, amount: healingPerHour(enduranceNumber(actor), { medicalCare: hasMedicalCare }) });
     const healAmount = newHealth - currentHealth;
 
-    // Apply healing
+    // Apply healing (the Absorption pool rides on top unchanged)
     await actor.update({
-      "system.attributes.health.value": newHealth
+      "system.attributes.health.value": newHealth + heldPool
     });
 
     // Healing is repeatable hourly. Preserve the original damage timestamp and
