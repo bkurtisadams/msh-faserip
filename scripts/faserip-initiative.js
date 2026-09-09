@@ -1,3 +1,16 @@
+// faserip-initiative.js v4.1.3 - 2026-09-09
+// v4.1.3: Single-side rounds no longer deadlock RAW play. When only one side
+//         has an eligible combatant (the villains are all KO'd, a mis-typed
+//         roster, a solo scene) there is nothing to roll for: that side acts.
+//         rollSideInitiative now skips the dice, stamps the acting side and
+//         opens Actions with a one-line card instead of refusing and leaving
+//         the round stuck in Declare with attacks and movement locked. With
+//         nobody eligible it says so and stops. _migrateOldSettings removed
+//         (useCustomInitiative predates the mode setting; the v13+ world
+//         storage has no getItem, so it only ever threw into its catch).
+//         Eligibility and power detection anchor their name tests: an effect
+//         blocks only when its name STARTS with "Unconscious" (or carries the
+//         status), Combat Sense / Enhanced Senses must start the power name.
 // faserip-initiative.js v4.1.2 - 2026-09-09
 // v4.1.2: Fixed-bug — the side rule read only the DOCUMENT type, so a
 //         villain built as a hero-type actor with system.characterType
@@ -255,23 +268,6 @@ export class FaseripInitiative {
       default: true
     });
 
-    // Migrate old boolean setting to new mode
-    this._migrateOldSettings();
-  }
-
-  static _migrateOldSettings() {
-    try {
-      const old = game.settings.storage.get("world")?.getItem("msh-faserip.useCustomInitiative");
-      if (old !== null && old !== undefined) {
-        const wasCustom = old === "true" || old === true;
-        const currentMode = game.settings.get("msh-faserip", "initiativeMode");
-        // Only migrate if the new setting is still default
-        if (currentMode === this.MODE_SIDE && !wasCustom) {
-          game.settings.set("msh-faserip", "initiativeMode", this.MODE_FOUNDRY);
-        }
-        console.log("[FASERIP] Migrated old useCustomInitiative setting");
-      }
-    } catch (e) { /* no old setting to migrate */ }
   }
 
   // Side-grouped tracker order for Side-Based mode. Sorting by initiative
@@ -687,10 +683,10 @@ export class FaseripInitiative {
     if (!actor) return facts;
     facts.intuitionNumber = Number(actor.system?.abilities?.intuition?.value) || 0;
     for (const p of actor.items.filter(i => i.type === "power")) {
-      const name = p.name.toLowerCase();
+      const name = p.name.trim().toLowerCase();
       const pVal = Number(p.system?.value) || 0;
-      if (name.includes("combat sense")) facts.combatSenseNumber = Math.max(facts.combatSenseNumber ?? 0, pVal);
-      if (name.includes("enhanced sense") && this._isHearingPower(p)) facts.enhancedHearingNumber = Math.max(facts.enhancedHearingNumber ?? 0, pVal);
+      if (/^combat sense\b/.test(name)) facts.combatSenseNumber = Math.max(facts.combatSenseNumber ?? 0, pVal);
+      if (/^enhanced senses?\b/.test(name) && this._isHearingPower(p)) facts.enhancedHearingNumber = Math.max(facts.enhancedHearingNumber ?? 0, pVal);
     }
     const talents = actor.items.filter(i => i.type === "talent");
     facts.hasMartialArtsE = talents.some(t => /martial arts\s*[- ]?e/i.test(`${t.name} ${t.system?.specialty || ""}`));
@@ -805,8 +801,8 @@ export class FaseripInitiative {
     if (actor.system?.combatMods?.canAct === false) return false;
     const blocked = actor.effects?.some(e => {
       if (e.disabled) return false;
-      const n = String(e.name || "").toLowerCase();
-      if (n.includes("unconscious")) return true;
+      const n = String(e.name || "").trim().toLowerCase();
+      if (/^unconscious\b/.test(n)) return true;
       if (e.statuses?.has?.("unconscious") || e.statuses?.has?.("dead")) return true;
       return (e.changes || []).some(ch => ch.key === "system.combatMods.canAct" && String(ch.value) === "false");
     });
@@ -1267,8 +1263,12 @@ export class FaseripInitiative {
         const side = this._getCombatantSide(c);
         (side === "pc" ? pcCombatants : npcCombatants).push(c);
       }
+      if (!pcCombatants.length && !npcCombatants.length) {
+        ui.notifications.warn("No combatant can act this round — nothing to roll.");
+        return;
+      }
       if (!pcCombatants.length || !npcCombatants.length) {
-        ui.notifications.warn("Side initiative requires at least one eligible combatant on each side.");
+        await this._resolveSingleSideRound(combat, pcCombatants.length ? "pc" : "npc", pcCombatants.length ? pcCombatants : npcCombatants);
         return;
       }
 
@@ -1381,6 +1381,47 @@ export class FaseripInitiative {
     } finally {
       this.isRolling = false;
     }
+  }
+
+  // Only one side can act: there is nothing to roll against. That side acts
+  // (RAW steps 5-6 collapse to one). Side flags are cleared so the initiative
+  // bar shows nothing; the acting side takes a nominal initiative so the
+  // tracker sorts it above KO'd rows; RAW opens Actions as after a roll.
+  static async _resolveSingleSideRound(combat, side, actingCombatants) {
+    const label = this._sideLabel(side);
+    const otherLabel = this._sideLabel(this._otherSide(side));
+    const actingIds = new Set(actingCombatants.map(c => c.id));
+    const initiativeOps = this._trackedCombatants(combat).map(c => ({ _id: c.id, initiative: actingIds.has(c.id) ? 10 : null }));
+    if (initiativeOps.length) await combat.updateEmbeddedDocuments("Combatant", initiativeOps);
+    await combat.update({
+      "flags.msh-faserip.pcInitiative": null, "flags.msh-faserip.npcInitiative": null,
+      "flags.msh-faserip.pcModifier": null, "flags.msh-faserip.npcModifier": null,
+      "flags.msh-faserip.pcRoll": null, "flags.msh-faserip.npcRoll": null,
+      "flags.msh-faserip.goesFirst": side,
+      "flags.msh-faserip.pcHighestName": null, "flags.msh-faserip.npcHighestName": null,
+      "flags.msh-faserip.pcTalentBonus": null, "flags.msh-faserip.npcTalentBonus": null,
+      "flags.msh-faserip.pcTalentSource": null, "flags.msh-faserip.npcTalentSource": null
+    }, { mshNoTimeAdvance: true });
+    await this._ensureSideFlags(combat);
+    await ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ alias: "Initiative" }),
+      content: `<div class="faserip-initiative-card"><strong>${this._esc(label)}</strong> act this round — no ${this._esc(otherLabel)} can act, so there is no initiative to roll.</div>`,
+      flavor: `Round ${combat.round}: ${label} only`
+    });
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+    await combat.setupTurns();
+    const turnIndex = this._firstEligibleTurnIndexForSide(combat, side);
+    this._dbg("single-side round", { side, turnIndex, rawPhases });
+    if (rawPhases) {
+      const update = { "flags.msh-faserip.turnPhase": this.PHASE_ACTIONS };
+      if (turnIndex >= 0) update.turn = turnIndex;
+      await combat.update(update, { mshNoTimeAdvance: true });
+      await this._autoResolveDeclaredFeats(combat);
+    } else if (turnIndex >= 0) {
+      await combat.update({ turn: turnIndex }, { mshNoTimeAdvance: true });
+    }
+    ui.combat?.render(true);
   }
 
   // --- Individual FASERIP Initiative ---
