@@ -1,4 +1,7 @@
-// scripts/dev/initiative-runtime-tests.js v1.0.2 - 2026-09-09
+// scripts/dev/initiative-runtime-tests.js v1.0.3 - 2026-09-09
+// v1.0.3: test actors use the sheet's real characterType vocabulary
+//         ("player" / "npc-villain"); a third, civilian NPC with a hostile
+//         token proves the disposition fall-through.
 // v1.0.2: [CERT] Dodging text (2026-09-09): a dodger may perform one other
 //         action that turn including an attack — asserted, no longer OPEN.
 // v1.0.1: the actions-begun Change Action check uses the pure rule with a
@@ -114,10 +117,11 @@ async function runFlow(recorder, state) {
   if (!scene) { recorder.skip("Initiative flow", { reason: "No Scene for tokens." }); return; }
   if (game.combat?.active) { recorder.skip("Initiative flow", { reason: "An active combat is running. End it and rerun." }); return; }
 
-  const hero = await createFighter("Hero", { characterType: "hero", intuition: 30, disposition: CONST.TOKEN_DISPOSITIONS.FRIENDLY, x: 100, y: 100 });
-  const villain = await createFighter("Villain", { characterType: "villain", intuition: 10, disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE, x: 400, y: 100 });
-  state.actors.push(hero.actor, villain.actor);
-  state.tokens.push(hero.token, villain.token);
+  const hero = await createFighter("Hero", { characterType: "player", intuition: 30, disposition: CONST.TOKEN_DISPOSITIONS.FRIENDLY, x: 100, y: 100 });
+  const villain = await createFighter("Villain", { characterType: "npc-villain", intuition: 10, disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE, x: 400, y: 100 });
+  const thug = await createFighter("Civilian Thug", { characterType: "civilian", intuition: 10, disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE, x: 700, y: 100 });
+  state.actors.push(hero.actor, villain.actor, thug.actor);
+  state.tokens.push(hero.token, villain.token, thug.token);
 
   const CombatClass = Combat.implementation ?? Combat;
   const combat = await CombatClass.create({ name: `${TEST_PREFIX} - Combat - ${Date.now()}`, type: "base", scene: scene.id, active: true });
@@ -131,7 +135,9 @@ async function runFlow(recorder, state) {
 
   // ── Side assignment (fixed-bug 2026-09-09) ────────────────────────────────
   recorder.assert(FaseripInitiative._determineSide(heroC()) === "pc", "Hero-type hero sits PC-side");
-  recorder.assert(FaseripInitiative._determineSide(villC()) === "npc", "Hero-type actor with characterType villain sits NPC-side (Klaw shape)", { characterType: villain.actor.system?.characterType });
+  recorder.assert(FaseripInitiative._determineSide(villC()) === "npc", "Hero-type actor with characterType npc-villain sits NPC-side (Klaw shape)", { characterType: villain.actor.system?.characterType });
+  recorder.assert(FaseripInitiative._determineSide({ actor: thug.actor, token: thug.token }) === "npc", "civilian characterType falls through to token disposition (HOSTILE → NPC)", { characterType: thug.actor.system?.characterType });
+  await thug.token.delete(); state.tokens.splice(state.tokens.indexOf(thug.token), 1);
 
   // ── Round 1 opens in Declare; attacks and moves refused ──────────────────
   await combat.startCombat();

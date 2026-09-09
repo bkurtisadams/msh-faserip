@@ -1,3 +1,11 @@
+// faserip-initiative.js v4.1.4 - 2026-09-09
+// v4.1.4: Fixed-bug — 4.1.3 read characterType against the wrong vocabulary.
+//         The sheet stores "player" / "npc-villain" / "civilian" (template.json),
+//         not hero/villain/npc, so Klaw ("npc-villain") still fell through to
+//         the hero document type and the round resolved single-side with
+//         both rows on the PC side. _characterKind now maps: player → hero;
+//         any value containing "villain" → villain; other npc kinds
+//         (civilian, npc-hero, npc) → fall through to disposition/ownership.
 // faserip-initiative.js v4.1.3 - 2026-09-09
 // v4.1.3: Single-side rounds no longer deadlock RAW play. When only one side
 //         has an eligible combatant (the villains are all KO'd, a mis-typed
@@ -546,8 +554,10 @@ export class FaseripInitiative {
   // The sheet's characterType is what the Judge set; the document type is
   // what the actor was created as. When they disagree the sheet wins.
   static _characterKind(actor) {
-    const stated = String(actor?.system?.characterType ?? "").toLowerCase();
-    if (stated === "hero" || stated === "villain" || stated === "npc") return { kind: stated, source: "characterType" };
+    const stated = String(actor?.system?.characterType ?? "").trim().toLowerCase();
+    if (stated === "player" || stated === "hero" || stated === "pc") return { kind: "hero", source: `characterType ${stated}` };
+    if (stated.includes("villain")) return { kind: "villain", source: `characterType ${stated}` };
+    if (stated) return { kind: "npc", source: `characterType ${stated}` };
     const type = actor?.type;
     if (type === "hero" || type === "villain" || type === "npc") return { kind: type, source: "actor type" };
     return { kind: null, source: null };
@@ -588,8 +598,8 @@ export class FaseripInitiative {
       const cached = c.getFlag("msh-faserip", "side") ?? null;
       const resolved = this._resolveSide(c);
       const reason = override ? "override (Swap Side)"
-        : kind === "hero" ? `${source} hero`
-        : kind === "villain" ? `${source} villain`
+        : kind === "hero" ? `${source} → hero`
+        : kind === "villain" ? `${source} → villain`
         : disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "token FRIENDLY"
         : disp === CONST.TOKEN_DISPOSITIONS.HOSTILE ? "token HOSTILE"
         : c.actor?.hasPlayerOwner ? "player-owned" : "not player-owned (fallback)";

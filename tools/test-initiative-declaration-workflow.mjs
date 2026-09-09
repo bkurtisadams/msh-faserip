@@ -1,4 +1,5 @@
-// tools/test-initiative-declaration-workflow.mjs v3.1.0 - 2026-09-09
+// tools/test-initiative-declaration-workflow.mjs v3.1.1 - 2026-09-09
+// v3.1.1: characterType vocabulary is player / npc-villain / civilian.
 // v3.1.0: faserip-initiative.js 4.1.3 — side rule reads the sheet's
 //         characterType before the document type; single-side rounds open
 //         Actions without a roll (third batched initiative write); anchored
@@ -97,6 +98,7 @@ const kindBlock = initiative.slice(initiative.indexOf('static _characterKind(act
 ok(kindBlock.indexOf('characterType') < kindBlock.indexOf('actor?.type'), 'characterType is consulted before the document type');
 ok(/const \{ kind \} = this\._characterKind\(combatant\.actor\);\s*if \(kind === "hero"\) return "pc";\s*if \(kind === "villain"\) return "npc";/.test(initiative), '_determineSide keys on the resolved kind');
 ok(/characterType: c\.actor\?\.system\?\.characterType/.test(initiative), 'explainSides reports characterType');
+ok(/stated === "player"/.test(initiative) && /stated\.includes\("villain"\)/.test(initiative), 'side rule speaks the sheet vocabulary: "player" is a hero, "npc-villain" a villain (template.json)');
 
 // Single-side rounds (RAW: initiative is rolled only while both sides can
 // act) open Actions instead of refusing.
