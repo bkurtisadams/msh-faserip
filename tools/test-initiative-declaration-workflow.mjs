@@ -1,4 +1,5 @@
-// tools/test-initiative-declaration-workflow.mjs v3.1.1 - 2026-09-09
+// tools/test-initiative-declaration-workflow.mjs v3.1.2 - 2026-09-09
+// v3.1.2: v14 tracker context hook name.
 // v3.1.1: characterType vocabulary is player / npc-villain / civilian.
 // v3.1.0: faserip-initiative.js 4.1.3 — side rule reads the sheet's
 //         characterType before the document type; single-side rounds open
@@ -142,7 +143,8 @@ ok(/"Auto-Roll Initiative Each Round \(non-RAW\)"/.test(initiative) && /"Roll In
 const panel = read('scripts/combat-panel.js');
 ok(/static async swapSide\(/.test(initiative) && /"flags\.msh-faserip\.sideOverride": newSide/.test(initiative), 'Swap Side persists a sideOverride flag');
 ok(/const correct = this\._resolveSide\(c\);/.test(initiative) && /_validSide\(combatant\.getFlag\("msh-faserip", "sideOverride"\)\) \?\? this\._determineSide\(combatant\)/.test(initiative), '_ensureSideFlags honours the override over the automatic rule (v4.1.1 _resolveSide)');
-ok(/getCombatantContextOptions/.test(initiative) && /getCombatTrackerEntryContext/.test(initiative), 'context entries registered for v12 and v13+ trackers');
+ok(/getCombatTrackerContextOptions/.test(initiative) && /getCombatantContextOptions/.test(initiative) && /getCombatTrackerEntryContext/.test(initiative), 'context entries registered for the v14 default name, v13 and v12 trackers');
+ok(/options\.some\(o => o\?\.name === "Swap Side"\)/.test(initiative), 'context entries dedupe when more than one hook name fires');
 ok(/FaseripInitiative\.swapSide\(combatant\)/.test(panel) && /clearSideOverride\(combatant\)/.test(panel), 'combat panel menu routes through the same swap/reset');
 ok(/update\.initiative = newSide === "pc" \? data\.pcInit : data\.npcInit;/.test(initiative), 'mid-round swap takes the new side\'s initiative total');
 

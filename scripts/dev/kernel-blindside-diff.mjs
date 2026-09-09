@@ -1,5 +1,6 @@
-// scripts/dev/kernel-blindside-diff.mjs v1.0.0 - 2026-09-05
-// Proof for the Blindside Karma refusal. Run from the system root:
+// scripts/dev/kernel-blindside-diff.mjs v1.1.0 - 2026-09-09
+// v1.1.0: +2CS to-hit anchor (attack-action 1.16.0) replaces the GAP line.
+// Proof for the Blindside Karma refusal and to-hit bonus. Run from the system root:
 //   node scripts/dev/kernel-blindside-diff.mjs
 // The kernel says which FEATs Karma may not touch; this checks that the
 // system actually has a path from an attacker's declaration to the target's
@@ -94,7 +95,23 @@ if (defOpts && defDeclare && defForced) {
 
 // --- known limits -------------------------------------------------------
 line("OPEN", "forewarned flag", "no UI for the previous-warning exception; declare by not ticking the box");
-line("GAP", "+2CS to-hit", "the blindside attack bonus is a later slice; this is Karma only");
+// --- +2CS to hit (attack-action 1.16.0) ---------------------------------
+const bonusConst = /const BLINDSIDE_TO_HIT_CS = 2;/.test(attack);
+const bonusPush = /attackerShift \+= BLINDSIDE_TO_HIT_CS;\s*\n\s*attackerEffects\.push\(\{ name: "Blindside", shift: BLINDSIDE_TO_HIT_CS \}\);/.test(attack);
+const bonusGated = /if \(choice\.blindside\) \{\s*\n\s*const manualText =/.test(attack);
+const bonusDedupe = /if \(\/blindsid\/i\.test\(manualText\)\) \{\s*\n\s*blindsideBonusSource = "manual";/.test(attack);
+const bonusBeforeTotal = attack.indexOf("attackerEffects.push({ name: \"Blindside\"") < attack.indexOf("const effectShift = attackerShift - defenderShift;");
+if (bonusConst && bonusPush && bonusGated && bonusBeforeTotal) {
+  line("FIXED-BUG", "+2CS to-hit", "choice.blindside adds a +2 attacker shift before the column resolves (was a dropdown pick only)");
+} else {
+  line("GAP", "+2CS to-hit", "attack-action does not add the blindside bonus from choice.blindside");
+}
+if (bonusDedupe) line("MATCH", "+2CS dedupe", "a CS row already naming Blindside keeps the manual +2, no stacking");
+else line("GAP", "+2CS dedupe", "a manual Blindside row would stack with the checkbox");
+const dodgeStrip = /if \(choice\.blindside\) \{\s*\n\s*const dodges = defenderEffects\.filter/.test(attack);
+if (dodgeStrip) line("MATCH", "dodge strip", "the same flag drops the target's Dodging shift (1.15.0)");
+else line("GAP", "dodge strip", "Dodging is not stripped on a blindside");
+line("OPEN", "dialog CS preview", "the CS row does not preview the +2 when the box is ticked; folded into the attack pipeline slice");
 
 console.log(`\n${match} match / ${fixed} fixed-bug / ${open} open / ${gap} gap`);
 process.exit(0);

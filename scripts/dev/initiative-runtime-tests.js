@@ -1,4 +1,5 @@
-// scripts/dev/initiative-runtime-tests.js v1.0.3 - 2026-09-09
+// scripts/dev/initiative-runtime-tests.js v1.0.4 - 2026-09-09
+// v1.0.4: Swap Side hook check fires the v14 tracker hook and expects the entries.
 // v1.0.3: test actors use the sheet's real characterType vocabulary
 //         ("player" / "npc-villain"); a third, civilian NPC with a hostile
 //         token proves the disposition fall-through.
@@ -246,7 +247,13 @@ async function runFlow(recorder, state) {
   await FaseripInitiative.clearSideOverride(villC());
   await sleep(150);
   recorder.assert(FaseripInitiative._resolveSide(villC()) === "npc" && flag(villC(), "sideOverride") == null, "Reset Side returns to the automatic rule");
-  recorder.assert(typeof Hooks.events?.getCombatantContextOptions?.length === "number" && Hooks.events.getCombatantContextOptions.length > 0, "Swap Side context entries are registered on getCombatantContextOptions (tracker menu)", { registered: Hooks.events?.getCombatantContextOptions?.length ?? 0 });
+  const menu = [];
+  Hooks.callAll("getCombatTrackerContextOptions", ui.combat, menu);
+  recorder.assert(menu.some(o => o.name === "Swap Side") && menu.some(o => o.name === "Reset Side (automatic)"), "Swap Side / Reset Side entries answer the v14 tracker hook (getCombatTrackerContextOptions)", { names: menu.map(o => o.name) });
+  const twice = [];
+  Hooks.callAll("getCombatTrackerContextOptions", ui.combat, twice);
+  Hooks.callAll("getCombatantContextOptions", ui.combat, twice);
+  recorder.assert(twice.filter(o => o.name === "Swap Side").length === 1, "Entries are not duplicated when two hook names fire");
 }
 
 async function cleanupState(state, keepArtifacts) {

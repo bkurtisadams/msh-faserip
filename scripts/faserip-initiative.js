@@ -1,3 +1,11 @@
+// faserip-initiative.js v4.1.5 - 2026-09-09
+// v4.1.5: Swap Side reaches the v14 tracker. v14's CombatTracker builds the
+//         row menu with _createContextMenu(..., {fixed: true}) and no
+//         hookName, so ApplicationV2's default "get{}ContextOptions" fires
+//         getCombatTrackerContextOptions — not v13's explicit
+//         getCombatantContextOptions. Registered on all three names;
+//         _sideContextOptions dedupes so a client firing two of them gets
+//         one Swap Side entry.
 // faserip-initiative.js v4.1.4 - 2026-09-09
 // v4.1.4: Fixed-bug — 4.1.3 read characterType against the wrong vocabulary.
 //         The sheet stores "player" / "npc-villain" / "civilian" (template.json),
@@ -502,8 +510,9 @@ export class FaseripInitiative {
     });
 
     // Chat card handlers
-    Hooks.on("getCombatantContextOptions", (_app, options) => this._sideContextOptions(options));
-    Hooks.on("getCombatTrackerEntryContext", (_html, options) => this._sideContextOptions(options));
+    Hooks.on("getCombatTrackerContextOptions", (_app, options) => this._sideContextOptions(options)); // v14 default name
+    Hooks.on("getCombatantContextOptions", (_app, options) => this._sideContextOptions(options));     // v13 explicit name
+    Hooks.on("getCombatTrackerEntryContext", (_html, options) => this._sideContextOptions(options));  // v12
 
     Hooks.on("renderChatMessageHTML", (msg, html) => {
       const root = html instanceof HTMLElement ? html : html[0] ?? html;
@@ -658,6 +667,7 @@ export class FaseripInitiative {
   // Context-menu entries for both tracker generations: v12 passes (html,
   // options) with jQuery <li>; v13+ passes (app, options) with HTMLElement.
   static _sideContextOptions(options) {
+    if (!Array.isArray(options) || options.some(o => o?.name === "Swap Side")) return;
     const combatantFrom = li => {
       const el = li instanceof HTMLElement ? li : li?.[0];
       const id = el?.dataset?.combatantId;

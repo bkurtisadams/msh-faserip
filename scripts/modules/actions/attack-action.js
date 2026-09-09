@@ -1,4 +1,10 @@
-// attack-action.js v1.15.0 - 2026-09-09
+// attack-action.js v1.16.0 - 2026-09-09
+// v1.16.0: Blindside +2CS to hit (RAW, Blindside: "+2CS"). A dialog that
+//          sets choice.blindside now adds a "Blindside +2" attacker shift
+//          alongside the Dodging strip, so the checkbox is the single
+//          source for both halves. If the CS row already names Blindside
+//          (csNotes/reason), the manual row stands and no second +2 is
+//          added. Dialog CS-row preview is unchanged (next slice).
 // v1.15.0: Fixed-bug (CERT Dodging text, 2026-09-09): "A character may not
 //          dodge an unexpected attack ... (Blindsiding)". A Blindside attack
 //          (choice.blindside) now drops the target's Dodging shift from the
@@ -291,6 +297,9 @@ import { deductKarma, getAvailableKarma } from "../dice/dice-roller.js";
 import { SCOPE, getFlagScope } from "./flags.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+
+// RAW (Blindside): the attacker gets +2CS to hit; the target may not dodge.
+const BLINDSIDE_TO_HIT_CS = 2;
 
 // Attack forms that use the redesigned shared chat card (attack-card.hbs)
 // and the muted consequence-bar style. Charging stays on the legacy card.
@@ -1023,6 +1032,20 @@ export class AttackAction extends BaseAction {
     let defenderShift = 0;
     let defenderEffects = [];
     let blindsideDodgeIgnored = 0;
+    let blindsideBonusSource = "";
+    // RAW (Blindside): +2CS to hit. The checkbox carries it unless the
+    // manual CS row already names Blindside, in which case that row stands.
+    if (choice.blindside) {
+      const manualText = [choice.shiftBreakdown?.csNotes, choice.csNotes, choice.reason, choice.csReason]
+        .filter(Boolean).map(String).join(" ");
+      if (/blindsid/i.test(manualText)) {
+        blindsideBonusSource = "manual";
+      } else {
+        attackerShift += BLINDSIDE_TO_HIT_CS;
+        attackerEffects.push({ name: "Blindside", shift: BLINDSIDE_TO_HIT_CS });
+        blindsideBonusSource = "auto";
+      }
+    }
     const primaryTarget = choice?.specificTarget ?? this._selectPrimaryTarget();
     debugLog(`_executeSingleAttack: specificTarget=${choice?.specificTarget?.name ?? "NONE"}, primaryTarget=${primaryTarget?.name ?? "NONE"}, attackNumber=${attackNumber ?? "?"}`);
     const defenderActor = primaryTarget?.actor ?? null;
@@ -1700,6 +1723,7 @@ export class AttackAction extends BaseAction {
           parts.push(`${eff.name}: ${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)}`);
         }
         if (blindsideDodgeIgnored) parts.push(`Blindside: Dodging (-${Math.abs(blindsideDodgeIgnored)}) ignored`);
+        if (blindsideBonusSource === "manual") parts.push(`Blindside: +${BLINDSIDE_TO_HIT_CS}CS already in CS row`);
         
         toHitChips = parts.flatMap(p => String(p).split(',').map(s => s.trim())).filter(Boolean);
         // Show the breakdown even when components cancel to a net 0 (e.g. Guns +1
