@@ -1,3 +1,17 @@
+// scripts/modules/effects/defense-effects.js v1.9.0 - 2026-09-09
+// v1.9.0: Two fixes found auditing Crosswise's (Johnny Frost) homebrew
+//         Energy Reflection item.
+//           Fixed-bug (system-wide): the Absorption AE had no isEnergyReflection
+//           guard, unlike Resistance's (which exists for exactly this reason —
+//           an unlimited AE would swallow RAW's >threshold remainder). An item
+//           with stray absorptionType/absorptionSpecific set alongside
+//           isEnergyReflection silently ran both mechanics at once.
+//           New: energyReflectionRank, previously read nowhere, now overrides
+//           the RAW threshold (100/Unearthly — confirmed by book text: "up to
+//           Unearthly damage or Intensity inflicts no damage... more than
+//           Unearthly... reflect 100 points... take the remainder") when set
+//           to a specific rank instead of the default "full". Every existing
+//           Reflection power keeps the RAW 100 threshold unless it opts out.
 // scripts/modules/effects/defense-effects.js v1.8.0 - 2026-09-09
 // v1.8.0: Absorption AE drops convertsToHealth / canRedirect (RULED
 //         2026-09-09: Absorption always heals and its excess may always be
@@ -218,10 +232,18 @@ function resolveEnergyReflectionValues(item) {
     ? sys.energyReflectionType
     : (sys.resistanceType || sys.energyReflectionType || "energy");
 
+  // RAW: attacks up to Unearthly damage or Intensity inflict no damage; this
+  // is the universal default and stays untouched for every ordinary
+  // Reflection power. A house-ruled power that departs from Unearthly names
+  // its own rank in energyReflectionRank instead of the default "full".
+  const overrideRank = sys.energyReflectionRank && sys.energyReflectionRank !== "full"
+    ? sys.energyReflectionRank
+    : null;
+  const threshold = overrideRank ? getRankValue(overrideRank) : 100;
+
   return {
     reflectionType,
-    // RAW: attacks up to Unearthly damage or Intensity inflict no damage.
-    threshold: 100,
+    threshold,
     rankValue: value,
     rank: sys.rank || getClosestRankName(value),
   };
@@ -580,7 +602,7 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   const absId = defenseEffectId("absorption", item.id);
   if (removing) {
     await removeDefenseAE(actor, absId);
-  } else if (sys.absorptionType || sys.absorptionSpecific) {
+  } else if ((sys.absorptionType || sys.absorptionSpecific) && !sys.isEnergyReflection) {
     const values = resolveAbsorptionValues(item);
     const aeData = buildAbsorptionAE(item, values);
     await registerDefenseAE(actor, absId, aeData, isInactive);
