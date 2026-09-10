@@ -1,3 +1,12 @@
+// scripts/modules/actions/blinding-touch-action.js v1.3.0 - 2026-09-09
+// v1.3.0: Generalized for reuse by Light Emission's Blind stunt (ranged
+//         Agility instead of touch Fighting) rather than writing a near-
+//         duplicate file. showBlindingTouchDialog(hero, item, opts) takes
+//         an optional 3rd arg — ability, verb, isRanged, rangeNote,
+//         powerLabel — all defaulting to the original Fighting/touch
+//         behavior, so Blinding Touch's own call site is unchanged. The
+//         protected-senses rank gate and Slam/Stun requirement are
+//         unchanged and now shared by both.
 // scripts/modules/actions/blinding-touch-action.js v1.2.0 - 2026-09-09
 // v1.2.0: Fixed-bug — hasProtectedSenses() was a flat "has the item =
 //         total immunity" check, but rules-reference.js's own
@@ -76,15 +85,24 @@ function protectedSensesRank(actor) {
   return null;
 }
 
-export async function showBlindingTouchDialog(hero, item) {
+export async function showBlindingTouchDialog(hero, item, opts = {}) {
+  const {
+    ability = "fighting",       // "fighting" (touch) or "agility" (ranged)
+    verb = "touches",
+    isRanged = false,
+    rangeNote = "",             // shown as a reminder; not range-enforced
+    powerLabel = "Blinding Touch",
+  } = opts;
+  const abilityLabel = ability.charAt(0).toUpperCase() + ability.slice(1);
+
   if (!hero || !item) {
-    ui.notifications.warn("Blinding Touch requires actor and power item.");
+    ui.notifications.warn(`${powerLabel} requires actor and power item.`);
     return;
   }
 
   const targets = Array.from(game.user.targets || []);
   if (targets.length !== 1) {
-    ui.notifications.warn("Blinding Touch requires exactly one target. Select a single token.");
+    ui.notifications.warn(`${powerLabel} requires exactly one target. Select a single token.`);
     return;
   }
   const target = targets[0].actor;
@@ -93,7 +111,7 @@ export async function showBlindingTouchDialog(hero, item) {
     return;
   }
   if (target.uuid === hero.uuid) {
-    ui.notifications.warn(`${hero.name} cannot blind themselves with Blinding Touch.`);
+    ui.notifications.warn(`${hero.name} cannot blind themselves with ${powerLabel}.`);
     return;
   }
 
@@ -101,8 +119,8 @@ export async function showBlindingTouchDialog(hero, item) {
   const powerValue = game.msh?.getRankValue?.(powerRank) ?? 0;
   const rankShort = RANK_ABBR[powerRank] || powerRank;
 
-  const heroFightRank = hero.system?.abilities?.fighting?.rank || "Typical";
-  const heroFightValue = hero.system?.abilities?.fighting?.value || 0;
+  const heroFightRank = hero.system?.abilities?.[ability]?.rank || "Typical";
+  const heroFightValue = hero.system?.abilities?.[ability]?.value || 0;
   const heroFightShort = RANK_ABBR[heroFightRank] || heroFightRank;
 
   const protectedRank = protectedSensesRank(target);
@@ -112,11 +130,10 @@ export async function showBlindingTouchDialog(hero, item) {
   // that rank still blinds normally.
   const protectedSenses = protectedRank !== null && powerValue < protectedValue;
 
-  // ── Effect-state shifts (auto-applied to Fighting FEAT) ───────────────
+  // ── Effect-state shifts (auto-applied to the FEAT) ─────────────────────
   // Mirrors attack-action.js:594 / Health-Drain v1.2.0 / Paralyzing v1.2.0.
-  // Touch is melee → isRanged = false.
-  const attackerShiftData = getAttackShiftBreakdown(hero, false);
-  const defenderShiftData = getDefenseShiftBreakdown(target, false);
+  const attackerShiftData = getAttackShiftBreakdown(hero, isRanged);
+  const defenderShiftData = getDefenseShiftBreakdown(target, isRanged);
   const effectShift = (attackerShiftData.total || 0) - (defenderShiftData.total || 0);
   const effectBreakdownLines = [
     ...(attackerShiftData.breakdown || []).map(b => `${b.name} (attacker, ${b.shift > 0 ? "+" : ""}${b.shift} attack)`),
@@ -134,11 +151,11 @@ export async function showBlindingTouchDialog(hero, item) {
       <span class="h-actor" title="${hero.name}">${hero.name}</span>
       <span class="h-paren">(</span>
       <span class="h-stat">
-        <span class="h-stat-label">Base Fighting:</span>
+        <span class="h-stat-label">Base ${abilityLabel}:</span>
         <span class="h-stat-rank">${heroFightShort} ${heroFightValue}</span>
       </span>
       <span class="h-paren">)</span>
-      <span class="h-verb">touches</span>
+      <span class="h-verb">${verb}</span>
       <span class="h-target" title="${target.name}">${target.name}</span>
     </div>`;
 
@@ -147,6 +164,7 @@ export async function showBlindingTouchDialog(hero, item) {
       <div style="font-size:0.9em;line-height:1.5;">
         <div>Target: <strong>${target.name}</strong></div>
         <div>Blind on <strong>Slam (Y)</strong> or <strong>Stun (R)</strong>; 1d10 rounds.</div>
+        ${rangeNote ? `<div style="color:#666;">${rangeNote}</div>` : ""}
         ${protectedSenses ? `<div style="color:#2e7d32;"><strong>${target.name}</strong>'s Protected Senses (${protectedRank}) ignores attacks below that Intensity — immune to this ${powerRank} touch.</div>` : ""}
         ${(protectedRank && !protectedSenses) ? `<div style="color:#c62828;"><strong>${target.name}</strong> has Protected Senses (${protectedRank}), but this ${powerRank} touch meets or exceeds it — not immune.</div>` : ""}
         ${effectShiftNoteHtml}
@@ -171,13 +189,13 @@ export async function showBlindingTouchDialog(hero, item) {
       </div>
       ${resultGridHtml}
       <div class="frp-foot" style="margin-top:8px;">
-        <button type="button" id="frp-roll" class="frp-btn frp-btn-primary">Touch &amp; Blind</button>
+        <button type="button" id="frp-roll" class="frp-btn frp-btn-primary">${verb === "touches" ? "Touch" : "Attack"} &amp; Blind</button>
         <button type="button" id="frp-cancel" class="frp-btn">Cancel</button>
       </div>
     </div>`;
 
   await showFaseripDialog({
-    title: `Blinding Touch — ${hero.name}`,
+    title: `${powerLabel} — ${hero.name}`,
     content: dialogContent,
     render: async (html, dlg) => {
       const $dialog = html.closest('.dialog');
@@ -197,7 +215,7 @@ export async function showBlindingTouchDialog(hero, item) {
         await fightRoll.evaluate();
         await fightRoll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor: hero }),
-          flavor: `${hero.name} makes a Fighting FEAT to touch ${target.name} (Blinding Touch)`,
+          flavor: `${hero.name} makes an ${abilityLabel} FEAT to ${verb.replace(/s$/, "")} ${target.name} (${powerLabel})`,
           rollMode: getRollMode()
         });
 
@@ -206,7 +224,7 @@ export async function showBlindingTouchDialog(hero, item) {
         if (spendKarma && getAvailableKarma(hero) > 0) {
           const initialColor = game.msh.rollUniversalTable(effectiveFightRank, fightRoll.total);
           const karmaResult = await showKarmaDecisionDialog(
-            hero, fightRoll.total, effectiveFightRank, "Blinding Touch (Fighting)", initialColor
+            hero, fightRoll.total, effectiveFightRank, `${powerLabel} (${abilityLabel})`, initialColor
           );
           cappedTotal = karmaResult.finalResult;
           karmaUsed = karmaResult.karmaSpent;
@@ -258,11 +276,11 @@ export async function showBlindingTouchDialog(hero, item) {
           content: `
             <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
               <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
-                <strong>Blinding Touch</strong><br>
+                <strong>${powerLabel}</strong><br>
                 <span style="font-size:0.85em;font-weight:400;">${hero.name} &rarr; ${target.name} &mdash; ${powerRank} (${powerValue})</span>
               </div>
               <div style="padding:5px 10px;font-size:0.9em;">
-                <div>Fighting FEAT (${heroFightShort} ${heroFightValue}${totalShift !== 0 ? ` ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank} (${effectiveFightValue})` : ""})</div>
+                <div>${abilityLabel} FEAT (${heroFightShort} ${heroFightValue}${totalShift !== 0 ? ` ${totalShift > 0 ? "+" : ""}${totalShift}CS &rarr; ${effectiveFightRank} (${effectiveFightValue})` : ""})</div>
                 ${(manualShift !== 0 && effectShift !== 0) ? `<div style="font-size:0.85em;color:#666;padding-left:8px;">manual ${manualShift > 0 ? "+" : ""}${manualShift}, effects ${effectShift > 0 ? "+" : ""}${effectShift}</div>` : ""}
                 ${(effectShift !== 0 && effectBreakdownLines.length) ? `<div style="font-size:0.85em;color:#1565c0;padding-left:8px;">${effectBreakdownLines.join("; ")}</div>` : ""}
                 <div>Roll: ${fightRoll.total}${karmaUsed ? ` + Karma: ${karmaUsed}` : ""} = ${cappedTotal}</div>

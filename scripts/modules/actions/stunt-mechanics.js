@@ -1,3 +1,15 @@
+// scripts/modules/actions/stunt-mechanics.js v1.4.0 - 2026-09-09
+// v1.4.0: Light Emission preset group (Illuminate, Blind). Illuminate
+//         is a new mechanic kind "grant-token-light" — creates a real
+//         faserip.token.light.* Active Effect (same custom-key
+//         mechanism the equipment-tab light/flashlight presets already
+//         use), toggled on/off by clicking the stunt again; init.js's
+//         existing reconciliation hooks do the actual token update, no
+//         new token-touching code here. Blind is a new kind
+//         "ranged-blind", delegating to blinding-touch-action.js's
+//         now-generalized showBlindingTouchDialog(hero, item, opts)
+//         with ability:"agility", isRanged:true — Fighting-FEAT-touch
+//         and Protected Senses gating shared, not duplicated.
 // scripts/modules/actions/stunt-mechanics.js v1.3.0 - 2026-09-09
 // v1.3.0: elec-heal switched from an info card to a real one-shot heal
 //         (new kind "heal-now", calling ongoing-engine.healPointsNow at
@@ -113,6 +125,14 @@ export const STUNT_PRESETS = {
     { key: "elec-shock", name: "Shocking Touch", aliases: ["shocking touch", "shock touch"],
       description: "Store energy and deliver a shocking touch of Power rank damage (Energy column, touch — 0 areas, no range penalty).",
       mechanic: { kind: "use-item", itemNames: ["shocking touch"], fallback: "energy-attack", touch: true } }
+  ],
+  lightEmission: [
+    { key: "light-illuminate", name: "Illuminate", aliases: ["illuminate", "light up", "normal light"],
+      description: "Illuminate a 1-area radius using normal light. Click to activate; click again (or remove the effect) to extinguish.",
+      mechanic: { kind: "grant-token-light", bright: 1, dim: 2, color: "#ffffee", alpha: 0.35 } },
+    { key: "light-blind", name: "Blind (Light Emission)", aliases: ["blind", "dazzle", "normal light blind"],
+      description: "Blind a foe with normal light at range: Agility FEAT, needs a Slam or Stun result; Protected Senses may negate it. Range limited to 8 areas.",
+      mechanic: { kind: "ranged-blind", rangeNote: "Range limited to 8 areas (not enforced by the dialog)." } }
   ]
 };
 
@@ -124,6 +144,7 @@ export function presetsForItem(item) {
   if (is("sound generation")) return STUNT_PRESETS.soundGeneration;
   if (is("air control")) return STUNT_PRESETS.airControl;
   if (is("electrical manipulation")) return STUNT_PRESETS.electricalManipulation;
+  if (is("light emission")) return STUNT_PRESETS.lightEmission;
   return [];
 }
 
@@ -255,6 +276,57 @@ export async function runStuntMechanic(actor, stunt) {
       }
     });
     return postInfoCard(actor, stunt, rank, shiftLabel, `Absorption (${m.absorptionSpecific || m.absorptionType}) active at ${rank} (${rankValue(rank)}). Remove the effect to end it.`);
+  }
+
+  if (m.kind === "grant-token-light") {
+    // Toggle: if this stunt already has an active light effect, remove it
+    // (extinguish) instead of stacking a duplicate.
+    const existing = actor.effects.find(e => e.flags?.["msh-faserip"]?.stuntKey === (stunt.presetKey || ""));
+    if (existing) {
+      await existing.delete();
+      return postInfoCard(actor, stunt, rank, shiftLabel, "Light extinguished.");
+    }
+    // Same faserip.token.light.* custom-key shape as the equipment-tab
+    // light/flashlight presets (equipment.js _buildPresetEffect) — created
+    // directly (not via applyEffect()) so the raw `changes` array survives
+    // untouched; init.js's applyActiveEffect/createActiveEffect hooks pick
+    // it up and write the real token.light.* values, baseline-reverted on
+    // deletion. RAW radius is fixed (not rank-scaled), so bright/dim come
+    // straight off the preset, not off `rank`.
+    const bright = m.bright ?? 1;
+    const dim = m.dim ?? (bright * 2);
+    const effectData = {
+      name: `${stunt.name} (${rank})`,
+      img: "icons/svg/light.svg",
+      origin: item?.uuid || actor.uuid,
+      disabled: false,
+      duration: {},
+      changes: [
+        { key: "faserip.token.light.bright", mode: "custom", value: String(bright) },
+        { key: "faserip.token.light.dim", mode: "custom", value: String(dim) },
+        { key: "faserip.token.light.color", mode: "custom", value: m.color || "#ffffee" },
+        { key: "faserip.token.light.alpha", mode: "custom", value: String(m.alpha ?? 0.35) },
+        { key: "faserip.token.light.angle", mode: "custom", value: "360" },
+        { key: "faserip.token.light.animation.type", mode: "custom", value: "null" },
+        { key: "faserip.token.light.animation.speed", mode: "custom", value: "0" },
+        { key: "faserip.token.light.animation.intensity", mode: "custom", value: "0" }
+      ],
+      flags: { "msh-faserip": { stuntKey: stunt.presetKey || "", isLightEmission: true } }
+    };
+    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    return postInfoCard(actor, stunt, rank, shiftLabel, `Illuminating a ${bright}-area radius. Click again to extinguish.`);
+  }
+
+  if (m.kind === "ranged-blind") {
+    if (!item) return ui.notifications.warn(`${stunt.name}: parent power not found.`);
+    const { showBlindingTouchDialog } = await import("./blinding-touch-action.js");
+    return showBlindingTouchDialog(actor, item, {
+      ability: "agility",
+      verb: "targets with light",
+      isRanged: true,
+      rangeNote: m.rangeNote || "",
+      powerLabel: stunt.name
+    });
   }
 
   if (m.kind === "apply-effect") {
