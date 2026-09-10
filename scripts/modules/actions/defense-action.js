@@ -1,3 +1,11 @@
+// scripts/modules/actions/defense-action.js v2.3.0 - 2026-09-09
+// v2.3.0: Dodge/Evade/Block/Catch header was a leftover dark green
+//         gradient (#2e8b2e→#1a6b1a) from before the rest of the dialog
+//         system's v3.10.0 header redesign; the shared --ink text color
+//         (#1a1a1a, meant for a light background) was unreadable against
+//         it. Lightened to a pale green gradient so the existing ink and
+//         gold text colors both read clearly, keeping the green identity
+//         Kurt wants for this dialog type.
 // scripts/modules/actions/defense-action.js v2.2.0 - 2026-09-05
 // v2.2.0: opts.blindside refuses the Karma offer. RAW: FEATs resulting
 //         from a Blindside or an unexpected attack may not be modified by
@@ -139,7 +147,7 @@ export class DefenseAction extends BaseAction {
 
     // ------- Dialog -------
     // Header gradient color per action category
-    const headerGrad = 'linear-gradient(90deg, #2e8b2e 0%, #1a6b1a 100%)';
+    const headerGrad = 'linear-gradient(90deg, #c8e6c9 0%, #a5d6a7 100%)';
     const abilityLabel = { dodging: 'Agility', evading: 'Fighting', blocking: 'Strength', catching: 'Agility' }[actionType] || ability.name;
 
     // Per-action extra HTML
