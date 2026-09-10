@@ -1,3 +1,12 @@
+// scripts/modules/effects/ongoing-engine.js v1.13.0 - 2026-09-09
+// v1.13.0: healPointsNow() — a one-shot heal for stunts adjudicated by the
+//         Judge at the table (e.g. Electrical Manipulation's heal-via-
+//         absorption stunt: up to Power rank per round, only while he's
+//         actually near a current). Reuses executeHealthHeal's pool-safe
+//         write (splitHealth, heal the real portion only, cap at max,
+//         write back real+pool) as a single call with no ongoing-effect
+//         registration — deliberately not an auto-ticking timer, since
+//         nothing here can detect "is he touching a live current".
 // scripts/modules/effects/ongoing-engine.js v1.12.0 - 2026-09-09
 // v1.12.0: Absorption onto the powers kernel. applyAbsorptionTempHPOngoing
 //          removed — it registered a stat.loss/health record that
@@ -1270,6 +1279,32 @@ export async function removeOngoingEffect(actor, effectId) {
 }
 
 // ─── Convenience: apply specific power types ──────────────────────────────────
+
+// One-shot heal: judged by the table, not auto-detected. Heals only the
+// REAL Health portion (an Absorption pool, if any, rides on top unchanged),
+// capped at max, in a single actor.update. No ongoing effect, no timer.
+export async function healPointsNow(actor, amount, { label = "Healing", img = "icons/svg/regen.svg" } = {}) {
+  if (!actor) return { healed: 0 };
+  const heal = Math.max(0, Math.floor(Number(amount) || 0));
+  if (!heal) return { healed: 0 };
+
+  const { real: currentHP, pool: heldPool, max: maxHP } = splitHealth(actor);
+  if (currentHP <= 0 || currentHP >= maxHP) {
+    await sendOngoingChat(actor, label, "heal",
+      `<strong>${actor.name}</strong> is already at max Health — nothing to heal.`);
+    return { healed: 0, health: currentHP };
+  }
+
+  const totalHeal = Math.min(heal, maxHP - currentHP);
+  const newHP = currentHP + totalHeal;
+  await actor.update({ "system.attributes.health.value": newHP + heldPool });
+
+  await sendOngoingChat(actor, label, "heal",
+    `<strong>${actor.name}</strong> healed <strong>${totalHeal} HP</strong>.
+     <div style="margin-top:4px;font-size:0.9em;color:#555;">Health: ${currentHP} &rarr; ${newHP} / ${maxHP}</div>`
+  );
+  return { healed: totalHeal, health: newHP };
+}
 
 export async function applyRegenerationOngoing(target, { healAmount, cycleTurns = 10, powerRank, powerItemId } = {}) {
   const actor = target?.actor ?? target;

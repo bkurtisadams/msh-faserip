@@ -1,3 +1,11 @@
+// scripts/modules/actions/stunt-mechanics.js v1.3.0 - 2026-09-09
+// v1.3.0: elec-heal switched from an info card to a real one-shot heal
+//         (new kind "heal-now", calling ongoing-engine.healPointsNow at
+//         full Power rank — Judge clicks it when the table says he's near
+//         a current; not an auto-ticking effect). elec-shock's dead
+//         `touch` flag is now honoured: the attack() helper passes it
+//         through deviceAbility so energy-action.js (v3.9.0) forces range
+//         0 instead of the remembered ranged distance.
 // scripts/modules/actions/stunt-mechanics.js v1.2.0 - 2026-09-09
 // v1.2.0: RULED (Electrical Manipulation, 2026-09-09) — elec-absorb and
 //         elec-conduct were built on a too-literal reading of "as if
@@ -92,7 +100,8 @@ export const STUNT_PRESETS = {
   ],
   electricalManipulation: [
     { key: "elec-heal", name: "Electrical Absorption Healing", aliases: ["absorption healing", "electrical healing"],
-      description: "Heal damage through absorption of electricity, up to Power rank amount per round.", mechanic: { kind: "info" } },
+      description: "Heal damage through absorption of electricity, up to Power rank amount per round. Click when the Judge says he's actually exposed to a current — not automatic.",
+      mechanic: { kind: "heal-now" } },
     { key: "elec-absorb", name: "Absorb Electricity", aliases: ["absorb electric"],
       description: "Absorb electrical damage as Absorption at Power rank -2CS — heals existing damage first, excess pools above max Health, pool capped at the -2CS rank and redirectable next round (RAW Absorption pipeline).",
       mechanic: { kind: "grant-absorption", shift: -2, absorptionType: "energy", absorptionSpecific: "electrical" } },
@@ -102,7 +111,7 @@ export const STUNT_PRESETS = {
     { key: "elec-ride", name: "Ride the Lines", aliases: ["lightning teleport", "ride the lines", "power lines"],
       description: "Move at Power rank speed by riding lines of electrical potential — power lines and building wiring.", mechanic: { kind: "info" } },
     { key: "elec-shock", name: "Shocking Touch", aliases: ["shocking touch", "shock touch"],
-      description: "Store energy and deliver a shocking touch of Power rank damage (Energy column, touch).",
+      description: "Store energy and deliver a shocking touch of Power rank damage (Energy column, touch — 0 areas, no range penalty).",
       mechanic: { kind: "use-item", itemNames: ["shocking touch"], fallback: "energy-attack", touch: true } }
   ]
 };
@@ -192,7 +201,7 @@ export async function runStuntMechanic(actor, stunt) {
   const attack = (column, ability) => {
     if (!item) return ui.notifications.warn(`${stunt.name}: parent power not found.`);
     const opts = { itemId: item.id, item, stuntName: stunt.name };
-    if (m.shift) opts.deviceAbility = { name: stunt.name, rank };
+    if (m.shift || m.touch) opts.deviceAbility = { name: stunt.name, rank, touch: !!m.touch };
     if (m.damageType) opts.damageType = m.damageType;
     if (m.note) ui.notifications.info(`${stunt.name}: ${m.note}`);
     return ActionDispatcher.roll(column, { actor, abilityName: ability, opts });
@@ -258,6 +267,12 @@ export async function runStuntMechanic(actor, stunt) {
       flags: { "msh-faserip": { effectType: m.effectType || "stuntEffect", stuntKey: stunt.presetKey || "", rank, value: rankValue(rank) } }
     });
     return postInfoCard(actor, stunt, rank, shiftLabel, `${m.effectName || stunt.name} active at ${rank} (${rankValue(rank)}). Remove the effect to end it.`);
+  }
+
+  if (m.kind === "heal-now") {
+    const { healPointsNow } = await import("../effects/ongoing-engine.js");
+    const { healed } = await healPointsNow(actor, rankValue(rank), { label: stunt.name });
+    return postInfoCard(actor, stunt, rank, shiftLabel, healed ? `Healed ${healed} HP.` : "");
   }
 
   if (m.kind === "info") return postInfoCard(actor, stunt, rank, shiftLabel);

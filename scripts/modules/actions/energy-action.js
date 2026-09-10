@@ -1,3 +1,10 @@
+// energy-action.js v3.9.0 - 2026-09-09
+// v3.9.0: Fixed-bug — stunt-mechanics.js's deviceAbility opts carried a
+//         `touch` flag (Shocking Touch et al.) that nothing read; the
+//         dialog always defaulted/remembered a ranged distance instead.
+//         deviceAbility.touch now forces the range field to 0, bypassing
+//         the remembered lastEnergyRange, so a touch-only stunt resolves
+//         at 0 areas with no range penalty every time it's used.
 // energy-action.js v3.8.0 - 2026-09-05
 // v3.8.0: Blindside declaration carried to the target's Slam/Stun/Kill
 //         FEAT, which then refuses the Karma offer (RAW).
@@ -197,7 +204,7 @@ export class EnergyAction extends RangedAttackAction {
     const shouldRemember = storedRemember === "1";
 
     const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyItemId") || "") : "");
-    const savedRange = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyRange") || 1) : 1;
+    let savedRange = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyRange") || 1) : 1;
 
     let savedAdHoc = passedItem ? false : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHoc") || (!energyItems.length)) : (!energyItems.length));
     let savedAdHocName = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHocName") || "Energy Blast") : "Energy Blast";
@@ -210,6 +217,9 @@ export class EnergyAction extends RangedAttackAction {
       savedAdHocName = `${deviceAbility.name}${passedItem ? ` (${passedItem.name})` : ""}`;
       savedAdHocRank = deviceAbility.rank || "Remarkable";
       savedAdHocDmg = CONFIG.FASERIP?.rankValues?.[deviceAbility.rank] || 20;
+      // Touch stunts (Shocking Touch, Energy Touch-style) resolve at 0
+      // areas regardless of what range was last remembered.
+      if (deviceAbility.touch) savedRange = 0;
     }
 
     const savedUsePowerToHit = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastEnergyUsePowerToHit")) === true) : false;
