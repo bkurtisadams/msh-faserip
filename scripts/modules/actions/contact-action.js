@@ -1,3 +1,14 @@
+// contact-action.js v1.3.0 - 2026-09-09
+// v1.3.0: Fix dialog ballooning to full width on any checkbox/select
+//         change. Same root cause and fix as energy-action.js v3.4.2:
+//         AppV2 re-applies its default position.width ('auto') on every
+//         form-input change, which measures the six "Nature of the
+//         request" checkbox labels laid out unwrapped (flex-wrap alone
+//         does nothing without a constrained width to wrap against) and
+//         blows the window out. Pin position.width to 380 via
+//         dlg.setPosition in render, and re-assert inside recompute()
+//         since every trigger (disposition, shift, all six request
+//         checkboxes) already funnels through it.
 // contact-action.js v1.2.0 - 2026-09-05
 // v1.2.0: RULED 2026-09-05 — Karma may not manipulate Popularity FEATs (Karma
 //         chapter). Karma controls and the post-roll Karma decision removed;
@@ -330,6 +341,14 @@ export async function rollContact(actor, contact) {
     },
     default: "roll",
     render: (html, dlg) => {
+      const $dialog = $(dlg.element);
+      if ($dialog.length) $dialog.css('width', '380px');
+      // Lock width through the AppV2 position API — a CSS-only width is
+      // overwritten by AppV2's next auto-measure (e.g. on any of the
+      // request checkboxes toggling), which then measures the unwrapped
+      // checkbox row and balloons the dialog. Re-asserted in recompute()
+      // below, which every change handler already funnels through.
+      try { dlg?.setPosition?.({ width: 380 }); } catch (_) {}
 
       const $stored    = html.find('[name="storedDisposition"]');
       const $shift     = html.find('[name="shift"]');
@@ -372,6 +391,8 @@ export async function rollContact(actor, contact) {
         if (cs !== 0) er = shiftRank(er, cs);
         if (isMutantPenaltyActive) er = shiftRank(er, -1);
         $effRank.text(er);
+
+        try { dlg?.setPosition?.({ width: 380 }); } catch (_) {}
       }
 
       $stored.on("change", recompute);

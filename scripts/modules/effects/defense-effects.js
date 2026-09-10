@@ -1,3 +1,14 @@
+// scripts/modules/effects/defense-effects.js v1.9.2 - 2026-09-09
+// v1.9.2: Fixed-bug — the "Rank @-1 CS" preset writes energyReflectionRank
+//         = "minus1" (confirmed from a live item export), not "rank-1" as
+//         v1.9.1 guessed.
+// scripts/modules/effects/defense-effects.js v1.9.1 - 2026-09-09
+// v1.9.1: Fixed-bug — v1.9.0 assumed energyReflectionRank held a rank
+//         name (e.g. "Amazing"), but the sheet's REFLECTED AT dropdown
+//         writes one of three literal preset keywords: "full" (RAW
+//         Unearthly/100, unchanged), "rank" (the item's own rank/value,
+//         no lookup needed), or "rank-1" (one CS below the item's own
+//         rank). getRankValue('rank') would have silently resolved to 0.
 // scripts/modules/effects/defense-effects.js v1.9.0 - 2026-09-09
 // v1.9.0: Two fixes found auditing Crosswise's (Johnny Frost) homebrew
 //         Energy Reflection item.
@@ -75,7 +86,7 @@
 // The mitigation pipeline reads protection values from AE flags.
 
 import { applyEffect } from "./effect-engine.js";
-import { rankValue as getRankValue, valueToRank } from "../../rules/rules-reference.js";
+import { rankValue as getRankValue, valueToRank, stepRank } from "../../rules/rules-reference.js";
 import { defenseValue } from "../../lib/faserip-rules/faserip-damage.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
@@ -234,12 +245,22 @@ function resolveEnergyReflectionValues(item) {
 
   // RAW: attacks up to Unearthly damage or Intensity inflict no damage; this
   // is the universal default and stays untouched for every ordinary
-  // Reflection power. A house-ruled power that departs from Unearthly names
-  // its own rank in energyReflectionRank instead of the default "full".
-  const overrideRank = sys.energyReflectionRank && sys.energyReflectionRank !== "full"
-    ? sys.energyReflectionRank
-    : null;
-  const threshold = overrideRank ? getRankValue(overrideRank) : 100;
+  // Reflection power. A house-ruled power that departs from Unearthly picks
+  // "Power Rank" or "Rank @-1 CS" on the sheet's REFLECTED AT dropdown
+  // instead of the default "full" — both preset keywords, not rank names.
+  const reflectPreset = sys.energyReflectionRank || "full";
+  let threshold;
+  if (reflectPreset === "rank") {
+    threshold = value;
+  } else if (reflectPreset === "minus1") {
+    threshold = getRankValue(stepRank(sys.rank || getClosestRankName(value), -1));
+  } else if (reflectPreset && reflectPreset !== "full") {
+    // Back-compat: an explicit rank name written directly (not through the
+    // sheet's preset dropdown).
+    threshold = getRankValue(reflectPreset);
+  } else {
+    threshold = 100;
+  }
 
   return {
     reflectionType,
