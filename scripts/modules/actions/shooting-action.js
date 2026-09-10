@@ -1,3 +1,17 @@
+// shooting-action.js v3.16.1 - 2026-09-10
+// v3.16.1: Fixed-bug — the ammo-variant suffix ("(2× explosive)",
+//          "(Remarkable KO drug)") was appended into the big nowrap damage
+//          number, so with Mercy/Explosive selected it swallowed the row
+//          and the weapon select collapsed to a sliver. The suffix now goes
+//          in its own small .frp-dmg-note span beside the number, and the
+//          weapon select keeps a 110px floor.
+// shooting-action.js v3.16.0 - 2026-09-10
+// v3.16.0: Fix dialog ballooning to full width on checkbox/select toggle —
+//          same bug and fix as energy-action.js v3.4.2 / force-action.js
+//          v3.7.0: the CSS-only width is overwritten by AppV2's next
+//          auto-measure on any form-input change. Pin position.width via
+//          dlg.setPosition in render, re-asserted at the end of update()
+//          and via a delegated change/input listener on the dialog root.
 // shooting-action.js v3.15.0 - 2026-09-05
 // v3.15.0: Karma effect reduction. Shooting results may not be pulled for
 //          free (Players Book, Modifying Results in Combat); the dialog
@@ -371,10 +385,11 @@ export class ShootingAction extends RangedAttackAction {
       <!-- Damage: weapon select + numbers inline -->
       <div class="frp-box frp-dmg-box">
         <div class="frp-dmg-inline">
-          <select class="frp-select" name="weapon" id="damage-source-select">
+          <select class="frp-select" name="weapon" id="damage-source-select" style="min-width:110px;">
             ${damageSrcOptions}
           </select>
           <span class="frp-dmg-num" id="dmg-val">${initialWeaponDamage}</span>
+          <span class="frp-dmg-note" id="dmg-variant-note" style="white-space:nowrap;"></span>
           <span class="frp-cs-arrow">&rarr;</span>
           <span class="frp-dmg-after" id="after-armor-display">${primaryTarget ? `${initialAfterArmor} after armor` : `${initialWeaponDamage} damage`}</span>
         </div>
@@ -505,6 +520,12 @@ export class ShootingAction extends RangedAttackAction {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
+          // Lock width through the AppV2 position API — a CSS-only width is
+          // re-applied as position.width ('auto') on the next auto-measure.
+          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          html.on('change input', 'input, select', () => {
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          });
 
           // ── Wire CS panel from shared utility ──
           // getRangePenalty reads live range from the dialog
@@ -546,13 +567,14 @@ export class ShootingAction extends RangedAttackAction {
             let previewSuffix = "";
             if (variantType === "explosive") {
               previewDamage = explosiveShotDamage(currentDamage);
-              previewSuffix = " (2× explosive)";
+              previewSuffix = "2× explosive";
             } else if (variantType === "mercy") {
               previewDamage = MERCY_SHOT.damage;
-              previewSuffix = ` (${foundryNameFor(MERCY_SHOT.drugIntensity)} KO drug)`;
+              previewSuffix = `${foundryNameFor(MERCY_SHOT.drugIntensity)} KO drug`;
             }
 
-            $val.text(previewDamage + previewSuffix);
+            $val.text(previewDamage);
+            html.find('#dmg-variant-note').text(previewSuffix);
             html.find('#max-range-hint').text(currentRange);
 
             // AP display
@@ -588,6 +610,7 @@ export class ShootingAction extends RangedAttackAction {
             }
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
           };
 
           update();
