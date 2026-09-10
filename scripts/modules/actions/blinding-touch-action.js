@@ -1,3 +1,13 @@
+// scripts/modules/actions/blinding-touch-action.js v1.2.0 - 2026-09-09
+// v1.2.0: Fixed-bug — hasProtectedSenses() was a flat "has the item =
+//         total immunity" check, but rules-reference.js's own
+//         protectedSenses desc is "Ignore damaging attacks < rank
+//         Intensity" — a threshold on the item's OWN rank, not a blanket
+//         immunity (found auditing Crosswise, whose write-up specifies
+//         Amazing as that threshold). Replaced with protectedSensesRank(),
+//         compared against Blinding Touch's own rank: negated only when
+//         this attack's rank is strictly below the target's Protected
+//         Senses rank.
 // scripts/modules/actions/blinding-touch-action.js v1.1.0 - 2026-05-15
 // v1.1.0: Auto-apply target/attacker effect-state shifts to the Fighting
 //         FEAT (mirrors attack-action.js:594 + Health-Drain v1.2.0 +
@@ -52,14 +62,18 @@ function colorFg(c) {
   }
 }
 
-function hasProtectedSenses(actor) {
-  if (!actor?.items) return false;
+// RAW (rules-reference.js protectedSenses desc): "Ignore damaging attacks
+// < rank Intensity" — a threshold on the Protected Senses item's own
+// rank, not a blanket immunity. Returns that rank, or null if the target
+// has no such power.
+function protectedSensesRank(actor) {
+  if (!actor?.items) return null;
   for (const item of actor.items) {
     if (item.type !== "power") continue;
     const nm = String(item.name || "").trim().toLowerCase();
-    if (nm === "protected senses") return true;
+    if (nm === "protected senses") return item.system?.rank || null;
   }
-  return false;
+  return null;
 }
 
 export async function showBlindingTouchDialog(hero, item) {
@@ -91,7 +105,12 @@ export async function showBlindingTouchDialog(hero, item) {
   const heroFightValue = hero.system?.abilities?.fighting?.value || 0;
   const heroFightShort = RANK_ABBR[heroFightRank] || heroFightRank;
 
-  const protectedSenses = hasProtectedSenses(target);
+  const protectedRank = protectedSensesRank(target);
+  const protectedValue = protectedRank ? (game.msh?.getRankValue?.(protectedRank) ?? 0) : 0;
+  // Negated only when THIS attack's rank is strictly below the target's
+  // Protected Senses rank ("< rank Intensity") — an attack at or above
+  // that rank still blinds normally.
+  const protectedSenses = protectedRank !== null && powerValue < protectedValue;
 
   // ── Effect-state shifts (auto-applied to Fighting FEAT) ───────────────
   // Mirrors attack-action.js:594 / Health-Drain v1.2.0 / Paralyzing v1.2.0.
@@ -128,7 +147,8 @@ export async function showBlindingTouchDialog(hero, item) {
       <div style="font-size:0.9em;line-height:1.5;">
         <div>Target: <strong>${target.name}</strong></div>
         <div>Blind on <strong>Slam (Y)</strong> or <strong>Stun (R)</strong>; 1d10 rounds.</div>
-        ${protectedSenses ? `<div style="color:#2e7d32;"><strong>${target.name}</strong> has Protected Senses &mdash; immune.</div>` : ""}
+        ${protectedSenses ? `<div style="color:#2e7d32;"><strong>${target.name}</strong>'s Protected Senses (${protectedRank}) ignores attacks below that Intensity — immune to this ${powerRank} touch.</div>` : ""}
+        ${(protectedRank && !protectedSenses) ? `<div style="color:#c62828;"><strong>${target.name}</strong> has Protected Senses (${protectedRank}), but this ${powerRank} touch meets or exceeds it — not immune.</div>` : ""}
         ${effectShiftNoteHtml}
       </div>
     </div>`;
@@ -216,7 +236,7 @@ export async function showBlindingTouchDialog(hero, item) {
               ${String(fightColor).toUpperCase()} &mdash; ${blindKind.toUpperCase()}
             </div>
             <div style="padding:5px 10px;text-align:center;font-size:0.95em;color:#2e7d32;">
-              ${target.name}'s Protected Senses negates the blinding.
+              ${target.name}'s Protected Senses (${protectedRank}) negates the blinding — this ${powerRank} touch is below that Intensity.
             </div>`;
         } else {
           const dur = new Roll("1d10");
