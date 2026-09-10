@@ -1,3 +1,10 @@
+// force-action.js v3.7.0 - 2026-09-09
+// v3.7.0: Fix dialog ballooning to full width on checkbox/select toggle —
+//         same bug and fix as energy-action.js v3.4.2 and
+//         contact-action.js v1.3.0. The CSS-only $dialog.css('width')
+//         gets overwritten by AppV2's next auto-measure (position.width
+//         back to 'auto') on any form-input change. Pin position.width
+//         via dlg.setPosition in render instead.
 // force-action.js v3.6.0 - 2026-09-05
 // v3.6.0: Blindside declaration carried to the target's Slam/Stun/Kill
 //         FEAT, which then refuses the Karma offer (RAW).
@@ -362,6 +369,11 @@ export class ForceAction extends RangedAttackAction {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
+          // Lock width through the AppV2 position API — a CSS-only width is
+          // re-applied as position.width ('auto') on the next setPosition
+          // AppV2 runs (e.g. on a form-input change), which then measures
+          // the widest content line and balloons the dialog.
+          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
 
           // ── Wire CS panel from shared utility ──
           const _getCurrentRangePenalty = () => {
@@ -593,6 +605,7 @@ export class ForceAction extends RangedAttackAction {
             _csState.setAbilityRank(usePwrHit ? currentRank : ability.rank);
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
           };
 
           // ── Event wiring ──
