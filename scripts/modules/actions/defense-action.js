@@ -1,3 +1,12 @@
+// scripts/modules/actions/defense-action.js v2.4.0 - 2026-09-09
+// v2.4.0: Fixed-bug — all four defense Active Effects (Blocking,
+//         Dodging, Evading/Evasion Failed, Evasion Bonus) used the field
+//         name "icon" instead of "img" in their ActiveEffect data.
+//         Foundry v11+ renamed this field; the old key is silently
+//         ignored, so every one of these fell back to the generic
+//         mystery-man icon regardless of which .svg was named. The
+//         already-chosen icons (shield/windmill/hazard/combat/upgrade)
+//         now actually render.
 // scripts/modules/actions/defense-action.js v2.3.0 - 2026-09-09
 // v2.3.0: Dodge/Evade/Block/Catch header was a leftover dark green
 //         gradient (#2e8b2e→#1a6b1a) from before the rest of the dialog
@@ -684,7 +693,7 @@ export class DefenseAction extends BaseAction {
         // Blocking armor is checked by getBodyArmorValues() during attack resolution
         const effectData = {
           name: `Blocking (${armorRank} Armor)`,
-          icon: "icons/svg/shield.svg",
+          img: "icons/svg/shield.svg",
           origin: this.actor.uuid,
           disabled: false,
           duration: {
@@ -743,7 +752,7 @@ export class DefenseAction extends BaseAction {
 
       const effectData = {
         name: `Dodging (${penaltyText})`,
-        icon: "icons/svg/windmill.svg",
+        img: "icons/svg/windmill.svg",
         origin: this.actor.uuid,
         disabled: false,
         duration: {
@@ -824,7 +833,7 @@ export class DefenseAction extends BaseAction {
       
       const evadingEffectData = {
         name: evadingEffectName,
-        icon: colorLower === 'white' ? "icons/svg/hazard.svg" : "icons/svg/combat.svg",
+        img: colorLower === 'white' ? "icons/svg/hazard.svg" : "icons/svg/combat.svg",
         origin: this.actor.uuid,
         disabled: false,
         duration: {
@@ -867,7 +876,7 @@ export class DefenseAction extends BaseAction {
         
         const bonusEffectData = {
           name: bonusEffectName,
-          icon: "icons/svg/upgrade.svg",
+          img: "icons/svg/upgrade.svg",
           origin: this.actor.uuid,
           disabled: false,
           duration: {
