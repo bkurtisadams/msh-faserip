@@ -1,3 +1,14 @@
+// charging-action.js v3.3.0 - 2026-09-09
+// v3.3.0: Fix dialog ballooning to full width on checkbox/select
+//         toggle — same bug and fix as energy-action.js v3.4.2,
+//         contact-action.js v1.3.0, force-action.js v3.7.0. The
+//         CSS-only $dialog.css('width') is overwritten by AppV2's
+//         next auto-measure on any form-input change. Pin
+//         position.width via dlg.setPosition in render, and
+//         re-assert it via a delegated change/input listener on
+//         the dialog root so every control (Pull Punch, Blindside,
+//         etc.) keeps it pinned regardless of which internal handler
+//         (updatePreview or otherwise) fires.
 // charging-action.js v3.2.0 - 2026-09-05
 // v3.2.0: Blindside declaration carried to the target's Slam/Stun/Kill
 //         FEAT, which then refuses the Karma offer (RAW).
@@ -414,6 +425,12 @@ export class ChargingAction extends AttackAction {
           $dialog.css('width', '360px');
           $dialog[0].style.height = 'auto';
         }
+        try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+        // Re-pin on any form-input change, whichever internal handler
+        // reacts to it — AppV2 re-measures to 'auto' width otherwise.
+        html.on('change input', 'input, select', () => {
+          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+        });
 
         // Auto-focus Roll button for keyboard Enter and focus ring
         html.find('#frp-roll').focus();

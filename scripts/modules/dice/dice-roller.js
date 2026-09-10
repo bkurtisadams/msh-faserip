@@ -17,6 +17,12 @@
 // a local sequence for the GM/owner, or a plain roll. Handler registered in
 // gm-utils registerSocket.
 
+// 2026-09-09: promptKarmaDeclaration() dialog opened at full width —
+// same AppV2 bug as the action dialogs (energy/contact/force/grappling/
+// grabbing/charging/check-action.js): no width pin at all here, and the
+// per-second countdown tick rewriting .karma-countdown's text likely
+// re-triggers AppV2's auto-measure every tick. Pin position.width via
+// dlg.setPosition in render, and re-assert it inside the countdown tick.
 import { runAsGM } from '../../gm-utils.js';
 
 // Inline debug helper to avoid import issues
@@ -66,12 +72,15 @@ export async function promptKarmaDeclaration(actor, { sourceName = "FEAT", rank 
       roll:    { label: "Roll Without Karma", icon: "fas fa-dice", callback: () => false }
     },
     default: "roll",
+    width: 400,
     render: ($html, dialog) => {
+      try { dialog?.setPosition?.({ width: 400 }); } catch (_) {}
       if (timeoutMs > 0) {
         let remaining = Math.ceil(timeoutMs / 1000);
         tick = setInterval(() => {
           remaining -= 1;
           $html.find(".karma-countdown").text(Math.max(0, remaining));
+          try { dialog?.setPosition?.({ width: 400 }); } catch (_) {}
         }, 1000);
         timer = setTimeout(() => { try { dialog.close(); } catch (_) {} }, timeoutMs);
       }

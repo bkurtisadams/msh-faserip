@@ -1,3 +1,13 @@
+// grabbing-action.js v2.1.0 - 2026-09-09
+// v2.1.0: Fix dialog ballooning to full width on checkbox/select
+//         toggle — same bug and fix as energy-action.js v3.4.2,
+//         contact-action.js v1.3.0, force-action.js v3.7.0. The
+//         CSS-only $dialog.css('width') is overwritten by AppV2's
+//         next auto-measure on any form-input change. Pin
+//         position.width via dlg.setPosition in render, and
+//         re-assert it via a delegated change/input listener on
+//         the dialog root so every control (including the CS toggles)
+//         keeps it pinned regardless of which internal handler fires.
 // scripts/modules/actions/grabbing-action.js v2.0.1 - 2026-09-02
 // v2.0.1: Third cell is a proper COMPARATOR cell via the template's
 //         thirdCellHtml slot (was squeezed into the red DAMAGE cell).
@@ -311,6 +321,12 @@ export class GrabbingAction extends AttackAction {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
+          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          // Re-pin on any form-input change, whichever internal handler
+          // reacts to it — AppV2 re-measures to 'auto' width otherwise.
+          html.on('change input', 'input, select', () => {
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          });
 
           // Wire CS panel from shared utility
           _csState = wireCSPanel(html, {

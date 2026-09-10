@@ -1,3 +1,13 @@
+// scripts/modules/actions/check-action.js v1.14.0 - 2026-09-09
+// v1.14.0: Fix Slam/Stun/Kill dialog opening at full width — same class
+//         of bug as energy-action.js v3.4.2, contact-action.js v1.3.0,
+//         force-action.js v3.7.0, grappling/grabbing/charging-action.js,
+//         but this dialog had no width handling at all (not even the
+//         CSS-only version), so it auto-sized to content from the
+//         first paint. Added a render callback: width:360 at
+//         construction plus dlg.setPosition pin, and a delegated
+//         change/input listener re-asserting it on the shift/
+//         dmgThrough/borderline controls.
 // scripts/modules/actions/check-action.js v1.13.1 - 2026-09-03
 // v1.13.1: _mentalIntensityRank accepts fixedRank under any intensity mode
 //          (Full-Auto passes intensity "power-rank" with saveFixedRank) and
@@ -673,6 +683,7 @@ export class CheckAction extends BaseAction {
       showFaseripButtonDialog({
         title: `${labelFor(actionType)}: ${actor.name}`,
         content: html,
+        width: 360,
         buttons: {
           roll: {
             label: "Roll",
@@ -689,7 +700,15 @@ export class CheckAction extends BaseAction {
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
-        default: "roll"
+        default: "roll",
+        render: (html, dlg) => {
+          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          // Re-pin on any form-input change — AppV2 re-measures to
+          // 'auto' width otherwise (same bug as the other action dialogs).
+          html.on('change input', 'input, select', () => {
+            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          });
+        }
       });
     });
     if (!choice) return;
