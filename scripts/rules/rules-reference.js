@@ -1,3 +1,10 @@
+// rules-reference.js v2.1.3 - 2026-09-09
+// v2.1.3: Fixed-bug — mentalPowers.ultimateSkill desc omitted the Other
+//         Skills exclusions (Student, Heir to Fortune, Leadership are not
+//         eligible; Professional and Mystic/Mental are excluded entirely).
+//         The book’s own contrast (“considered Unearthly … as opposed to
+//         modifying … +1 or +2CS”) is now in the desc: Ultimate Skill
+//         replaces the talent’s own CS, it does not stack with it.
 // rules-reference.js v2.1.2 - 2026-09-05
 // v2.1.2: POISON_RULES no longer restates Judge rulings PR1-PR5 in prose;
 //         the block points at the kernel ERRATA entries that now hold
@@ -2091,7 +2098,7 @@ export const POWERS = {
 
   // ── MENTAL POWERS ──
   mentalPowers: {
-    ultimateSkill:   { desc: "Unearthly ability in one Talent (Weapon, Fighting, Scientific, or Other skills). Not Professional or Mystic/Mental." },
+    ultimateSkill:   { desc: "Pick one Weapon, Fighting, Scientific, or Other Skill (not Student, Heir to Fortune, Leadership) and its ability becomes Unearthly — replacing that talent’s own CS, not stacking with it. Not Professional or Mystic/Mental. Judge has final say on the pick." },
     telepathy:       { desc: "Mind-to-mind communication. Surface thoughts. Auto: willing or lower Psyche. Yellow: equal Psyche. Red: mental Powers/psi-screen. Impossible: higher unwilling Psyche." },
     imageGeneration: { desc: "Mental illusions. Not on cameras/non-sentient robots. Line of sight. Int FEAT to disbelieve (only if player suspects). Illusory damage: 'death'=unconscious 1-10rnd." },
     telekinesis:     { desc: "Lift/Str FEATs at rank. Rank range. Stunts: flight(-1CS), TK force field(-2CS), TK bolts(-1CS Force column)." },

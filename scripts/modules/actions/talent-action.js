@@ -1,3 +1,13 @@
+// talent-action.js v1.2.1 - 2026-09-09
+// v1.2.1: Fixed-bug — the v1.2.0 picker-skip for unambiguous Fighting
+//         Skill talents (Wrestling, MA-A/B/C/D/E, Acrobatics, Thrown
+//         Objects) never checked rankOverride, so an Ultimate Skill
+//         pick on a Fighting talent silently rolled at the normal
+//         talent bonus instead of Unearthly. hasOverrides now treats a
+//         set rankOverride the same as the other saved overrides and
+//         forces the dialog, where the override math and â chip
+//         already work correctly (Weapon Skill talents were never
+//         affected â they always show the picker).
 // talent-action.js v1.2.0 - 2026-05-16
 // v1.2.0: Picker-skip — rollTalent now routes unambiguous combat talents
 //         (Fighting Skill with recognized specialty: Wrestling, MA-A/B/C/D/E,
@@ -248,11 +258,17 @@ export async function rollTalent(actor, talent, options = {}) {
   // this and show the picker regardless.
   const unambiguousActionKey = getUnambiguousActionCode(talent);
   const _abilityModified = talent.system.abilityModified || "none";
+  // RULED 2026-09-09 (Ultimate Skill): a set rankOverride replaces the
+  // talent's own CS with Unearthly (or whatever rank was chosen), not an
+  // additional shift to stack. It must force the dialog like any other
+  // saved override, or the picker-skip below rolls at the plain talent
+  // bonus and the override never applies.
   const hasOverrides =
     Number(savedExtraShift) !== 0 ||
     (savedIntensity && savedIntensity !== "") ||
     (savedAbility && savedAbility !== "" && savedAbility !== _abilityModified) ||
-    (savedActionType && savedActionType !== unambiguousActionKey);
+    (savedActionType && savedActionType !== unambiguousActionKey) ||
+    !!talent.system.rankOverride;
 
   if (unambiguousActionKey && !hasOverrides && !options.forcePicker) {
     const dispatcherCode = COMBAT_ACTION_MAP[unambiguousActionKey];

@@ -1,3 +1,20 @@
+// scripts/modules/actions/stunt-mechanics.js v1.2.0 - 2026-09-09
+// v1.2.0: RULED (Electrical Manipulation, 2026-09-09) — elec-absorb and
+//         elec-conduct were built on a too-literal reading of "as if
+//         possessing Resistance to Electricity at -2CS" (a passive
+//         damage-reduction effect for both). Corrected:
+//           elec-absorb  — new kind "grant-absorption" builds a manual
+//             defense AE (defenseType absorption, no powerItemId —
+//             mitigation.js keeps those for back-compat) at rank -2CS, so
+//             it runs the real Absorption pool/heal/redirect pipeline via
+//             absorption-pool.planAbsorption, not a standalone effect.
+//           elec-conduct — switched from apply-effect (self-buff) to
+//             kind energy-attack at -2CS: this is an attack on the target,
+//             conducting an external source through the hero, not a
+//             passive resistance to himself.
+//         elec-heal (heal N/round) and the elec-shock touch flag (never
+//         read by attack()) are known gaps, held for ongoing-engine.js and
+//         energy-action.js respectively — not built blind.
 // scripts/modules/actions/stunt-mechanics.js v1.1.0 - 2026-09-03
 // v1.1.0: Presets for Sound Generation, Air Control, Electrical Manipulation.
 //         Adopt-don't-duplicate: a preset first matches an existing tab stunt
@@ -77,11 +94,11 @@ export const STUNT_PRESETS = {
     { key: "elec-heal", name: "Electrical Absorption Healing", aliases: ["absorption healing", "electrical healing"],
       description: "Heal damage through absorption of electricity, up to Power rank amount per round.", mechanic: { kind: "info" } },
     { key: "elec-absorb", name: "Absorb Electricity", aliases: ["absorb electric"],
-      description: "Absorb electrical damage as if possessing Resistance to Electricity at -2CS.",
-      mechanic: { kind: "apply-effect", shift: -2, effectName: "Electrical Absorption", effectType: "electricResist" } },
+      description: "Absorb electrical damage as Absorption at Power rank -2CS — heals existing damage first, excess pools above max Health, pool capped at the -2CS rank and redirectable next round (RAW Absorption pipeline).",
+      mechanic: { kind: "grant-absorption", shift: -2, absorptionType: "energy", absorptionSpecific: "electrical" } },
     { key: "elec-conduct", name: "Conductor", aliases: ["conductor", "conduit"],
-      description: "Act as a conductor between a power source and a target, as if possessing Resistance to Electricity at -2CS.",
-      mechanic: { kind: "apply-effect", shift: -2, effectName: "Conductor", effectType: "electricResist" } },
+      description: "Grab hold of an external electrical source and conduct it into a target: Energy column attack, damage at Power rank -2CS.",
+      mechanic: { kind: "energy-attack", shift: -2, note: "Conducts an external electrical source (power line, generator, storm) through the hero into the target." } },
     { key: "elec-ride", name: "Ride the Lines", aliases: ["lightning teleport", "ride the lines", "power lines"],
       description: "Move at Power rank speed by riding lines of electrical potential — power lines and building wiring.", mechanic: { kind: "info" } },
     { key: "elec-shock", name: "Shocking Touch", aliases: ["shocking touch", "shock touch"],
@@ -202,6 +219,33 @@ export async function runStuntMechanic(actor, stunt) {
     if (m.fallback === "energy-attack") return attack("energy", "agility");
     if (m.fallback === "force-attack")  return attack("force", "agility");
     return postInfoCard(actor, stunt, rank, shiftLabel);
+  }
+
+  if (m.kind === "grant-absorption") {
+    // Manual defense AE in mitigation.js's own shape (defenseType absorption).
+    // No powerItemId: isDefenseAEBackedByCurrentPower() keeps AEs with no
+    // named source item for backwards compatibility, so this rides the real
+    // pool/heal/redirect pipeline (absorption-pool.planAbsorption) without a
+    // second dummy power item.
+    const { applyEffect } = await import("../effects/effect-engine.js");
+    await applyEffect(actor, {
+      name: `${stunt.name} (${rank})`,
+      img: "icons/svg/lightning.svg",
+      rounds: null,
+      originUuid: item?.uuid || actor.uuid,
+      flags: {
+        "msh-faserip": {
+          effectCategory: "defense",
+          defenseType: "absorption",
+          absorptionType: m.absorptionType || "energy",
+          absorptionSpecific: m.absorptionSpecific || "",
+          rankValue: rankValue(rank),
+          rank,
+          stuntKey: stunt.presetKey || ""
+        }
+      }
+    });
+    return postInfoCard(actor, stunt, rank, shiftLabel, `Absorption (${m.absorptionSpecific || m.absorptionType}) active at ${rank} (${rankValue(rank)}). Remove the effect to end it.`);
   }
 
   if (m.kind === "apply-effect") {
