@@ -1,4 +1,9 @@
-﻿// init.js v1.16.2 - 2026-09-05
+﻿// init.js v1.17.0 - 2026-09-09
+// v1.17.0: dataMigrationVersion 3 — Absorption is RAW (always heals, excess
+//          always redirectable). scripts/absorption-migration.js retires the
+//          absorptionConvertsToHealth / absorptionCanRedirect flags and the
+//          old temp-HP absorption AEs; wired after the AP-CS block.
+// init.js v1.16.2 - 2026-09-05
 // v1.16.2: Parked sweep — retire the orphan actionHudButtonSize setting.
 //          Registered by v1.16.0 but never read anywhere in the system
 //          (confirmed by a tree-wide search of js/hbs/html); the HUD
@@ -159,6 +164,7 @@ import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 import { migrateApCsDocuments } from "./ap-cs-migration.js";
+import { migrateAbsorption } from "./absorption-migration.js";
 
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
@@ -3188,6 +3194,21 @@ Hooks.once("ready", async () => {
       console.log(`[FASERIP] One-time document migrations complete (dataMigrationVersion=2, AP-CS: ${n} item(s))`);
     } catch (e) {
       console.warn("[FASERIP WARN] AP-CS migration failed:", e);
+    }
+  }
+
+  // dataMigrationVersion 3 — RULED 2026-09-09: Absorption always heals and its
+  // excess may always be redirected. Retire the two power flags and the old
+  // temp-HP absorption effects.
+  const _mshAbsorptionPending = game.user?.isGM === true
+    && Number(game.settings.get("msh-faserip", "dataMigrationVersion") ?? 0) < 3;
+  if (_mshAbsorptionPending) {
+    try {
+      const n = await migrateAbsorption();
+      await game.settings.set("msh-faserip", "dataMigrationVersion", 3);
+      console.log(`[FASERIP] One-time document migrations complete (dataMigrationVersion=3, Absorption: ${n ?? "done"})`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] Absorption migration failed:", e);
     }
   }
 
