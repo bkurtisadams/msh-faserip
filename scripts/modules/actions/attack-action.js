@@ -1,3 +1,9 @@
+// attack-action.js v1.16.1 - 2026-09-10
+// v1.16.1: Fixed-bug — the mitigation summary line credited the whole
+//          mitigated total to the primary layer ("Energy Reflection blocked
+//          60" when reflection blocked 50 and Resistance took 10). It now
+//          uses the primary layer's own amount and names the other
+//          contributing layers with what they took.
 // attack-action.js v1.16.0 - 2026-09-09
 // v1.16.0: Blindside +2CS to hit (RAW, Blindside: "+2CS"). A dialog that
 //          sets choice.blindside now adds a "Blindside +2" attacker shift
@@ -377,15 +383,27 @@ function buildMitigationChatSummary(result, context = {}) {
   const primaryType = escapeChatText(displayLayerType(primaryLayer));
   const primaryKind = layerKind(primaryLayer);
 
+  // Credit each layer its own share: the primary layer's amount, plus a
+  // note for any other layer that took part of the damage (e.g. Reflection
+  // blocks its threshold and a Resistance reduces the remainder).
+  const primaryAmount = primaryLayer?.immune
+    ? (absorbed || afterArmor)
+    : (Number(primaryLayer?.absorbed || 0) || absorbed || afterArmor);
+  const otherLayers = activeLayers.filter(l => l && l !== primaryLayer && !l.skipped && Number(l.absorbed || 0) > 0);
+  const otherTotal = otherLayers.reduce((sum, l) => sum + Number(l.absorbed || 0), 0);
+  const othersNote = otherTotal > 0
+    ? `; ${otherLayers.map(l => escapeChatText(displayLayerType(l))).join(" + ")} took the remaining ${otherTotal}`
+    : "";
+
   const visibleSummary = primaryLayer?.immune || net <= 0
     ? primaryKind === "reflection"
-      ? `${primaryType} blocked ${absorbed || afterArmor}${damageLabel} — may reflect.`
-      : `${primaryType} prevented ${absorbed || afterArmor}${damageLabel}.`
+      ? `${primaryType} blocked ${primaryAmount}${damageLabel}${othersNote} — may reflect.`
+      : `${primaryType} prevented ${primaryAmount}${damageLabel}${othersNote}.`
     : absorbed > 0
       ? primaryKind === "absorption"
-        ? `${primaryType} absorbed ${absorbed}${damageLabel}; ${net} damage taken.`
+        ? `${primaryType} absorbed ${primaryAmount}${damageLabel}${othersNote}; ${net} damage taken.`
         : primaryKind === "reflection"
-          ? `${primaryType} blocked ${absorbed}${damageLabel}; ${net} damage taken — may reflect.`
+          ? `${primaryType} blocked ${primaryAmount}${damageLabel}${othersNote}; ${net} damage taken — may reflect.`
           : `${primaryType} reduced ${afterArmor}${damageLabel} to ${net}.`
       : `Mitigation left ${net}${damageLabel} taken.`;
 
