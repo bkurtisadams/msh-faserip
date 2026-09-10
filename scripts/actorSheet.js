@@ -1,3 +1,30 @@
+// actorSheet.js v2.14.1 - 2026-09-10
+// v2.14.1: v2.14.0 reordered correctly but the drop still bubbled to the
+//          tab-level drop zone, which only skips *Sort payloads; a plain
+//          FaseripItem drag went on into _onDrop -> _onDropItem, where
+//          fromDropData builds a parentless Item from data.data before
+//          trying the uuid, so the same-actor guard never fired and a
+//          duplicate was created alongside the reorder. _onDrop now
+//          really skips intra-sheet drags (the comment claimed it did;
+//          nothing implemented it) via _isIntraSheetItemDrag, and the six
+//          row handlers mark the event __mshDropHandled on the reorder
+//          path so tab/form-level listeners bail.
+// actorSheet.js v2.14.0 - 2026-09-09
+// v2.14.0: Fixed-bug — a plain (non-Shift) drag of a row in any of the
+//          six sortable lists (Powers, Talents, Contacts, Equipment,
+//          Vehicles, Headquarters) produces a "FaseripItem" hotbar-macro
+//          payload, not the list's own *Sort payload (Shift+drag is
+//          required for that, undiscoverable and easy to not know about).
+//          Dropped back onto another row of the SAME list, each drop
+//          handler only recognized its own *Sort type and fell through
+//          to _onDrop -> _onDropItem for anything else, which creates a
+//          new embedded item — duplicating the row instead of moving it.
+//          Each of the six drop handlers now also treats a FaseripItem
+//          payload as a reorder when its actorId matches this actor, so
+//          a plain drag onto another row in the same list reorders
+//          correctly regardless of whether Shift was held. Genuinely
+//          external drops (compendium, sidebar, another actor) are
+//          unaffected — still routed to _onDrop.
 // actorSheet.js v2.13.0 - 2026-09-09
 // v2.13.0: Absorption pool on the sheet. The Health area shows the held
 //          pool as a green "+N absorbed" tag beside the value (tooltip:
@@ -1269,6 +1296,10 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
 
     const data = await this._mshGetDropData(event);
     if (!data) return;
+    // Intra-sheet drag (a row of this actor's own item list, plain or Shift
+    // drag): the per-row handlers own reordering. Creating anything here
+    // would duplicate the item.
+    if (this._isIntraSheetItemDrag(data)) return false;
     if (this._isDuplicateDropData(data)) return false;
 
     if (Hooks.call("dropActorSheetData", this.actor, this, data) === false) return;
@@ -1285,8 +1316,16 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     }
   }
 
+  _isIntraSheetItemDrag(data) {
+    if (!data) return false;
+    if (data.actorId && data.actorId === this.actor.id) return true;
+    const uuid = String(data.uuid ?? "");
+    return !!this.actor.uuid && uuid.startsWith(`${this.actor.uuid}.Item.`);
+  }
+
   async _onDropItem(event, data) {
     if (!this.actor.isOwner) return false;
+    if (this._isIntraSheetItemDrag(data)) return false;
 
     let item = null;
     try {
@@ -2981,7 +3020,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "TalentSort") { ev.stopPropagation(); return this._onDrop(ev); }
+          const isSameTalentDrag = (sourceData.type === "TalentSort") || (sourceData.type === "FaseripItem" && sourceData.actorId === this.actor.id);
+          if (!isSameTalentDrag) { ev.stopPropagation(); return this._onDrop(ev); }
+          ev.__mshDropHandled = true; ev.stopPropagation();
     
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -3059,7 +3100,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "ContactSort") { ev.stopPropagation(); return this._onDrop(ev); }
+          const isSameContactDrag = (sourceData.type === "ContactSort") || (sourceData.type === "FaseripItem" && sourceData.actorId === this.actor.id);
+          if (!isSameContactDrag) { ev.stopPropagation(); return this._onDrop(ev); }
+          ev.__mshDropHandled = true; ev.stopPropagation();
     
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -3136,7 +3179,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "EquipmentSort") { ev.stopPropagation(); return this._onDrop(ev); }
+          const isSameEquipmentDrag = (sourceData.type === "EquipmentSort") || (sourceData.type === "FaseripItem" && sourceData.actorId === this.actor.id);
+          if (!isSameEquipmentDrag) { ev.stopPropagation(); return this._onDrop(ev); }
+          ev.__mshDropHandled = true; ev.stopPropagation();
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -3213,7 +3258,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          if (sourceData.type !== "VehicleSort") { ev.stopPropagation(); return this._onDrop(ev); }
+          const isSameVehicleDrag = (sourceData.type === "VehicleSort") || (sourceData.type === "FaseripItem" && sourceData.actorId === this.actor.id);
+          if (!isSameVehicleDrag) { ev.stopPropagation(); return this._onDrop(ev); }
+          ev.__mshDropHandled = true; ev.stopPropagation();
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -3381,7 +3428,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           // power row. Bubbling to the form-level _onDrop is unreliable under
           // core 14.364 appv1 DragDrop, so delegate explicitly (_onDrop's
           // __mshDropHandled guard prevents a double-create if it also bubbles).
-          if (sourceData.type !== "PowerSort") { ev.stopPropagation(); return this._onDrop(ev); }
+          const isSamePowerDrag = (sourceData.type === "PowerSort") || (sourceData.type === "FaseripItem" && sourceData.actorId === this.actor.id);
+          if (!isSamePowerDrag) { ev.stopPropagation(); return this._onDrop(ev); }
+          ev.__mshDropHandled = true; ev.stopPropagation();
 
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
@@ -4823,7 +4872,9 @@ html.find('.headquarters-row').each((i, row) => {
 
     try {
       const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "HeadquartersSort") { ev.stopPropagation(); return this._onDrop(ev); }
+      const isSameHeadquartersDrag = (sourceData.type === "HeadquartersSort") || (sourceData.type === "FaseripItem" && sourceData.actorId === this.actor.id);
+          if (!isSameHeadquartersDrag) { ev.stopPropagation(); return this._onDrop(ev); }
+          ev.__mshDropHandled = true; ev.stopPropagation();
 
       const sourceId = sourceData.itemId;
       const targetId = row.dataset.itemId;
