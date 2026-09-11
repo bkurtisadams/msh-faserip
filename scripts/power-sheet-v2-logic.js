@@ -1,3 +1,19 @@
+// power-sheet-v2-logic.js v1.12.0 - 2026-09-10
+// v1.12.0: Fixed-bug — matterControl had no "save" section anywhere in
+//          CATEGORY_SECTIONS, so it was UNREACHABLE from the UI (the
+//          whole section, header and toggle included, is hidden unless
+//          the category suggests it or the toggle is already checked —
+//          a closed loop for a hidden section). Found auditing Air
+//          Control (wind generation is an Endurance-vs-Intensity save,
+//          same shape IntensityAction already handles generically), but
+//          the book text confirms several other Matter Control powers
+//          need it too: Weather Control's heat prostration, Density
+//          Manipulation's Endurance-FEAT-or-unconscious loop, and Body/
+//          Animal Transformation's Psyche-or-Endurance resist FEAT.
+//          Added "save" to matterControl's CATEGORY_SECTIONS and
+//          CATEGORY_AUTO_EXPAND, matching distanceAttacks/mentalPowers/
+//          bodyAlterationsOffensive. requiresSave is still never auto-
+//          ticked (matches those three) — only reachability changed.
 // power-sheet-v2-logic.js v1.11.2 - 2026-07-02
 // v1.11.2: Preset layer extracted to power-presets.mjs (shared with the
 //          powers compendium build tool). Import populatePowerTypeOptions
@@ -66,7 +82,7 @@ const CATEGORY_SECTIONS = {
   resistances:              ["defense"],
   senses:                   ["detection", "abilitySubstitution"],
   movement:                 ["movement"],
-  matterControl:            ["control", "attack"],
+  matterControl:            ["control", "attack", "save"],
   energyControl:            ["control", "attack", "defense"],
   bodyControl:              ["transformation", "defense", "abilitySubstitution"],
   distanceAttacks:          ["attack", "save"],
@@ -104,7 +120,8 @@ const CATEGORY_AUTO_EXPAND = {
   bodyAlterationsDefensive: { sections: ["defense"], subs: [] },
   mentalPowers:             { sections: ["save"], subs: [] },
   distanceAttacks:          { sections: ["save"], subs: [] },
-  bodyAlterationsOffensive: { sections: ["save"], subs: [] }
+  bodyAlterationsOffensive: { sections: ["save"], subs: [] },
+  matterControl:            { sections: ["save"], subs: [] }
 };
 
 // Category -> section flags to auto-tick on category CHANGE (not on render).
