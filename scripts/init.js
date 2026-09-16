@@ -2649,6 +2649,22 @@ Hooks.on("canvasReady", async () => {
   }
 });
 
+Hooks.on("canvasReady", async () => {
+  if (!game.modules.get("sequencer")?.active) return;
+  const files = new Set();
+  for (const token of canvas.tokens?.placeables ?? []) {
+    for (const item of token.actor?.items ?? []) {
+      const v = item.system?.vfx;
+      if (!v || v.enabled === false) continue;
+      if (v.asset) files.add(v.asset);
+      if (v.impact) files.add(v.impact);
+    }
+  }
+  if (files.size) {
+    try { await Sequencer.Preloader.preloadForClients([...files]); } catch { /* noop */ }
+  }
+});
+
 // ---------------------------------------------------------------------------
 // FASERIP status palette. Replace CONFIG.statusEffects in `setup` (after every
 // module's init, including Battlesystem) so the Token HUD shows only FASERIP

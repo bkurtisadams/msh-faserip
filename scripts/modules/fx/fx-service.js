@@ -2,6 +2,10 @@
 // Modular power FX service. Currently routes through Sequencer (if active) with
 // a no-op fallback. A native v14 VFX provider can be added as a second branch
 // once foundry.canvas VFX leaves "experimental" without changing call sites.
+//
+// Duration: 0 (default) means "play the asset's natural length". Only a
+// positive value forces .duration() on the beam — JB2A beams have a ramp-in
+// and clipping them at 1000ms hides them entirely.
 
 const SYS_ID = () => game.system?.id || "msh-faserip";
 
@@ -104,20 +108,25 @@ function presetFromActionType(actionType, damageType) {
   return null;
 }
 
+// Normalise a raw vfx block (item, attack mode, or sheet form) into a preset.
+function normalizeConfig(v, presetFallback = "custom") {
+  return {
+    preset:   v.preset || presetFallback,
+    color:    v.color || null,
+    asset:    v.asset || null,
+    impact:   v.impact || null,
+    scale:    Number(v.scale ?? 1),
+    duration: Number(v.duration ?? 0),
+    impactDelay: Number(v.impactDelay ?? 600)
+  };
+}
+
 function resolvePreset({ item, actionType, damageType }) {
   // Item-level override
   const iv = item?.system?.vfx;
   if (iv?.enabled === false) return null;
-  if (iv?.preset || iv?.asset) {
-    return {
-      preset: iv.preset || "custom",
-      color:  iv.color || null,
-      asset:  iv.asset || null,
-      impact: iv.impact || null,
-      scale:  Number(iv.scale ?? 1),
-      duration: Number(iv.duration ?? 1000)
-    };
-  }
+  if (iv?.preset || iv?.asset) return normalizeConfig(iv);
+
   // Per-mode override
   const modes = item?.system?.attackModes;
   if (Array.isArray(modes)) {
@@ -125,33 +134,27 @@ function resolvePreset({ item, actionType, damageType }) {
       String(m?.actionType ?? "").toLowerCase() === String(actionType ?? "").toLowerCase()
     );
     const mv = mode?.vfx;
-    if (mv && mv.enabled !== false && (mv.preset || mv.asset)) {
-      return {
-        preset: mv.preset || "custom",
-        color:  mv.color || null,
-        asset:  mv.asset || null,
-        impact: mv.impact || null,
-        scale:  Number(mv.scale ?? 1),
-        duration: Number(mv.duration ?? 1000)
-      };
-    }
+    if (mv && mv.enabled !== false && (mv.preset || mv.asset)) return normalizeConfig(mv);
   }
+
   // Default by action/damage type
   const def = presetFromActionType(actionType, damageType);
   if (!def) return null;
-  return { ...def, asset: null, impact: null, scale: 1, duration: 1000 };
+  return { ...def, asset: null, impact: null, scale: 1, duration: 0 };
 }
 
+// `|| undefined` so an empty color falls through to the preset's default
+// parameter — a null would become the literal string "null" in the key.
 function resolveAsset(p) {
   if (p?.asset) return p.asset;
   const fn = BEAMS[p?.preset];
-  return fn ? fn(p.color) : null;
+  return fn ? fn(p.color || undefined) : null;
 }
 
 function resolveImpact(p) {
   if (p?.impact) return p.impact;
   const fn = IMPACTS[p?.preset];
-  return fn ? fn(p.color) : null;
+  return fn ? fn(p.color || undefined) : null;
 }
 
 function resolveSourceToken(actor, fallback) {
@@ -163,6 +166,27 @@ function resolveSourceToken(actor, fallback) {
 function resolveTargets(provided) {
   if (Array.isArray(provided) && provided.length) return provided;
   return Array.from(game.user?.targets ?? []);
+}
+
+// Shared builders so playAttack and preview stay identical.
+function addBeam(seq, beam, source, target, scale, duration, impactLead = 0) {
+  const fx = seq.effect()
+    .file(beam)
+    .atLocation(source)
+    .stretchTo(target)
+    .scale(scale);
+  if (duration > 0) fx.duration(duration);
+  if (impactLead > 0) fx.waitUntilFinished(-impactLead);
+  return fx;
+}
+
+function addImpact(seq, impact, target, scale, delay = 0) {
+  const fx = seq.effect()
+    .file(impact)
+    .atLocation(target)
+    .scale(scale * 0.8);
+  if (delay > 0) fx.delay(delay);
+  return fx;
 }
 
 export const fxService = {
@@ -189,33 +213,22 @@ export const fxService = {
       }
 
       const scale = (p.scale ?? 1) * intensityScale();
-      const duration = p.duration ?? 1000;
+      const duration = p.duration ?? 0;
 
       const seq = new Sequence();
       if (beamOk) {
-        for (const t of targets) {
-          seq.effect()
-            .file(beam)
-            .atLocation(sourceToken)
-            .stretchTo(t)
-            .duration(duration)
-            .scale(scale);
-        }
+        for (const t of targets) addBeam(seq, beam, sourceToken, t, scale, duration, impactOk && isHit ? p.impactDelay : 0);
       } else if (beam) {
         dlog("skip beam: not in DB", { beam });
       }
       if (isHit && impactOk) {
-        for (const t of targets) {
-          seq.effect()
-            .file(impact)
-            .atLocation(t)
-            .scale(scale * 0.8);
-        }
+        for (const t of targets) addImpact(seq, impact, t, scale);
       } else if (isHit && impact && !impactOk) {
         dlog("skip impact: not in DB", { impact });
       }
 
-      dlog("play", { preset: p.preset, beam: beamOk ? beam : null, impact: impactOk ? impact : null, isHit, n: targets.length });
+      dlog("play", { preset: p.preset, beam: beamOk ? beam : null, impact: impactOk ? impact : null, isHit, duration, n: targets.length });
+      try { await Sequencer.Preloader.preload([beamOk ? beam : null, impactOk ? impact : null].filter(Boolean)); } catch { /* noop */ }
       await seq.play();
     } catch (err) {
       console.warn("[FX] playAttack failed:", err);
@@ -247,14 +260,7 @@ export const fxService = {
         y: (sourceToken.center?.y ?? sourceToken.y)
       };
 
-      const p = {
-        preset:   opts.preset || "custom",
-        color:    opts.color || null,
-        asset:    opts.asset || null,
-        impact:   opts.impact || null,
-        scale:    Number(opts.scale ?? 1),
-        duration: Number(opts.duration ?? 1000)
-      };
+      const p = normalizeConfig(opts);
 
       const beam = resolveAsset(p);
       const impact = resolveImpact(p);
@@ -275,24 +281,14 @@ export const fxService = {
       }
 
       const scale = (p.scale ?? 1) * intensityScale();
-      const duration = p.duration ?? 1000;
+      const duration = p.duration ?? 0;
 
       const seq = new Sequence();
-      if (beamOk) {
-        seq.effect()
-          .file(beam)
-          .atLocation(sourceToken)
-          .stretchTo(target)
-          .duration(duration)
-          .scale(scale);
-      }
-      if (impactOk) {
-        seq.effect()
-          .file(impact)
-          .atLocation(target)
-          .scale(scale * 0.8);
-      }
-      dlog("preview", { preset: p.preset, beam: beamOk ? beam : null, impact: impactOk ? impact : null });
+      if (beamOk) addBeam(seq, beam, sourceToken, target, scale, duration, impactOk ? p.impactDelay : 0);
+      if (impactOk) addImpact(seq, impact, target, scale);
+
+      dlog("preview", { preset: p.preset, beam: beamOk ? beam : null, impact: impactOk ? impact : null, duration });
+      try { await Sequencer.Preloader.preload([beamOk ? beam : null, impactOk ? impact : null].filter(Boolean)); } catch { /* noop */ }
       await seq.play();
     } catch (err) {
       console.warn("[FX] preview failed:", err);

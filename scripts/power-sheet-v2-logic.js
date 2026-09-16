@@ -519,7 +519,8 @@ export function ps2ActivateListeners(html, sheet) {
       type: btn.dataset.type || "imagevideo",
       current: input.val() || "",
       callback: path => {
-        input.val(path).trigger("change");
+        input.val(path);
+        input[0]?.dispatchEvent(new Event("change", { bubbles: true }));
       }
     }).render(true);
   });

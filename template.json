@@ -574,7 +574,8 @@
         "asset": "",
         "impact": "",
         "scale": 1,
-        "duration": 1000
+        "duration": 0,
+        "impactDelay": 600
       },
       "specialMechanics": ""
     },
@@ -651,7 +652,8 @@
         "asset": "",
         "impact": "",
         "scale": 1,
-        "duration": 1000
+        "duration": 0,
+        "impactDelay": 600
       },
       "variantType": "standard",
       "specialAmmo": {

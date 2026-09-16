@@ -27,11 +27,47 @@ export function isDialogDetached(dialog) {
   } catch (_) { return false; }
 }
 
+const _POS_STORE = "msh-faserip.dialogPositions";
+
+function _positionKey(title) {
+  return String(title ?? "")
+    .split(/[:\u2014\u2013-]/)[0]
+    .trim()
+    .toLowerCase() || null;
+}
+
+function _loadPositions() {
+  try { return JSON.parse(localStorage.getItem(_POS_STORE) || "{}"); }
+  catch { return {}; }
+}
+
+function _savedPosition(key) {
+  if (!key) return null;
+  const p = _loadPositions()[key];
+  if (!p || typeof p.left !== "number" || typeof p.top !== "number") return null;
+  // Clamp so a dialog saved on a larger screen doesn't open off-canvas.
+  const maxLeft = Math.max(0, window.innerWidth - 200);
+  const maxTop  = Math.max(0, window.innerHeight - 100);
+  return { left: Math.min(p.left, maxLeft), top: Math.min(p.top, maxTop) };
+}
+
+function _rememberPosition(key, dialog) {
+  if (!key || !dialog || isDialogDetached(dialog)) return;
+  const { left, top } = dialog.position ?? {};
+  if (typeof left !== "number" || typeof top !== "number") return;
+  try {
+    const all = _loadPositions();
+    all[key] = { left, top };
+    localStorage.setItem(_POS_STORE, JSON.stringify(all));
+  } catch { /* noop */ }
+}
+
 // 2026-07-09: showFaseripDialog now accepts optional width/height (routed to
 // DialogV2 position, matching showFaseripButtonDialog) and resizable (routed
 // to window.resizable) for content-heavy dialogs like the Hardware help.
 export async function showFaseripDialog({ title, content, render, close, width, height, resizable } = {}) {
   const { DialogV2 } = foundry.applications.api;
+  const posKey = _positionKey(title);
   const cfg = {
     window: { title, ...(resizable ? { resizable: true } : {}) },
     content,
@@ -62,12 +98,16 @@ export async function showFaseripDialog({ title, content, render, close, width, 
         dialog.bringToFront?.();
       } catch (_) {}
     },
-    close: () => {
+    close: (event, dialog) => {
+      _rememberPosition(posKey, dialog);
       try { close?.(); }
       catch (e) { console.warn("FASERIP dialog close error:", e); }
     }
   };
-  if (width || height) cfg.position = { ...(width ? { width } : {}), ...(height ? { height } : {}) };
+  const saved = _savedPosition(posKey);
+  if (width || height || saved) {
+    cfg.position = { ...(saved ?? {}), ...(width ? { width } : {}), ...(height ? { height } : {}) };
+  }
   return DialogV2.wait(cfg);
 }
 
