@@ -1,4 +1,10 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.12.0 - 2026-09-26
+// scripts/modules/canvas/faserip-dot-token.js v1.13.0 - 2026-09-27
+// v1.13.0: Leaving dot mode no longer forces mesh.visible = true on every non-dot token
+//          (only restores tokens this module hid). HUD toggle flips the effective state
+//          in one update (flag null = inherit). Scene/world dot changes resize tokens
+//          from the active GM only, batched. Dot drawn beneath bars/effects/nameplate.
+//          Portraits: fix stale map entry blocking re-show, hide when token not
+//          visible, clear on canvas teardown. "V" is now a rebindable keybinding.
 // v1.12.0: Facing offset from the actor's Art Facing (flags.msh-faserip.artFacing: 0 Up,
 //          90 Right, 180 Down, 270 Left; default Up = no offset). Token flag facingOffset
 //          still overrides. Light/vision rebuilt when either changes.
@@ -53,20 +59,23 @@ function _getDotRatio() {
 // ---------------------------------------------------------------------------
 
 function _isDotMode(token) {
-  // 1. Per-token override (highest priority) — strict boolean only.
-  //    Non-booleans (stale strings, objects, etc.) are treated as "no
-  //    override" and fall through.
   const perToken = token.document.getFlag(SCOPE, DOT_FLAG);
   if (perToken === true || perToken === false) return perToken;
-  // 2. Per-scene flag — strict boolean only.
+  return _inheritedDotMode();
+}
+
+function _inheritedDotMode() {
   const sceneFlag = canvas.scene?.getFlag(SCOPE, DOT_FLAG);
   if (sceneFlag === true || sceneFlag === false) return sceneFlag;
-  // 3. World setting fallback
   try {
     return Boolean(game.settings.get(SCOPE, DOT_FLAG));
   } catch {
     return false;
   }
+}
+
+function _isActiveGM() {
+  return game.user?.isGM && (game.users?.activeGM?.id ?? game.user.id) === game.user.id;
 }
 
 function _isVehicle(token) {
@@ -119,8 +128,10 @@ function _updatePortraitPosition(entry) {
   const { el, token } = entry;
   if (!token || token.destroyed || !el.isConnected) {
     _removePortraitEntry(entry);
+    if (_activePortraits.get(entry.id) === entry) _activePortraits.delete(entry.id);
     return;
   }
+  el.style.display = token.visible ? "" : "none";
   // Use token.x/y (live PIXI position) not token.document.x/y (only updates on drop)
   const pt = canvas.clientCoordinatesFromCanvas({
     x: token.x + (token.w / 2),
@@ -144,10 +155,13 @@ function _showPortrait(token) {
 
   const el = document.createElement("div");
   el.classList.add("faserip-dot-portrait");
-  el.innerHTML = `<img src="${src}" alt="">`;
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = "";
+  el.appendChild(img);
   document.body.appendChild(el);
 
-  const entry = { el, token, raf: null };
+  const entry = { el, token, id: token.id, raf: null };
   _activePortraits.set(token.id, entry);
   entry.raf = requestAnimationFrame(() => _updatePortraitPosition(entry));
 }
@@ -192,19 +206,32 @@ function _onTokenPointerLeave(token) {
 // Auto-resize: shrink to 0.5×0.5 on dot-mode entry, restore on exit
 // ---------------------------------------------------------------------------
 
-async function _shrinkForDotMode(tokenDoc) {
+function _shrinkChanges(tokenDoc) {
   const w = tokenDoc.width;
   const h = tokenDoc.height;
-  if (w <= 0.5 && h <= 0.5) return; // already small
-  await tokenDoc.setFlag(SCOPE, SIZE_FLAG, { w, h });
-  await tokenDoc.update({ width: 0.5, height: 0.5 });
+  if (w <= 0.5 && h <= 0.5) return {};
+  return { width: 0.5, height: 0.5, [`flags.${SCOPE}.${SIZE_FLAG}`]: { w, h } };
 }
 
-async function _restoreFromDotMode(tokenDoc) {
+function _restoreChanges(tokenDoc) {
   const orig = tokenDoc.getFlag(SCOPE, SIZE_FLAG);
-  if (!orig) return;
-  await tokenDoc.unsetFlag(SCOPE, SIZE_FLAG);
-  await tokenDoc.update({ width: orig.w, height: orig.h });
+  if (!orig) return {};
+  return { width: orig.w, height: orig.h, [`flags.${SCOPE}.${SIZE_FLAG}`]: null };
+}
+
+async function _applyInheritedDotModeToScene() {
+  if (!canvas.ready) return;
+  if (_isActiveGM()) {
+    const updates = [];
+    for (const token of canvas.tokens?.placeables ?? []) {
+      const perToken = token.document.getFlag(SCOPE, DOT_FLAG);
+      if (perToken === true || perToken === false) continue;
+      const changes = _inheritedDotMode() ? _shrinkChanges(token.document) : _restoreChanges(token.document);
+      if (Object.keys(changes).length) updates.push({ _id: token.document.id, ...changes });
+    }
+    if (updates.length) await canvas.scene.updateEmbeddedDocuments("Token", updates);
+  }
+  for (const token of canvas.tokens?.placeables ?? []) token.renderFlags.set({ refreshMesh: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -297,12 +324,18 @@ function _refreshTokenDot(token) {
       token._faseripDot.destroy({ children: true });
       token._faseripDot = null;
     }
-    if (token.mesh) token.mesh.visible = true;
+    if (token._faseripHidMesh) {
+      token._faseripHidMesh = false;
+      if (token.mesh) token.mesh.visible = token.visible;
+      token.renderFlags.set({ refreshVisibility: true });
+    }
     return;
   }
 
-  // Hide artwork — dot replaces it visually
-  if (token.mesh) token.mesh.visible = false;
+  if (token.mesh) {
+    token.mesh.visible = false;
+    token._faseripHidMesh = true;
+  }
 
   // Only redraw if dot doesn't exist or size/disposition/dotRatio changed
   const curRatio = _getDotRatio();
@@ -326,7 +359,7 @@ function _refreshTokenDot(token) {
     _drawDot(g, token);
   }
 
-  token.addChild(g);
+  token.addChildAt(g, 0);
   token._faseripDot = g;
 
   // Make dot interactive with full-token hit area so Foundry's hoverToken fires
@@ -365,7 +398,6 @@ function _onRenderTokenHUD(app, html, data) {
   if (!token) return;
 
   const el = html instanceof HTMLElement ? html : html[0] ?? html;
-  const current = token.document.getFlag(SCOPE, DOT_FLAG);
   const isDot = _isDotMode(token);
 
   // Build the toggle button
@@ -380,17 +412,13 @@ function _onRenderTokenHUD(app, html, data) {
     ev.preventDefault();
     ev.stopPropagation();
 
-    // Three-state cycle: unset → dot → normal → unset
-    if (current === true) {
-      await token.document.setFlag(SCOPE, DOT_FLAG, false);
-      await _restoreFromDotMode(token.document);
-    } else if (current === false) {
-      await token.document.unsetFlag(SCOPE, DOT_FLAG);
-      if (_isDotMode(token)) await _shrinkForDotMode(token.document);
-    } else {
-      await token.document.setFlag(SCOPE, DOT_FLAG, true);
-      await _shrinkForDotMode(token.document);
-    }
+    const doc = token.document;
+    const wantDot = !_isDotMode(token);
+    const update = {
+      [`flags.${SCOPE}.${DOT_FLAG}`]: wantDot === _inheritedDotMode() ? null : wantDot,
+      ...(wantDot ? _shrinkChanges(doc) : _restoreChanges(doc))
+    };
+    await doc.update(update);
     token.renderFlags.set({ refreshMesh: true });
     app.render();
   });
@@ -476,19 +504,25 @@ export function initDotToken() {
 
   // Cancel pending hover timer on pan/zoom
   Hooks.on("canvasPan", _cancelHoverTimer);
+  Hooks.on("canvasTearDown", () => {
+    _cancelHoverTimer();
+    _hideAllPortraits();
+  });
 
-  // "V" hotkey: toggle persistent portrait mode
-  document.addEventListener("keydown", (ev) => {
-    if (ev.key !== "v" && ev.key !== "V") return;
-    const tag = document.activeElement?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
-
-    _persistentPortraits = !_persistentPortraits;
-    if (!_persistentPortraits) {
-      _hideAllPortraits();
+  game.keybindings.register(SCOPE, "toggleDotPortraits", {
+    name: "Toggle Persistent Dot Portraits",
+    hint: "Dot mode: keep hovered token portraits pinned until toggled off.",
+    editable: [{ key: "KeyV" }],
+    onDown: () => {
+      _persistentPortraits = !_persistentPortraits;
+      if (!_persistentPortraits) _hideAllPortraits();
+      ui.notifications?.info(`Dot portraits: ${_persistentPortraits ? "persistent (hover to pin)" : "hover only"}`);
+      return true;
     }
-    ui.notifications?.info(`Dot portraits: ${_persistentPortraits ? "persistent (hover to pin)" : "hover only"}`);
+  });
+
+  Hooks.on("updateSetting", (setting) => {
+    if (setting.key === `${SCOPE}.${DOT_FLAG}`) _applyInheritedDotModeToScene();
   });
 
   // Expose a one-shot cleanup for stale string flags. Run from console:
@@ -596,14 +630,7 @@ export function initDotToken() {
     if (scene.id !== canvas.scene?.id) return;
     if (changes?.flags?.[SCOPE]?.[DOT_FLAG] !== undefined
       || changes?.flags?.[SCOPE]?.[`-=${DOT_FLAG}`] !== undefined) {
-      for (const token of canvas.tokens?.placeables ?? []) {
-        const perToken = token.document.getFlag(SCOPE, DOT_FLAG);
-        if (perToken === null || perToken === undefined) {
-          if (_isDotMode(token)) _shrinkForDotMode(token.document);
-          else _restoreFromDotMode(token.document);
-        }
-        token.renderFlags.set({ refreshMesh: true });
-      }
+      _applyInheritedDotModeToScene();
     }
   });
 }

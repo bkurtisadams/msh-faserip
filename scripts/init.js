@@ -1,4 +1,5 @@
-﻿// init.js v1.18.0 - 2026-09-26
+﻿// init.js v1.18.1 - 2026-09-27
+// v1.18.1: Fix garbled dotMode setting hint and update it for HUD toggle / plain hover.
 // v1.18.0: registerVehicleCrewCombat — vehicles join combat as their crew.
 // v1.17.1: Vehicle prototype tokens default lockRotation false so art turns with headlights.
 // v1.17.0: dataMigrationVersion 3 — Absorption is RAW (always heals, excess
@@ -1292,7 +1293,7 @@ Hooks.once("init", async () => {
 
   game.settings.register("msh-faserip", "dotMode", {
     name: "Dot Mode (Theater of the Mind)",
-    hint: "Default dot mode for new scenes. Individual scenes can override this in Scene Config â†’ Grid tab. Right-click tokens to override per-token. Ctrl+hover a dot for portrait.",
+    hint: "Default dot mode for scenes. Individual scenes can override this in Scene Config → Grid tab. Use the Token HUD dot button to override per token. Hover a dot for its portrait.",
     scope: "world",
     config: true,
     type: Boolean,
