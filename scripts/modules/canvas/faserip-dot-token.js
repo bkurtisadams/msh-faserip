@@ -1,4 +1,8 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.10.0 - 2026-05-06
+// scripts/modules/canvas/faserip-dot-token.js v1.12.0 - 2026-09-26
+// v1.12.0: Facing offset from the actor's Art Facing (flags.msh-faserip.artFacing: 0 Up,
+//          90 Right, 180 Down, 270 Left; default Up = no offset). Token flag facingOffset
+//          still overrides. Light/vision rebuilt when either changes.
+// v1.11.0: Facing offset for vehicle light/vision cones and facing tick.
 // v1.10.0: Robustness — _isDotMode honors only strict boolean flag values;
 //          non-booleans (e.g. stale "off"/"on"/"default" strings from older
 //          scene saves) fall through as "no override". preUpdateScene now
@@ -67,6 +71,26 @@ function _isDotMode(token) {
 
 function _isVehicle(token) {
   return token.actor?.type === "vehicle";
+}
+
+function _facingOffset(token) {
+  const tokFlag = token.document.getFlag(SCOPE, "facingOffset");
+  if (tokFlag !== undefined && tokFlag !== null && tokFlag !== "" && Number.isFinite(Number(tokFlag))) return Number(tokFlag);
+  const art = Number(token.actor?.getFlag(SCOPE, "artFacing"));
+  return Number.isFinite(art) ? art : 0;
+}
+
+function _refreshFacing(token) {
+  if (!token) return;
+  token.initializeLightSource?.();
+  token.initializeVisionSource?.();
+  _syncDotRotation(token);
+}
+
+function _withFacing(token, data) {
+  const off = _facingOffset(token);
+  if (off && data && "rotation" in data) data.rotation = ((data.rotation ?? 0) + off) % 360;
+  return data;
 }
 
 function _getDotColor(token) {
@@ -254,7 +278,7 @@ function _syncDotRotation(token) {
   if (!g) return;
   const cx = token.w / 2;
   const cy = token.h / 2;
-  const rad = (token.document.rotation ?? 0) * Math.PI / 180;
+  const rad = ((token.document.rotation ?? 0) + _facingOffset(token)) * Math.PI / 180;
   if (g.pivot.x !== cx || g.pivot.y !== cy) {
     g.pivot.set(cx, cy);
     g.position.set(cx, cy);
@@ -411,9 +435,29 @@ export function initDotToken() {
       if (_isDotMode(this)) return 0;
       return super._getSnappingModes();
     }
+
+    _getLightSourceData() {
+      return _withFacing(this, super._getLightSourceData());
+    }
+
+    _getVisionSourceData() {
+      return _withFacing(this, super._getVisionSourceData());
+    }
   }
 
   CONFIG.Token.objectClass = FaseripToken;
+
+  Hooks.on("updateToken", (doc, changes) => {
+    const has = foundry.utils.hasProperty;
+    if (has(changes, `flags.${SCOPE}.facingOffset`) || has(changes, `flags.${SCOPE}.-=facingOffset`)
+        || has(changes, `delta.flags.${SCOPE}.artFacing`)) {
+      _refreshFacing(doc.object);
+    }
+  });
+  Hooks.on("updateActor", (actor, changes) => {
+    if (!foundry.utils.hasProperty(changes, `flags.${SCOPE}.artFacing`)) return;
+    for (const t of actor.getActiveTokens?.() ?? []) _refreshFacing(t);
+  });
 
   Hooks.on("refreshToken", _refreshTokenDot);
   Hooks.on("destroyToken", _destroyTokenDot);

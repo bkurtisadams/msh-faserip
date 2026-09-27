@@ -1,4 +1,5 @@
-﻿// init.js v1.17.0 - 2026-09-09
+﻿// init.js v1.17.1 - 2026-09-26
+// v1.17.1: Vehicle prototype tokens default lockRotation false so art turns with headlights.
 // v1.17.0: dataMigrationVersion 3 — Absorption is RAW (always heals, excess
 //          always redirectable). scripts/absorption-migration.js retires the
 //          absorptionConvertsToHealth / absorptionCanRedirect flags and the
@@ -242,7 +243,7 @@ function _faseripVehiclePrototypeTokenDefaults() {
     "prototypeToken.displayName": _tokenDisplayMode("ALWAYS", 50),
     "prototypeToken.bar1.attribute": "resources.body",
     "prototypeToken.texture.fit": "contain",
-    "prototypeToken.lockRotation": true
+    "prototypeToken.lockRotation": false
   };
 }
 

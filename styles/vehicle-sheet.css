@@ -260,6 +260,18 @@
   gap: 2px;
 }
 .vehicle-sheet .crew-passenger { margin-bottom: 0; }
+.vehicle-sheet .crew-add-row {
+  display: flex;
+  gap: 4px;
+}
+.vehicle-sheet .crew-add-selected {
+  flex: 0 0 auto;
+  width: auto;
+  line-height: 1;
+  padding: 2px 6px;
+  font-size: .8em;
+  white-space: nowrap;
+}
 .vehicle-sheet .veh-seats-row {
   display: flex;
   align-items: center;
@@ -292,6 +304,13 @@
   display: block;
   margin-bottom: 1px;
 }
+.vehicle-sheet .veh-facing-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vehicle-sheet .veh-facing-row label { display: inline; margin: 0; }
+.vehicle-sheet .veh-facing-row select { width: auto; }
 .vehicle-sheet .veh-detail-row textarea {
   width: 100%;
   font-size: .85em;

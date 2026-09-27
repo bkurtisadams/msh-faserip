@@ -114,6 +114,7 @@
             </div>
           {{else}}
             <div class="crew-drop-zone" data-slot="driver">Drag actor here</div>
+            <button type="button" class="crew-add-selected" data-slot="driver" title="Add the selected canvas token as driver"><i class="fas fa-crosshairs"></i> Selected</button>
           {{/if}}
         </div>
 
@@ -127,7 +128,10 @@
                 <a class="crew-remove" data-slot="passenger" data-uuid="{{this.uuid}}" title="Remove"><i class="fas fa-times"></i></a>
               </div>
             {{/each}}
-            <div class="crew-drop-zone" data-slot="passenger">Drag actor to add</div>
+            <div class="crew-add-row">
+              <div class="crew-drop-zone" data-slot="passenger">Drag actor to add</div>
+              <button type="button" class="crew-add-selected" data-slot="passenger" title="Add the selected canvas tokens as crew"><i class="fas fa-crosshairs"></i> Selected</button>
+            </div>
           </div>
         </div>
 
@@ -140,6 +144,12 @@
 
       <fieldset class="veh-fieldset">
         <legend>Details</legend>
+        <div class="veh-detail-row veh-facing-row">
+          <label title="Which way the front of the vehicle points in the token image file. Headlights and vision cones follow this.">Art Facing</label>
+          <select name="flags.msh-faserip.artFacing">
+            {{selectOptions artFacingChoices selected=artFacing}}
+          </select>
+        </div>
         <div class="veh-detail-row">
           <label>Special Features</label>
           <textarea name="system.features" rows="2" placeholder="ECM, Sensors, Autopilot, Amphibious…">{{system.features}}</textarea>

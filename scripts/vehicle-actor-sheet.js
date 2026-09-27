@@ -1,4 +1,7 @@
-// scripts/vehicle-actor-sheet.js v3.0.1 - 2026-03-13
+// scripts/vehicle-actor-sheet.js v3.2.0 - 2026-09-26
+// v3.2.0: Art Facing select (flags.msh-faserip.artFacing) drives headlight/vision cone offset
+// v3.1.0: Unlinked tokens as crew — "Selected" buttons add controlled canvas tokens by
+//         synthetic-actor UUID; token names shown for token crew; shared _addCrew path
 // v3.0.1: Fix button inline layout, horizontal tabs, clamp CS loss to 0+
 // v3.0.0: Compact layout, effective ranks, current speed, OOC flag, FEAT/charging display, repair button
 // v2.1.0: Use Foundry v13 _onDropActor API instead of custom _onDrop parsing
@@ -13,6 +16,14 @@ import {
 
 function lesserRank(a, b) {
   return rankVal(a) <= rankVal(b) ? a : b;
+}
+
+function crewName(doc) {
+  return doc?.token?.name || doc?.name || "";
+}
+
+function crewNames(uuids) {
+  return uuids.map(u => crewName(fromUuidSync(u)) || u).join(", ");
 }
 
 export class MSHVehicleActorSheet extends FaseripActorSheet {
@@ -38,6 +49,9 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       "Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000"
     ];
 
+    data.artFacingChoices = { "0": "Up", "90": "Right", "180": "Down", "270": "Left" };
+    data.artFacing = String(Number(this.actor.getFlag("msh-faserip", "artFacing")) || 0);
+
     data.vehicleTypes = ["Road","Off-Road","Railed","GEV","Air","Space","Water","Submersible"];
 
     const items = this.actor.items?.contents ?? this.actor.items ?? [];
@@ -56,7 +70,7 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
           || driverDoc.system?.abilities?.agility?.value || null;
         driverAgility = agiRank;
         data.driverActor = {
-          name: driverDoc.name,
+          name: crewName(driverDoc),
           img: driverDoc.img || "icons/svg/mystery-man.svg",
           uuid: driverUuid,
           agility: agiRank || "?"
@@ -71,7 +85,7 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       const doc = fromUuidSync(uuid);
       if (doc) {
         data.passengerActors.push({
-          name: doc.name,
+          name: crewName(doc),
           img: doc.img || "icons/svg/mystery-man.svg",
           uuid
         });
@@ -160,13 +174,67 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
         const filtered = current.filter(u => u !== uuid);
         await this.actor.update({
           "system.passengerUuids": filtered,
-          "system.passengers": filtered.map(u => {
-            const d = fromUuidSync(u);
-            return d?.name || u;
-          }).join(", ")
+          "system.passengers": crewNames(filtered)
         });
       }
     });
+
+    html.find(".crew-add-selected").on("click", async (ev) => {
+      ev.preventDefault();
+      const slot = ev.currentTarget.dataset.slot;
+      const vehicleUuid = this.actor.uuid;
+      const docs = (canvas.tokens?.controlled ?? [])
+        .map(t => t.actor)
+        .filter(a => a && a.type !== "vehicle" && a.uuid !== vehicleUuid);
+      if (!docs.length) {
+        ui.notifications?.info("Select one or more character tokens on the canvas first.");
+        return;
+      }
+      if (slot === "driver") await this._addCrew("driver", docs[0]);
+      else for (const doc of docs) {
+        if (!(await this._addCrew("passenger", doc))) break;
+      }
+    });
+  }
+
+  async _addCrew(slot, doc) {
+    const uuid = doc.uuid;
+    const sys = this.actor.system;
+
+    if (slot === "driver") {
+      const passengers = (Array.isArray(sys.passengerUuids) ? sys.passengerUuids : []).filter(u => u !== uuid);
+      await this.actor.update({
+        "system.driverUuid": uuid,
+        "system.driver": crewName(doc),
+        "system.passengerUuids": passengers,
+        "system.passengers": crewNames(passengers)
+      });
+      return true;
+    }
+
+    const current = Array.isArray(sys.passengerUuids) ? [...sys.passengerUuids] : [];
+    const driverCount = sys.driverUuid ? 1 : 0;
+    const capacity = Number(sys.seatingCapacity) || 5;
+
+    if (current.includes(uuid)) {
+      ui.notifications?.info(`${crewName(doc)} is already a passenger.`);
+      return true;
+    }
+    if (uuid === sys.driverUuid) {
+      ui.notifications?.info(`${crewName(doc)} is already the driver.`);
+      return true;
+    }
+    if ((driverCount + current.length) >= capacity) {
+      ui.notifications?.warn(`Vehicle is at capacity (${capacity} seats).`);
+      return false;
+    }
+
+    current.push(uuid);
+    await this.actor.update({
+      "system.passengerUuids": current,
+      "system.passengers": crewNames(current)
+    });
+    return true;
   }
 
   /**
@@ -192,44 +260,8 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       return super._onDropActor(event, data);
     }
 
-    if (slot === "driver") {
-      await this.actor.update({
-        "system.driverUuid": uuid,
-        "system.driver": doc.name
-      });
-      return doc;
-    }
-
-    if (slot === "passenger") {
-      const current = Array.isArray(this.actor.system.passengerUuids)
-        ? [...this.actor.system.passengerUuids] : [];
-      const driverCount = this.actor.system.driverUuid ? 1 : 0;
-      const capacity = Number(this.actor.system.seatingCapacity) || 5;
-
-      if (current.includes(uuid)) {
-        ui.notifications?.info(`${doc.name} is already a passenger.`);
-        return false;
-      }
-      if (uuid === this.actor.system.driverUuid) {
-        ui.notifications?.info(`${doc.name} is already the driver.`);
-        return false;
-      }
-      if ((driverCount + current.length) >= capacity) {
-        ui.notifications?.warn(`Vehicle is at capacity (${capacity} seats).`);
-        return false;
-      }
-
-      current.push(uuid);
-      await this.actor.update({
-        "system.passengerUuids": current,
-        "system.passengers": current.map(u => {
-          const d = fromUuidSync(u);
-          return d?.name || u;
-        }).join(", ")
-      });
-      return doc;
-    }
-
-    return false;
+    if (slot !== "driver" && slot !== "passenger") return false;
+    await this._addCrew(slot, doc);
+    return doc;
   }
 }
