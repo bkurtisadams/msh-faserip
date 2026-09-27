@@ -1,4 +1,5 @@
-﻿// init.js v1.17.1 - 2026-09-26
+﻿// init.js v1.18.0 - 2026-09-26
+// v1.18.0: registerVehicleCrewCombat — vehicles join combat as their crew.
 // v1.17.1: Vehicle prototype tokens default lockRotation false so art turns with headlights.
 // v1.17.0: dataMigrationVersion 3 — Absorption is RAW (always heals, excess
 //          always redirectable). scripts/absorption-migration.js retires the
@@ -162,6 +163,7 @@ import { fxService } from "./modules/fx/fx-service.js";
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
+import { registerVehicleCrewCombat } from "./modules/combat/vehicle-crew-combat.js";
 import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 import { migrateApCsDocuments } from "./ap-cs-migration.js";
@@ -3022,6 +3024,11 @@ Hooks.once("ready", async () => {
     registerNullifyAuraHooks();
   } catch (e) {
     console.warn("MSH FASERIP | Failed to register nullify aura hooks:", e);
+  }
+  try {
+    registerVehicleCrewCombat();
+  } catch (e) {
+    console.warn("MSH FASERIP | Failed to register vehicle crew combat hooks:", e);
   }
 
   // Manual mode chat listeners
