@@ -1,4 +1,11 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.13.0 - 2026-09-27
+// scripts/modules/canvas/faserip-dot-token.js v1.14.1 - 2026-09-27
+// v1.14.1: Dot identity editor gets its own Token HUD button (palette icon) shown in
+//          dot mode, replacing the hidden right-click on the dot toggle.
+// v1.14.0: Dot identity. Signature fill color (flags.msh-faserip.dotColor) with the
+//          disposition color kept as a ring, and 1-3 character initials drawn upright in
+//          the dot (flags.msh-faserip.dotLabel, else auto from the token name when the
+//          user may see the name). Token flag > actor flag. Right-click the HUD dot button
+//          to edit (linked tokens write to the actor). World setting "Dot Labels".
 // v1.13.0: Leaving dot mode no longer forces mesh.visible = true on every non-dot token
 //          (only restores tokens this module hid). HUD toggle flips the effective state
 //          in one update (flag null = inherit). Scene/world dot changes resize tokens
@@ -39,6 +46,7 @@ const SCOPE = "msh-faserip";
 const DOT_FLAG = "dotMode";
 const SIZE_FLAG = "dotOrigSize"; // stashed {w,h} before dot-mode shrink
 const DOT_SIZE_SETTING = "dotSize"; // world setting: "small" | "medium" | "large"
+const LABEL_SETTING = "dotLabels"; // world setting: "auto" | "custom" | "off"
 const HOVER_DELAY = 300; // ms before portrait appears
 const PORTRAIT_SIZE = 36; // px — rendered portrait thumbnail size
 
@@ -235,56 +243,186 @@ async function _applyInheritedDotModeToScene() {
 }
 
 // ---------------------------------------------------------------------------
+// Dot identity: signature color + initials
+// ---------------------------------------------------------------------------
+
+function _identityOwner(token) {
+  return (token.document.actorLink && token.actor) ? token.actor : token.document;
+}
+
+function _parseColor(value) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(value ?? "").trim());
+  return m ? Number.parseInt(m[1], 16) : null;
+}
+
+function _canSeeName(token) {
+  if (game.user.isGM || token.isOwner) return true;
+  const M = CONST.TOKEN_DISPLAY_MODES;
+  return token.document.displayName === M.HOVER || token.document.displayName === M.ALWAYS;
+}
+
+function _autoInitials(name) {
+  const words = String(name ?? "").split(/[\s\-_.]+/).filter(Boolean);
+  if (!words.length) return "";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return words.slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+
+function _dotIdentity(token) {
+  const td = token.document;
+  const color = td.getFlag(SCOPE, "dotColor") || token.actor?.getFlag(SCOPE, "dotColor") || "";
+  const custom = String(td.getFlag(SCOPE, "dotLabel") || token.actor?.getFlag(SCOPE, "dotLabel") || "").trim().slice(0, 3);
+  let mode = "auto";
+  try { mode = game.settings.get(SCOPE, LABEL_SETTING); } catch {}
+  let label = "";
+  if (mode !== "off") {
+    if (custom) label = custom;
+    else if (mode === "auto" && _canSeeName(token)) label = _autoInitials(td.name);
+  }
+  return { color: _parseColor(color), label };
+}
+
+function _drawDotLabel(token, label, fill, radius) {
+  if (!label) return null;
+  const r = (fill >> 16) & 0xFF;
+  const gC = (fill >> 8) & 0xFF;
+  const b = fill & 0xFF;
+  const dark = (0.299 * r) + (0.587 * gC) + (0.114 * b) < 150;
+  const fontSize = Math.max(6, radius * (label.length >= 3 ? 0.85 : 1.1));
+  const style = new PIXI.TextStyle({
+    fontFamily: CONFIG.canvasTextStyle?.fontFamily ?? "Signika",
+    fontWeight: "bold",
+    fontSize,
+    fill: dark ? 0xFFFFFF : 0x000000,
+    stroke: dark ? 0x000000 : 0xFFFFFF,
+    strokeThickness: Math.max(1, fontSize * 0.12),
+    align: "center"
+  });
+  const TextCls = foundry.canvas?.containers?.PreciseText ?? globalThis.PreciseText ?? PIXI.Text;
+  const t = new TextCls(label, style);
+  if (TextCls === PIXI.Text) t.resolution = Math.max(2, (window.devicePixelRatio ?? 1) * 2);
+  t.anchor.set(0.5, 0.5);
+  t.position.set(token.w / 2, token.h / 2);
+  t.eventMode = "none";
+  return t;
+}
+
+function _clearDot(token) {
+  if (token._faseripDot) {
+    token._faseripDot.destroy({ children: true });
+    token._faseripDot = null;
+  }
+  if (token._faseripDotLabel) {
+    token._faseripDotLabel.destroy();
+    token._faseripDotLabel = null;
+  }
+}
+
+function _escapeAttr(v) {
+  return String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+async function _editDotIdentity(token) {
+  const owner = _identityOwner(token);
+  const color = owner.getFlag(SCOPE, "dotColor") || "";
+  const label = owner.getFlag(SCOPE, "dotLabel") || "";
+  const auto = _autoInitials(token.document.name);
+  const content = `
+    <div class="form-group">
+      <label>Dot Color</label>
+      <div class="form-fields"><color-picker name="dotColor" value="${_escapeAttr(color)}"></color-picker></div>
+      <p class="hint">Signature fill color. Blank = disposition color. Disposition stays as the ring.</p>
+    </div>
+    <div class="form-group">
+      <label>Initials</label>
+      <div class="form-fields"><input type="text" name="dotLabel" maxlength="3" value="${_escapeAttr(label)}" placeholder="${_escapeAttr(auto)}"></div>
+      <p class="hint">Up to 3 characters. Blank = automatic from the token name.</p>
+    </div>
+    <p class="hint">${owner === token.actor ? "Saved to the actor (all its tokens)." : "Saved to this token."}</p>`;
+  const FDE = foundry.applications?.ux?.FormDataExtended ?? globalThis.FormDataExtended;
+  const result = await foundry.applications.api.DialogV2.prompt({
+    window: { title: `Dot Identity: ${token.document.name}` },
+    content,
+    ok: { label: "Save", icon: "fas fa-save", callback: (event, button) => new FDE(button.form).object },
+    rejectClose: false
+  });
+  if (!result) return;
+  const hex = _parseColor(result.dotColor);
+  await owner.update({
+    [`flags.${SCOPE}.dotColor`]: hex === null ? null : `#${hex.toString(16).padStart(6, "0")}`,
+    [`flags.${SCOPE}.dotLabel`]: String(result.dotLabel ?? "").trim().slice(0, 3) || null
+  });
+}
+
+function _refreshTokensForIdentity(tokens) {
+  for (const t of tokens) {
+    if (t && !t.destroyed) t.renderFlags.set({ refreshMesh: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function _drawDot(g, token) {
+function _drawDot(g, token, ident) {
   const cx = token.w / 2;
   const cy = token.h / 2;
   const r = Math.min(token.w, token.h) * _getDotRatio();
-  const fill = _getDotColor(token);
+  const disp = _getDotColor(token);
+  const fill = ident.color ?? disp;
+  const ring = ident.color !== null;
 
-  // Dark outline ring
   g.beginFill(0x000000, 0.65);
-  g.drawCircle(cx, cy, r + 2);
+  g.drawCircle(cx, cy, r + (ring ? 4 : 2));
   g.endFill();
 
-  // Filled dot
+  if (ring) {
+    g.beginFill(disp, 1.0);
+    g.drawCircle(cx, cy, r + 2.5);
+    g.endFill();
+  }
+
   g.beginFill(fill, 1.0);
   g.drawCircle(cx, cy, r);
   g.endFill();
 
-  // Facing tick — drawn at 0°, PIXI rotation handles facing
-  _drawFacingTick(g, cx, cy, r);
+  _drawFacingTick(g, cx, cy, r, !!ident.label, ring);
+  return { fill, radius: r };
 }
 
-function _drawVehicleRect(g, token) {
+function _drawVehicleRect(g, token, ident) {
   const cx = token.w / 2;
   const cy = token.h / 2;
-  // Rectangle sized proportional to token, smaller than full size
   const hw = token.w * 0.18;
   const hh = token.h * 0.12;
-  const fill = _getDotColor(token);
+  const disp = _getDotColor(token);
+  const fill = ident.color ?? disp;
+  const ring = ident.color !== null;
   const corner = 2;
+  const o = ring ? 3 : 1;
 
-  // Dark outline
   g.beginFill(0x000000, 0.65);
-  g.drawRoundedRect(cx - hw - 1, cy - hh - 1, (hw + 1) * 2, (hh + 1) * 2, corner + 1);
+  g.drawRoundedRect(cx - hw - o, cy - hh - o, (hw + o) * 2, (hh + o) * 2, corner + o);
   g.endFill();
 
-  // Filled rect
+  if (ring) {
+    g.beginFill(disp, 1.0);
+    g.drawRoundedRect(cx - hw - 2, cy - hh - 2, (hw + 2) * 2, (hh + 2) * 2, corner + 2);
+    g.endFill();
+  }
+
   g.beginFill(fill, 1.0);
   g.drawRoundedRect(cx - hw, cy - hh, hw * 2, hh * 2, corner);
   g.endFill();
 
-  // Facing tick — drawn at 0°, PIXI rotation handles facing
-  _drawFacingTick(g, cx, cy, Math.max(hw, hh));
+  _drawFacingTick(g, cx, cy, Math.max(hw, hh), !!ident.label, ring);
+  return { fill, radius: hh * 1.1 };
 }
 
 /** Draw a short facing tick mark pointing straight up (0°) — rotation handled by _refreshRotation */
-function _drawFacingTick(g, cx, cy, radius) {
-  const innerR = radius * 0.5;
-  const outerR = radius + 3;
+function _drawFacingTick(g, cx, cy, radius, hasLabel = false, hasRing = false) {
+  const innerR = hasLabel ? radius : radius * 0.5;
+  const outerR = radius + (hasRing ? 6 : 3);
   const x1 = cx;
   const y1 = cy + innerR;
   const x2 = cx;
@@ -320,10 +458,7 @@ function _syncDotRotation(token) {
 function _refreshTokenDot(token) {
   if (!_isDotMode(token)) {
     if (!_persistentPortraits) _hidePortrait(token);
-    if (token._faseripDot) {
-      token._faseripDot.destroy({ children: true });
-      token._faseripDot = null;
-    }
+    _clearDot(token);
     if (token._faseripHidMesh) {
       token._faseripHidMesh = false;
       if (token.mesh) token.mesh.visible = token.visible;
@@ -337,30 +472,32 @@ function _refreshTokenDot(token) {
     token._faseripHidMesh = true;
   }
 
-  // Only redraw if dot doesn't exist or size/disposition/dotRatio changed
   const curRatio = _getDotRatio();
+  const ident = _dotIdentity(token);
+  const identKey = `${ident.color}|${ident.label}`;
   if (token._faseripDot) {
     const g = token._faseripDot;
     if (g._faseripW === token.w && g._faseripH === token.h
         && g._faseripDisp === token.document.disposition
-        && g._faseripRatio === curRatio) {
+        && g._faseripRatio === curRatio
+        && g._faseripIdent === identKey) {
       _syncDotRotation(token);
       return;
     }
-    g.destroy({ children: true });
-    token._faseripDot = null;
+    _clearDot(token);
   }
 
   const g = new PIXI.Graphics();
-
-  if (_isVehicle(token)) {
-    _drawVehicleRect(g, token);
-  } else {
-    _drawDot(g, token);
-  }
+  const drawn = _isVehicle(token) ? _drawVehicleRect(g, token, ident) : _drawDot(g, token, ident);
 
   token.addChildAt(g, 0);
   token._faseripDot = g;
+
+  const label = _drawDotLabel(token, ident.label, drawn.fill, drawn.radius);
+  if (label) {
+    token.addChildAt(label, 1);
+    token._faseripDotLabel = label;
+  }
 
   // Make dot interactive with full-token hit area so Foundry's hoverToken fires
   g.eventMode = "static";
@@ -371,6 +508,7 @@ function _refreshTokenDot(token) {
   g._faseripH = token.h;
   g._faseripDisp = token.document.disposition;
   g._faseripRatio = curRatio;
+  g._faseripIdent = identKey;
 
   _syncDotRotation(token);
 }
@@ -382,10 +520,7 @@ function _refreshTokenDot(token) {
 function _destroyTokenDot(token) {
   _cancelHoverTimer();
   if (!_persistentPortraits) _hidePortrait(token);
-  if (token._faseripDot) {
-    token._faseripDot.destroy({ children: true });
-    token._faseripDot = null;
-  }
+  _clearDot(token);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,10 +558,21 @@ function _onRenderTokenHUD(app, html, data) {
     app.render();
   });
 
-  // Insert into the right column of the HUD
+  const idBtn = document.createElement("div");
+  idBtn.classList.add("control-icon");
+  idBtn.dataset.action = "faserip-dot-identity";
+  idBtn.title = "Dot Color & Initials";
+  idBtn.innerHTML = `<i class="fas fa-palette"></i>`;
+  idBtn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    _editDotIdentity(token);
+  });
+
   const col = el.querySelector?.(".col.right") || el.querySelector?.(".right");
   if (col) {
     col.appendChild(btn);
+    if (isDot) col.appendChild(idBtn);
   }
 }
 
@@ -447,12 +593,34 @@ export function initDotToken() {
     onChange: () => {
       for (const token of canvas.tokens?.placeables ?? []) {
         if (_isDotMode(token) && token._faseripDot) {
-          token._faseripDot.destroy({ children: true });
-          token._faseripDot = null;
+          _clearDot(token);
           token.renderFlags.set({ refreshMesh: true });
         }
       }
     }
+  });
+
+  game.settings.register(SCOPE, LABEL_SETTING, {
+    name: "Dot Labels",
+    hint: "Initials drawn inside dots. Automatic uses a custom label if set, otherwise initials from the token name (only for users allowed to see the name).",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "auto",
+    choices: { auto: "Automatic (custom or name initials)", custom: "Custom labels only", off: "Off" },
+    onChange: () => _refreshTokensForIdentity(canvas.tokens?.placeables ?? [])
+  });
+
+  Hooks.on("updateToken", (doc, changes) => {
+    const f = changes?.flags?.[SCOPE];
+    if (!f) return;
+    if (["dotColor", "dotLabel", "-=dotColor", "-=dotLabel"].some(k => k in f)) _refreshTokensForIdentity([doc.object]);
+  });
+  Hooks.on("updateActor", (actor, changes) => {
+    const f = changes?.flags?.[SCOPE];
+    if (!f) return;
+    if (!["dotColor", "dotLabel", "-=dotColor", "-=dotLabel"].some(k => k in f)) return;
+    _refreshTokensForIdentity((canvas.tokens?.placeables ?? []).filter(t => t.document.actorId === actor.id));
   });
 
   const BaseToken = CONFIG.Token.objectClass;
