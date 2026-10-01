@@ -2526,7 +2526,9 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       // binding, then own the click natively with a per-render re-bind.
       // Selector stays narrowed to img so editor-content divs (which also
       // carry data-edit) never open the FilePicker.
-      if (this.isEditable) {
+      // v2.14.2: bind regardless of isEditable at render time; _onEditImage
+      // does its own permission check (isEditable can read false on first render).
+      {
         html.find("img[data-edit]").off("click");
         if (this._mshEditImgHandler) {
           dropEl.removeEventListener("click", this._mshEditImgHandler);

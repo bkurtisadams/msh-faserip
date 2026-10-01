@@ -267,6 +267,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
       const el = ev.target.closest("img[data-edit]");
       if (!el || !this.element.contains(el)) return;
       ev.preventDefault();
+      ev.stopImmediatePropagation();   // v1.1.1: v1's adapter-bound handler must not open a second picker
       this._onEditImage(el);
     });
     this._editImageBound = true;

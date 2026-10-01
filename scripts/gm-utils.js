@@ -1,4 +1,7 @@
-// gm-utils.js v1.2.1 - 2026-04-03
+// gm-utils.js v1.3.0 - 2026-09-30
+// v1.3.0: runAsGM / executeAsGM skip GM delegation when no GM is connected —
+//         return null with a throttled warning instead of throwing
+//         SocketlibNoGMConnectedError through every safeActor* caller
 // v1.2.1: Replace local RANKS array with import from rules-reference.js
 // v1.2.0: Add updateActiveEffect and renameEffectWithRemaining GM socket handlers
 //         for player-initiated effect updates on unowned actors
@@ -99,8 +102,24 @@ export function getItemMaterialRank(it) {
  * Legacy entrypoint: run arbitrary GM op via { operation, ... }.
  * If caller is GM, run locally; else dispatch over socketlib.
  */
+export function hasActiveGM() {
+  return !!(game.users?.activeGM ?? game.users?.some(u => u.isGM && u.active));
+}
+
+let _noGMWarnedAt = 0;
+function _skipNoGM(label) {
+  console.warn(`[FASERIP] No GM connected — skipped GM-delegated write (${label})`);
+  const now = Date.now();
+  if (now - _noGMWarnedAt > 10000) {
+    _noGMWarnedAt = now;
+    ui.notifications?.warn("No GM is connected — changes to actors you don't own (damage, Dying, effects) were not applied.");
+  }
+  return null;
+}
+
 export async function runAsGM(data) {
   if (game.user.isGM) return await runGMCommand(data);
+  if (!hasActiveGM()) return _skipNoGM(data?.operation ?? "runGMCommand");
   ensureSocket();
   return await socket.executeAsGM("runGMCommand", data);
 }
@@ -128,6 +147,7 @@ export async function executeAsGM(action, payload) {
       default: throw new Error(`Unknown GM action: ${action}`);
     }
   }
+  if (!hasActiveGM()) return _skipNoGM(action);
   ensureSocket();
   return await socket.executeAsGM(action, payload);
 }

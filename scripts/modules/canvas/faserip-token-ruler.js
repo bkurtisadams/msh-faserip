@@ -1,4 +1,7 @@
-// // scripts/modules/canvas/faserip-token-ruler.js v1.3.1 - 2026-04-19
+// // scripts/modules/canvas/faserip-token-ruler.js v1.4.0 - 2026-09-29
+// v1.4.0: Fix bands on non-Area scenes (e.g. 5 ft grid) — ruler cost is in scene units
+//         (ft/m), movement ranges are in Areas. Convert cost via getUnitsPerArea()
+//         before comparing. Label now shows areas on every scene, not just Area scenes.
 // v1.3.1: v14 — foundry.canvas.tokens → foundry.canvas.placeables.tokens
 // v1.3.0: Fix combat tracker interference — track passedWaypoints cost so color coding
 //         accounts for prior movement this turn. Override refresh() to capture prior cost.
@@ -7,6 +10,7 @@
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
 
 import { FaseripInitiative } from "../../faserip-initiative.js";
+import { getUnitsPerArea } from "../actions/action-utils.js";
 
 const TokenRuler = foundry.canvas.placeables.tokens.TokenRuler ?? CONFIG.Token.rulerClass;
 
@@ -145,11 +149,20 @@ export class FaseripTokenRuler extends TokenRuler {
   }
 
   /**
-   * Determine the speed tier color for a given cumulative cost.
+   * Convert a ruler cost (scene units: ft, m, areas...) into FASERIP Areas.
+   */
+  _toAreas(cost) {
+    const upa = getUnitsPerArea();
+    return (upa > 0 && upa !== 1) ? cost / upa : cost;
+  }
+
+  /**
+   * Determine the speed tier color for a given cumulative cost (scene units).
    */
   _getSpeedColor(cost) {
     const ranges = this._getMovementRanges();
     if (!ranges) return COLOR_DEFAULT;
+    cost = this._toAreas(cost);
 
     // Small epsilon for floating-point comparison
     const eps = 0.001;
@@ -228,7 +241,6 @@ export class FaseripTokenRuler extends TokenRuler {
     if (!ranges) return base;
 
     const cost = this._getCost(waypoint);
-    const gridDistance = canvas.scene?.grid?.distance || 1;
     const gridUnits = canvas.scene?.grid?.units || "areas";
 
     // Action label for display
@@ -241,11 +253,13 @@ export class FaseripTokenRuler extends TokenRuler {
     const halfSuffix = ranges.declHalved ? " ½" : "";
     const actionLabel = `${baseLabel}${modeSuffix}${halfSuffix}`;
 
-    // If the grid unit is area-based, show "X / Y areas (Mode)"
+    // Area scenes: "X / Y areas (Mode)". Other units: "30 ft · 0.2 / 3 areas (Mode)"
+    const costAreas = this._toAreas(cost);
+    const areaText = `${this._round(costAreas)} / ${this._round(ranges.normal)}`;
     if (gridUnits.toLowerCase().includes("area")) {
-      const costAreas = cost;
-      const maxAreas = ranges.normal;
-      base.distance = `${this._round(costAreas)} / ${this._round(maxAreas)} ${gridUnits} (${actionLabel})`;
+      base.distance = `${areaText} ${gridUnits} (${actionLabel})`;
+    } else {
+      base.distance = `${this._round(cost)} ${gridUnits} · ${areaText} areas (${actionLabel})`;
     }
 
     return base;
