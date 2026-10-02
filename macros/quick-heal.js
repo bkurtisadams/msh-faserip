@@ -5,7 +5,7 @@
 //         unlinked tokens (fixed-bug: the linked branch never wrote
 //         health.max, leaving value above a still-reduced max). Also clears
 //         originalEnduranceValue, lastHealingWorldTime and the ongoing.healing
-//         config, and the hourly Healing AE is classed as a combat effect
+//         config, recoveryForfeitedDate; the hourly Healing AE is classed as a combat effect
 //         (deleted by default — the solarRegen id was also "solarRegeneration").
 // quick-heal.js v2.1.0 - 2026-09-02
 // v2.1.0: GM guard. Kept defense effects that were disabled by a force-field
@@ -258,6 +258,7 @@ async function applyHeal(token, effectIdsToDelete, { reenableDefenses = true } =
   try { await actor.unsetFlag(SCOPE, "lastHealingWorldTime"); } catch {}
   try { await actor.unsetFlag(SCOPE, "ongoing.healing"); } catch {}
   try { await actor.unsetFlag(SCOPE, "wasKnockedOut"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "recoveryForfeitedDate"); } catch {}
   try { await actor.unsetFlag(SCOPE, "lastDamageWorldTime"); } catch {}
   try { await actor.unsetFlag(SCOPE, "lastDamageTime"); } catch {}
 

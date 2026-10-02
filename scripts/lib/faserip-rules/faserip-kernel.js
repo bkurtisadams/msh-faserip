@@ -1,4 +1,7 @@
 // faserip-rules kernel v0.2.15
+// v0.2.16: ERRATA — Recovery forfeited by a second hit inside the ten-turn
+//          window (Judge, 2026-10-01); recoveryAllowed damagedAgain now has a
+//          Foundry caller.
 // v0.2.15: ERRATA — Absorption heals before it pools (Judge, 2026-09-09),
 //          superseding the flat-pool ruling; faserip-powers.js v0.2.0.
 //          Fixed-bug: KERNEL_VERSION had stayed at 0.2.12 through two bumps.
@@ -46,7 +49,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.15';
+export const KERNEL_VERSION = '0.2.16';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -307,6 +310,7 @@ export const ERRATA = [
   'RULED 2026-09-05 (Judge): Absorption damage above the rank number is damage the absorber MUST take, against real Health; it may not be paid out of the pool the same attack grants. Amazing(48) at Health 100 hit for 60: real Health 88, pool 48, 136 displayed. The pool soaks only subsequent damage, so when it lapses the character stands at 88 — the 12 points really landed. Health loss thereafter comes off the pool first, then real Health (book text).',
   'RULED 2026-09-05 (Judge): the Absorption pool caps at the Power rank number — a second absorption refreshes it rather than stacking — and one 10-round clock is refreshed by each absorption rather than a queue of staged expiries. The book is silent on repeat absorptions; without a cap a character standing in a storm accumulates without limit.',
   'RULED 2026-09-05 (Judge): redirected Absorption excess resolves as the absorbed damage type on that type\'s own Battle Effects column at the absorber\'s Agility, for the excess amount, on the round after it was absorbed. The book gives the amount and the timing but names no attack form.',
+  'RULED 2026-10-01 (Judge): Recovery is forfeited for the day when the character is damaged again inside the ten-turn window ("damaged, steps out, and then is damaged again before Recovery takes place, then only Healing is possible"); the second hit does not merely restart the clock. recoveryAllowed({ damagedAgain }) is the kernel expression; msh-faserip sets it from recordDamage.',
   'RULED 2026-08-31: Teleporting into an object inflicts damage equal to the material strength (1x, Movement chapter text authoritative); the Appendix A power description saying twice is wrong. Body Armor gives no protection.',
   'RULED 2026-08-31: Fall impact resolves entirely as a Charging attack per the Charging rules (rebound mechanism); "damage equivalent to the distance" is descriptive, not an alternate formula.',
   'RULED 2026-08-31: Laser rifles are Energy attacks (Energy column, Body Armor at -20); the weapon table typing them "S" is wrong.',

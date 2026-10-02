@@ -1,5 +1,14 @@
 // scripts/modules/rest-system.js v1.8.0 - 2026-10-01
 // v1.8.0: Healing/regeneration audit.
+//         - RULED 2026-10-01 (Judge): a hit taken inside the 10-turn Recovery
+//           window forfeits that day's Recovery ("...damaged again before
+//           Recovery takes place, then only Healing is possible").
+//           recordDamage stamps recoveryForfeitedDate (game date) when the
+//           previous damage is less than RECOVERY_DELAY_SECONDS old and
+//           Recovery has not already been used today; canAttemptRecovery
+//           refuses on that date. Expires with the game date. Mirrors the
+//           kernel's recoveryAllowed({ damagedAgain }) reason, which nothing
+//           had set before. A hit AFTER the window only restarts the clock.
 //         - stabilizeDying fallback Impaired Endurance AE now writes
 //           selfPenaltyCS -2 like the other three creation sites (fixed-bug:
 //           attackShift only penalised attacks; RAW is -2CS on all FEATs).
@@ -454,6 +463,15 @@ export class RestSystem {
       return { 
         canRest: false, 
         reason: "Recovery can only be used once per day (already used today)" 
+      };
+    }
+
+    // RULED 2026-10-01: damaged again inside the 10-turn window — only
+    // Healing is possible today (kernel reason "damaged again").
+    if (actor.getFlag(SCOPE, "recoveryForfeitedDate") === today) {
+      return {
+        canRest: false,
+        reason: "Recovery forfeited — damaged again before Recovery took place; only hourly Healing is possible today"
       };
     }
 
@@ -1236,6 +1254,25 @@ static async attemptRegainConsciousness(actor) {
 export async function recordDamage(actor, { previousHealth = null } = {}) {
   const now = Date.now();
   const worldNow = game.time?.worldTime ?? 0;
+
+  // RULED 2026-10-01: a second hit inside the 10-turn Recovery window
+  // forfeits today's Recovery. Read the previous stamp before overwriting it.
+  try {
+    const prevDamageWT = actor.getFlag(SCOPE, "lastDamageWorldTime");
+    const today = getCurrentGameDate();
+    if (Number.isFinite(prevDamageWT)
+        && worldNow - prevDamageWT < RECOVERY_DELAY_SECONDS
+        && actor.getFlag(SCOPE, "lastRecoveryDate") !== today
+        && actor.getFlag(SCOPE, "recoveryForfeitedDate") !== today) {
+      await safeActorSetFlag(actor, SCOPE, "recoveryForfeitedDate", today);
+      if (game.settings.get(SCOPE, "debugMode")) {
+        console.log(`FASERIP | ${actor.name} damaged again inside the Recovery window — Recovery forfeited for ${today}`);
+      }
+    }
+  } catch (e) {
+    console.warn("[FASERIP WARN] Recovery-forfeit check failed:", e);
+  }
+
   await safeActorSetFlag(actor, SCOPE, "lastDamageTime", now);
   await safeActorSetFlag(actor, SCOPE, "lastDamageWorldTime", worldNow);
   try { await actor.unsetFlag(SCOPE, "lastHealingWorldTime"); } catch (_e) {}
