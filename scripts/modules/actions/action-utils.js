@@ -1,3 +1,7 @@
+// action-utils.js v1.14.1 - 2026-10-01
+// v1.14.1: _applyFourColorKnockout sets the awaitingWake flag (the wake path
+//          no longer infers unconsciousness from Health 0, since hourly
+//          Healing now ticks while a character is knocked out).
 // action-utils.js v1.14.0 - 2026-09-09
 // v1.14.0: Absorption onto the powers kernel (RULED 2026-09-09, RAW).
 //          applyDamageToTargets writes the kernel's heal + pool gain into
@@ -190,7 +194,7 @@ import {
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
 import { applyDamageToVehicle } from "./vehicle-damage.js";
-import { safeActorUpdate, safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
+import { safeActorUpdate, safeActorCreateEffect, safeActorDeleteEffects, safeActorSetFlag } from "../../gm-utils.js";
 import { bluntDamage as kernelBluntDamage, meleeWeaponDamage as kernelMeleeWeaponDamage } from "../../lib/faserip-rules/faserip-damage.js";
 import { rankDistance as kernelRankDistance, rankForNumber as kernelRankForNumber } from "../../lib/faserip-rules/faserip-kernel.js";
 import { resolveAttack as kernelResolveAttack } from "../../lib/faserip-rules/faserip-effects.js";
@@ -2286,6 +2290,7 @@ export async function _applyFourColorKnockout(actor, rounds) {
     duration: computeDuration({ rounds: Math.max(1, Number(rounds)), forceCombatRounds: true })
   };
   await safeActorCreateEffect(actor, [effectData]);
+  try { await safeActorSetFlag(actor, "msh-faserip", "awaitingWake", true); } catch (_e) {}
   try {
     await game.msh?.rest?.appendRecoveryLog?.(actor, {
       event: "unconscious-start",

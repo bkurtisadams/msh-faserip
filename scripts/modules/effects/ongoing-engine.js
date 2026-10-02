@@ -1,3 +1,12 @@
+// scripts/modules/effects/ongoing-engine.js v1.15.0 - 2026-10-01
+// v1.15.0: Rules audit (Judge readings 2026-10-01).
+//          - Hourly Healing (effectId "healing") heals at 0 Health and while
+//            knocked out; while the dying effect is active the hours pass
+//            without healing (clock advances, no burst afterwards). Other
+//            heal effects keep the old 0-Health stop.
+//          - processOngoingEffects runs rest-system processAutoRecovery per
+//            actor before the ongoing effects (automatic Recovery).
+//          - Reaching Shift-0 while dying runs rest-system checkDisabilities.
 // scripts/modules/effects/ongoing-engine.js v1.14.0 - 2026-10-01
 // v1.14.0: Healing/regeneration audit.
 //          - restoreOneEnduranceRank now maintains the Impaired Endurance
@@ -428,8 +437,14 @@ function stepEnduranceRank(actor, direction) {
  */
 export async function processOngoingEffects(worldTime, dt = 0) {
   const scope = SCOPE();
+  let processAutoRecovery = null;
+  try { ({ processAutoRecovery } = await import("../rest-system.js")); } catch (_e) {}
 
   for (const actor of getActiveSceneActors()) {
+    if (processAutoRecovery) {
+      try { await processAutoRecovery(actor, worldTime, dt); }
+      catch (e) { console.error(`[FASERIP ERROR] Auto Recovery failed for ${actor.name}:`, e); }
+    }
     const ongoingMap = actor.getFlag(scope, "ongoing");
 
     // ── Legacy dying AE migration ──────────────────────────────────
@@ -591,8 +606,18 @@ async function executeHealthHeal(actor, ae, effectId, config, healPerCycle, cycl
   // Heal the REAL Health; an Absorption pool rides on top unchanged.
   const { real: currentHP, pool: heldPool, max: maxHP } = splitHealth(actor);
 
-  // Already at max (or dead)
-  if (currentHP <= 0) return;
+  if (effectId === "healing") {
+    // Hourly Healing: none for the dead; while dying the hours pass unhealed.
+    if (actor.system?.details?.isDead) return;
+    const dying = actor.effects.find(e =>
+      !e.disabled && (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying || e.statuses?.has?.("dying")));
+    if (dying) {
+      await actor.setFlag(scope, `ongoing.${effectId}.startedAt`, startedAt + (cycles * cycleSeconds));
+      return;
+    }
+  } else if (currentHP <= 0) {
+    return;
+  }
   const cap = (config.capAtMax !== false) ? maxHP : Infinity;
   if (currentHP >= cap) {
     if (config.autoDisable !== false) {
@@ -1065,6 +1090,13 @@ async function _processDyingRoundInner(actor, dyingAE, scope, effectiveWorldTime
 
   // ── Shift-0 warning ──────────────────────────────────────────────
   if (nextName === "Shift-0") {
+    // Disabilities (RAW p.32): roll once on slipping to Shift 0.
+    try {
+      const { checkDisabilities } = await import("../rest-system.js");
+      await checkDisabilities(actor);
+    } catch (e) {
+      console.error(`[FASERIP ERROR] Disability checks failed for ${actor.name}:`, e);
+    }
     console.warn(`[FASERIP WARN] ${actor.name} has reached Shift-0 Endurance (will die next round if not stabilized)`);
     const warningContent = `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
       <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>

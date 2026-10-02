@@ -1,3 +1,24 @@
+// scripts/modules/rest-system.js v1.9.0 - 2026-10-01
+// v1.9.0: Rules audit against Life, Death, and Health (Judge readings
+//         2026-10-01).
+//         - Recovery is automatic: processAutoRecovery (called from the
+//           ongoing engine on every time advance) applies it when the
+//           10-turn mark falls inside the advance, gated by
+//           autoHealingEnabled. A missed mark is not made up; the sheet
+//           button stays as the manual path.
+//         - Hourly Healing runs while knocked out at 0 Health, timed from the
+//           last damage (wake no longer rebases the clock). Health gained
+//           while unconscious does not wake the character: unconsciousness
+//           is the awaitingWake flag / unconscious status, not Health 0.
+//           Wake success sets Health to the higher of the Endurance number
+//           and current Health, then clears awaitingWake.
+//         - Wake FEAT takes the Impaired Endurance -2CS (selfPenaltyCS) and
+//           offers Karma (resolveResistFeat).
+//         - checkDisabilities: at Shift 0 Endurance, each physical ability
+//           above Good makes a Green FEAT (-2CS while impaired, Karma
+//           allowed); failure drops it to the next lower printed number.
+//           Endurance checks against its pre-damage rank.
+//         - recordDamage keeps wasKnockedOut on hits taken while unconscious.
 // scripts/modules/rest-system.js v1.8.0 - 2026-10-01
 // v1.8.0: Healing/regeneration audit.
 //         - RULED 2026-10-01 (Judge): a hit taken inside the 10-turn Recovery
@@ -173,6 +194,7 @@ import {
   enduranceRestoreStep, RECOVERY_DELAY_TURNS, HEALING_INTERVAL_TURNS,
   STABILIZE_UNCONSCIOUS_HOURS, ENDURANCE_RANK_HEAL_DAYS,
 } from "../lib/faserip-rules/faserip-damage.js";
+import { rankByKey, rankDistance, shiftRank as kernelShiftRank } from "../lib/faserip-rules/faserip-kernel.js";
 import { kernelKeyFor, foundryNameFor } from "../kernel/adapter.js";
 
 const HEALING_INTERVAL_SECONDS = HEALING_INTERVAL_TURNS * TURN_SECONDS;
@@ -191,13 +213,57 @@ const rollRange = ({ min, max }) => min + Math.floor(Math.random() * (max - min 
 
 const SCOPE = getFlagScope();
 
+/** Knocked out (unconscious status, or waiting on the 0-Health wake FEAT). */
+export function isUnconscious(actor) {
+  if (!actor) return false;
+  if (actor.getFlag(SCOPE, "awaitingWake")) return true;
+  return !!actor.effects?.some(e => !e.disabled && e.statuses?.has?.("unconscious"));
+}
+
+/** Waiting on the 0-Health wake FEAT. Health 0 still counts for older worlds. */
+export function isAwaitingWake(actor) {
+  if (!actor || actor.system?.details?.isDead) return false;
+  if (actor.getFlag(SCOPE, "awaitingWake")) return true;
+  return splitHealth(actor).real <= 0;
+}
+
+/** FEAT shifts from Impaired Endurance and other all-FEAT penalties. */
+function featPenaltyShifts(actor) {
+  const cs = Number(actor?.system?.combatMods?.selfPenaltyCS) || 0;
+  return cs ? [{ cs, reason: "impaired" }] : [];
+}
+
+/** Shifted rank, or null for ranks the kernel will not shift (Class 1000+). */
+function safeShift(key, cs) {
+  try { return kernelShiftRank(key, cs); } catch (_e) { return null; }
+}
+
+/** d100 for an Endurance-type FEAT with the owner's Karma offer. */
+async function rollFeatWithKarma(actor, { sourceName, rankName }) {
+  try {
+    const { resolveResistFeat } = await import("./dice/dice-roller.js");
+    const fr = await resolveResistFeat(actor, {
+      sourceName, rank: rankName, requirement: "Green",
+      declareTimeoutMs: 10000, localDeclareTimeoutMs: 10000
+    });
+    if (fr && typeof fr.cappedTotal === "number") {
+      return { roll: fr.rollTotal, total: Math.min(100, fr.cappedTotal), karmaUsed: fr.karmaUsed || 0 };
+    }
+  } catch (e) {
+    console.warn("[FASERIP WARN] FEAT karma routing failed; rolling plain:", e);
+  }
+  const roll = Math.floor(Math.random() * 100) + 1;
+  return { roll, total: roll, karmaUsed: 0 };
+}
+
 /**
  * FASERIP Rest System
  * 
  * Recovery: Regain Endurance rank number in Health 10 turns after damage
+ *   - Automatic at the 10-turn mark (processAutoRecovery); sheet button is manual
  *   - Once per day
- *   - Must be conscious (Health > 0)
- *   - Further damage restarts the 10-turn clock
+ *   - Must be conscious, and not knocked out by that damage
+ *   - A second hit inside the 10 turns forfeits the day's Recovery
  * 
  * Healing: Heal Endurance rank number each 600 turns (1 hour) after last damage
  *   - Can be used multiple times, once per elapsed hour
@@ -383,7 +449,7 @@ export async function postRecoveryCard(actor, { content, eventType, detail, flag
   } else if (policy === "gm-detailed") {
     mode = "gm";
   } else if (policy === "critical") {
-    if (eventType === "shift0-warning") mode = "gm";
+    if (eventType === "shift0-warning" || eventType === "disability-check") mode = "gm";
     else if (onScene && activeSceneCritical.has(eventType)) mode = "public";
   }
 
@@ -429,8 +495,8 @@ export class RestSystem {
     // REAL Health (an Absorption pool rides on top and does not count)
     const { real: currentHealth, max: maxHealth } = splitHealth(actor);
     
-    // Must be conscious
-    if (currentHealth <= 0) {
+    // Must be conscious (Health can rise above 0 while still knocked out)
+    if (currentHealth <= 0 || isUnconscious(actor)) {
       return { 
         canRest: false, 
         reason: "Cannot recover while unconscious (Health must be above 0)" 
@@ -500,11 +566,11 @@ export class RestSystem {
    * @param {Actor} actor - The actor attempting recovery
    * @returns {Promise<Object>} {success: boolean, message: string, healed: number}
    */
-  static async attemptRecovery(actor) {
+  static async attemptRecovery(actor, { auto = false } = {}) {
     const check = this.canAttemptRecovery(actor);
     
     if (!check.canRest) {
-      ui.notifications.warn(check.reason);
+      if (!auto) ui.notifications.warn(check.reason);
       return { success: false, message: check.reason, healed: 0 };
     }
 
@@ -535,9 +601,9 @@ export class RestSystem {
       </div>`
     });
 
-    // This method is invoked directly from the sheet, so a small confirmation
-    // toast is useful even when NPC automatic bookkeeping is otherwise quiet.
-    ui.notifications.info(message);
+    // Sheet clicks get a confirmation toast; automatic Recovery follows the
+    // normal routed-output policy.
+    if (!auto || shouldNotifyRecoveryEvent(actor, "recovery-heal")) ui.notifications.info(message);
     
     if (game.settings.get(SCOPE, "debugMode")) {
       console.log("FASERIP | Recovery applied:", {
@@ -729,8 +795,8 @@ static async attemptRegainConsciousness(actor) {
 
     const { real: currentHealth, pool: heldPool } = splitHealth(actor);
     
-    // Must be at 0 HP (real Health; a held Absorption pool does not count)
-    if (currentHealth > 0) {
+    // Must be knocked out at 0 Health (Healing may have raised Health since)
+    if (!isAwaitingWake(actor)) {
       const msg = `${actor.name} is already conscious (Health: ${currentHealth})`;
       ui.notifications.warn(msg);
       return { success: false, message: msg };
@@ -761,25 +827,26 @@ static async attemptRegainConsciousness(actor) {
 
     // Endurance FEAT, green succeeds (RULED 2026-09-05); Health on waking =
     // Endurance rank number (the impaired number while ranks are lost).
+    // -2CS while Endurance ranks are lost (Impaired Abilities); Karma allowed.
     const enduranceRank = actor.system?.abilities?.endurance?.rank || "Typical";
     const enduranceKey = kernelKeyFor(enduranceRank) ?? "TY";
-    const roll = Math.floor(Math.random() * 100) + 1;
-    const feat = regainConsciousnessFeat({ enduranceRank: enduranceKey, enduranceNumber: enduranceNumber(actor), roll });
+    const shifted = featPenaltyShifts(actor).length ? safeShift(enduranceKey, featPenaltyShifts(actor)[0].cs) : null;
+    const shifts = shifted ? featPenaltyShifts(actor) : [];
+    const effectiveName = shifted ? foundryNameFor(shifted.key, "dash") : enduranceRank;
+    const fr = await rollFeatWithKarma(actor, { sourceName: "Regain Consciousness (Endurance FEAT)", rankName: effectiveName });
+    const roll = fr.roll;
+    const feat = regainConsciousnessFeat({ enduranceRank: enduranceKey, enduranceNumber: enduranceNumber(actor), roll: fr.total, karma: 0, shifts });
     const color = feat.color ?? (feat.success ? "green" : "white");
     const success = feat.success;
     
     if (success) {
-      const enduranceValue = feat.wakeHealth;
+      // Health on waking is the Endurance number, or what Healing has already
+      // restored while unconscious if that is higher.
+      const enduranceValue = Math.max(feat.wakeHealth, currentHealth);
       await actor.update({
         "system.attributes.health.value": enduranceValue + heldPool
       });
-
-      // Rebase the hourly Healing clock at wake-up. This prevents an immediate
-      // stacked heal while still allowing manual Healing one hour later.
-      const wakeWorldTime = game.time?.worldTime ?? 0;
-      await actor.setFlag(SCOPE, "lastDamageWorldTime", wakeWorldTime);
-      await actor.unsetFlag(SCOPE, "lastHealingWorldTime");
-      await actor.unsetFlag(SCOPE, "lastDamageTime"); // legacy cleanup
+      await actor.unsetFlag(SCOPE, "awaitingWake");
 
       const message = `${actor.name} regained consciousness with ${enduranceValue} Health!`;
       
@@ -798,7 +865,7 @@ static async attemptRegainConsciousness(actor) {
             <strong>Result:</strong> Success - Conscious with ${enduranceValue} Health
           </div>
           <div style="background:#c8e6c9;padding:8px;margin-top:8px;border-radius:3px;text-align:center;">
-            <strong>Health: 0 → ${enduranceValue}</strong>
+            <strong>Health: ${currentHealth} → ${enduranceValue}</strong>
           </div>
         </div>`,
         flags: { "msh-faserip": { wakeSuccess: { roll, color } } }
@@ -835,12 +902,14 @@ static async attemptRegainConsciousness(actor) {
         });
       }
 
-      // Re-register hourly Healing per RAW: End rank HP/hour after last
-      // damage, no further damage. Waking alive qualifies. Gated by
-      // autoHealingEnabled; matches recordDamage pattern.
+      // Hourly Healing keeps its clock from the last damage. Register it only
+      // when nothing is running (an older world, or Healing disabled at cap).
       try {
         const enabled = game.settings?.get?.(SCOPE, "autoHealingEnabled") ?? true;
-        if (enabled) await ensureHealingEffect(actor, game.time?.worldTime ?? 0);
+        const running = actor.getFlag(SCOPE, "ongoing.healing");
+        if (enabled && !Number.isFinite(running?.startedAt)) {
+          await ensureHealingEffect(actor, actor.getFlag(SCOPE, "lastDamageWorldTime") ?? (game.time?.worldTime ?? 0));
+        }
       } catch (e) {
         console.warn("[FASERIP WARN] ensureHealingEffect failed on consciousness regain:", e);
       }
@@ -974,7 +1043,7 @@ static async attemptRegainConsciousness(actor) {
     // are stabilized but remain conscious (rules p.31: unconscious only at 0 HP).
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const hours = rollRange(STABILIZE_UNCONSCIOUS_HOURS);
-    if (currentHealth <= 0) {
+    if (currentHealth <= 0 || actor.getFlag(SCOPE, "awaitingWake")) {
       const unconsciousEffect = {
         name: `Unconscious (${hours} hours)`,
         img: "icons/svg/unconscious.svg",
@@ -1278,7 +1347,7 @@ export async function recordDamage(actor, { previousHealth = null } = {}) {
   try { await actor.unsetFlag(SCOPE, "lastHealingWorldTime"); } catch (_e) {}
 
   const healthNow = actor.system?.attributes?.health?.value ?? 0;
-  if (previousHealth != null && previousHealth > 0 && healthNow > 0 && actor.getFlag(SCOPE, "wasKnockedOut")) {
+  if (previousHealth != null && previousHealth > 0 && healthNow > 0 && !isUnconscious(actor) && actor.getFlag(SCOPE, "wasKnockedOut")) {
     try { await actor.unsetFlag(SCOPE, "wasKnockedOut"); } catch (_e) {}
   }
 
@@ -1344,32 +1413,10 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
     return;
   }
 
-  // Skip 0-HP characters. Dropping to 0 HP enters the dying pipeline;
-  // Healing does not apply during dying or stabilized-unconscious periods.
-  // On wake-up (attemptRegainConsciousness) HP is restored to End rank# and
-  // Healing can be re-registered via the normal damage path. Registering now
-  // would produce a Healing AE that sits enabled alongside the dying AE with
-  // a stale startedAt, risking burst-heal if HP briefly goes above 0.
-  const currentHp = actor.system?.attributes?.health?.value ?? 0;
-  if (currentHp <= 0) {
-    if (game.settings.get(SCOPE, "debugMode")) {
-      console.log(`FASERIP | Skipping healing registration for ${actor.name} (0 HP)`);
-    }
-    return;
-  }
-
-  // Skip actively dying characters
-  const dyingEffect = actor.effects?.find(e =>
-    e.flags?.[SCOPE]?.ongoingId === "dying" ||
-    e.flags?.[SCOPE]?.isDying ||
-    e.statuses?.has?.("dying")
-  );
-  if (dyingEffect && !dyingEffect.disabled) {
-    if (game.settings.get(SCOPE, "debugMode")) {
-      console.log(`FASERIP | Skipping healing registration for ${actor.name} (dying)`);
-    }
-    return;
-  }
+  // Judge reading 2026-10-01: Healing runs at 0 Health and while knocked
+  // out, timed from the last damage. It registers even when the character
+  // is dying; the ongoing engine's heal executor lets the hours pass without
+  // healing while the dying effect is active, so nothing bursts afterwards.
 
   // Skip if a (resting) Regeneration power supersedes normal healing: it
   // replaces the End-rank/hour baseline rather than stacking on top.
@@ -1465,6 +1512,105 @@ export async function refreshHealingEffect(actor) {
 }
 
 /**
+ * Automatic Recovery (RAW: "Ten turns after a character takes damage, he
+ * regains Health..."). Applies only when the 10-turn mark falls inside this
+ * time advance, so Recovery lands at the mark or not at all. Gated by
+ * autoHealingEnabled; canAttemptRecovery enforces the rest (once per day,
+ * knockout, second hit, conscious).
+ */
+export async function processAutoRecovery(actor, worldNow, dt) {
+  if (!actor || !(dt > 0)) return;
+  const enabled = game.settings?.get?.(SCOPE, "autoHealingEnabled") ?? true;
+  if (!enabled || actor.system?.details?.isDead) return;
+  const lastDamage = actor.getFlag(SCOPE, "lastDamageWorldTime");
+  if (!Number.isFinite(lastDamage)) return;
+  const mark = lastDamage + RECOVERY_DELAY_SECONDS;
+  if (mark > worldNow || mark <= worldNow - dt) return;
+  if (!RestSystem.canAttemptRecovery(actor).canRest) return;
+  await RestSystem.attemptRecovery(actor, { auto: true });
+}
+
+const DISABILITY_KEYS = ["fighting", "agility", "strength", "endurance"];
+
+/**
+ * Disabilities (RAW p.32): a character who slips to Shift 0 Endurance rolls a
+ * Green FEAT for each physical ability above Good; failure reduces it to the
+ * next lower printed number. Endurance checks its pre-damage rank, and a loss
+ * lowers the rank it heals back to. -2CS applies while Endurance is impaired.
+ */
+export async function checkDisabilities(actor) {
+  if (!actor) return [];
+  const results = [];
+  const shifts = featPenaltyShifts(actor);
+  const cs = shifts.reduce((t, x) => t + x.cs, 0);
+
+  for (const key of DISABILITY_KEYS) {
+    const isEnd = key === "endurance";
+    const label = key.charAt(0).toUpperCase() + key.slice(1);
+    const rankName = isEnd
+      ? (actor.getFlag(SCOPE, "originalEndurance") || actor.system?.abilities?.endurance?.rank)
+      : actor.system?.abilities?.[key]?.rank;
+    const rk = kernelKeyFor(rankName);
+    if (!rk || rankDistance("GD", rk) <= 0) continue;
+
+    const lower = safeShift(rk, -1);
+    if (!lower) continue;
+    const effShift = cs ? safeShift(rk, cs) : null;
+    const effName = effShift ? foundryNameFor(effShift.key, "dash") : rankName;
+    const fr = await rollFeatWithKarma(actor, { sourceName: `Disability check (${label})`, rankName: effName });
+    const color = String(game.msh?.rollUniversalTable?.(effName, fr.total) || "white").toLowerCase();
+    if (color !== "white") {
+      results.push({ label, rankName, color, roll: fr.roll, total: fr.total, lost: false });
+      continue;
+    }
+
+    const newName = foundryNameFor(lower.key, "dash");
+    const newNumber = lower.standard;
+    if (isEnd) {
+      await actor.setFlag(SCOPE, "originalEndurance", newName);
+      await actor.setFlag(SCOPE, "originalEnduranceValue", newNumber);
+      const dyingAE = actor.effects.find(e => e.getFlag(SCOPE, "isDying") || e.statuses?.has?.("dying"));
+      if (dyingAE) await dyingAE.setFlag(SCOPE, "originalEndurance", newName);
+      const impaired = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
+      if (impaired) {
+        await impaired.update({
+          name: `Impaired Endurance (${actor.system?.abilities?.endurance?.rank} of ${newName})`,
+          [`flags.${SCOPE}.originalEndurance`]: newName
+        });
+      }
+    } else {
+      const oldNumber = Number(actor.system?.abilities?.[key]?.value) || rankByKey(rk).standard;
+      const curMax = Number(actor.system?.attributes?.health?.max) || 0;
+      const newMax = Math.max(0, curMax - Math.max(0, oldNumber - newNumber));
+      const { real, pool } = splitHealth(actor);
+      await actor.update({
+        [`system.abilities.${key}.rank`]: newName,
+        [`system.abilities.${key}.value`]: newNumber,
+        "system.attributes.health.max": newMax,
+        "system.attributes.health.value": Math.min(real, newMax) + pool
+      }, { mshDyingTick: true });
+    }
+    results.push({ label, rankName, color, roll: fr.roll, total: fr.total, lost: true, newName, newNumber });
+  }
+
+  if (results.length) {
+    const rows = results.map(r => r.lost
+      ? `<div><strong>${r.label}</strong> ${r.rankName}: ${r.total} WHITE — reduced to <strong>${r.newName} (${r.newNumber})</strong></div>`
+      : `<div><strong>${r.label}</strong> ${r.rankName}: ${r.total} ${r.color.toUpperCase()} — unharmed</div>`).join("");
+    await postRecoveryCard(actor, {
+      eventType: "disability-check",
+      detail: results.filter(r => r.lost).map(r => `${r.label} → ${r.newName}`).join(", ") || "no abilities lost",
+      content: `<div style="background:#fff3e0;border:2px solid #ff9800;padding:10px;border-radius:5px;">
+        <div style="font-weight:bold;color:#e65100;margin-bottom:4px;">Disabilities — ${actor.name} at Shift-0 Endurance</div>
+        <div style="font-size:.9em;color:#555;margin-bottom:4px;">Green FEAT for each physical ability above Good${cs ? ` (${cs}CS impaired)` : ""}. Lost ranks return only through experience.</div>
+        ${rows}
+      </div>`
+    });
+  }
+  return results;
+}
+
+/**
  * Initialize the rest system
  */
 export function initRestSystem() {
@@ -1481,6 +1627,9 @@ export function initRestSystem() {
   game.msh.rest.postRecoveryCard = postRecoveryCard;
   game.msh.rest.shouldNotifyRecoveryEvent = shouldNotifyRecoveryEvent;
   game.msh.rest.isOnActiveScene = isOnActiveScene;
+  game.msh.rest.isUnconscious = isUnconscious;
+  game.msh.rest.isAwaitingWake = isAwaitingWake;
+  game.msh.rest.checkDisabilities = checkDisabilities;
   
   console.log("FASERIP | Rest system initialized");
   
@@ -1507,9 +1656,9 @@ export function initRestSystem() {
     
     if (!wasUnconsciousEffect) return;
     
-    // Check if actor is still at 0 HP
-    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-    if (currentHealth > 0) return; // Already conscious
+    // Still waiting on the 0-Health wake FEAT (Health may have risen
+    // through Healing while unconscious)
+    if (!isAwaitingWake(actor)) return;
 
         // Check if actor is dead
     if (actor.system?.details?.isDead) {

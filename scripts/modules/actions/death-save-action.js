@@ -1,3 +1,10 @@
+// scripts/modules/actions/death-save-action.js v1.12.0 - 2026-10-01
+// v1.12.0: RAW Life, Death, and Health p.31. The 0-Health knockout is a flat
+//          1d10 rounds (was the stunDurationDie house-rule die, meant for the
+//          White result on a Stun check). On No effect the character is also
+//          Stunned 1d10 rounds (Judge reading 2026-10-01: rolled separately,
+//          out until the longer ends, then the Endurance wake FEAT). Sets the
+//          awaitingWake flag so the wake path no longer relies on Health 0.
 // scripts/modules/actions/death-save-action.js v1.11.1 - 2026-08-20
 // v1.11.1: Unconscious duration now uses shared computeDuration so active
 //          combat always counts RAW rounds, even when CTT is enabled.
@@ -38,7 +45,7 @@ import {
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
+import { safeActorCreateEffect, safeActorDeleteEffects, safeActorSetFlag } from "../../gm-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 import { computeDuration } from "../effects/effect-engine.js";
 
@@ -73,15 +80,10 @@ export class DeathSaveAction extends BaseAction {
       const roll = kr.roll;
       const colorLower = String(game.msh.rollUniversalTable(effectiveRank, kr.capped)).toLowerCase();
 
-      const stunDie = game.settings.get("msh-faserip", "stunDurationDie") || "d10";
-      let unconsciousDuration = null;
-      if (fromZeroHealth) {
-        const durationRoll = await (new Roll(`1${stunDie}`)).evaluate();
-        unconsciousDuration = durationRoll.total;
-      }
-
       const killResult = resolveKillFeat(colorLower, killContext);
       const isDying    = (killResult.outcome === "EnduranceLoss");
+      const ko = fromZeroHealth ? await this._rollKnockout({ isDying }) : null;
+      const unconsciousDuration = ko?.rounds ?? null;
       const isRobot    = actor.system?.origin === "Robot";
 
       console.log(`[FASERIP] Death Save | ${actor.name} rolled ${colorLower.toUpperCase()} (${roll.total}) vs ${effectiveRank} — ${killResult.label}`);
@@ -91,7 +93,7 @@ export class DeathSaveAction extends BaseAction {
         content: this._buildDeathSaveCard({
           actor, effectiveRank, shiftDisplay, endValue,
           roll, colorLower, killResult, isDying, fromZeroHealth,
-          unconsciousDuration, attackForm, killContext, isRobot,
+          unconsciousDuration, knockout: ko, attackForm, killContext, isRobot,
           karmaUsed: kr.karmaUsed, cappedTotal: kr.capped
         })
       });
@@ -231,15 +233,10 @@ export class DeathSaveAction extends BaseAction {
 
     const colorLower = String(game.msh.rollUniversalTable(effectiveRank, kr.capped) || "").toLowerCase();
 
-    const stunDie = game.settings.get("msh-faserip", "stunDurationDie") || "d10";
-    let unconsciousDuration = null;
-    if (fromZeroHealth) {
-      const durationRoll = await (new Roll(`1${stunDie}`)).evaluate();
-      unconsciousDuration = durationRoll.total;
-    }
-
     const killResult = resolveKillFeat(colorLower, killContext);
     const isDying    = (killResult.outcome === "EnduranceLoss");
+    const ko = fromZeroHealth ? await this._rollKnockout({ isDying }) : null;
+    const unconsciousDuration = ko?.rounds ?? null;
 
     console.log(`[FASERIP] Death Save | ${actor.name} rolled ${colorLower.toUpperCase()} (${roll.total}) vs ${effectiveRank} — ${killResult.label}`);
 
@@ -248,7 +245,7 @@ export class DeathSaveAction extends BaseAction {
       content: this._buildDeathSaveCard({
         actor, effectiveRank, shiftDisplay, endValue: endurance.value,
         roll, colorLower, killResult, isDying, fromZeroHealth,
-        unconsciousDuration, attackForm, killContext, isRobot,
+        unconsciousDuration, knockout: ko, attackForm, killContext, isRobot,
         karmaUsed: kr.karmaUsed, cappedTotal: kr.capped
       })
     });
@@ -304,7 +301,7 @@ export class DeathSaveAction extends BaseAction {
     return { roll, rollTotal: roll.total, capped: Math.min(100, roll.total), karmaUsed: 0, viaKarmaPath: false };
   }
 
-  _buildDeathSaveCard({ actor, effectiveRank, shiftDisplay, endValue, roll, colorLower, killResult, isDying, fromZeroHealth, unconsciousDuration, attackForm, killContext, isRobot=false, karmaUsed = 0, cappedTotal = null }) {
+  _buildDeathSaveCard({ actor, effectiveRank, shiftDisplay, endValue, roll, colorLower, killResult, isDying, fromZeroHealth, unconsciousDuration, knockout = null, attackForm, killContext, isRobot=false, karmaUsed = 0, cappedTotal = null }) {
     const isEdgedOrShooting = (killContext === KILL_CONTEXTS.EDGED_MELEE || killContext === KILL_CONTEXTS.SHOOTING);
     // 0 HP = unconscious regardless of how the kill save was triggered
     const atZeroHealth = (actor?.system?.attributes?.health?.value ?? 1) === 0;
@@ -345,7 +342,10 @@ export class DeathSaveAction extends BaseAction {
       </div>`);
     } else if (fromZeroHealth) {
       outcomeLines.push(`<div style="color:#1565c0;font-weight:700;">UNCONSCIOUS — ${unconsciousDuration} round${unconsciousDuration !== 1 ? "s" : ""}</div>`);
-      outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Wakes with Health = Endurance rank value (${endValue}).</div>`);
+      if (knockout?.stunRounds) {
+        outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Knocked out ${knockout.knockoutRounds}, Stunned ${knockout.stunRounds} (No effect) — out for the longer.</div>`);
+      }
+      outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Then an Endurance FEAT to wake; success gives Health equal to the Endurance number (${endValue}), or current Health if higher.</div>`);
     } else {
       outcomeLines.push(`<div style="color:#2e7d32;font-weight:700;">NO EFFECT</div>`);
       outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Kill result resisted — no Endurance loss.</div>`);
@@ -392,9 +392,17 @@ export class DeathSaveAction extends BaseAction {
     }
   }
 
+  /** 0-Health knockout 1d10; on No effect also Stunned 1d10; out for the longer. */
+  async _rollKnockout({ isDying }) {
+    const knockoutRounds = (await (new Roll("1d10")).evaluate()).total;
+    const stunRounds = isDying ? null : (await (new Roll("1d10")).evaluate()).total;
+    return { knockoutRounds, stunRounds, rounds: Math.max(knockoutRounds, stunRounds ?? 0) };
+  }
+
   /** Create an UNCONSCIOUS effect (N rounds) */
   async _createStunnedEffect(actor, unconsciousRounds = 1) {
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+    try { await safeActorSetFlag(actor, scope, "awaitingWake", true); } catch (_e) {}
 
     try {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));

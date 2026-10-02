@@ -1,4 +1,13 @@
-﻿// init.js v1.19.1 - 2026-10-01
+﻿// init.js v1.19.2 - 2026-10-01
+// v1.19.2: updateActor damage hook no longer clears lastDamageWorldTime when
+//          Health goes up (fixed-bug: after the first manual hourly Healing the
+//          next was refused as "No damage recorded"; any Health gain inside the
+//          10 turns unlocked Recovery early; a heal between two hits hid the
+//          first hit from the Recovery-forfeit check; and only GM-made changes
+//          did this). The rest system owns the clock (lastHealingWorldTime).
+//          wasKnockedOut is kept on hits taken while still unconscious, since
+//          Healing can now lift Health above 0 during a knockout.
+// init.js v1.19.1 - 2026-10-01
 // v1.19.1: House rule houseRules.stunRecoveryFeat (default off) — stunned
 //          combatants may make a Green Endurance FEAT at the start of each
 //          new round to shake off a stun longer than 1 round. Called from
@@ -3606,16 +3615,9 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       }
     }
 
-    // Ignore healing or non-damage changes (including 0->0)
-    if (newHealth >= oldHealth && newHealth > 0) {
-      // HP went up - clear damage timer so healing cooldown resets
-      if (newHealth > oldHealth) {
-        const SCOPE = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
-        await actor.unsetFlag(SCOPE, "lastDamageTime");
-      }
-      return;
-    }
+    // Ignore healing or non-damage changes (including 0->0). Healing must not
+    // touch the damage clock; the rest system tracks it.
+    if (newHealth >= oldHealth && newHealth > 0) return;
 
     // Skip no-op updates where HP was already at/below 0
     // (endurance rank changes from processDyingRound fire updateActor with healthChange:{old:0,new:0})
@@ -3719,7 +3721,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       // recovery (health restored from 0), so the KO flag should stay â€” per rules p.32,
       // Recovery is unavailable after being knocked unconscious; only hourly Healing applies.
       const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-      if (oldHealth > 0 && actor.getFlag(scope, "wasKnockedOut")) {
+      if (oldHealth > 0 && !game.msh?.rest?.isUnconscious?.(actor) && actor.getFlag(scope, "wasKnockedOut")) {
         await actor.unsetFlag(scope, "wasKnockedOut");
       }
 

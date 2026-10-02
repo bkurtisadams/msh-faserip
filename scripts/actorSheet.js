@@ -1,3 +1,6 @@
+// actorSheet.js v2.14.4 - 2026-10-01
+// v2.14.4: Wake Up crisis button also shows while the awaitingWake flag is
+//          set (hourly Healing can lift Health above 0 during a knockout).
 // actorSheet.js v2.14.3 - 2026-10-01
 // v2.14.3: Portrait click binds directly on <img data-edit> each render
 //          instead of delegating from the window frame, so it can't be
@@ -623,7 +626,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     // (real Health — an Absorption pool does not keep a character conscious)
     const _hp = splitHealth(this.actor);
     const currentHP = _hp.real;
-    context.isInCrisis = context.isDying || currentHP === 0;
+    context.isInCrisis = context.isDying || currentHP === 0 || !!this.actor.getFlag(scope, "awaitingWake");
     context.absorptionPool = _hp.pool;
     context.realHealth = _hp.real;
 

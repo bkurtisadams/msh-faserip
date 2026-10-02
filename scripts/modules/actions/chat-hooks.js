@@ -1,3 +1,6 @@
+// chat-hooks.js v1.8.3 - 2026-10-01
+// v1.8.3: dying-refeat-200 rolls at -2CS while Endurance is impaired
+//         (selfPenaltyCS; RAW Impaired Abilities).
 // chat-hooks.js v1.8.2 - 2026-10-01
 // v1.8.2: stun-recovery-roll chat button handler (house rule
 //         houseRules.stunRecoveryFeat); logic in effects/stun-recovery.js.
@@ -807,8 +810,11 @@ export function installActionChatHandlers() {
         // stops the dying; RAW's price: "If you succeed, you are
         // unconscious." Failure: karma spent, keep dying, may pay again
         // on the next slip.
-        const curRank = dyingAE.getFlag(scope, "currentTempRank")
+        const baseRank = dyingAE.getFlag(scope, "currentTempRank")
           || dyingActor.system?.abilities?.endurance?.rank || "Typical";
+        // -2CS while Endurance ranks are lost (RAW Impaired Abilities)
+        const featCs = Number(dyingActor.system?.combatMods?.selfPenaltyCS) || 0;
+        const curRank = featCs ? shiftRank(baseRank, featCs) : baseRank;
         const r = await (new Roll("1d100")).evaluate();
         const colorLower = String(game.msh.rollUniversalTable(curRank, Math.min(100, r.total)) || "white").toLowerCase();
         const success = colorLower !== "white";
