@@ -1,4 +1,9 @@
-﻿// init.js v1.19.3 - 2026-10-01
+﻿// init.js v1.19.4 - 2026-10-01
+// v1.19.4: Karma setting text. combatAwardScope renamed "Full Karma to Each
+//          Hero (house rule)" and now covers all positive encounter karma;
+//          groupAwardMode hint no longer suggests faking full shares with
+//          the multiplier, and notes losses are always individual (RAW).
+// init.js v1.19.3 - 2026-10-01
 // v1.19.3: combatRound time/dying/poison handler runs once per target round
 //          (fixed-bug: a double-clicked Next Round fired it twice for the same
 //          round, advancing world time 12s and stepping dying twice) and not
@@ -1388,7 +1393,7 @@ Hooks.once("init", async () => {
 
     game.settings.register("msh-faserip", "groupAwardMode", {
       name: "Group Karma Award Mode",
-      hint: "How group karma awards are distributed. Split (RAW): divided among present heroes per the rulebook. Pool: awards go to the team karma pool. To reproduce 'full share' behavior (each hero gets the full amount), use Split and set Karma Multiplier to your expected party size.",
+      hint: "How group karma awards are distributed. Split (RAW): divided evenly among the present heroes, fractions dropped. Pool: awards go to the team karma pool. Losses are always individual (RAW); in Pool mode a hero's loss comes from their own karma first, then the pool. For full awards to each hero, see Full Karma to Each Hero.",
       scope: "world",
       config: true,
       type: String,
@@ -1400,14 +1405,14 @@ Hooks.once("init", async () => {
     });
 
     game.settings.register("msh-faserip", "combatAwardScope", {
-      name: "Combat Award Scope",
-      hint: "How auto-computed combat awards (foe defeats, stop crime, arrest, rescue) are distributed in encounters. Split (RAW): goes through Group Karma Award Mode. Individual: each present hero gets the full base amount (matches the common houserule that RAW awards are too small). GM-discretion bonuses still follow Group Karma Award Mode.",
+      name: "Full Karma to Each Hero (house rule)",
+      hint: "Split (RAW): an encounter's karma is divided among the present heroes. Full award to each hero: every present hero gets the whole amount, as if they had soloed it — foes, crimes stopped and arrested, rescues, the GM Award and Split bonuses. Losses are always individual either way.",
       scope: "world",
       config: true,
       type: String,
       choices: {
         split: "Split (RAW)",
-        individual: "Individual (full to each hero)"
+        individual: "Full award to each hero (house rule)"
       },
       default: "split"
     });

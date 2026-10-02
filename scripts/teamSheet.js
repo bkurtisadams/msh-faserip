@@ -1,3 +1,18 @@
+// teamSheet.js v4.14.0 - 2026-10-01
+// v4.14.0: Karma audit against the Karma chapter (RAW unless a setting is on).
+//          - Foe award gate is Remarkable or higher via the kernel's
+//            foeDefeatAward (fixed-bug: >= 30 left out Remarkable 26-29).
+//          - Losses are always individual (RAW): the encounter's Losses
+//            field and negative Split bonuses apply in full to each present
+//            hero; the per-encounter Loss Scope choice is retired.
+//          - A loss never takes a hero below 0 (RAW): _addHeroKarmaEvent caps
+//            a negative entry at the hero's available karma.
+//          - Pool mode: each hero's loss comes from the hero first, the
+//            remainder from the pool (kernel poolAbsorbLoss).
+//          - House setting combatAwardScope "individual" now gives every
+//            present hero the full amount of ALL positive encounter karma
+//            (foes, crimes, rescues, GM award, Split bonuses), as if soloed.
+//            Default "split" is RAW.
 // teamSheet.js v4.13.1 - 2026-10-01
 // v4.13.1: Three fixed-bugs.
 //          - Combat capture counted unlinked foes once: three Hydra agent
@@ -132,6 +147,7 @@ import { RANKS_ORDERED, rankValueForStorage } from "./rules/rules-reference.js";
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey, computeKarmaTotals } from "./karma-rules.js";
 import { EncounterEditor } from "./apps/encounter-editor.js";
+import { foeDefeatAward, poolAbsorbLoss } from "./lib/faserip-rules/faserip-karma.js";
 
 export class TeamSheet extends Application {
 
@@ -311,8 +327,9 @@ export class TeamSheet extends Application {
       const expanded = this._expandedEncounters.has(idx);
       const villainRows = (enc.villains || []).map(v => {
         const count = Math.max(1, v.count || 1);
-        const eligible = v.rankValue >= 30;
-        const foeKarma = eligible ? v.rankValue * count : 0;
+        const perFoe = foeDefeatAward(Number(v.rankValue) || 0);
+        const eligible = perFoe > 0;
+        const foeKarma = perFoe * count;
         return { ...v, count, eligible, subRemarkable: !eligible, foeKarma };
       });
       const hasFoes = villainRows.length > 0;
@@ -490,7 +507,7 @@ export class TeamSheet extends Application {
       return {
         ...enc, expanded, hasFoes, hasName, villainRows, foeTotal,
         stopValue, arrestValue, rescueKarma, gmAward,
-        lossKarma: splitLoss, losses: enc.losses || 0, lossScope,
+        lossKarma: perHeroLoss, losses: enc.losses || 0, lossScope,
         lossScopeSplit: lossScope === "split", lossScopePerHero: lossScope === "per_hero",
         bonuses: bonusRows, bonusPositive, bonusNegative: bonusNegative || 0,
         splitPositive, perHeroBonusRaw: perHeroPositive, perHeroBonusShown: perHeroPosShown,
@@ -1138,7 +1155,7 @@ export class TeamSheet extends Application {
       : "—";
     const dateStr = [enc.gameDate, enc.gameTime].filter(Boolean).join(" ") || "—";
     const lossStr = enc.losses
-      ? `${enc.losses}${enc.lossScope === "per_hero" ? " per hero" : " split"}`
+      ? `${enc.losses} each hero`
       : "—";
     const warnBlock = warnings.length
       ? `<div style="background:#fff3cd;border:1px solid #e0a800;padding:6px 8px;border-radius:3px;margin-top:8px;font-size:12px;">
@@ -1738,7 +1755,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     })) return;
 
     // Description parts (shared across hero entries)
-    const foeNames = enc.villains.filter(v => v.rankValue >= 30).map(v => `${v.name}(${v.rankValue})`).join('+');
+    const foeNames = enc.villains.filter(v => foeDefeatAward(Number(v.rankValue) || 0) > 0).map(v => `${v.name}(${v.rankValue})`).join('+');
     const sharedDescParts = [];
     if (enc.name) sharedDescParts.push(enc.name);
     if (foeNames) sharedDescParts.push(`Foe: ${foeNames}`);
@@ -1755,6 +1772,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     }
     const perHeroBonuses = (enc.bonuses || []).filter(b => b.scope === "per_hero" && b.amount);
     const desc = sharedDescParts.join(', ');
+    const fullShare = getCombatAwardScope() === "individual";
     const baseNote = `(split base ${splitPositive} ×${multiplier} ÷${heroes.length})`;
 
     for (const hero of heroes) {
@@ -1770,7 +1788,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         const phLabels = perHeroBonuses.filter(b => b.amount > 0).map(b => `${b.label || 'Award'} +${b.amount}`).join(', ');
         await this._addHeroKarmaEvent(hero, {
           amount: perHeroPosShown, type: "Encounter Award",
-          description: `Per-hero: ${phLabels} (×${multiplier})`,
+          description: fullShare
+            ? `${[desc, phLabels].filter(Boolean).join(', ')} (full award to each hero ×${multiplier})`
+            : `Per-hero: ${phLabels} (×${multiplier})`,
           gameDate, realDate, encounterId: enc.id
         });
       }
@@ -1781,11 +1801,12 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           description: `Shared losses — ${encLabel}`, gameDate, realDate, encounterId: enc.id
         });
       }
-      // Per-hero scope losses (includes Property Damage when lossScope=per_hero)
+      // Losses: always individual (Losses field, negative Split and Per-hero bonuses)
       if (perHeroLossShown < 0) {
         const phLossLabels = perHeroBonuses.filter(b => b.amount < 0).map(b => `${b.label || 'Penalty'} ${b.amount}`).join(', ');
         const lossDesc = [
-          t.lossScope === "per_hero" && enc.losses ? `Property Damage -${enc.losses}` : '',
+          enc.losses ? `Losses -${enc.losses}` : '',
+          ...splitBonuses.filter(b => b.amount < 0).map(b => `${b.label || 'Penalty'} ${b.amount}`),
           phLossLabels
         ].filter(Boolean).join(', ') || `Per-hero losses — ${encLabel}`;
         await this._addHeroKarmaEvent(hero, {
@@ -1842,13 +1863,14 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     }).groupTotal;
     const penMult = getCategoryMultiplier("penalty");
     const lossMult = penMult > 1 ? penMult : 1;
-    const splitLossGross = splitLoss ? Math.ceil(splitLoss * lossMult) : 0;
     // Per-hero scope: each present hero's share goes to pool (×heroCount at full)
     const multiplier = splitGross && splitPositive ? splitGross / splitPositive : getCategoryMultiplier("combat");
     const perHeroPosGross = perHeroPositive ? Math.floor(perHeroPositive * multiplier) * heroCount : 0;
-    const perHeroLossGross = perHeroLoss ? Math.ceil(perHeroLoss * lossMult) * heroCount : 0;
+    // Losses are individual (RAW): each hero pays from their own karma first,
+    // the remainder from the pool (kernel poolAbsorbLoss).
+    const lossEach = perHeroLoss ? Math.abs(Math.ceil(perHeroLoss * lossMult)) : 0;
 
-    const poolDelta = splitGross + splitLossGross + perHeroPosGross + perHeroLossGross;
+    const poolDelta = splitGross + perHeroPosGross;
     const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
 
     // Individual bonuses still go to the named hero even in pool mode
@@ -1867,16 +1889,35 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     if (!await Dialog.confirm({
       title: `Award to Pool — ${encLabel}`,
       content: `<p>Add <strong>${poolDelta}</strong> karma to team pool?</p>${
+        lossEach ? `<p>Losses: <strong>-${lossEach}</strong> to each of ${heroCount} hero${heroCount === 1 ? '' : 'es'}, from their own karma first, then the pool.</p>` : ''
+      }${
         indSummary.length ? `<p>Individual awards (to named heroes): ${indSummary.join('; ')}</p>` : ''
       }${poolPendingWarning}`
     })) return;
 
-    const pool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
-    await game.settings.set("msh-faserip", "teamKarmaPoolTotal", Math.max(0, pool + poolDelta));
-
-    // Individual bonuses: apply directly to named heroes
     const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
     const realDate = enc.realDate || new Date().toLocaleDateString();
+    let poolNow = Math.max(0, (game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0) + poolDelta);
+    if (lossEach) {
+      for (const hid of presentIds) {
+        const h = game.actors.get(hid);
+        if (!h) continue;
+        const have = this._calculateAvailableKarma(h);
+        const after = poolAbsorbLoss({ individual: have, pool: poolNow, loss: lossEach });
+        const fromHero = have - after.individual;
+        poolNow = after.pool;
+        if (fromHero > 0) {
+          await this._addHeroKarmaEvent(h, {
+            amount: -fromHero, type: "Encounter Loss",
+            description: `Losses — ${encLabel}${fromHero < lossEach ? ` (${lossEach - fromHero} from pool)` : ""}`,
+            gameDate, realDate, encounterId: enc.id
+          });
+        }
+      }
+    }
+    await game.settings.set("msh-faserip", "teamKarmaPoolTotal", poolNow);
+
+    // Individual bonuses: apply directly to named heroes
     for (const [hid, items] of Object.entries(individualByHero)) {
       const h = game.actors.get(hid);
       if (!h) continue;
@@ -1941,7 +1982,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
   _calcEncounterTotals(enc) {
     const foeTotal = (enc.villains || []).reduce((sum, v) => {
       const count = Math.max(1, v.count || 1);
-      return sum + (v.rankValue >= 30 ? v.rankValue * count : 0);
+      return sum + foeDefeatAward(Number(v.rankValue) || 0) * count;
     }, 0);
     let stopValue = 0, arrestValue = 0;
     for (const c of TeamSheet._normalizeCrimes(enc)) {
@@ -1990,15 +2031,17 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       }
     }
 
-    const combatScope = getCombatAwardScope();
+    // RAW: positive karma splits among the present heroes. House setting
+    // combatAwardScope "individual": every hero gets all of it in full.
+    const fullShare = getCombatAwardScope() === "individual";
     const combatTotal = foeTotal + stopValue + arrestValue + rescueKarma;
-    const splitPositive = (combatScope === "individual" ? 0 : combatTotal) + gmAward + buckets.splitPos;
-    const splitLoss = rawLoss + buckets.splitNeg; // RAW losses default to split
-    const lossScope = enc.lossScope || "split";
-    // If lossScope === "per_hero", move the raw `losses` field into perHero bucket
-    const perHeroPositive = buckets.perHeroPos + (combatScope === "individual" ? combatTotal : 0);
-    const perHeroLoss = (lossScope === "per_hero" ? rawLoss : 0) + buckets.perHeroNeg;
-    const splitLossFinal = lossScope === "per_hero" ? buckets.splitNeg : splitLoss;
+    const sharedPositive = combatTotal + gmAward + buckets.splitPos;
+    const splitPositive = fullShare ? 0 : sharedPositive;
+    const perHeroPositive = buckets.perHeroPos + (fullShare ? sharedPositive : 0);
+    // RAW: losses are always individual, so every loss applies to each hero.
+    const lossScope = "per_hero";
+    const perHeroLoss = rawLoss + buckets.splitNeg + buckets.perHeroNeg;
+    const splitLossFinal = 0;
 
     // Back-compat fields used by existing display code
     const bonusPositive = buckets.splitPos + buckets.perHeroPos + individualPos;
@@ -2023,7 +2066,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const parts = [];
     const foeTotal = (enc.villains || []).reduce((sum, v) => {
       const count = Math.max(1, v.count || 1);
-      return sum + (v.rankValue >= 30 ? v.rankValue * count : 0);
+      return sum + foeDefeatAward(Number(v.rankValue) || 0) * count;
     }, 0);
     if (foeTotal > 0) parts.push(`Foe +${foeTotal}`);
     for (const c of TeamSheet._normalizeCrimes(enc)) {
@@ -2045,8 +2088,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       parts.push(`${b.label || (b.amount > 0 ? 'Award' : 'Penalty')} ${sign}${b.amount}${tag}`);
     }
     if (enc.losses > 0) {
-      const lossScope = enc.lossScope || "split";
-      parts.push(`Loss -${enc.losses}${lossScope === "per_hero" ? ' [ea]' : ''}`);
+      parts.push(`Loss -${enc.losses} [ea]`);
     }
     return parts.join(', ') + ` (×${multiplier} ÷${heroCount} on split pool)`;
   }
@@ -2132,6 +2174,15 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
   }
 
   async _addHeroKarmaEvent(hero, { amount, type, description, gameDate, realDate, encounterId }) {
+    // RAW: Karma may never drop below 0 — a loss takes at most what the hero has.
+    if (amount < 0) {
+      const available = this._calculateAvailableKarma(hero);
+      if (available <= 0) return;
+      if (-amount > available) {
+        description = `${description} (capped at ${available}; loss was ${-amount})`;
+        amount = -available;
+      }
+    }
     const history = foundry.utils.deepClone(hero.system.karma?.history || []);
     history.push({
       timestamp: new Date().toISOString(),

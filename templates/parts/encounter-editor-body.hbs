@@ -156,14 +156,7 @@
     <div class="ee-section-body">
       <div class="detail-row extras">
         <label>Rescues: <input type="number" class="rescue-count" data-enc-idx="{{encIdx}}" value="{{enc.rescues}}" min="0" max="99" /></label>
-        <label>Losses: <input type="number" class="loss-amount" data-enc-idx="{{encIdx}}" value="{{enc.losses}}" min="0" max="9999" /></label>
-        <label class="loss-scope-label">
-          Loss Scope:
-          <select class="loss-scope-select" data-enc-idx="{{encIdx}}">
-            <option value="split" {{#if enc.lossScopeSplit}}selected{{/if}}>Split</option>
-            <option value="per_hero" {{#if enc.lossScopePerHero}}selected{{/if}}>Per hero</option>
-          </select>
-        </label>
+        <label title="RAW: losses are always individual — each present hero loses this amount.">Losses (each hero): <input type="number" class="loss-amount" data-enc-idx="{{encIdx}}" value="{{enc.losses}}" min="0" max="9999" /></label>
         <label class="gm-award-label">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{encIdx}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
       </div>
     </div>
