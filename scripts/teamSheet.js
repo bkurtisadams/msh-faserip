@@ -1,3 +1,17 @@
+// teamSheet.js v4.13.1 - 2026-10-01
+// v4.13.1: Three fixed-bugs.
+//          - Combat capture counted unlinked foes once: three Hydra agent
+//            tokens share one base actor id, so the encounter recorded one
+//            agent. Repeats of the same actor now raise that foe's count.
+//          - Friendly non-team combatants (an allied NPC, disposition
+//            friendly) were added to presentHeroIds, so the split divided by
+//            them and paid them karma the hero checkboxes never showed.
+//            Capture now records team members only, and preview + award
+//            read presentHeroIds through _presentTeamIds (team members only)
+//            so existing encounters are corrected too.
+//          - Team roster (Health, Karma, Popularity) refreshes when a team
+//            member's actor changes; it went stale until the window redrew
+//            for another reason.
 // teamSheet.js v4.13.0 - 2026-07-23
 // teamSheet.js v4.12.1 - 2026-05-12
 // v4.12.1: Collapsed encounter row carries precomputed isEvent /
@@ -175,6 +189,20 @@ export class TeamSheet extends Application {
       const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
       if (hqActorId && item.parent?.id === hqActorId && this.rendered) this.render(false);
     });
+    // Live roster: redraw (debounced) when a team member's actor changes
+    this._actorUpdateHook = Hooks.on("updateActor", (actor) => {
+      if (!this.rendered) return;
+      const ids = game.settings.get("msh-faserip", "teamMembers") || [];
+      if (!ids.includes(actor.id)) return;
+      clearTimeout(this._rosterRenderTimer);
+      this._rosterRenderTimer = setTimeout(() => { if (this.rendered) this.render(false); }, 150);
+    });
+  }
+
+  /** Present heroes who are on the team (allied NPCs in the fight are not). */
+  _presentTeamIds(enc) {
+    const team = new Set(game.settings.get("msh-faserip", "teamMembers") || []);
+    return (enc?.presentHeroIds || []).filter(id => team.has(id) && game.actors.get(id));
   }
 
   static get defaultOptions() {
@@ -191,6 +219,8 @@ export class TeamSheet extends Application {
     if (this._itemHook) Hooks.off("updateItem", this._itemHook);
     if (this._createItemHook) Hooks.off("createItem", this._createItemHook);
     if (this._deleteItemHook) Hooks.off("deleteItem", this._deleteItemHook);
+    if (this._actorUpdateHook) Hooks.off("updateActor", this._actorUpdateHook);
+    clearTimeout(this._rosterRenderTimer);
     return super.close(options);
   }
 
@@ -330,7 +360,7 @@ export class TeamSheet extends Application {
         lossScope
       } = totals;
 
-      const presentIds = (enc.presentHeroIds || []).filter(id => game.actors.get(id));
+      const presentIds = this._presentTeamIds(enc);
       const heroCount = Math.max(1, presentIds.length);
 
       const splitAward = computeGroupAward({
@@ -1650,7 +1680,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const mode = getGroupAwardMode();
     if (mode === "pool") return this._onAwardEncounterToPool(ev);
 
-    const heroes = (enc.presentHeroIds || []).map(id => game.actors.get(id)).filter(Boolean);
+    const heroes = this._presentTeamIds(enc).map(id => game.actors.get(id)).filter(Boolean);
     if (!heroes.length) { ui.notifications.warn("No heroes marked as present"); return; }
 
     const t = this._calcEncounterTotals(enc);
@@ -1800,7 +1830,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       perHeroPositive, perHeroLoss,
       individualByHero
     } = t;
-    const presentIds = (enc.presentHeroIds || []).filter(id => game.actors.get(id));
+    const presentIds = this._presentTeamIds(enc);
     const heroCount = Math.max(1, presentIds.length);
 
     // Split pool: full gross to pool (no divide)
@@ -2347,10 +2377,12 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       const disp = tokenDisp ?? protoDisp ?? (actor.type === "villain" ? -1 : 0);
       console.log(`[FASERIP] Combatant: ${actor.name}, tokenDisp=${tokenDisp}, protoDisp=${protoDisp}, resolved=${disp}, type=${actor.type}, defeated=${c.defeated}`);
 
-      if (teamMemberIds.includes(actor.id) || disp > 0) {
-        heroCombatantIds.push(actor.id);
+      if (teamMemberIds.includes(actor.id)) {
+        if (!heroCombatantIds.includes(actor.id)) heroCombatantIds.push(actor.id);
         continue;
       }
+      // Allies who aren't on the team neither share the award nor count as foes
+      if (disp > 0) continue;
 
       const isHostile = disp < 0 || actor.type === "villain";
       if (!isHostile) {
@@ -2375,14 +2407,15 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     if (!villainActors.length) { console.log("[FASERIP] No defeated hostiles found"); return; }
     console.log(`[FASERIP] Found ${villainActors.length} defeated villains, ${heroCombatantIds.length} heroes`);
 
-    const seen = new Set();
-    const villains = [];
+    // Unlinked tokens of one actor share its id: count them, don't drop them.
+    const byId = new Map();
     for (const actor of villainActors) {
-      if (seen.has(actor.id)) continue;
-      seen.add(actor.id);
+      const existing = byId.get(actor.id);
+      if (existing) { existing.count += 1; continue; }
       const { rankValue, rankLabel } = TeamSheet.getHighestRank(actor);
-      villains.push({ name: actor.name, img: actor.img || "icons/svg/mystery-man.svg", actorId: actor.id, rankValue, rankLabel });
+      byId.set(actor.id, { name: actor.name, img: actor.img || "icons/svg/mystery-man.svg", actorId: actor.id, rankValue, rankLabel, count: 1 });
     }
+    const villains = [...byId.values()];
     if (!villains.length) return;
 
     const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
@@ -2399,7 +2432,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     });
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
 
-    const names = villains.map(v => `${v.name} (${v.rankLabel})`).join(', ');
+    const names = villains.map(v => `${v.count > 1 ? `${v.count}× ` : ""}${v.name} (${v.rankLabel})`).join(', ');
     ui.notifications.info(`[FASERIP] Combat ended — captured: ${names}`);
     for (const w of Object.values(ui.windows)) {
       if (w instanceof TeamSheet) w.render(true);
