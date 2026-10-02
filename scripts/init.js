@@ -1,4 +1,10 @@
-﻿// init.js v1.19.2 - 2026-10-01
+﻿// init.js v1.19.3 - 2026-10-01
+// v1.19.3: combatRound time/dying/poison handler runs once per target round
+//          (fixed-bug: a double-clicked Next Round fired it twice for the same
+//          round, advancing world time 12s and stepping dying twice) and not
+//          on Previous Round (rewinding no longer adds time or a dying step;
+//          stepping forward again over rounds already played adds none either).
+// init.js v1.19.2 - 2026-10-01
 // v1.19.2: updateActor damage hook no longer clears lastDamageWorldTime when
 //          Health goes up (fixed-bug: after the first manual hourly Healing the
 //          next was refused as "No damage recorded"; any Health gain inside the
@@ -339,9 +345,20 @@ Hooks.on("renderChatMessageHTML", (message, htmlEl) => {
 });
 
 // FASERIP Combat Sync - Use combatRound hook (fires once per round)
+const _combatRoundHandled = new Map();
 Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // ðŸ”’ GM-only â€“ only the GM advances world time
   if (!game.user.isGM) return;
+
+  // Rewinding a round is not elapsed time; and each target round is handled
+  // once (a fast double click on Next Round fires this twice for one round).
+  if (updateOptions?.direction === -1) return;
+  const targetRound = Number(updateData?.round);
+  if (Number.isFinite(targetRound)) {
+    const last = _combatRoundHandled.get(combat.id);
+    if (last != null && targetRound <= last) return;
+    _combatRoundHandled.set(combat.id, targetRound);
+  }
   
   // Single clock authority: when CTT sync is on, the updateCombat hook advances
   // the CTT calendar and CTT pushes the matching worldTime delta itself.

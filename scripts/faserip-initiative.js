@@ -1,3 +1,11 @@
+// faserip-initiative.js v4.1.6 - 2026-10-01
+// v4.1.6: Fixed-bug — duplicate round numbers on fast round advances. Foundry
+//         fires combatRound before the round update is saved, so the
+//         auto-reroll could read the previous round and post "Round N —
+//         Initiative" a second time at the start of round N+1. The handler
+//         now waits for the combat to reach the target round
+//         (updateData.round) before resetting or rolling, and skips a repeat
+//         call for the same round (a double-clicked Next Round).
 // faserip-initiative.js v4.1.5 - 2026-09-09
 // v4.1.5: Swap Side reaches the v14 tracker. v14's CombatTracker builds the
 //         row menu with _createContextMenu(..., {fixed: true}) and no
@@ -172,6 +180,17 @@ export class FaseripInitiative {
   // and after (actions; per-character Pre-Action FEAT gates live inside it).
   static PHASE_DECLARE = "declare";
   static PHASE_ACTIONS = "actions";
+
+  /** Resolve true once the combat document is at the given round (2s cap). */
+  static _waitForRound(combat, round) {
+    if (combat.round === round) return Promise.resolve(true);
+    return new Promise(resolve => {
+      let hookId = null;
+      const done = (ok) => { if (hookId !== null) Hooks.off("updateCombat", hookId); clearTimeout(timer); resolve(ok); };
+      hookId = Hooks.on("updateCombat", (c) => { if (c.id === combat.id && c.round === round) done(true); });
+      const timer = setTimeout(() => done(combat.round === round), 2000);
+    });
+  }
 
   static _dbg(...args) {
     try { if (!game.settings.get("msh-faserip", "debugMode")) return; } catch { return; }
@@ -391,9 +410,27 @@ export class FaseripInitiative {
       }
     });
 
-    Hooks.on("combatRound", async (combat) => {
+    Hooks.on("combatRound", async (combat, updateData) => {
       if (!game.user.isGM) return;
       if (!this._isFaseripMode()) return;
+
+      // combatRound fires before the round update is saved. Wait until the
+      // combat shows the new round so cards and flags use the right number,
+      // and handle each target round once (a double-clicked Next Round fires
+      // this twice for the same round).
+      const target = Number(updateData?.round);
+      if (Number.isFinite(target)) {
+        this._roundHandled ??= new Map();
+        if (this._roundHandled.get(combat.id) === target) {
+          this._dbg("combatRound: duplicate call skipped", { round: target });
+          return;
+        }
+        this._roundHandled.set(combat.id, target);
+        if (!(await this._waitForRound(combat, target))) {
+          this._dbg("combatRound: round never reached, skipped", { round: target, now: combat.round });
+          return;
+        }
+      }
 
       const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
 
