@@ -1,3 +1,7 @@
+// scripts/modules/rest-system.js v1.9.1 - 2026-10-01
+// v1.9.1: Recovery card ("recovery-heal") posts publicly for NPCs on the
+//         active scene under the default "critical" NPC output policy, like
+//         wake-success. Off-scene NPCs still log to the ledger only.
 // scripts/modules/rest-system.js v1.9.0 - 2026-10-01
 // v1.9.0: Rules audit against Life, Death, and Health (Judge readings
 //         2026-10-01).
@@ -438,7 +442,8 @@ export async function postRecoveryCard(actor, { content, eventType, detail, flag
   catch (_e) { /* setting may not exist during early init */ }
 
   const activeSceneCritical = new Set([
-    "dying-start", "unconscious-start", "stabilized", "wake-success", "dying-death"
+    "dying-start", "unconscious-start", "stabilized", "wake-success", "dying-death",
+    "recovery-heal"
   ]);
 
   let mode = "none";
