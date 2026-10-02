@@ -1,3 +1,12 @@
+// quick-heal.js v2.2.0 - 2026-10-01
+// v2.2.0: Reads the originalEnduranceValue flag first when ranks are lost
+//         (fixed-bug: a Gd 15 hero came back as Good 10). Max Health is
+//         restored by the Endurance DELTA (relative ruling) on both linked and
+//         unlinked tokens (fixed-bug: the linked branch never wrote
+//         health.max, leaving value above a still-reduced max). Also clears
+//         originalEnduranceValue, lastHealingWorldTime and the ongoing.healing
+//         config, and the hourly Healing AE is classed as a combat effect
+//         (deleted by default — the solarRegen id was also "solarRegeneration").
 // quick-heal.js v2.1.0 - 2026-09-02
 // v2.1.0: GM guard. Kept defense effects that were disabled by a force-field
 //         breach are re-enabled (checkbox, default on). Rank values via the
@@ -80,9 +89,10 @@ function classifyEffect(e) {
   if (flags.status?.isUnconscious) return "combat";
   if (flags.status?.isSlammed) return "combat";
   if (flags.fromDeathSave || flags.fromConsciousnessFail) return "combat";
+  if (flags.ongoingId === "healing") return "combat"; // hourly Healing timer — moot at full Health
   if (COMBAT_EFFECT_TYPES.has(effectType)) return "combat";
   if (flags.effectCategory === "defense") return "defense";
-  if (flags.ongoingId === "regeneration" || flags.ongoingId === "solarRegen" ||
+  if (flags.ongoingId === "regeneration" || flags.ongoingId === "solarRegen" || flags.ongoingId === "solarRegeneration" ||
       flags.ongoingId === "absorption" || effectType === "regeneration") return "power";
   if (flags.effectType === "nullified") return "power";
   if (flags.ongoingId) return "power";
@@ -158,9 +168,13 @@ function resolveEndurance(actor, token) {
     originalRank = "Good";
   }
 
+  const flagOriginalValue = Number(actor.getFlag(SCOPE, "originalEnduranceValue"));
   let originalValue;
   if (!hasDyingOrImpaired) {
     originalValue = Number(actor.system.abilities?.endurance?.value) || getRankValue(originalRank);
+  } else if (Number.isFinite(flagOriginalValue) && flagOriginalValue > 0 && originalRank === actorFlagOriginal) {
+    // The pre-damage number recorded when the first rank was lost (RULED 2026-09-05).
+    originalValue = flagOriginalValue;
   } else if (isUnlinked && baseEndurance?.value && baseEndurance.rank === originalRank) {
     originalValue = Number(baseEndurance.value);
   } else if (actor.system.abilities?.endurance?.initialValue && normalizeRank(initialRankAbbrev) === originalRank) {
@@ -169,12 +183,15 @@ function resolveEndurance(actor, token) {
     originalValue = getRankValue(originalRank);
   }
 
-  const f = actor.system.abilities?.fighting?.value || 0;
-  const a = actor.system.abilities?.agility?.value || 0;
-  const s = actor.system.abilities?.strength?.value || 0;
-  const restoredHealthMax = f + a + s + originalValue;
-  const targetHealthMax = isUnlinked && baseActor
-    ? baseActor.system.attributes?.health?.max
+  // Max Health moves by the Endurance delta (relative ruling), never an
+  // absolute F+A+S+E recompute; a hero with no lost ranks keeps his max.
+  const currentEndValue = Number(actor.system.abilities?.endurance?.value) || 0;
+  const currentMax = Number(actor.system.attributes?.health?.max) || 0;
+  const restoredHealthMax = hasDyingOrImpaired
+    ? Math.max(0, currentMax + (originalValue - currentEndValue))
+    : currentMax;
+  const targetHealthMax = isUnlinked && baseActor && !hasDyingOrImpaired
+    ? (baseActor.system.attributes?.health?.max ?? restoredHealthMax)
     : restoredHealthMax;
 
   return { originalRank, originalValue, targetHealthMax, isUnlinked, baseActor };
@@ -202,6 +219,7 @@ async function applyHeal(token, effectIdsToDelete, { reenableDefenses = true } =
       "system.abilities.endurance.rank": originalRank,
       "system.abilities.endurance.value": originalValue,
       "system.attributes.health.value": targetHealthMax,
+      "system.attributes.health.max": targetHealthMax,
       "system.details.isDead": false
     });
   }
@@ -236,6 +254,9 @@ async function applyHeal(token, effectIdsToDelete, { reenableDefenses = true } =
 
   // Clear flags
   try { await actor.unsetFlag(SCOPE, "originalEndurance"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "originalEnduranceValue"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "lastHealingWorldTime"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "ongoing.healing"); } catch {}
   try { await actor.unsetFlag(SCOPE, "wasKnockedOut"); } catch {}
   try { await actor.unsetFlag(SCOPE, "lastDamageWorldTime"); } catch {}
   try { await actor.unsetFlag(SCOPE, "lastDamageTime"); } catch {}

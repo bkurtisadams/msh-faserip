@@ -1,3 +1,23 @@
+// scripts/modules/rest-system.js v1.8.0 - 2026-10-01
+// v1.8.0: Healing/regeneration audit.
+//         - stabilizeDying fallback Impaired Endurance AE now writes
+//           selfPenaltyCS -2 like the other three creation sites (fixed-bug:
+//           attackShift only penalised attacks; RAW is -2CS on all FEATs).
+//         - canAttemptRecovery and attemptRegainConsciousness read REAL Health
+//           via splitHealth (fixed-bug: a held Absorption pool made Recovery
+//           report "Already at maximum Health"; waking wrote over the pool).
+//         - Hourly Healing config stores formula "@endurance" + multiplier
+//           (x2 medical care) instead of a frozen number, so the live
+//           Endurance number is used on every tick. New refreshHealingEffect
+//           re-labels the AE and updates the multiplier; setMedicalCare and
+//           healImpairedEndurance call it (fixed-bug: toggling care or
+//           restoring a rank after the damage left the auto rate stale).
+//         - ensureHealingEffect no longer skips Solar Regeneration characters;
+//           the Healing config carries the "solarShade" gate instead. RAW
+//           (Solar Regeneration): "In darkness, inside buildings ... the
+//           character heals normally." Regeneration (rest) still replaces it.
+//         - healImpairedEndurance deletes an orphaned Impaired Endurance AE
+//           when the rank is already back at the original.
 // scripts/modules/rest-system.js v1.7.0 - 2026-09-09
 // v1.7.0: Recovery and Healing act on REAL Health (health.value minus any
 //         Absorption pool, absorption-pool.splitHealth) and write the pool
@@ -397,8 +417,8 @@ export class RestSystem {
       return { canRest: false, reason: "No actor provided" };
     }
 
-    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-    const maxHealth = actor.system?.attributes?.health?.max ?? 0;
+    // REAL Health (an Absorption pool rides on top and does not count)
+    const { real: currentHealth, max: maxHealth } = splitHealth(actor);
     
     // Must be conscious
     if (currentHealth <= 0) {
@@ -638,6 +658,10 @@ export class RestSystem {
    */
   static async setMedicalCare(actor, enabled) {
     await actor.setFlag(SCOPE, "medicalCare", enabled);
+    // Keep a running automatic Healing effect on the new rate and label.
+    try { await refreshHealingEffect(actor); } catch (e) {
+      console.warn("[FASERIP WARN] Could not refresh automatic Healing after care toggle:", e);
+    }
     const status = enabled ? "receiving medical care (healing ×2)" : "no longer receiving medical care";
     ui.notifications.info(`${actor.name} is now ${status}`);
     
@@ -685,9 +709,9 @@ static async attemptRegainConsciousness(actor) {
       return { success: false, message: "No actor provided" };
     }
 
-    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+    const { real: currentHealth, pool: heldPool } = splitHealth(actor);
     
-    // Must be at 0 HP
+    // Must be at 0 HP (real Health; a held Absorption pool does not count)
     if (currentHealth > 0) {
       const msg = `${actor.name} is already conscious (Health: ${currentHealth})`;
       ui.notifications.warn(msg);
@@ -729,7 +753,7 @@ static async attemptRegainConsciousness(actor) {
     if (success) {
       const enduranceValue = feat.wakeHealth;
       await actor.update({
-        "system.attributes.health.value": enduranceValue
+        "system.attributes.health.value": enduranceValue + heldPool
       });
 
       // Rebase the hourly Healing clock at wake-up. This prevents an immediate
@@ -995,8 +1019,11 @@ static async attemptRegainConsciousness(actor) {
               medicalCare: actor.getFlag(SCOPE, "medicalCare") ?? false
             }
           },
+          // -2CS on ALL FEATs (RAW Impaired Abilities) — selfPenaltyCS, same
+          // key as the ongoing-engine creation sites. attackShift only
+          // penalised attacks.
           changes: [{
-            key: "system.combatMods.attackShift",
+            key: "system.combatMods.selfPenaltyCS",
             mode: "add",
             value: "-2"
           }]
@@ -1039,9 +1066,14 @@ static async attemptRegainConsciousness(actor) {
    * Rules: 1 rank/week normal, 1 rank/day with medical care
    * @param {Actor} actor - The actor to heal
    * @param {boolean} medicalCare - Whether under medical care (daily vs weekly healing)
+   * @param {object} [opts]
+   * @param {number} [opts.now] - Effective world time (CTT fires timeAdvanced
+   *   before worldTime moves; init.js passes start + delta)
+   * @param {number} [opts.anchor] - Value to store as lastHealed (init.js
+   *   passes lastHealed + required so leftover time carries into the next rank)
    * @returns {Promise<Object>} {success: boolean, message: string, rankRestored: string|null}
    */
-  static async healImpairedEndurance(actor, medicalCare = false) {
+  static async healImpairedEndurance(actor, medicalCare = false, { now: nowOpt = null, anchor = null } = {}) {
     if (!actor) {
       return { success: false, message: "No actor provided" };
     }
@@ -1060,7 +1092,7 @@ static async attemptRegainConsciousness(actor) {
     const lastHealed = impairedEffect.getFlag(SCOPE, "lastHealed") || 0;
     
     // Check if enough time has passed (world time in seconds)
-    const now = game.time.worldTime;
+    const now = Number.isFinite(Number(nowOpt)) ? Number(nowOpt) : game.time.worldTime;
     const dayInSeconds = 86400;
     const requiredTime = (medicalCare ? ENDURANCE_RANK_HEAL_DAYS.hospital : ENDURANCE_RANK_HEAL_DAYS.normal) * dayInSeconds;
     const timeSinceHealing = now - lastHealed;
@@ -1089,7 +1121,12 @@ static async attemptRegainConsciousness(actor) {
     const newRankIndex = Math.min(currentRankIndex + 1, originalRankIndex);
     
     if (newRankIndex === currentRankIndex) {
-      return { success: false, message: `${actor.name}'s Endurance is already at maximum (${originalEndurance})` };
+      // Rank already back at the original (restored by the Recovery or
+      // Healing power) — drop the orphaned -2CS record instead of leaving it.
+      await actor.deleteEmbeddedDocuments("ActiveEffect", [impairedEffect.id], { mshIntentional: true });
+      try { await actor.unsetFlag(SCOPE, "originalEndurance"); } catch (_e) {}
+      try { await actor.unsetFlag(SCOPE, "originalEnduranceValue"); } catch (_e) {}
+      return { success: false, message: `${actor.name}'s Endurance is already at maximum (${originalEndurance}); stale Impaired Endurance record removed` };
     }
 
     // RULED 2026-09-05: intermediate ranks carry the highest number of the
@@ -1110,6 +1147,8 @@ static async attemptRegainConsciousness(actor) {
       "system.abilities.endurance.value": newValue,
       "system.attributes.health.max": newHealthMax
     });
+    // Re-label a running automatic Healing effect for the new number.
+    try { await refreshHealingEffect(actor); } catch (_e) {}
 
     // Check if fully healed
     if (newRankIndex >= originalRankIndex) {
@@ -1147,7 +1186,7 @@ static async attemptRegainConsciousness(actor) {
       await impairedEffect.update({
         name: `Impaired Endurance (${newRank} of ${originalEndurance})`,
         [`flags.${SCOPE}.currentEndurance`]: newRank,
-        [`flags.${SCOPE}.lastHealed`]: now,
+        [`flags.${SCOPE}.lastHealed`]: Number.isFinite(Number(anchor)) ? Number(anchor) : now,
         [`flags.${SCOPE}.medicalCare`]: medicalCare,
       });
       
@@ -1295,15 +1334,15 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
     return;
   }
 
-  // Skip if a Regeneration power supersedes normal healing. Regen-rest and
-  // Regen-solar replace the End-rank/hour baseline rather than stacking
-  // on top, so the generic hourly healer must not co-exist with them.
-  const hasRegenRest  = !!actor.getFlag(SCOPE, "ongoing.regeneration");
-  const hasRegenSolar = !!actor.getFlag(SCOPE, "ongoing.solarRegeneration");
-  if (hasRegenRest || hasRegenSolar) {
+  // Skip if a (resting) Regeneration power supersedes normal healing: it
+  // replaces the End-rank/hour baseline rather than stacking on top.
+  // Solar Regeneration does NOT skip — RAW: "In darkness, inside buildings,
+  // and in other similar situations, the character heals normally." The
+  // solarShade gate below pauses Healing only while Solar is healing.
+  const hasRegenRest = !!actor.getFlag(SCOPE, "ongoing.regeneration");
+  if (hasRegenRest) {
     if (game.settings.get(SCOPE, "debugMode")) {
-      const which = hasRegenRest ? "Regeneration" : "Solar Regeneration";
-      console.log(`FASERIP | Skipping healing registration for ${actor.name} — ${which} active`);
+      console.log(`FASERIP | Skipping healing registration for ${actor.name} — Regeneration active`);
     }
     return;
   }
@@ -1314,11 +1353,14 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   const config = {
     type: "heal",
     stat: "health",
-    formula: healPerHour,
+    // Live Endurance number on every tick (reduced-rank number while ranks
+    // are lost), x2 under medical care — never a frozen amount.
+    formula: "@endurance",
+    multiplier: hasMedicalCare ? 2 : 1,
     rate: 1,
     cycle: "hour",
     count: -1,
-    gate: "none",
+    gate: "solarShade",
     interruptOnDamage: false,  // we re-register on damage instead
     oncePerDay: false,
     capAtMax: true,
@@ -1360,6 +1402,32 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
 }
 
 /**
+ * Re-label a registered automatic Healing effect and update its medical-care
+ * multiplier after the Endurance number or care status changes. Leaves the
+ * clock (startedAt) alone. No-op when no Healing config is registered.
+ */
+export async function refreshHealingEffect(actor) {
+  if (!actor) return;
+  const config = actor.getFlag(SCOPE, "ongoing.healing");
+  if (!config || typeof config !== "object") return;
+  const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
+  const healPerHour = healingPerHour(enduranceNumber(actor), { medicalCare: hasMedicalCare });
+  await safeActorSetFlag(actor, SCOPE, "ongoing.healing", {
+    ...config,
+    formula: "@endurance",
+    multiplier: hasMedicalCare ? 2 : 1,
+    gate: "solarShade",
+  });
+  const ae = actor.effects?.find(e => e.flags?.[SCOPE]?.ongoingId === "healing");
+  if (ae) {
+    await ae.update({
+      [`flags.${SCOPE}.medicalCare`]: hasMedicalCare,
+      name: `Healing (${healPerHour} HP/hour${hasMedicalCare ? ', medical' : ''})`
+    });
+  }
+}
+
+/**
  * Initialize the rest system
  */
 export function initRestSystem() {
@@ -1372,6 +1440,7 @@ export function initRestSystem() {
   
   // Expose ledger helpers for ongoing-engine and external callers
   game.msh.rest.appendRecoveryLog = appendRecoveryLog;
+  game.msh.rest.refreshHealingEffect = refreshHealingEffect;
   game.msh.rest.postRecoveryCard = postRecoveryCard;
   game.msh.rest.shouldNotifyRecoveryEvent = shouldNotifyRecoveryEvent;
   game.msh.rest.isOnActiveScene = isOnActiveScene;

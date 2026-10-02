@@ -1,4 +1,9 @@
-// scripts/actor-sheet-v2.js v1.1.0 - 2026-08-01
+// scripts/actor-sheet-v2.js v1.1.2 - 2026-10-01
+// v1.1.2: Portrait edit and sheet-level drop listeners were guarded by
+//         instance flags but bound to this.element, which ApplicationV2
+//         discards on close; after close/reopen neither listener existed.
+//         Portrait click now binds on the img each render; drop guard is
+//         keyed to the element it was bound on.
 // v1.1.0: Preserve focused core-stat fields across submitOnChange renders so
 //         keyboard Tab navigation survives ApplicationV2 PART replacement.
 // FASERIP ActorSheetV2 — Slice 1 (scaffolding).
@@ -226,9 +231,13 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
    *  (PowerSort, FaseripItem, etc.). Once-only flag prevents duplicate
    *  listeners on re-render. */
   _bindDragDrop() {
-    if (this._dragDropBound) return;
     const root = this.element;
     if (!root) return;
+    // v1.1.2: guard per *element*, not per instance. ApplicationV2 discards
+    // this.element on close and builds a fresh one on the next render, so an
+    // instance-level once-only flag left the reopened sheet with no live
+    // listener (same failure the v1 sheet hit with __mshDropBound).
+    if (this._dragDropBoundEl === root) return;
 
     root.addEventListener("dragover", ev => ev.preventDefault());
     root.addEventListener("drop", async ev => {
@@ -236,7 +245,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
       await this._onDrop(ev);
     });
 
-    this._dragDropBound = true;
+    this._dragDropBoundEl = root;
     console.log("FaseripActorSheetV2 | drop listener bound on", root);
   }
 
@@ -262,15 +271,24 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
    *  data-edit (e.g. data-edit="system.history") and would otherwise
    *  open the FilePicker with editor HTML as a bogus "current path."  */
   _bindEditImage() {
-    if (this._editImageBound) return;
-    this.element.addEventListener("click", ev => {
-      const el = ev.target.closest("img[data-edit]");
-      if (!el || !this.element.contains(el)) return;
-      ev.preventDefault();
-      ev.stopImmediatePropagation();   // v1.1.1: v1's adapter-bound handler must not open a second picker
-      this._onEditImage(el);
-    });
-    this._editImageBound = true;
+    // v1.1.2: bind on the <img> elements themselves, every render. The old
+    // root-delegated listener was guarded by an instance flag, but
+    // ApplicationV2 replaces this.element on close/reopen and replaces the
+    // header PART's DOM on every render, so the guard outlived the element it
+    // protected and the portrait went dead. A listener on the img is rebuilt
+    // with the DOM and fires before any ancestor handler can swallow it.
+    const root = this.element;
+    if (!root) return;
+    for (const img of root.querySelectorAll("img[data-edit]")) {
+      if (img.__mshEditBound) continue;
+      img.__mshEditBound = true;
+      img.style.cursor = "pointer";
+      img.addEventListener("click", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();   // v1's adapter-bound handler must not open a second picker
+        this._onEditImage(img);
+      });
+    }
   }
 
   async _onEditImage(target) {
@@ -299,13 +317,18 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     }
 
     const current = foundry.utils.getProperty(this.actor, attr);
-    return new FilePickerClass({
+    const top  = (this.position?.top ?? 0) + 40;
+    const left = (this.position?.left ?? 0) + 10;
+    const picker = new FilePickerClass({
       type: "image",
       current,
       callback: (path) => this.actor.update({ [attr]: path }),
-      top: (this.position?.top ?? 0) + 40,
-      left: (this.position?.left ?? 0) + 10
-    }).render(true);
+      // ApplicationV2 FilePicker reads position.{top,left}; the appv1
+      // fallback reads top/left. Supply both.
+      position: { top, left },
+      top, left
+    });
+    return picker.render(true);
   }
 
   /** Activate v1-style {{editor}} helper outputs ({.editor-content[data-edit]})

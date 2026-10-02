@@ -1,4 +1,20 @@
-﻿// init.js v1.18.1 - 2026-09-27
+﻿// init.js v1.19.0 - 2026-10-01
+// v1.19.0: Healing/regeneration audit.
+//          - timeTracker.timeAdvanced Impaired Endurance block: uses the
+//            effective end-of-interval time (CTT fires the hook before
+//            game.time.worldTime moves — fixed-bug: a 7-day advance healed
+//            nothing until the following advance) and loops so a multi-week
+//            jump restores every rank it covers.
+//          - Regeneration amount is the hero's OWN Endurance number (the
+//            reduced-rank number while ranks are lost), matching
+//            rest-system enduranceNumber; was the rank's standard number.
+//          - Solar Regeneration no longer removes hourly Healing. RAW: "In
+//            darkness, inside buildings ... the character heals normally";
+//            Healing carries the solarShade gate instead. Warns when the
+//            Solar power rank is below Endurance +1CS (RAW minimum).
+//          - Removing a Regeneration power re-registers hourly Healing when
+//            the hero is still hurt.
+// init.js v1.18.1 - 2026-09-27
 // v1.18.1: Fix garbled dotMode setting hint and update it for HUD toggle / plain hover.
 // v1.18.0: registerVehicleCrewCombat — vehicles join combat as their crew.
 // v1.17.1: Vehicle prototype tokens default lockRotation false so art turns with headlights.
@@ -1630,25 +1646,30 @@ Hooks.once("init", async () => {
       // removing the old `deltaSeconds >= 86400` filter lets cumulative
       // sub-day advances (e.g. four 6-hour ticks → 1 day) correctly tick
       // recovery. Skip zero/negative deltas (time rewinds, resyncs).
+      // CTT fires this hook BEFORE game.time.worldTime moves, so measure
+      // against the end of the interval (start + delta), as the dying block
+      // above does. Loop: a multi-week advance restores every rank covered.
       if (deltaSeconds > 0) {
         try {
           const { RestSystem } = await import("./modules/rest-system.js");
+          const effectiveNow = (game.time?.worldTime ?? 0) + deltaSeconds;
           for (const actor of Effects.getAllTokenActors()) {
             if (!actor?.effects?.size) continue;
             const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-            const impairedAE = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance") && !e.disabled);
-            if (!impairedAE) continue;
             const medicalCare = actor.getFlag(scope, "medicalCare") ?? false;
             const dayInSeconds = 86400;
             const weekInSeconds = 7 * dayInSeconds;
             const required = medicalCare ? dayInSeconds : weekInSeconds;
-            const lastHealed = impairedAE.getFlag(scope, "lastHealed") || 0;
-            const elapsed = game.time.worldTime - lastHealed;
-            if (elapsed >= required) {
-              const result = await RestSystem.healImpairedEndurance(actor, medicalCare);
-              if (result.success) {
-                console.log(`[FASERIP] Impaired Endurance healed: ${actor.name} â€” ${result.message}`);
-              }
+            for (let guard = 0; guard < 20; guard++) {
+              const impairedAE = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance") && !e.disabled);
+              if (!impairedAE) break;
+              // Dying still owns the Endurance ladder; never heal a rank mid-spiral.
+              if (actor.effects.some(e => (e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")) && !e.disabled)) break;
+              const lastHealed = impairedAE.getFlag(scope, "lastHealed") || 0;
+              if (effectiveNow - lastHealed < required) break;
+              const result = await RestSystem.healImpairedEndurance(actor, medicalCare, { now: effectiveNow, anchor: lastHealed + required });
+              if (!result.success) break;
+              console.log(`[FASERIP] Impaired Endurance healed: ${actor.name} — ${result.message}`);
             }
           }
         } catch (e) {
@@ -2287,13 +2308,13 @@ Hooks.once("init", async () => {
       ui.notifications.warn(`${actor.name} has no Regeneration power. Set Regeneration Type on the power's Functions tab.`);
       return null;
     }
-    // RAW: "recovers the Endurance Rank every 10 turns" — the rank number
-    // (e.g. Remarkable = 30), not the character's raw Endurance value.
-    const endRank = actor.system?.abilities?.endurance?.rank || "";
-    const endValue = _rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
+    // RAW: "recovers the Endurance Rank every 10 turns" — the hero's own
+    // Endurance number (reduced-rank number while ranks are lost), read live
+    // by the engine's "@endurance" formula (healAmount null).
+    const endValue = Number(actor.system?.abilities?.endurance?.value) || 10;
     if (OngoingEngine) {
       return OngoingEngine.applyRegenerationOngoing(actor, {
-        healAmount: endValue,
+        healAmount: null,
         cycleTurns: 10,
         powerRank: regenPower.system?.rank || null,
         powerItemId: regenPower.id,
@@ -3083,9 +3104,8 @@ Hooks.once("ready", async () => {
         if (hasAE) continue;
 
         // Create new AE
-        // RAW: Endurance rank number per 10 turns, not raw Endurance value
-        const endRank = actor.system?.abilities?.endurance?.rank || "";
-        const endValue = _rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
+        // RAW: the hero's own Endurance number per 10 turns
+        const endValue = Number(actor.system?.abilities?.endurance?.value) || 10;
         await Effects.applyRegeneration(actor, {
           healAmount: endValue,
           cycleTurns: 10,
@@ -3355,11 +3375,9 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     // Register resting regeneration (skip if already exists)
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
     if (!hasRegen) {
-      // RAW: Endurance rank number per 10 turns, not raw Endurance value
-      const endRank = actor.system?.abilities?.endurance?.rank || "";
-      const endValue = _rankValue(endRank) || (actor.system?.abilities?.endurance?.value ?? 10);
+      // RAW: the hero's own Endurance number per 10 turns (live "@endurance")
       await OngoingEngine.applyRegenerationOngoing(actor, {
-        healAmount: endValue,
+        healAmount: null,
         cycleTurns: 10,
         powerRank: item.system?.rank || null,
         powerItemId: item.id,
@@ -3373,12 +3391,24 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
     if (hasRegen) await OngoingEngine.removeOngoingEffect(actor, "regeneration");
 
-    // Remove generic hourly Healing — same supersession as rest-regen.
-    const hasGenericHealSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "healing");
-    if (hasGenericHealSolar) {
-      await OngoingEngine.removeOngoingEffect(actor, "healing");
-      console.log(`[FASERIP] Generic Healing removed from ${actor.name} — superseded by Solar Regeneration`);
-    }
+    // Hourly Healing stays. RAW (Solar Regeneration): "In darkness, inside
+    // buildings, and in other similar situations, the character heals
+    // normally." The Healing config's solarShade gate pauses it only while
+    // Solar is healing in sunshine. Refresh so a pre-1.8.0 config gets the gate.
+    try {
+      const { refreshHealingEffect } = await import("./modules/rest-system.js");
+      await refreshHealingEffect(actor);
+    } catch (_e) {}
+
+    // RAW minimum: Power rank of Endurance +1CS. Warn, don't block.
+    try {
+      const endRank = normalizeRank(actor.system?.abilities?.endurance?.rank || "");
+      const minRank = _shiftRank(endRank, 1);
+      const powerRank = normalizeRank(item.system?.rank || "");
+      if (endRank && powerRank && RANKS_ORDERED.indexOf(powerRank) < RANKS_ORDERED.indexOf(minRank)) {
+        ui.notifications.warn(`${actor.name}: Solar Regeneration is ${powerRank}; RAW minimum is Endurance +1CS (${minRank}).`);
+      }
+    } catch (_e) {}
 
     // Register solar regeneration
     const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");
@@ -3405,6 +3435,17 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     }
     // Clean up legacy flags too
     try { await actor.unsetFlag(scope, "regeneration"); } catch (_) {}
+
+    // The standard hourly healer comes back once Regeneration is gone.
+    if (hasRegen || hasSolar) {
+      try {
+        const { ensureHealingEffect } = await import("./modules/rest-system.js");
+        const { real, max } = (await import("./modules/effects/absorption-pool.js")).splitHealth(actor);
+        if (real > 0 && real < max) await ensureHealingEffect(actor);
+      } catch (e) {
+        console.warn("[FASERIP WARN] Could not re-register Healing after Regeneration removal:", e);
+      }
+    }
   }
 }
 

@@ -1,3 +1,21 @@
+// scripts/modules/effects/ongoing-engine.js v1.14.0 - 2026-10-01
+// v1.14.0: Healing/regeneration audit.
+//          - restoreOneEnduranceRank now maintains the Impaired Endurance
+//            record: renames it on a partial restore and deletes it at cap
+//            (fixed-bug: the Recovery power and Healing's End-rank mode left
+//            the -2CS AE on the actor forever). Current Health no longer rises
+//            with the rank — only max moves (relative ruling), matching
+//            rest-system healImpairedEndurance; Health comes back through
+//            Healing / Recovery.
+//          - config.multiplier: executeHealthHeal scales the resolved formula
+//            (hourly Healing stores "@endurance" x 2 for medical care, so the
+//            live Endurance number is read on every tick).
+//          - New gate "solarShade": true unless the actor's Solar Regeneration
+//            is enabled AND it is daylight. RAW (Solar Regeneration): "In
+//            darkness, inside buildings ... the character heals normally" —
+//            hourly Healing now runs for a Solar character and only pauses
+//            while Solar is the one healing.
+//          - processOneEffect: dead `ae || dyingAE` reference removed.
 // scripts/modules/effects/ongoing-engine.js v1.13.0 - 2026-09-09
 // v1.13.0: healPointsNow() — a one-shot heal for stunts adjudicated by the
 //         Judge at the table (e.g. Electrical Manipulation's heal-via-
@@ -316,10 +334,24 @@ function checkGate(gateName, actor, _config) {
       return hp > 0;
     }
 
+    case "solarShade": {
+      // Normal hourly Healing yields to Solar Regeneration only while Solar
+      // is actually healing: an enabled solar AE in daylight.
+      return !isSolarRegenerationActive(actor);
+    }
+
     default:
       console.warn(`[FASERIP WARN] Unknown gate: "${gateName}"`);
       return true;
   }
+}
+
+/** True when the actor has an enabled Solar Regeneration AE and it is daylight. */
+export function isSolarRegenerationActive(actor) {
+  const scope = SCOPE();
+  const solar = actor?.effects?.find(e => e.flags?.[scope]?.ongoingId === "solarRegeneration" && !e.disabled);
+  if (!solar) return false;
+  return checkGate("daylight", actor, actor.getFlag(scope, "ongoing.solarRegeneration") || {});
 }
 
 function checkAllGates(config, actor) {
@@ -486,9 +518,8 @@ async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
 
   // Count limit
   if (config.count > 0 && (config.triggerCount || 0) >= config.count) {
-    const activeAE = ae || dyingAE;
     if (config.autoDisable !== false) {
-      await activeAE.update({ disabled: true });
+      await ae.update({ disabled: true });
       console.log(`[FASERIP] ${actor.name}: ${effectId} auto-disabled (count exhausted)`);
     }
     return;
@@ -526,8 +557,9 @@ async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
     return;
   }
 
-  // Resolve formula
-  const rawAmount = resolveFormula(config.formula, actor, config);
+  // Resolve formula (config.multiplier scales it, e.g. x2 medical care)
+  const mult = Number(config.multiplier);
+  const rawAmount = resolveFormula(config.formula, actor, config) * (Number.isFinite(mult) && mult > 0 ? mult : 1);
 
   // Execute effect by type
   await executeEffect(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt);
@@ -1711,12 +1743,12 @@ export async function restoreOneEnduranceRank(actor, { originalRankCap = null, s
   if (newRank === currentRank) return { restored: false, atCap: true, oldRank: currentRank, newRank };
 
   const newValue = restore?.number ?? game.msh?.getRankValue?.(newRank) ?? 0;
-  const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
-  const enduranceDelta = Math.max(0, newValue - currentValue);
 
+  // Only max Health moves with the rank (relative ruling); current Health is
+  // left for Healing / Recovery, as in rest-system healImpairedEndurance.
   const newMaxHealth = _recalcMaxHealth(actor, newValue);
   const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-  const newHealth = Math.min(newMaxHealth, currentHealth + enduranceDelta);
+  const newHealth = Math.min(newMaxHealth, currentHealth);
 
   await actor.update({
     "system.abilities.endurance.rank": newRank,
@@ -1725,10 +1757,21 @@ export async function restoreOneEnduranceRank(actor, { originalRankCap = null, s
     "system.attributes.health.max": newMaxHealth,
   });
 
+  // Keep the Impaired Endurance record (and its -2CS) in step with the rank.
+  const impairedAE = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
   if (newRank === cap) {
     await actor.unsetFlag(scope, "originalEndurance");
     await actor.unsetFlag(scope, "originalEnduranceValue");
+    if (impairedAE) await impairedAE.delete({ mshIntentional: true });
+  } else if (impairedAE) {
+    await impairedAE.update({
+      name: `Impaired Endurance (${newRank} of ${cap})`,
+      [`flags.${scope}.currentEndurance`]: newRank,
+      // lastHealed untouched: the weekly/daily natural heal runs on its own
+      // clock, independent of a Recovery-power or Healing-power restore.
+    });
   }
+  try { await game.msh?.rest?.refreshHealingEffect?.(actor); } catch (_e) {}
 
   const sourceLabel = source ? ` (${source})` : "";
   await sendOngoingChat(actor, `Endurance Restored${sourceLabel}`, "stat.gain",

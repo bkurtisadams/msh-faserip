@@ -1,3 +1,11 @@
+// scripts/modules/actions/healing-action.js v2.1.0 - 2026-10-01
+// v2.1.0: Health mode heals REAL Health through healPointsNow (splitHealth;
+//         fixed-bug: the raw min(max, value + amount) write wiped a held
+//         Absorption pool and the pre-flight "missing HP" counted the pool).
+//         End-rank mode: a healer's failed-FEAT rank loss now records an
+//         Impaired Endurance entry (ensureImpairedEnduranceEffect, -2CS) so
+//         the lost rank heals per Impaired Abilities (fixed-bug: it never
+//         healed back).
 // scripts/modules/actions/healing-action.js v2.0.2 - 2026-07-03
 // v2.0.2: End-mode death threshold fix (Kurt ruling): the healer perishes only
 //         when Endurance drops BELOW Shift-0 (i.e. already at Shift-0 and the
@@ -32,8 +40,11 @@ import { resolveFeat } from "../../rules/feat-core.js";
 import {
   restoreOneEnduranceRank,
   loseOneEnduranceRank,
+  ensureImpairedEnduranceEffect,
+  healPointsNow,
   getCurrentGameDate,
 } from "../effects/ongoing-engine.js";
+import { splitHealth } from "../effects/absorption-pool.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -107,8 +118,8 @@ export async function showHealingDialog(healer, item) {
   const today = getCurrentGameDate();
 
   // ── Pre-flight: Health state ─────────────────────────────────────────
-  const tHp = Number(target.system?.attributes?.health?.value ?? 0);
-  const tHpMax = Number(target.system?.attributes?.health?.max ?? tHp);
+  // REAL Health (an Absorption pool rides on top and is not "missing")
+  const { real: tHp, max: tHpMax } = splitHealth(target);
   const missingHp = Math.max(0, tHpMax - tHp);
   const dailyCapRemaining = getHealingDailyCap(healer, target.uuid, today, powerValue);
   const healthMaxThisRoll = Math.min(powerValue, missingHp, dailyCapRemaining);
@@ -246,11 +257,10 @@ export async function showHealingDialog(healer, item) {
         });
 
         if (success) {
-          const tHpNow = Number(target.system?.attributes?.health?.value ?? 0);
-          const tHpMaxNow = Number(target.system?.attributes?.health?.max ?? tHpNow);
-          const newHp = Math.min(tHpMaxNow, tHpNow + amount);
-          const actualHealed = newHp - tHpNow;
-          await target.update({ "system.attributes.health.value": newHp });
+          const { real: tHpNow } = splitHealth(target);
+          const healed = await healPointsNow(target, amount, { label: `Healing by ${healer.name}` });
+          const actualHealed = healed?.healed ?? 0;
+          const newHp = tHpNow + actualHealed;
           await recordHealingHealth(healer, target.uuid, today, actualHealed);
 
           await ChatMessage.create({
@@ -328,6 +338,16 @@ export async function showHealingDialog(healer, item) {
         let lost = null, dieWarning = "";
         if (!success) {
           lost = await loseOneEnduranceRank(healer, { source: `Failed Healing on ${target.name}` });
+          if (lost?.lost) {
+            // Impaired Abilities: the lost rank heals 1/week (1/day in care)
+            // at -2CS until restored — needs the record the heal path reads.
+            await ensureImpairedEnduranceEffect(healer, {
+              originalRank: healer.getFlag(scope, "originalEndurance") || lost.oldRank,
+              currentRank: lost.newRank,
+              penaltyCS: -2,
+              source: "Failed Healing",
+            });
+          }
           if (lost?.atFloor) {
             // Already at Shift-0: the failed FEAT would take Endurance BELOW
             // Shift-0 — the healer perishes. (RAW ruling: survive AT Shift-0,

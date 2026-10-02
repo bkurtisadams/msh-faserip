@@ -1,4 +1,9 @@
-// actorSheet.js v2.14.1 - 2026-09-10
+// actorSheet.js v2.14.3 - 2026-10-01
+// v2.14.3: Portrait click binds directly on <img data-edit> each render
+//          instead of delegating from the window frame, so it can't be
+//          swallowed by lower handlers that stop propagation and doesn't
+//          depend on the frame element staying live. FilePicker opened
+//          with position.{top,left} (ApplicationV2 shape) as well as top/left.
 // v2.14.1: v2.14.0 reordered correctly but the drop still bubbled to the
 //          tab-level drop zone, which only skips *Sort payloads; a plain
 //          FaseripItem drag went on into _onDrop -> _onDropItem, where
@@ -1419,13 +1424,18 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     if (!FilePickerClass) return;
 
     const current = foundry.utils.getProperty(this.actor, attr);
-    return new FilePickerClass({
+    const top  = (this.position?.top ?? 0) + 40;
+    const left = (this.position?.left ?? 0) + 10;
+    const picker = new FilePickerClass({
       type: "image",
       current,
       callback: (path) => this.actor.update({ [attr]: path }),
-      top: (this.position?.top ?? 0) + 40,
-      left: (this.position?.left ?? 0) + 10
-    }).render(true);
+      // ApplicationV2 FilePicker reads position.{top,left}; the appv1
+      // fallback reads top/left. Supply both.
+      position: { top, left },
+      top, left
+    });
+    return picker.render(true);
   }
 
   async close(options = {}) {
@@ -2528,18 +2538,29 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       // carry data-edit) never open the FilePicker.
       // v2.14.2: bind regardless of isEditable at render time; _onEditImage
       // does its own permission check (isEditable can read false on first render).
+      // v2.14.3: bind directly on each <img data-edit> instead of delegating
+      // from the window frame. The frame-level handler sat *behind* every
+      // listener bound lower in the tree, so any row/panel handler that
+      // stopped propagation on a click swallowed the portrait too, and it
+      // depended on this.element still being the live frame. A listener on
+      // the img itself fires first and is recreated with the DOM each render.
       {
         html.find("img[data-edit]").off("click");
         if (this._mshEditImgHandler) {
           dropEl.removeEventListener("click", this._mshEditImgHandler);
+          this._mshEditImgHandler = null;
         }
-        this._mshEditImgHandler = ev => {
-          const el = ev.target.closest("img[data-edit]");
-          if (!el || !dropEl.contains(el)) return;
-          ev.preventDefault();
-          this._onEditImage(el);
-        };
-        dropEl.addEventListener("click", this._mshEditImgHandler);
+        const imgs = (html?.[0] ?? html ?? dropEl).querySelectorAll?.("img[data-edit]") ?? [];
+        for (const img of imgs) {
+          if (img.__mshEditBound) continue;
+          img.__mshEditBound = true;
+          img.style.cursor = "pointer";
+          img.addEventListener("click", ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this._onEditImage(img);
+          });
+        }
       }
     }
 
