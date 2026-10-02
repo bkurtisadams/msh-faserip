@@ -1,8 +1,13 @@
+// karmaPool.js v2.2.0 - 2026-10-01
+// v2.2.0: Optional rule "Locking Pool" (karmaPoolLocked): withdrawals refused,
+//         Use Pool Karma limited to die rolls, dissolving requires the
+//         members' unanimous vote (confirmed by the GM).
 // karmaPool.js v2.1.0 - 2026-07-22
 // v2.1.0: Karma recompute sites delegate to computeKarmaTotals (karma-rules.js).
 // karmaPool.js v2.0.0 - 2026-02-28
 // v2.0.0: Rewrite - fix double-deduct, consistent karma calc, add GM award to pool, clean UI
 import { computeKarmaTotals } from "./karma-rules.js";
+import { isKarmaPoolLocked } from "./karma-multipliers.js";
 
 export class KarmaPoolSheet extends DocumentSheet {
   static get defaultOptions() {
@@ -180,7 +185,9 @@ export class KarmaPoolSheet extends DocumentSheet {
             <input type="text" name="reason" placeholder="e.g., Critical FEAT roll, building project..." />
           </div>
           <p style="font-size:0.85em; color:#666; margin-top:6px;">
-            Pool karma can be used to manipulate die rolls or build things, but not for advancement.
+            ${isKarmaPoolLocked()
+              ? "Locked pool: pool karma may only be used on die rolls."
+              : "Pool karma can be used to manipulate die rolls or build things, but not for advancement."}
           </p>
         </form>
       `,
@@ -208,6 +215,10 @@ export class KarmaPoolSheet extends DocumentSheet {
 
   _onWithdrawFromPool(event) {
     event.preventDefault();
+    if (isKarmaPoolLocked()) {
+      ui.notifications.warn("The team pool is locked: nothing may be withdrawn.");
+      return;
+    }
     const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     const memberCount = teamMemberIds.length;
@@ -578,6 +589,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         <p><strong>Team Members:</strong> ${teamMembers.length}</p>
         ${currentPool > 0 ? `<p><strong>Refund Per Member:</strong> ${refundPerMember}</p>` : ''}
         <p style="color:#8b0000; margin-top:10px;">This resets the pool to 0, clears all contribution tracking, and refunds karma.</p>
+        ${isKarmaPoolLocked() ? `<p><strong>Locked pool:</strong> dissolve only after a unanimous vote of the members.</p>` : ""}
       `
     });
     

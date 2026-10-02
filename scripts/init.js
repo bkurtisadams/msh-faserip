@@ -1,4 +1,11 @@
-﻿// init.js v1.19.4 - 2026-10-01
+﻿// init.js v1.19.5 - 2026-10-01
+// v1.19.5: Karma settings move to karma-multipliers.js registerKarmaSettings
+//          (grouped in the settings window) with migrateKarmaSettings in the
+//          ready hook. Removed here: karmaPromptActorTypes, useKarmaPool,
+//          sessionRIPBonus, karmaMultiplier and the category multipliers,
+//          groupAwardMode, combatAwardScope, and the unused teamKarmaAwards /
+//          pendingKarmaAwards.
+// init.js v1.19.4 - 2026-10-01
 // v1.19.4: Karma setting text. combatAwardScope renamed "Full Karma to Each
 //          Hero (house rule)" and now covers all positive encounter karma;
 //          groupAwardMode hint no longer suggests faking full shares with
@@ -211,6 +218,7 @@ import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 import { migrateApCsDocuments } from "./ap-cs-migration.js";
 import { migrateAbsorption } from "./absorption-migration.js";
+import { registerKarmaSettings, migrateKarmaSettings } from "./karma-multipliers.js";
 
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
@@ -812,25 +820,6 @@ Hooks.once("init", async () => {
     requiresReload: false
   });
 
-  // Karma prompt gate by actor type. Checked in resolveResistFeat
-  // (dice-roller.js) before any declaration prompt/routing; gated actors
-  // roll plain with no karma. RAW: villains maintain karma pools, nameless
-  // NPCs generally do not — hence villainsOnly default.
-  game.settings.register("msh-faserip", "karmaPromptActorTypes", {
-    name: "Karma Prompts for Non-Hero Actors",
-    hint: "Which actor types are offered the Karma declaration prompt on resist FEATs (Slam/Stun/Kill checks, intensity saves, KO saves, death saves). Gated actors roll without Karma. Heroes are always prompted. Default skips NPCs but keeps villains (RAW: villains spend Karma, nameless NPCs don't).",
-    scope: "world",
-    config: true,
-    type: String,
-    choices: {
-      "all": "All Actors (Heroes, Villains, NPCs)",
-      "villainsOnly": "Heroes and Villains (skip NPCs)",
-      "heroesOnly": "Heroes Only (skip Villains and NPCs)"
-    },
-    default: "villainsOnly",
-    requiresReload: false
-  });
-
   // Register consolidated chat cards setting
   game.settings.register("msh-faserip", "consolidatedChatCards", {
     name: "Consolidated Chat Cards",
@@ -1383,59 +1372,8 @@ Hooks.once("init", async () => {
       default: []
     });
 
-    game.settings.register("msh-faserip", "karmaMultiplier", {
-      name: "Karma Multiplier",
-      scope: "world",
-      config: false,
-      type: Number,
-      default: 1
-    });
-
-    game.settings.register("msh-faserip", "groupAwardMode", {
-      name: "Group Karma Award Mode",
-      hint: "How group karma awards are distributed. Split (RAW): divided evenly among the present heroes, fractions dropped. Pool: awards go to the team karma pool. Losses are always individual (RAW); in Pool mode a hero's loss comes from their own karma first, then the pool. For full awards to each hero, see Full Karma to Each Hero.",
-      scope: "world",
-      config: true,
-      type: String,
-      choices: {
-        split: "Split (RAW)",
-        pool: "To karma pool"
-      },
-      default: "split"
-    });
-
-    game.settings.register("msh-faserip", "combatAwardScope", {
-      name: "Full Karma to Each Hero (house rule)",
-      hint: "Split (RAW): an encounter's karma is divided among the present heroes. Full award to each hero: every present hero gets the whole amount, as if they had soloed it — foes, crimes stopped and arrested, rescues, the GM Award and Split bonuses. Losses are always individual either way.",
-      scope: "world",
-      config: true,
-      type: String,
-      choices: {
-        split: "Split (RAW)",
-        individual: "Full award to each hero (house rule)"
-      },
-      default: "split"
-    });
-
-    for (const cat of ["combat", "rescue", "personal", "gaming", "penalty"]) {
-      game.settings.register("msh-faserip", `karmaMultiplier_${cat}`, {
-        name: `Karma Multiplier: ${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
-        hint: "0 = use global Karma Multiplier. Otherwise overrides for this category.",
-        scope: "world",
-        config: true,
-        type: Number,
-        default: 0
-      });
-    }
-
-    // Add this new one:
-    game.settings.register("msh-faserip", "teamKarmaAwards", {
-      name: "Team Karma Awards History",
-      scope: "world",
-      config: false,
-      type: Array,
-      default: []
-    });
+    // All karma settings (grouped): karma-multipliers.js
+    registerKarmaSettings();
 
     game.settings.register("msh-faserip", "defeatedVillains", {
       name: "Defeated Villains List",
@@ -1470,31 +1408,6 @@ Hooks.once("init", async () => {
       default: ""
     });
 
-    game.settings.register("msh-faserip", "useKarmaPool", {
-      name: "Enable Team Karma Pool",
-      hint: "Enable the shared team karma pool (RAW rules). When off, all group awards split directly to individual heroes.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: false
-    });
-
-    game.settings.register("msh-faserip", "sessionRIPBonus", {
-      name: "Session R+I+P Bonus (House Rule)",
-      hint: "Enable the Graycloak house rule: at session end, each hero may be awarded karma equal to Reason + Intuition + Psyche. Adds an R+I+P button to the Team Tracker. Not from the rulebook.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: false
-    });
-
-    game.settings.register("msh-faserip", "pendingKarmaAwards", {
-      name: "Pending Karma Awards",
-      scope: "world",
-      config: false,
-      type: Array,
-      default: []
-    });
 
     game.settings.register("msh-faserip", "effects.durationPolicy", {
       name: "Effects Duration Policy",
@@ -2795,6 +2708,9 @@ Hooks.once("setup", () => {
 });
 
 Hooks.once("ready", async () => {
+  try { await migrateKarmaSettings(); }
+  catch (e) { console.error("[FASERIP] Karma settings migration failed:", e); }
+
   // One-time migration: make existing character actors match FASERIP's preferred
   // prototype token visibility and health-bar defaults. New actors are handled by
   // the preCreateActor hook above; this catches actors created before the fix.

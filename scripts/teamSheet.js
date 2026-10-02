@@ -1,3 +1,6 @@
+// teamSheet.js v4.14.1 - 2026-10-01
+// v4.14.1: Loss multiplier is the Penalty multiplier as set (no "> 1 only"
+//          special case), matching karma-multipliers.js v1.2.0.
 // teamSheet.js v4.14.0 - 2026-10-01
 // v4.14.0: Karma audit against the Karma chapter (RAW unless a setting is on).
 //          - Foe award gate is Remarkable or higher via the kernel's
@@ -394,7 +397,7 @@ export class TeamSheet extends Application {
       const splitLossPerHero = splitLoss ? computeLossAmount(splitLoss, heroCount, groupMode) : 0;
       // perHeroLoss applies to every present hero at full; apply penalty mult if > 1
       const penMult = getCategoryMultiplier("penalty");
-      const lossMult = penMult > 1 ? penMult : 1;
+      const lossMult = penMult;
       const perHeroLossShown = perHeroLoss ? Math.ceil(perHeroLoss * lossMult) : 0;
       // Positive per-hero applies at full to each present hero
       const perHeroPosShown = perHeroPositive ? Math.floor(perHeroPositive * encMult) : 0;
@@ -1719,7 +1722,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
     // Per-hero scope math (full amount to each present hero, mult applied)
     const penMult = getCategoryMultiplier("penalty");
-    const lossMult = penMult > 1 ? penMult : 1;
+    const lossMult = penMult;
     const perHeroPosShown = perHeroPositive ? Math.floor(perHeroPositive * multiplier) : 0;
     const perHeroLossShown = perHeroLoss ? Math.ceil(perHeroLoss * lossMult) : 0;
     const splitLossPerHero = splitLoss ? computeLossAmount(splitLoss, heroes.length, mode) : 0;
@@ -1862,7 +1865,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       groupMode: "pool"
     }).groupTotal;
     const penMult = getCategoryMultiplier("penalty");
-    const lossMult = penMult > 1 ? penMult : 1;
+    const lossMult = penMult;
     // Per-hero scope: each present hero's share goes to pool (×heroCount at full)
     const multiplier = splitGross && splitPositive ? splitGross / splitPositive : getCategoryMultiplier("combat");
     const perHeroPosGross = perHeroPositive ? Math.floor(perHeroPositive * multiplier) * heroCount : 0;

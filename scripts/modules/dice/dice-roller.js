@@ -1,4 +1,7 @@
 // File: systems/msh-faserip/scripts/modules/dice/dice-roller.js
+// 2026-10-01: Optional rule "Spend Karma in Increments of 5"
+// (karmaIncrementFive): the Phase-2 amount dialog offers and accepts only
+// multiples of 5 (spending all remaining Karma is always allowed).
 // Two-phase karma system per FASERIP rules:
 // Phase 1: Declare intent to spend karma BEFORE rolling
 // Phase 2: After seeing roll, decide amount (minimum 10 or all remaining)
@@ -322,12 +325,16 @@ function calculateKarmaToColor(rollResult, rank, targetColor) {
 export async function showKarmaDecisionDialog(actor, rollResult, rank, sourceName, initialColor) {
   const availableKarma = getAvailableKarma(actor);
   const minKarma = getMinimumKarmaCommitment(actor);
-  const maxUseful = Math.min(availableKarma, 100 - rollResult); // Can't go above 100
+  // Optional rule: amounts in steps of 5 (all remaining Karma always allowed)
+  let inc = 1;
+  try { inc = game.settings.get("msh-faserip", "karmaIncrementFive") ? 5 : 1; } catch (_) {}
+  const stepUp = (v) => (inc === 1 || v >= 999) ? v : Math.ceil(v / inc) * inc;
+  const maxUseful = Math.min(availableKarma, stepUp(100 - rollResult)); // Can't go above 100
   
   // Calculate karma needed to reach each color threshold
-  const karmaToGreen = calculateKarmaToColor(rollResult, rank, 'green');
-  const karmaToYellow = calculateKarmaToColor(rollResult, rank, 'yellow');
-  const karmaToRed = calculateKarmaToColor(rollResult, rank, 'red');
+  const karmaToGreen = stepUp(calculateKarmaToColor(rollResult, rank, 'green'));
+  const karmaToYellow = stepUp(calculateKarmaToColor(rollResult, rank, 'yellow'));
+  const karmaToRed = stepUp(calculateKarmaToColor(rollResult, rank, 'red'));
   
   // Build radio button options
   let optionsHtml = '';
@@ -394,8 +401,8 @@ export async function showKarmaDecisionDialog(actor, rollResult, rank, sourceNam
     <div style="margin: 10px 0; padding: 8px; border-top: 1px solid #ccc;">
       <input type="radio" name="karmaChoice" id="karma-custom" value="custom">
       <label for="karma-custom"><strong>Custom amount:</strong></label>
-      <input type="number" id="karma-custom-amount" min="${minKarma}" max="${maxUseful}" value="${minKarma}" style="width: 60px; margin-left: 8px;" disabled>
-      <span style="font-size: 0.85em; color: #666;">(${minKarma} - ${maxUseful})</span>
+      <input type="number" id="karma-custom-amount" min="${minKarma}" max="${maxUseful}" step="${inc}" value="${minKarma}" style="width: 60px; margin-left: 8px;" disabled>
+      <span style="font-size: 0.85em; color: #666;">(${minKarma} - ${maxUseful}${inc > 1 ? `, steps of ${inc}` : ""})</span>
     </div>
   `;
   
@@ -438,8 +445,9 @@ export async function showKarmaDecisionDialog(actor, rollResult, rank, sourceNam
               karmaSpent = parseInt(choice) || minKarma;
             }
             
-            // Enforce bounds
-            karmaSpent = Math.max(minKarma, Math.min(karmaSpent, maxUseful));
+            // Enforce bounds (and the optional steps of 5)
+            if (inc > 1 && karmaSpent !== availableKarma) karmaSpent = Math.min(availableKarma, stepUp(karmaSpent));
+            karmaSpent = Math.max(minKarma, Math.min(karmaSpent, Math.max(maxUseful, minKarma)));
             
             const finalResult = Math.min(100, rollResult + karmaSpent);
             const finalColor = game.msh.rollUniversalTable(rank, finalResult);
