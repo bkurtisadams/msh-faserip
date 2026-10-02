@@ -1,3 +1,6 @@
+// chat-hooks.js v1.8.2 - 2026-10-01
+// v1.8.2: stun-recovery-roll chat button handler (house rule
+//         houseRules.stunRecoveryFeat); logic in effects/stun-recovery.js.
 // chat-hooks.js v1.8.1 - 2026-09-03
 // v1.8.1: Full-Auto power-save auto-run passes the card's effective power
 //         rank (powerRankName, fixedRank fallback) and a defender prefill so
@@ -831,6 +834,14 @@ export function installActionChatHandlers() {
           });
         }
       } catch (e) { console.error("[FASERIP] dying-refeat-200 handler failed:", e); }
+    });
+
+    html.on("click", '[data-action="stun-recovery-roll"]', async (ev) => {
+      ev.preventDefault();
+      try {
+        const { handleStunRecoveryClick } = await import("../effects/stun-recovery.js");
+        await handleStunRecoveryClick(ev.currentTarget);
+      } catch (e) { console.error("[FASERIP] stun-recovery-roll handler failed:", e); }
     });
 
     html.on("click", '[data-action="dying-aid"]', async (ev) => {

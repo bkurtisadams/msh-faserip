@@ -1,4 +1,10 @@
-﻿// init.js v1.19.0 - 2026-10-01
+﻿// init.js v1.19.1 - 2026-10-01
+// v1.19.1: House rule houseRules.stunRecoveryFeat (default off) — stunned
+//          combatants may make a Green Endurance FEAT at the start of each
+//          new round to shake off a stun longer than 1 round. Called from
+//          updateCombat after expired effects are removed. Logic lives in
+//          modules/effects/stun-recovery.js.
+// init.js v1.19.0 - 2026-10-01
 // v1.19.0: Healing/regeneration audit.
 //          - timeTracker.timeAdvanced Impaired Endurance block: uses the
 //            effective end-of-interval time (CTT fires the hook before
@@ -754,6 +760,20 @@ Hooks.once("init", async () => {
   game.settings.register("msh-faserip", "houseRules.clawsPenetrateNaturalBA", {
     name: "House Rule — Claws Penetrate Natural BA",
     hint: "Allow claws-class powers to roll a per-attack material-strength FEAT against natural Body Armor (e.g. Wolverine cutting Hulk). On a successful FEAT the attack bypasses natural BA. Adamantium-tier claws auto-penetrate; ordinary claws still can't beat tough hide. Off by default (strict RAW).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    requiresReload: false
+  });
+
+  // House rule: stun recovery FEAT. Per stun-recovery.js. At the start of
+  // each new combat round, a stunned combatant whose stun was longer than
+  // 1 round may make a Green Endurance FEAT (Karma allowed) to recover.
+  // Default off to preserve strict RAW behavior.
+  game.settings.register("msh-faserip", "houseRules.stunRecoveryFeat", {
+    name: "House Rule — Stun Recovery FEAT",
+    hint: "At the start of each new combat round, a stunned character (stun longer than 1 round) may make a Green Endurance FEAT, Karma allowed, to shake off the stun and act normally that round. Applies to heroes, villains, and NPCs. Full-Auto rolls automatically; Semi-Auto and Manual post a chat button. Off by default (strict RAW).",
     scope: "world",
     config: true,
     type: Boolean,
@@ -3919,6 +3939,17 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
       } catch (e) {
         console.warn("Failed to rename effect:", e);
       }
+    }
+  }
+
+  // House rule: stun recovery FEAT, once per new round, after expired
+  // stuns have been removed above.
+  if ("round" in changed && combat?.active) {
+    try {
+      const { processStunRecoveryRound } = await import("./modules/effects/stun-recovery.js");
+      await processStunRecoveryRound(combat);
+    } catch (e) {
+      console.error("[FASERIP ERROR] Stun recovery round processing failed:", e);
     }
   }
 
