@@ -1,3 +1,9 @@
+// teamSheet.js v4.17.2 - 2026-10-03
+// v4.17.2: The Ledger shows awards and losses only; spending (die rolls,
+//          stunts, advancement, additions, pool moves) stays on each
+//          hero's Karma History. Additions, Reduce Effect and Other spends
+//          no longer slip through as losses. Spending / Everything filters
+//          removed.
 // teamSheet.js v4.17.1 - 2026-10-01
 // v4.17.1: Ledger rows for immediate awards (types "Immediate Award" /
 //          "Immediate Loss", apps/quick-karma.js) take their description as
@@ -585,13 +591,15 @@ export class TeamSheet extends Application {
 
   /** Karma entries a GM would call spending rather than an award or loss. */
   static _isSpendingType(type) {
-    return /die roll|advancement|pool contribution|stunt|spend|build|purchase|invent/i.test(String(type || ""));
+    const t = String(type || "");
+    if (t === "Other" || t === "Reduce Effect") return true;
+    return /die roll|advancement|addition|pool contribution|pool withdrawal|pool refund|stunt|spend|build|purchase|invent/i.test(t);
   }
 
   /** Ledger view: one row per event, grouped by game date; optional grid. */
   _buildLedger(context) {
     const heroFilter = this._ledgerHero || "all";
-    const kind = this._ledgerKind || "awardsLosses";
+    const kind = ["awards", "losses"].includes(this._ledgerKind) ? this._ledgerKind : "awardsLosses";
     const view = this._ledgerView || "list";
     const limit = this._ledgerLimit || 60;
     const expanded = this._ledgerExpanded ??= new Set();
@@ -605,11 +613,9 @@ export class TeamSheet extends Application {
       history.forEach((e, i) => {
         const amount = Number(e.amount) || 0;
         if (!amount) return;
-        const spending = TeamSheet._isSpendingType(e.type);
-        if (kind === "awardsLosses" && spending) return;
-        if (kind === "awards" && (spending || amount < 0)) return;
-        if (kind === "losses" && (spending || amount > 0)) return;
-        if (kind === "spending" && !spending) return;
+        if (TeamSheet._isSpendingType(e.type)) return;
+        if (kind === "awards" && amount < 0) return;
+        if (kind === "losses" && amount > 0) return;
 
         const minute = String(e.timestamp || "").slice(0, 16);
         const key = e.encounterId ? `enc:${e.encounterId}` : `batch:${e.type || ""}:${minute}:${amount < 0 ? "-" : "+"}`;
@@ -651,7 +657,6 @@ export class TeamSheet extends Application {
         const icon = g.encounterId ? "fas fa-skull"
           : g.total < 0 ? "fas fa-minus-circle"
           : /session/i.test(g.type) ? "fas fa-star"
-          : TeamSheet._isSpendingType(g.type) ? "fas fa-coins"
           : "fas fa-hand-sparkles";
         return {
           key: g.key, title: g.title, icon, gameDate: g.gameDate,
@@ -686,8 +691,7 @@ export class TeamSheet extends Application {
       ledgerGridHeroes: heroes.map(tm => ({ name: tm.name, short: tm.name.slice(0, 3) })),
       ledgerHeroOptions: (context.teamMembers || []).map(tm => ({ id: tm.id, name: tm.name, selected: tm.id === heroFilter })),
       ledgerKindOptions: [
-        ["awardsLosses", "Awards & losses"], ["awards", "Awards"], ["losses", "Losses"],
-        ["spending", "Spending"], ["all", "Everything"]
+        ["awardsLosses", "Awards & losses"], ["awards", "Awards"], ["losses", "Losses"]
       ].map(([value, label]) => ({ value, label, selected: value === kind }))
     };
   }
