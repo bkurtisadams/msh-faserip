@@ -1,3 +1,13 @@
+// teamSheet.js v4.17.0 - 2026-10-01
+// v4.17.0: Ledger redesign. One line per event (an encounter, or a batch:
+//          same type entered in the same minute across heroes, e.g. one R+I+P
+//          handout), grouped under game-date headers with day totals.
+//          Equal awards read "6 heroes · +200 each", unequal ones show the
+//          range; click a row for per-hero detail. Source icons: battle,
+//          session, loss, other. Optional By hero grid (events × heroes,
+//          "·" = not there). Batch undo removes every entry in the batch.
+//          Pending tray rows are one line; "--" becomes "no karma" with the
+//          reason as a tooltip.
 // teamSheet.js v4.16.0 - 2026-10-01
 // v4.16.0: Karma UI slice 2. Editing moves onto the battle report card:
 //          the Ledger's Edit, Add and Import open the encounter's card in
@@ -550,7 +560,13 @@ export class TeamSheet extends Application {
 
     context.encounterCount = context.encounters.length;
     context.pending = context.encounters
-      .map((e, idx) => ({ ...e, idx, heroesLabel: e.heroCount ? `${e.heroCount} hero${e.heroCount === 1 ? "" : "es"}` : "" }))
+      .map((e, idx) => ({
+        ...e, idx,
+        heroesLabel: e.heroCount ? `${e.heroCount} hero${e.heroCount === 1 ? "" : "es"}` : "",
+        noKarmaReason: e.hasPositive ? "" : (e.hasFoes && (e.villainRows || []).every(v => !v.eligible)
+          ? "Foes below Remarkable earn no karma (RAW). Add crimes, rescues or a GM award, or delete it."
+          : "Nothing that earns karma yet. Edit it to add foes, crimes, rescues or a GM award.")
+      }))
       .filter(e => !e.awarded);
     context.pendingCount = context.pending.length;
     Object.assign(context, this._buildLedger(context));
@@ -568,18 +584,20 @@ export class TeamSheet extends Application {
     return /die roll|advancement|pool contribution|stunt|spend|build|purchase|invent/i.test(String(type || ""));
   }
 
-  /** Ledger view: team members' karma history grouped by encounter. */
+  /** Ledger view: one row per event, grouped by game date; optional grid. */
   _buildLedger(context) {
     const heroFilter = this._ledgerHero || "all";
     const kind = this._ledgerKind || "awardsLosses";
+    const view = this._ledgerView || "list";
     const limit = this._ledgerLimit || 60;
+    const expanded = this._ledgerExpanded ??= new Set();
     const encById = new Map((context.encounters || []).map((e, idx) => [e.id, { ...e, idx }]));
+    const heroes = (context.teamMembers || []).filter(tm => heroFilter === "all" || tm.id === heroFilter);
     const groups = new Map();
+    const sign = (n) => `${n > 0 ? "+" : ""}${n}`;
 
-    for (const tm of context.teamMembers || []) {
-      if (heroFilter !== "all" && heroFilter !== tm.id) continue;
-      const actor = game.actors.get(tm.id);
-      const history = actor?.system?.karma?.history || [];
+    for (const tm of heroes) {
+      const history = game.actors.get(tm.id)?.system?.karma?.history || [];
       history.forEach((e, i) => {
         const amount = Number(e.amount) || 0;
         if (!amount) return;
@@ -589,7 +607,8 @@ export class TeamSheet extends Application {
         if (kind === "losses" && (spending || amount > 0)) return;
         if (kind === "spending" && !spending) return;
 
-        const key = e.encounterId ? `enc:${e.encounterId}` : `line:${tm.id}:${i}`;
+        const minute = String(e.timestamp || "").slice(0, 16);
+        const key = e.encounterId ? `enc:${e.encounterId}` : `batch:${e.type || ""}:${minute}:${amount < 0 ? "-" : "+"}`;
         let g = groups.get(key);
         if (!g) {
           const enc = e.encounterId ? encById.get(e.encounterId) : null;
@@ -597,34 +616,69 @@ export class TeamSheet extends Application {
             key, encounterId: e.encounterId || null,
             encIdx: enc ? enc.idx : null,
             title: enc ? enc.displayName : (e.type || "Karma"),
-            gameDate: e.gameDate || "", timestamp: e.timestamp || "",
-            lines: [], total: 0,
-            singleActorId: e.encounterId ? null : tm.id,
-            singleIndex: e.encounterId ? null : i
+            type: e.type || "",
+            gameDate: e.gameDate || e.realDate || "",
+            timestamp: e.timestamp || "",
+            byHero: new Map(), entries: [], total: 0
           };
           groups.set(key, g);
         }
         if (String(e.timestamp || "") > g.timestamp) g.timestamp = e.timestamp;
+        if (!g.gameDate && (e.gameDate || e.realDate)) g.gameDate = e.gameDate || e.realDate;
         g.total += amount;
-        g.lines.push({ heroName: tm.name, amount, positive: amount > 0, type: e.type || "", description: e.description || "" });
+        const h = g.byHero.get(tm.id) || { id: tm.id, name: tm.name, amount: 0, descriptions: [] };
+        h.amount += amount;
+        if (e.description) h.descriptions.push(e.description);
+        g.byHero.set(tm.id, h);
+        g.entries.push(`${tm.id}:${i}`);
       });
     }
 
-    const ledger = [...groups.values()]
+    const rows = [...groups.values()]
       .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
-      .map(g => ({
-        ...g,
-        isEncounter: !!g.encounterId,
-        canUndoEncounter: g.encIdx !== null,
-        totalPositive: g.total > 0,
-        totalDisplay: `${g.total > 0 ? "+" : ""}${g.total}`,
-        lines: g.lines.map(l => ({ ...l, amountDisplay: `${l.amount > 0 ? "+" : ""}${l.amount}` }))
-      }));
+      .slice(0, limit)
+      .map(g => {
+        const list = [...g.byHero.values()];
+        const amounts = list.map(h => h.amount);
+        const min = Math.min(...amounts), max = Math.max(...amounts);
+        const n = list.length;
+        const each = n === 1 ? list[0].name : (min === max ? `${n} heroes · ${sign(min)} each` : `${n} heroes · ${sign(min)} to ${sign(max)}`);
+        const icon = g.encounterId ? "fas fa-skull"
+          : g.total < 0 ? "fas fa-minus-circle"
+          : /session/i.test(g.type) ? "fas fa-star"
+          : TeamSheet._isSpendingType(g.type) ? "fas fa-coins"
+          : "fas fa-hand-sparkles";
+        return {
+          key: g.key, title: g.title, icon, gameDate: g.gameDate,
+          summary: each, heroNames: list.map(h => h.name).join(", "),
+          total: g.total, totalDisplay: sign(g.total), totalPositive: g.total > 0,
+          expanded: expanded.has(g.key),
+          isEncounter: !!g.encounterId, encIdx: g.encIdx, canUndoEncounter: g.encIdx !== null,
+          entries: g.entries.join(";"),
+          detail: list.map(h => ({ name: h.name, amountDisplay: sign(h.amount), positive: h.amount > 0, description: [...new Set(h.descriptions)].join(" · ") })),
+          cells: (context.teamMembers || []).filter(tm => heroFilter === "all" || tm.id === heroFilter).map(tm => {
+            const h = g.byHero.get(tm.id);
+            return h ? { value: sign(h.amount), positive: h.amount > 0, absent: false } : { value: "·", absent: true };
+          })
+        };
+      });
+
+    // Group rows under game-date headers, newest first, with day totals.
+    const days = [];
+    for (const r of rows) {
+      let d = days[days.length - 1];
+      if (!d || d.date !== r.gameDate) { d = { date: r.gameDate || "Undated", total: 0, rows: [] }; days.push(d); }
+      d.rows.push(r);
+      d.total += r.total;
+    }
+    for (const d of days) { d.totalDisplay = sign(d.total); d.totalPositive = d.total > 0; }
 
     return {
-      ledger: ledger.slice(0, limit),
-      ledgerMore: ledger.length > limit,
-      ledgerHero: heroFilter,
+      ledgerDays: days,
+      ledgerEmpty: !rows.length,
+      ledgerMore: groups.size > limit,
+      ledgerIsGrid: view === "grid",
+      ledgerGridHeroes: heroes.map(tm => ({ name: tm.name, short: tm.name.slice(0, 3) })),
       ledgerHeroOptions: (context.teamMembers || []).map(tm => ({ id: tm.id, name: tm.name, selected: tm.id === heroFilter })),
       ledgerKindOptions: [
         ["awardsLosses", "Awards & losses"], ["awards", "Awards"], ["losses", "Losses"],
@@ -633,26 +687,34 @@ export class TeamSheet extends Application {
     };
   }
 
-  async _onLedgerUndoLine(ev) {
+  /** Undo a batch (or single) of history entries: "actorId:index;..." */
+  async _onLedgerUndoBatch(ev) {
     ev.stopPropagation();
     if (!game.user.isGM) return;
-    const { actorId, index } = ev.currentTarget.dataset;
-    const hero = game.actors.get(actorId);
-    const i = Number(index);
-    const history = foundry.utils.deepClone(hero?.system?.karma?.history || []);
-    const entry = history[i];
-    if (!entry) return;
+    const byActor = new Map();
+    for (const part of String(ev.currentTarget.dataset.entries || "").split(";").filter(Boolean)) {
+      const [actorId, idx] = part.split(":");
+      if (!byActor.has(actorId)) byActor.set(actorId, []);
+      byActor.get(actorId).push(Number(idx));
+    }
+    if (!byActor.size) return;
+    const count = [...byActor.values()].reduce((n, a) => n + a.length, 0);
     if (!await Dialog.confirm({
-      title: "Undo Karma Entry",
-      content: `<p>Remove this entry from <strong>${hero.name}</strong>?</p><p>${entry.amount > 0 ? "+" : ""}${entry.amount} — ${entry.description || entry.type || ""}</p>`
+      title: "Undo Karma",
+      content: `<p>Remove ${count} karma entr${count === 1 ? "y" : "ies"} from ${byActor.size} hero${byActor.size === 1 ? "" : "es"}?</p>`
     })) return;
-    history.splice(i, 1);
-    const { earned, value } = computeKarmaTotals(history, { advancement: hero.system.karma?.advancement });
-    await hero.update({
-      "system.karma.history": history,
-      "system.karma.lifetime": earned,
-      "system.attributes.karma.value": value
-    });
+    for (const [actorId, indices] of byActor) {
+      const hero = game.actors.get(actorId);
+      if (!hero) continue;
+      const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+      for (const i of [...indices].sort((a, b) => b - a)) history.splice(i, 1);
+      const { earned, value } = computeKarmaTotals(history, { advancement: hero.system.karma?.advancement });
+      await hero.update({
+        "system.karma.history": history,
+        "system.karma.lifetime": earned,
+        "system.attributes.karma.value": value
+      });
+    }
     this.render(false);
   }
 
@@ -792,7 +854,14 @@ export class TeamSheet extends Application {
     html.find('.popout-encounter').click(ev => this._onPopoutEncounter(ev));
     html.find('.ledger-award').click(ev => this._onAwardEncounterToHeroes(ev));
     html.find('.ledger-edit').click(ev => { ev.stopPropagation(); TeamSheet.editEncounterById(ev.currentTarget.dataset.encId); });
-    html.find('.ledger-undo-line').click(ev => this._onLedgerUndoLine(ev));
+    html.find('.ledger-undo-batch').click(ev => this._onLedgerUndoBatch(ev));
+    html.find('.ledger-row-main').click(ev => {
+      const key = ev.currentTarget.dataset.key;
+      this._ledgerExpanded ??= new Set();
+      if (this._ledgerExpanded.has(key)) this._ledgerExpanded.delete(key); else this._ledgerExpanded.add(key);
+      this.render(false);
+    });
+    html.find('.ledger-view-toggle').click(ev => { this._ledgerView = ev.currentTarget.dataset.view; this.render(false); });
     html.find('.ledger-hero-filter').change(ev => { this._ledgerHero = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-kind-filter').change(ev => { this._ledgerKind = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-more').click(() => { this._ledgerLimit = (this._ledgerLimit || 60) + 60; this.render(false); });

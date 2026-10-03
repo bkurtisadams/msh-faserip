@@ -1,4 +1,8 @@
-/* team-tracker.css v4.6.0 - 2026-10-01
+/* team-tracker.css v4.7.0 - 2026-10-01
+ * v4.7.0: Ledger redesign — one-line pending rows, date-grouped one-line
+ *         event rows with expandable detail, and the By hero grid.
+ *
+ * team-tracker.css v4.6.0 - 2026-10-01
  * v4.6.0: Battle report card edit view (.br-edit, shown with .br-editing).
  *
  * team-tracker.css v4.5.0 - 2026-10-01
@@ -878,38 +882,81 @@
 /* ===== LEDGER TAB ===== */
 .faserip.sheet.team-tracker .tt-panel-ledger { display: flex; flex-direction: column; gap: 6px; }
 .faserip.sheet.team-tracker .ledger-header { margin-top: 10px; }
+.faserip.sheet.team-tracker .ledger-header .section-btns { display: flex; gap: 4px; align-items: center; }
 .faserip.sheet.team-tracker .ledger-header select { width: auto; height: 26px; font-size: 12px; }
-.faserip.sheet.team-tracker .ledger-pending { display: flex; flex-direction: column; gap: 4px; }
+.faserip.sheet.team-tracker .ledger-views { display: flex; }
+.faserip.sheet.team-tracker .ledger-view-toggle {
+  width: 28px !important; flex: 0 0 auto !important; height: 26px; margin: 0; padding: 0;
+  border: 1px solid #aaa; background: #fff; color: #555; cursor: pointer;
+}
+.faserip.sheet.team-tracker .ledger-view-toggle:first-child { border-radius: 3px 0 0 3px; }
+.faserip.sheet.team-tracker .ledger-view-toggle:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+.faserip.sheet.team-tracker .ledger-view-toggle.active { background: #8b0000; color: #fff; border-color: #8b0000; }
+
+.faserip.sheet.team-tracker .ledger-pending { display: flex; flex-direction: column; gap: 3px; }
 .faserip.sheet.team-tracker .ledger-pending-row {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-  background: #fff; border: 1px solid #8b0000; border-left-width: 4px; border-radius: 3px;
+  display: flex; align-items: center; gap: 8px; padding: 3px 8px; min-height: 32px;
+  background: #fff; border: 1px solid #ddd; border-left: 4px solid #8b0000; border-radius: 3px;
 }
-.faserip.sheet.team-tracker .lp-main { flex: 1; min-width: 0; }
 .faserip.sheet.team-tracker .lp-title {
-  font-weight: 700; color: #000; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.faserip.sheet.team-tracker .lp-sub { font-size: 11px; color: #555; }
-.faserip.sheet.team-tracker .ledger-award {
-  width: auto !important; flex: 0 0 auto !important; height: 26px; padding: 0 10px; margin: 0;
-  background: #8b0000; color: #fff; border: none; border-radius: 3px; font-weight: 700; font-size: 12px; cursor: pointer;
-}
-.faserip.sheet.team-tracker .ledger-award:hover { background: #6b0000; }
-.faserip.sheet.team-tracker .ledger-list { display: flex; flex-direction: column; gap: 4px; }
-.faserip.sheet.team-tracker .ledger-group { background: #fff; border: 1px solid #ccc; border-radius: 3px; padding: 4px 8px; }
-.faserip.sheet.team-tracker .lg-head { display: flex; align-items: center; gap: 8px; }
-.faserip.sheet.team-tracker .lg-title {
   flex: 1; min-width: 0; font-weight: 700; color: #000; font-size: 13px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.faserip.sheet.team-tracker .lg-date { font-size: 11px; color: #555; white-space: nowrap; }
-.faserip.sheet.team-tracker .lg-total { font-weight: 700; font-size: 13px; min-width: 40px; text-align: right; }
-.faserip.sheet.team-tracker .lg-line { display: flex; gap: 8px; font-size: 12px; padding-left: 10px; color: #333; }
-.faserip.sheet.team-tracker .lg-hero { font-weight: 600; white-space: nowrap; }
-.faserip.sheet.team-tracker .lg-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #555; }
-.faserip.sheet.team-tracker .lg-amt { font-weight: 600; min-width: 40px; text-align: right; }
+.faserip.sheet.team-tracker .lp-sub { font-size: 11px; color: #555; white-space: nowrap; }
+.faserip.sheet.team-tracker .ledger-pending-row .karma-val { min-width: 54px; text-align: right; }
+.faserip.sheet.team-tracker .ledger-pending-row .no-award { font-size: 11px !important; cursor: help; }
+.faserip.sheet.team-tracker .ledger-award {
+  width: auto !important; flex: 0 0 auto !important; height: 24px; padding: 0 8px; margin: 0;
+  background: #8b0000; color: #fff; border: none; border-radius: 3px; font-weight: 700; font-size: 12px; cursor: pointer;
+}
+.faserip.sheet.team-tracker .ledger-award:hover { background: #6b0000; }
+
+.faserip.sheet.team-tracker .ledger-list { display: flex; flex-direction: column; gap: 8px; }
+.faserip.sheet.team-tracker .ld-head {
+  display: flex; justify-content: space-between; padding: 0 2px 2px;
+  border-bottom: 1px solid #c9b9a0; font-size: 11px; font-weight: 700; color: #555;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.faserip.sheet.team-tracker .ledger-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px;
+  border-bottom: 1px solid #eee;
+}
+.faserip.sheet.team-tracker .ledger-row-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  padding: 4px 2px; cursor: pointer; font-size: 13px;
+}
+.faserip.sheet.team-tracker .ledger-row-main:hover { background: #f5f0e6; }
+.faserip.sheet.team-tracker .lr-icon { width: 14px; text-align: center; color: #6b1717; font-size: 12px; flex: 0 0 auto; }
+.faserip.sheet.team-tracker .lr-title {
+  flex: 1; min-width: 0; font-weight: 700; color: #000;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.faserip.sheet.team-tracker .lr-summary { font-size: 12px; color: #555; white-space: nowrap; }
+.faserip.sheet.team-tracker .lr-total { font-weight: 700; min-width: 48px; text-align: right; }
+.faserip.sheet.team-tracker .lr-detail { flex: 0 0 100%; padding: 2px 0 6px 24px; }
+.faserip.sheet.team-tracker .lr-dline { display: flex; gap: 8px; font-size: 12px; }
+.faserip.sheet.team-tracker .lr-dname { font-weight: 600; white-space: nowrap; }
+.faserip.sheet.team-tracker .lr-ddesc { flex: 1; min-width: 0; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .faserip.sheet.team-tracker .pos { color: #1b5e20; }
 .faserip.sheet.team-tracker .neg { color: #b71c1c; }
 .faserip.sheet.team-tracker .ledger-more { width: auto; align-self: center; margin-top: 4px; }
+
+.faserip.sheet.team-tracker .ledger-grid-wrap { overflow-x: auto; }
+.faserip.sheet.team-tracker .ledger-grid { width: 100%; border-collapse: collapse; font-size: 12px; margin: 0; }
+.faserip.sheet.team-tracker .ledger-grid th {
+  font-size: 11px; color: #555; font-weight: 700; text-align: right; padding: 2px 6px;
+  border-bottom: 1px solid #c9b9a0; background: none;
+}
+.faserip.sheet.team-tracker .ledger-grid td { text-align: right; padding: 3px 6px; border-bottom: 1px solid #eee; font-variant-numeric: tabular-nums; }
+.faserip.sheet.team-tracker .ledger-grid .lgd-event {
+  text-align: left; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;
+}
+.faserip.sheet.team-tracker .ledger-grid .lgd-event i { color: #6b1717; width: 14px; }
+.faserip.sheet.team-tracker .ledger-grid .lgd-day td {
+  text-align: left; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase;
+  background: #f3ece0; padding-top: 4px;
+}
+.faserip.sheet.team-tracker .ledger-grid .absent { color: #aaa; }
 
 /* ===== BATTLE REPORT CHAT CARD ===== */
 .faserip-battle-report { background: #f5f5f0; border: 1px solid #8b0000; border-radius: 3px; font-size: 13px; }

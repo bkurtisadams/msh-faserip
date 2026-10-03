@@ -169,11 +169,9 @@
         {{#each pending as |enc|}}
         <div class="ledger-pending-row">
           <i class="{{enc.iconClass}} enc-type-icon" title="{{enc.typeLabel}}"></i>
-          <div class="lp-main">
-            <div class="lp-title">{{enc.displayName}}</div>
-            <div class="lp-sub">{{enc.dateDisplay}}{{#if enc.heroesLabel}} · {{enc.heroesLabel}}{{/if}}</div>
-          </div>
-          {{#if enc.hasPositive}}<span class="karma-val">+{{enc.positiveTotal}}</span>{{else}}<span class="karma-val no-award">--</span>{{/if}}
+          <span class="lp-title" title="{{enc.displayName}}">{{enc.displayName}}</span>
+          <span class="lp-sub">{{enc.dateDisplay}}{{#if enc.heroesLabel}} · {{enc.heroesLabel}}{{/if}}</span>
+          {{#if enc.hasPositive}}<span class="karma-val">+{{enc.positiveTotal}}</span>{{else}}<span class="karma-val no-award" title="{{enc.noKarmaReason}}">no karma</span>{{/if}}
           <button type="button" class="ledger-award" data-enc-idx="{{enc.idx}}" title="Award"><i class="fas fa-check"></i> Award</button>
           <a class="ledger-edit" data-enc-id="{{enc.id}}" title="Edit on its battle report card"><i class="fas fa-pen"></i></a>
           <a class="delete-encounter" data-enc-idx="{{enc.idx}}" title="Delete"><i class="fas fa-times"></i></a>
@@ -194,35 +192,64 @@
           <select class="ledger-kind-filter" aria-label="Kind">
             {{#each ledgerKindOptions as |o|}}<option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>{{/each}}
           </select>
+          <div class="ledger-views" role="group" aria-label="View">
+            <button type="button" class="ledger-view-toggle {{#unless ledgerIsGrid}}active{{/unless}}" data-view="list" aria-pressed="{{#if ledgerIsGrid}}false{{else}}true{{/if}}" title="List"><i class="fas fa-list"></i></button>
+            <button type="button" class="ledger-view-toggle {{#if ledgerIsGrid}}active{{/if}}" data-view="grid" aria-pressed="{{#if ledgerIsGrid}}true{{else}}false{{/if}}" title="By hero"><i class="fas fa-th"></i></button>
+          </div>
         </div>
       </div>
-      {{#if ledger.length}}
+      {{#if ledgerEmpty}}
+      <p class="no-encounters">No karma entries match.</p>
+      {{else}}
+      {{#if ledgerIsGrid}}
+      <div class="ledger-grid-wrap">
+        <table class="ledger-grid">
+          <thead><tr><th class="lgd-event">Event</th>{{#each ledgerGridHeroes as |h|}}<th title="{{h.name}}">{{h.short}}</th>{{/each}}</tr></thead>
+          <tbody>
+          {{#each ledgerDays as |d|}}
+            <tr class="lgd-day"><td colspan="99">{{d.date}} <span class="{{#if d.totalPositive}}pos{{else}}neg{{/if}}">{{d.totalDisplay}}</span></td></tr>
+            {{#each d.rows as |r|}}
+            <tr>
+              <td class="lgd-event" title="{{r.title}}"><i class="{{r.icon}}"></i> {{r.title}}</td>
+              {{#each r.cells as |c|}}<td class="{{#if c.absent}}absent{{else}}{{#if c.positive}}pos{{else}}neg{{/if}}{{/if}}">{{c.value}}</td>{{/each}}
+            </tr>
+            {{/each}}
+          {{/each}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
       <div class="ledger-list">
-        {{#each ledger as |g|}}
-        <div class="ledger-group">
-          <div class="lg-head">
-            <span class="lg-title">{{g.title}}</span>
-            <span class="lg-date">{{g.gameDate}}</span>
-            <span class="lg-total {{#if g.totalPositive}}pos{{else}}neg{{/if}}">{{g.totalDisplay}}</span>
-            {{#if g.isEncounter}}
-              {{#if g.canUndoEncounter}}<button type="button" class="undo-award btn-undo" data-enc-idx="{{g.encIdx}}" title="Undo this award for every hero"><i class="fas fa-undo"></i></button>{{/if}}
+        {{#each ledgerDays as |d|}}
+        <div class="ledger-day">
+          <div class="ld-head"><span>{{d.date}}</span><span class="{{#if d.totalPositive}}pos{{else}}neg{{/if}}">{{d.totalDisplay}}</span></div>
+          {{#each d.rows as |r|}}
+          <div class="ledger-row {{#if r.expanded}}expanded{{/if}}">
+            <div class="ledger-row-main" data-key="{{r.key}}" title="{{r.heroNames}}">
+              <i class="{{r.icon}} lr-icon"></i>
+              <span class="lr-title">{{r.title}}</span>
+              <span class="lr-summary">{{r.summary}}</span>
+              <span class="lr-total {{#if r.totalPositive}}pos{{else}}neg{{/if}}">{{r.totalDisplay}}</span>
+            </div>
+            {{#if r.isEncounter}}
+              {{#if r.canUndoEncounter}}<button type="button" class="undo-award btn-undo" data-enc-idx="{{r.encIdx}}" title="Undo this award"><i class="fas fa-undo"></i></button>{{/if}}
             {{else}}
-              <button type="button" class="ledger-undo-line btn-undo" data-actor-id="{{g.singleActorId}}" data-index="{{g.singleIndex}}" title="Undo this entry"><i class="fas fa-undo"></i></button>
+              <button type="button" class="ledger-undo-batch btn-undo" data-entries="{{r.entries}}" title="Undo"><i class="fas fa-undo"></i></button>
             {{/if}}
-          </div>
-          {{#each g.lines as |l|}}
-          <div class="lg-line">
-            <span class="lg-hero">{{l.heroName}}</span>
-            <span class="lg-desc">{{l.description}}</span>
-            <span class="lg-amt {{#if l.positive}}pos{{else}}neg{{/if}}">{{l.amountDisplay}}</span>
+            {{#if r.expanded}}
+            <div class="lr-detail">
+              {{#each r.detail as |h|}}
+              <div class="lr-dline"><span class="lr-dname">{{h.name}}</span><span class="lr-ddesc">{{h.description}}</span><span class="{{#if h.positive}}pos{{else}}neg{{/if}}">{{h.amountDisplay}}</span></div>
+              {{/each}}
+            </div>
+            {{/if}}
           </div>
           {{/each}}
         </div>
         {{/each}}
       </div>
+      {{/if}}
       {{#if ledgerMore}}<button type="button" class="ledger-more">Show more</button>{{/if}}
-      {{else}}
-      <p class="no-encounters">No karma entries match.</p>
       {{/if}}
     {{else}}
     <p class="no-encounters">The ledger is kept by the GM.</p>
