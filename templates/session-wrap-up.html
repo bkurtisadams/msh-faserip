@@ -1,0 +1,111 @@
+<div class="wu-root">
+  <div class="wu-banner">
+    <span class="wu-team">{{teamName}}</span>
+    {{#if sessionEnds}}<span class="wu-ends">Session ends {{sessionEnds}}</span>{{/if}}
+  </div>
+
+  {{#if hasHeroes}}
+  <div class="wu-body">
+
+    <section class="wu-section">
+      <div class="wu-head">
+        <h2>Gaming awards</h2>
+        <span class="wu-note">Role-play up to 10, Stump the Judge up to 15 once per stunt, Humor 5</span>
+      </div>
+      <div class="wu-grid wu-gaming wu-colheads">
+        <span>Hero</span><span>Role-play</span><span>Stump</span><span>Humor</span>
+      </div>
+      {{#each heroes as |h|}}
+      <div class="wu-grid wu-gaming wu-row">
+        <span class="wu-hero">{{h.name}}</span>
+        <input type="number" min="0" max="10" value="{{h.rp}}" data-gaming="rp" data-hero="{{h.id}}" aria-label="Role-play award for {{h.name}}">
+        <input type="number" min="0" max="15" value="{{h.stump}}" data-gaming="stump" data-hero="{{h.id}}" aria-label="Stump the Judge award for {{h.name}}">
+        <label class="wu-check"><input type="checkbox" data-gaming="humor" data-hero="{{h.id}}" {{#if h.humor}}checked{{/if}}><span>+5</span></label>
+      </div>
+      {{/each}}
+    </section>
+
+    <section class="wu-section">
+      {{#if hasCtt}}
+      <div class="wu-head">
+        <h2>Commitments this session</h2>
+        <span class="wu-note">From the calendar: came due since the last wrap-up</span>
+      </div>
+      {{#if hasCommitments}}
+      {{#each commitments as |c|}}
+      <div class="wu-grid wu-commit wu-row {{#if c.isOpen}}wu-open{{/if}}">
+        <span class="wu-hero">{{c.hero}}</span>
+        <span class="wu-commit-text">
+          <span class="wu-commit-title">{{c.title}}</span>
+          <span class="wu-commit-when">{{c.when}}</span>
+          {{#if c.isOpen}}<span class="wu-commit-flag">Still open: pick what happened</span>{{/if}}
+        </span>
+        <span class="wu-opts">
+          {{#each c.options as |o|}}
+          <button type="button" class="wu-opt {{o.cls}} {{#if o.selected}}is-selected{{/if}}" data-outcome="{{o.key}}" data-commitment="{{c.id}}" aria-pressed="{{#if o.selected}}true{{else}}false{{/if}}">{{o.label}}</button>
+          {{/each}}
+        </span>
+      </div>
+      {{/each}}
+      <span class="wu-note">Late arrival isn't in the rules, so it's a GM ruling. A ruling opens an amount box on Apply.</span>
+      {{else}}
+      <p class="wu-empty">No commitments came due since the last wrap-up.</p>
+      {{/if}}
+      {{else}}
+      <div class="wu-head">
+        <h2>Commitments this session</h2>
+        <span class="wu-note">Tally from play: kept +5, missed −10, left early −5</span>
+      </div>
+      <div class="wu-grid wu-tally wu-colheads">
+        <span>Hero</span><span>Kept</span><span>Missed</span><span>Left early</span>
+      </div>
+      {{#each heroes as |h|}}
+      <div class="wu-grid wu-tally wu-row">
+        <span class="wu-hero">{{h.name}}</span>
+        <input type="number" min="0" value="{{h.tally.kept}}" data-tally="kept" data-hero="{{h.id}}" aria-label="Commitments kept by {{h.name}}">
+        <input type="number" min="0" value="{{h.tally.missed}}" data-tally="missed" data-hero="{{h.id}}" aria-label="Commitments missed by {{h.name}}">
+        <input type="number" min="0" value="{{h.tally.left}}" data-tally="left" data-hero="{{h.id}}" aria-label="Commitments left early by {{h.name}}">
+      </div>
+      {{/each}}
+      {{/if}}
+    </section>
+
+    <section class="wu-section">
+      <div class="wu-head">
+        <h2>Weekly award</h2>
+        <label class="wu-check wu-week-toggle"><input type="checkbox" name="weeklyOn" {{#if weeklyOn}}checked{{/if}}><span>{{weekLabel}}</span></label>
+      </div>
+      {{#if weeklyOn}}
+      {{#each weekly as |w|}}
+      <div class="wu-grid wu-weekly wu-row">
+        <span class="wu-hero">{{w.name}}</span>
+        {{#if w.hasObligations}}<span class="wu-obl">{{w.obligations}}</span>{{else}}<span class="wu-obl wu-obl-none">{{#if ../hasCtt}}Nothing on the calendar. Think job, school, family.{{else}}Job, school, family: did they keep up?{{/if}}</span>{{/if}}
+        <input type="number" min="0" max="10" value="{{w.value}}" data-weekly="1" data-hero="{{w.id}}" aria-label="Weekly award for {{w.name}}">
+      </div>
+      {{/each}}
+      <span class="wu-note">Up to 10 for keeping up job, school and family.{{#if hasCtt}} Obligations come from the calendar.{{/if}}</span>
+      {{/if}}
+    </section>
+
+    <section class="wu-section">
+      <div class="wu-head"><h2>Each hero gets</h2></div>
+      <div class="wu-totals">
+        {{#each totals as |t|}}
+        <div class="wu-total">
+          <span class="wu-total-name">{{t.name}}</span>
+          <span class="wu-total-val {{t.sign}}" data-total="{{t.id}}">{{t.display}}</span>
+        </div>
+        {{/each}}
+      </div>
+    </section>
+  </div>
+
+  <div class="wu-footer">
+    <span class="wu-footer-note">Writes <span class="wu-entry-count">{{entryCount}}</span> entries to {{heroCount}} heroes. Losses never take a hero below 0.</span>
+    <button type="button" class="wu-cancel" data-wu="cancel">Cancel</button>
+    <button type="button" class="wu-apply" data-wu="apply">Apply wrap-up</button>
+  </div>
+  {{else}}
+  <p class="wu-empty wu-body">No heroes on the team yet. Add them on the Team tab first.</p>
+  {{/if}}
+</div>

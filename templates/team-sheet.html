@@ -106,7 +106,7 @@
         {{#if sessionRIPBonus}}
         <button type="button" class="award-session-bonus" title="Session R+I+P Bonus (house rule): each hero receives their Reason + Intuition + Psyche as bonus karma."><i class="fas fa-star"></i> R+I+P Bonus</button>
         {{/if}}
-        <button type="button" class="tt-close-session" title="Close the current session (coming soon)."><i class="fas fa-flag-checkered"></i> Close Session</button>
+        <button type="button" class="tt-close-session" title="End-of-session awards: role-play, Stump the Judge, humor, commitments and the weekly award."><i class="fas fa-flag-checkered"></i> Close Session</button>
       </div>
     </div>
     {{/if}}
@@ -207,7 +207,7 @@
           <thead><tr><th class="lgd-event">Event</th>{{#each ledgerGridHeroes as |h|}}<th title="{{h.name}}">{{h.short}}</th>{{/each}}</tr></thead>
           <tbody>
           {{#each ledgerDays as |d|}}
-            <tr class="lgd-day"><td colspan="99">{{d.date}} <span class="{{#if d.totalPositive}}pos{{else}}neg{{/if}}">{{d.totalDisplay}}</span></td></tr>
+            <tr class="lgd-day"><td colspan="99">{{d.date}}</td></tr>
             {{#each d.rows as |r|}}
             <tr>
               <td class="lgd-event" title="{{r.title}}"><i class="{{r.icon}}"></i> {{r.title}}</td>
@@ -222,7 +222,7 @@
       <div class="ledger-list">
         {{#each ledgerDays as |d|}}
         <div class="ledger-day">
-          <div class="ld-head"><span>{{d.date}}</span><span class="{{#if d.totalPositive}}pos{{else}}neg{{/if}}">{{d.totalDisplay}}</span></div>
+          <div class="ld-head"><span>{{d.date}}</span></div>
           {{#each d.rows as |r|}}
           <div class="ledger-row {{#if r.expanded}}expanded{{/if}}">
             <div class="ledger-row-main" data-key="{{r.key}}" title="{{r.heroNames}}">

@@ -1,3 +1,11 @@
+// teamSheet.js v4.18.1 - 2026-10-03
+// v4.18.1: Ledger rows show what each hero got, not the sum across heroes:
+//          "+200 each" when equal, "+18 to +80" when not, the bare amount for
+//          one hero. The middle column is the hero count (or the hero's
+//          name). Day headers drop the cross-hero total.
+// teamSheet.js v4.18.0 - 2026-10-03
+// v4.18.0: Close Session opens the session wrap-up (apps/session-wrap-up.js):
+//          gaming awards, commitments and the weekly award in one dialog.
 // teamSheet.js v4.17.2 - 2026-10-03
 // v4.17.2: The Ledger shows awards and losses only; spending (die rolls,
 //          stunts, advancement, additions, pool moves) stays on each
@@ -653,7 +661,10 @@ export class TeamSheet extends Application {
         const amounts = list.map(h => h.amount);
         const min = Math.min(...amounts), max = Math.max(...amounts);
         const n = list.length;
-        const each = n === 1 ? list[0].name : (min === max ? `${n} heroes · ${sign(min)} each` : `${n} heroes · ${sign(min)} to ${sign(max)}`);
+        const each = n === 1 ? list[0].name : `${n} heroes`;
+        const perHero = n === 1 || min === max
+          ? `${sign(min)}${n > 1 ? " each" : ""}`
+          : `${sign(min)} to ${sign(max)}`;
         const icon = g.encounterId ? "fas fa-skull"
           : g.total < 0 ? "fas fa-minus-circle"
           : /session/i.test(g.type) ? "fas fa-star"
@@ -661,7 +672,7 @@ export class TeamSheet extends Application {
         return {
           key: g.key, title: g.title, icon, gameDate: g.gameDate,
           summary: each, heroNames: list.map(h => h.name).join(", "),
-          total: g.total, totalDisplay: sign(g.total), totalPositive: g.total > 0,
+          total: g.total, totalDisplay: perHero, totalPositive: (n === 1 || min === max ? min : g.total) > 0,
           expanded: expanded.has(g.key),
           isEncounter: !!g.encounterId, encIdx: g.encIdx, canUndoEncounter: g.encIdx !== null,
           entries: g.entries.join(";"),
@@ -795,7 +806,7 @@ export class TeamSheet extends Application {
 
     // Team tab: bio + placeholder session actions
     html.find('.tt-open-bio').click(() => this._onOpenTeamBio());
-    html.find('.tt-close-session').click(() => this._onCloseSessionPlaceholder());
+    html.find('.tt-close-session').click(() => this._onCloseSession());
 
     // Roster
     html.find('.add-hero-to-team-btn').click(() => {
@@ -977,12 +988,9 @@ export class TeamSheet extends Application {
     this.render(false);
   }
 
-  /**
-   * Placeholder for future "Close Session" action. The real implementation
-   * needs session-boundary data (archived encounters, session metadata).
-   */
-  _onCloseSessionPlaceholder() {
-    ui.notifications.info("Close Session: coming soon. Will archive awarded encounters into a session log.");
+  /** Close Session: the end-of-session wrap-up dialog. */
+  _onCloseSession() {
+    import("./apps/session-wrap-up.js").then(m => m.openSessionWrapUp());
   }
 
   async _onAddHeroToTeam(heroId) {

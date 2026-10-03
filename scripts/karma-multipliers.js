@@ -1,3 +1,13 @@
+// karma-multipliers.js v1.3.1 - 2026-10-03
+// v1.3.1: fixed-bug: wrapUpLastWeekly registered with default null threw in
+//         Foundry v14 (an Object setting may not default to null), which
+//         stopped init before karmaMultiplier, defeatedVillains and the rest
+//         registered, so battle report cards could not be edited. Default {}.
+// karma-multipliers.js v1.3.0 - 2026-10-03
+// v1.3.0: Hidden wrap-up settings: wrapUpLastWeekly (world time and game
+//         date of the last weekly award) and wrapUpAwardedCommitments
+//         (calendar commitment ids already paid). R+I+P hint no longer says
+//         "at session end".
 // karma-multipliers.js v1.2.0 - 2026-10-01
 // v1.2.0: Karma settings cleanup. All karma settings register here
 //         (registerKarmaSettings, called from init.js) so they sit together
@@ -199,8 +209,14 @@ export function registerKarmaSettings() {
   });
   game.settings.register(S, "sessionRIPBonus", {
     name: "Session R+I+P Bonus (house rule)",
-    hint: "At session end, each hero may be awarded karma equal to Reason + Intuition + Psyche. Adds an R+I+P button to the Team Tracker. Not from the rulebook.",
+    hint: "Once per session, each hero may be awarded karma equal to Reason + Intuition + Psyche. Adds an R+I+P button to the Team Tracker. Not from the rulebook.",
     scope: "world", config: true, type: Boolean, default: false
+  });
+  game.settings.register(S, "wrapUpLastWeekly", {
+    scope: "world", config: false, type: Object, default: {}
+  });
+  game.settings.register(S, "wrapUpAwardedCommitments", {
+    scope: "world", config: false, type: Array, default: []
   });
   game.settings.register(S, "karmaMultiplier", {
     name: "Karma Multiplier (house rule)",

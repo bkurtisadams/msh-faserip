@@ -1,4 +1,8 @@
-/* team-tracker.css v4.8.0 - 2026-10-01
+/* team-tracker.css v4.9.0 - 2026-10-03
+ * v4.9.0: Close Session wrap-up dialog (.msh-wrapup), Barlow Semi
+ *         Condensed import.
+ *
+ * team-tracker.css v4.8.0 - 2026-10-01
  * v4.8.0: Award Karma dialog (.faserip-quick-karma).
  *
  * team-tracker.css v4.7.0 - 2026-10-01
@@ -51,6 +55,7 @@
  *         actions panels. Team name in header. Preserves existing member-row
  *         and encounter-entry styles unchanged.
  */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&display=swap');
 
 .team-tracker {
   font-family: 'Barlow Condensed', Arial, sans-serif;
@@ -1030,3 +1035,85 @@
 .faserip-quick-karma .qk-preview {
   margin-top: 8px; padding: 6px 8px; background: #f3ece0; border-radius: 3px; font-size: 12px;
 }
+
+/* ===== CLOSE SESSION WRAP-UP (v4.9.0) ===== */
+.msh-wrapup .window-content { padding: 0; overflow-y: auto; background: #f3ecdc; }
+.msh-wrapup .wu-root {
+  display: flex; flex-direction: column; min-height: 100%;
+  font-family: 'Barlow Semi Condensed', 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  color: #231f1a; background: #f3ecdc;
+}
+.msh-wrapup .wu-banner {
+  background: #a8171c; color: #fff8ec; padding: 14px 18px;
+  display: flex; align-items: baseline; gap: 18px;
+}
+.msh-wrapup .wu-team { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 24px; font-weight: 600; letter-spacing: 1px; }
+.msh-wrapup .wu-ends { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 16px; font-weight: 500; }
+.msh-wrapup .wu-body { padding: 16px 18px 6px; display: flex; flex-direction: column; gap: 18px; }
+.msh-wrapup .wu-section { display: flex; flex-direction: column; gap: 6px; }
+.msh-wrapup .wu-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-bottom: 2px solid #9b1c1c; padding-bottom: 4px;
+}
+.msh-wrapup .wu-head h2 {
+  margin: 0; border: none; font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 18px; font-weight: 600; color: #9b1c1c; letter-spacing: 0.5px;
+}
+.msh-wrapup .wu-note { font-size: 13px; color: #5e554b; }
+.msh-wrapup .wu-grid { display: grid; gap: 12px; align-items: center; }
+.msh-wrapup .wu-gaming { grid-template-columns: minmax(0, 1fr) 96px 96px 84px; }
+.msh-wrapup .wu-tally { grid-template-columns: minmax(0, 1fr) 96px 96px 96px; }
+.msh-wrapup .wu-commit { grid-template-columns: 150px minmax(0, 1fr) auto; }
+.msh-wrapup .wu-weekly { grid-template-columns: 150px minmax(0, 1fr) 96px; }
+.msh-wrapup .wu-colheads { gap: 4px 12px; padding: 0 10px; font-size: 12px; font-weight: 600; color: #5e554b; }
+.msh-wrapup .wu-row { background: #fffaf0; border: 1px solid #ddd2bd; padding: 5px 10px; }
+.msh-wrapup .wu-row.wu-open { background: #fff1d6; border-color: #c98a2b; }
+.msh-wrapup .wu-hero { font-size: 16px; font-weight: 600; }
+.msh-wrapup .wu-root input[type="number"] {
+  width: 70px; height: 30px; font: inherit; font-size: 15px; padding: 0 6px;
+  border: 1px solid #a79a86; border-radius: 0; background: #ffffff; color: #231f1a;
+}
+.msh-wrapup .wu-check { display: flex; align-items: center; gap: 6px; font-size: 15px; cursor: pointer; margin: 0; }
+.msh-wrapup .wu-check input[type="checkbox"] { width: 16px; height: 16px; margin: 0; --checkbox-size: 16px; }
+.msh-wrapup .wu-week-toggle { font-size: 14px; font-weight: 600; }
+.msh-wrapup .wu-commit-text { display: flex; flex-direction: column; min-width: 0; }
+.msh-wrapup .wu-commit-title { font-size: 15px; font-weight: 500; }
+.msh-wrapup .wu-commit-when { font-size: 13px; color: #5e554b; }
+.msh-wrapup .wu-commit-flag { font-size: 13px; font-weight: 600; color: #8a4b00; }
+.msh-wrapup .wu-opts { display: flex; gap: 4px; }
+.msh-wrapup .wu-opt {
+  flex: none; width: auto; height: 30px; line-height: 28px; padding: 0 9px; margin: 0;
+  font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  border: 1px solid #a79a86; border-radius: 0; background: #fffaf0; color: #231f1a;
+}
+.msh-wrapup .wu-opt-kept.is-selected { background: #1f6b2f; border-color: #174f23; color: #ffffff; }
+.msh-wrapup .wu-opt-left.is-selected { background: #9a5a00; border-color: #704100; color: #ffffff; }
+.msh-wrapup .wu-opt-missed.is-selected { background: #9b1c1c; border-color: #6e1212; color: #ffffff; }
+.msh-wrapup .wu-opt-ruling.is-selected { background: #4b4038; border-color: #2b2724; color: #ffffff; }
+.msh-wrapup .wu-obl { font-size: 14px; color: #231f1a; }
+.msh-wrapup .wu-obl-none { color: #6b6258; }
+.msh-wrapup .wu-empty { margin: 0; font-size: 14px; color: #5e554b; }
+.msh-wrapup .wu-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.msh-wrapup .wu-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  background: #fffaf0; border: 1px solid #ddd2bd; padding: 6px 10px;
+}
+.msh-wrapup .wu-total-name { font-size: 15px; font-weight: 600; }
+.msh-wrapup .wu-total-val { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 20px; font-weight: 600; }
+.msh-wrapup .wu-total-val.pos { color: #1f6b2f; }
+.msh-wrapup .wu-total-val.neg { color: #9b1c1c; }
+.msh-wrapup .wu-total-val.zero { color: #5e554b; }
+.msh-wrapup .wu-footer {
+  display: flex; align-items: center; gap: 10px; margin-top: auto;
+  padding: 12px 18px 16px; border-top: 1px solid #c9bca5;
+}
+.msh-wrapup .wu-footer-note { flex: 1; font-size: 14px; color: #5e554b; }
+.msh-wrapup .wu-cancel,
+.msh-wrapup .wu-apply {
+  flex: none; width: auto; height: 44px; padding: 0 18px; margin: 0;
+  font: inherit; font-size: 16px; font-weight: 600; border-radius: 0; cursor: pointer;
+}
+.msh-wrapup .wu-cancel { background: #fffaf0; color: #231f1a; border: 1px solid #7a6f60; }
+.msh-wrapup .wu-apply { padding: 0 22px; background: #9b1c1c; color: #fff8ec; border: 1px solid #6e1212; }
+.msh-wrapup .wu-apply:hover { background: #7f1616; }
+.msh-wrapup .wu-cancel:hover { background: #f3ecdc; }
