@@ -1,3 +1,7 @@
+// scripts/apps/battle-report.js v1.1.1 - 2026-10-03
+// v1.1.1: Crime editor layout: "+ Crime" sits under the Crimes label, each
+//         crime takes two rows (type dropdown with its remove button, then
+//         Stopped and Arrested) so the dropdown shows the full crime name.
 // scripts/apps/battle-report.js v1.1.0 - 2026-10-01
 // v1.1.0: Karma UI slice 2 — the card edits in place, retiring the pop-out
 //         encounter editor. Edit (GM) opens an edit view on the card: name,
@@ -50,13 +54,17 @@ function editHtml(encId, raw, TeamSheet) {
       <button type="button" data-br="foe-remove" data-i="${i}" aria-label="Remove ${esc(v.name)}"><i class="fas fa-times"></i></button>
     </div>`).join("");
 
-  const crimes = TeamSheet._normalizeCrimes(raw).map((c, i) => `<div class="br-erow">
-      <select data-br="crime-type" data-i="${i}" aria-label="Crime type">
-        ${CRIME_OPTIONS.map(([v, l]) => `<option value="${v}" ${c.type === v ? "selected" : ""}>${l}</option>`).join("")}
-      </select>
-      <label><input type="checkbox" data-br="crime-stopped" data-i="${i}" ${c.stopped ? "checked" : ""}> Stopped</label>
-      <label><input type="checkbox" data-br="crime-arrested" data-i="${i}" ${c.arrested ? "checked" : ""}> Arrested</label>
-      <button type="button" data-br="crime-remove" data-i="${i}" aria-label="Remove crime"><i class="fas fa-times"></i></button>
+  const crimes = TeamSheet._normalizeCrimes(raw).map((c, i) => `<div class="br-crime">
+      <div class="br-erow br-crime-type">
+        <select data-br="crime-type" data-i="${i}" aria-label="Crime type">
+          ${CRIME_OPTIONS.map(([v, l]) => `<option value="${v}" ${c.type === v ? "selected" : ""}>${l}</option>`).join("")}
+        </select>
+        <button type="button" data-br="crime-remove" data-i="${i}" aria-label="Remove crime"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="br-erow br-crime-flags">
+        <label><input type="checkbox" data-br="crime-stopped" data-i="${i}" ${c.stopped ? "checked" : ""}> Stopped</label>
+        <label><input type="checkbox" data-br="crime-arrested" data-i="${i}" ${c.arrested ? "checked" : ""}> Arrested</label>
+      </div>
     </div>`).join("");
 
   const num = (field, label, title) => `<label class="br-num" title="${title}">${label}
@@ -70,8 +78,8 @@ function editHtml(encId, raw, TeamSheet) {
     ${foes || "<em class=\"br-none\">No foes.</em>"}
     <button type="button" class="br-small" data-br="foe-add-selected"><i class="fas fa-crosshairs"></i> Add selected tokens</button>
     <div class="br-label">Crimes</div>
-    ${crimes}
     <button type="button" class="br-small" data-br="crime-add"><i class="fas fa-plus"></i> Crime</button>
+    ${crimes}
     <div class="br-label">Other</div>
     <div class="br-nums">
       ${num("rescues", "Rescues", "20 each, at most 100 per rescue action")}

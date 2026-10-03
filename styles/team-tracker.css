@@ -1,4 +1,8 @@
-/* team-tracker.css v4.9.0 - 2026-10-03
+/* team-tracker.css v4.9.1 - 2026-10-03
+ * v4.9.1: Battle report crime editor: dropdown row, then Stopped /
+ *         Arrested row (.br-crime).
+ *
+ * team-tracker.css v4.9.0 - 2026-10-03
  * v4.9.0: Close Session wrap-up dialog (.msh-wrapup), Barlow Semi
  *         Condensed import.
  *
@@ -1117,3 +1121,8 @@
 .msh-wrapup .wu-apply { padding: 0 22px; background: #9b1c1c; color: #fff8ec; border: 1px solid #6e1212; }
 .msh-wrapup .wu-apply:hover { background: #7f1616; }
 .msh-wrapup .wu-cancel:hover { background: #f3ecdc; }
+
+/* Battle report crime editor (v4.9.1) */
+.faserip-battle-report .br-crime { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; border-bottom: 1px dashed rgba(0,0,0,0.2); }
+.faserip-battle-report .br-crime-type select { flex: 1 1 auto; min-width: 0; width: 100%; }
+.faserip-battle-report .br-crime-flags { gap: 14px; padding-left: 2px; }
