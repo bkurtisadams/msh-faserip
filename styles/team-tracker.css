@@ -1,4 +1,14 @@
-/* team-tracker.css v4.4.2 - 2026-05-12
+/* team-tracker.css v4.5.0 - 2026-10-01
+ * v4.5.0: Ledger tab (pending tray, filters, grouped entries) and the
+ *         battle report chat card (.faserip-battle-report).
+ *
+ * team-tracker.css v4.4.3 - 2026-10-01
+ * v4.4.3: Fixed-bug — awarded encounter rows showed no name. The Undo
+ *         <button> inherited Foundry's base width:100%, and in the flex
+ *         header it took the space the name (.enc-villains-summary,
+ *         min-width 0) needed. .btn-undo is now auto-width, no flex.
+ *
+ * team-tracker.css v4.4.2 - 2026-05-12
  * v4.4.2: Drop .awarded opacity entirely — the green ✓ badge already
  *         signals awarded. Awarded rows now muted only at the
  *         .enc-villains-summary level (#555), keeping action icons,
@@ -225,6 +235,9 @@
 .faserip.sheet.team-tracker .awarded-badge { color: #2e7d32; font-size: 12px; }
 .faserip.sheet.team-tracker .btn-undo {
   background: none; border: none; color: #5a5a5a; cursor: pointer; font-size: 11px; padding: 0 2px;
+  /* Foundry's base button is width:100%, which in this flex row squeezed the
+     name to nothing on awarded rows. */
+  width: auto !important; flex: 0 0 auto !important; min-width: 0; margin: 0;
 }
 .faserip.sheet.team-tracker .btn-undo:hover { color: #c62828; }
 .faserip.sheet.team-tracker .delete-encounter {
@@ -858,3 +871,64 @@
   padding: 24px; text-align: center; color: #888;
   font-family: 'Barlow Condensed', sans-serif;
 }
+
+/* ===== LEDGER TAB ===== */
+.faserip.sheet.team-tracker .tt-panel-ledger { display: flex; flex-direction: column; gap: 6px; }
+.faserip.sheet.team-tracker .ledger-header { margin-top: 10px; }
+.faserip.sheet.team-tracker .ledger-header select { width: auto; height: 26px; font-size: 12px; }
+.faserip.sheet.team-tracker .ledger-pending { display: flex; flex-direction: column; gap: 4px; }
+.faserip.sheet.team-tracker .ledger-pending-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  background: #fff; border: 1px solid #8b0000; border-left-width: 4px; border-radius: 3px;
+}
+.faserip.sheet.team-tracker .lp-main { flex: 1; min-width: 0; }
+.faserip.sheet.team-tracker .lp-title {
+  font-weight: 700; color: #000; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.faserip.sheet.team-tracker .lp-sub { font-size: 11px; color: #555; }
+.faserip.sheet.team-tracker .ledger-award {
+  width: auto !important; flex: 0 0 auto !important; height: 26px; padding: 0 10px; margin: 0;
+  background: #8b0000; color: #fff; border: none; border-radius: 3px; font-weight: 700; font-size: 12px; cursor: pointer;
+}
+.faserip.sheet.team-tracker .ledger-award:hover { background: #6b0000; }
+.faserip.sheet.team-tracker .ledger-list { display: flex; flex-direction: column; gap: 4px; }
+.faserip.sheet.team-tracker .ledger-group { background: #fff; border: 1px solid #ccc; border-radius: 3px; padding: 4px 8px; }
+.faserip.sheet.team-tracker .lg-head { display: flex; align-items: center; gap: 8px; }
+.faserip.sheet.team-tracker .lg-title {
+  flex: 1; min-width: 0; font-weight: 700; color: #000; font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.faserip.sheet.team-tracker .lg-date { font-size: 11px; color: #555; white-space: nowrap; }
+.faserip.sheet.team-tracker .lg-total { font-weight: 700; font-size: 13px; min-width: 40px; text-align: right; }
+.faserip.sheet.team-tracker .lg-line { display: flex; gap: 8px; font-size: 12px; padding-left: 10px; color: #333; }
+.faserip.sheet.team-tracker .lg-hero { font-weight: 600; white-space: nowrap; }
+.faserip.sheet.team-tracker .lg-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #555; }
+.faserip.sheet.team-tracker .lg-amt { font-weight: 600; min-width: 40px; text-align: right; }
+.faserip.sheet.team-tracker .pos { color: #1b5e20; }
+.faserip.sheet.team-tracker .neg { color: #b71c1c; }
+.faserip.sheet.team-tracker .ledger-more { width: auto; align-self: center; margin-top: 4px; }
+
+/* ===== BATTLE REPORT CHAT CARD ===== */
+.faserip-battle-report { background: #f5f5f0; border: 1px solid #8b0000; border-radius: 3px; font-size: 13px; }
+.faserip-battle-report.is-awarded { border-color: #2e7d32; }
+.faserip-battle-report .br-head {
+  display: flex; justify-content: space-between; gap: 6px; padding: 5px 8px;
+  background: #8b0000; color: #fff;
+}
+.faserip-battle-report.is-awarded .br-head { background: #2e7d32; }
+.faserip-battle-report .br-when { font-size: 11px; opacity: 0.9; white-space: nowrap; }
+.faserip-battle-report .br-body { padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; }
+.faserip-battle-report .br-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-top: 4px;
+}
+.faserip-battle-report .br-foe { display: flex; gap: 6px; align-items: baseline; }
+.faserip-battle-report .br-count { font-weight: 700; min-width: 22px; }
+.faserip-battle-report .br-name { flex: 1; min-width: 0; }
+.faserip-battle-report .br-rank { font-size: 11px; color: #555; white-space: nowrap; }
+.faserip-battle-report .br-karma { font-weight: 700; color: #1b5e20; min-width: 34px; text-align: right; }
+.faserip-battle-report .br-extras { font-size: 12px; color: #333; }
+.faserip-battle-report .br-summary { margin-top: 4px; padding-top: 4px; border-top: 1px solid #ddd; font-size: 12px; }
+.faserip-battle-report .br-status { font-weight: 700; color: #2e7d32; }
+.faserip-battle-report .br-buttons { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid #ddd; }
+.faserip-battle-report .br-buttons button { flex: 1; height: 28px; font-size: 12px; }
+.faserip-battle-report .br-buttons .br-primary { background: #8b0000; color: #fff; font-weight: 700; }

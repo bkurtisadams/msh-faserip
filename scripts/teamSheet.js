@@ -1,3 +1,17 @@
+// teamSheet.js v4.15.0 - 2026-10-01
+// v4.15.0: Karma UI refactor, slice 1 (ledger + battle report).
+//          - Encounters tab becomes the Ledger: a pending tray (unawarded
+//            encounters with Award / Edit / Delete) above every team
+//            member's karma history, grouped by encounter, newest first,
+//            filtered by hero and by kind (awards & losses / awards / losses /
+//            spending / all). Undo per encounter or per single line. The
+//            inline encounter forms are gone from the tab; editing is the
+//            pop-out editor until the battle report card edits in place.
+//          - Combat-end capture posts a battle report chat card
+//            (apps/battle-report.js).
+//          - TeamSheet.worker() gives the award engine without an open
+//            window (headless instance); awardEncounterById /
+//            undoEncounterById / editEncounterById drive it by encounter id.
 // teamSheet.js v4.14.1 - 2026-10-01
 // v4.14.1: Loss multiplier is the Penalty multiplier as set (no "> 1 only"
 //          special case), matching karma-multipliers.js v1.2.0.
@@ -150,6 +164,7 @@ import { RANKS_ORDERED, rankValueForStorage } from "./rules/rules-reference.js";
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey, computeKarmaTotals } from "./karma-rules.js";
 import { EncounterEditor } from "./apps/encounter-editor.js";
+import { postBattleReport, registerBattleReportHooks } from "./apps/battle-report.js";
 import { foeDefeatAward, poolAbsorbLoss } from "./lib/faserip-rules/faserip-karma.js";
 
 export class TeamSheet extends Application {
@@ -528,6 +543,11 @@ export class TeamSheet extends Application {
     });
 
     context.encounterCount = context.encounters.length;
+    context.pending = context.encounters
+      .map((e, idx) => ({ ...e, idx, heroesLabel: e.heroCount ? `${e.heroCount} hero${e.heroCount === 1 ? "" : "es"}` : "" }))
+      .filter(e => !e.awarded);
+    context.pendingCount = context.pending.length;
+    Object.assign(context, this._buildLedger(context));
 
     // Team Headquarters
     const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
@@ -535,6 +555,146 @@ export class TeamSheet extends Application {
     context.teamHQs = hqActor ? hqActor.items.filter(i => i.type === "headquarters").map(i => ({ id: i.id, name: i.name, img: i.img, location: i.system.location, size: i.system.size, materialStrength: i.system.materialStrength, ownership: i.system.ownership, purchaseCost: i.system.purchaseCost, rentCost: i.system.rentCost })) : [];
 
     return context;
+  }
+
+  /** Karma entries a GM would call spending rather than an award or loss. */
+  static _isSpendingType(type) {
+    return /die roll|advancement|pool contribution|stunt|spend|build|purchase|invent/i.test(String(type || ""));
+  }
+
+  /** Ledger view: team members' karma history grouped by encounter. */
+  _buildLedger(context) {
+    const heroFilter = this._ledgerHero || "all";
+    const kind = this._ledgerKind || "awardsLosses";
+    const limit = this._ledgerLimit || 60;
+    const encById = new Map((context.encounters || []).map((e, idx) => [e.id, { ...e, idx }]));
+    const groups = new Map();
+
+    for (const tm of context.teamMembers || []) {
+      if (heroFilter !== "all" && heroFilter !== tm.id) continue;
+      const actor = game.actors.get(tm.id);
+      const history = actor?.system?.karma?.history || [];
+      history.forEach((e, i) => {
+        const amount = Number(e.amount) || 0;
+        if (!amount) return;
+        const spending = TeamSheet._isSpendingType(e.type);
+        if (kind === "awardsLosses" && spending) return;
+        if (kind === "awards" && (spending || amount < 0)) return;
+        if (kind === "losses" && (spending || amount > 0)) return;
+        if (kind === "spending" && !spending) return;
+
+        const key = e.encounterId ? `enc:${e.encounterId}` : `line:${tm.id}:${i}`;
+        let g = groups.get(key);
+        if (!g) {
+          const enc = e.encounterId ? encById.get(e.encounterId) : null;
+          g = {
+            key, encounterId: e.encounterId || null,
+            encIdx: enc ? enc.idx : null,
+            title: enc ? enc.displayName : (e.type || "Karma"),
+            gameDate: e.gameDate || "", timestamp: e.timestamp || "",
+            lines: [], total: 0,
+            singleActorId: e.encounterId ? null : tm.id,
+            singleIndex: e.encounterId ? null : i
+          };
+          groups.set(key, g);
+        }
+        if (String(e.timestamp || "") > g.timestamp) g.timestamp = e.timestamp;
+        g.total += amount;
+        g.lines.push({ heroName: tm.name, amount, positive: amount > 0, type: e.type || "", description: e.description || "" });
+      });
+    }
+
+    const ledger = [...groups.values()]
+      .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+      .map(g => ({
+        ...g,
+        isEncounter: !!g.encounterId,
+        canUndoEncounter: g.encIdx !== null,
+        totalPositive: g.total > 0,
+        totalDisplay: `${g.total > 0 ? "+" : ""}${g.total}`,
+        lines: g.lines.map(l => ({ ...l, amountDisplay: `${l.amount > 0 ? "+" : ""}${l.amount}` }))
+      }));
+
+    return {
+      ledger: ledger.slice(0, limit),
+      ledgerMore: ledger.length > limit,
+      ledgerHero: heroFilter,
+      ledgerHeroOptions: (context.teamMembers || []).map(tm => ({ id: tm.id, name: tm.name, selected: tm.id === heroFilter })),
+      ledgerKindOptions: [
+        ["awardsLosses", "Awards & losses"], ["awards", "Awards"], ["losses", "Losses"],
+        ["spending", "Spending"], ["all", "Everything"]
+      ].map(([value, label]) => ({ value, label, selected: value === kind }))
+    };
+  }
+
+  async _onLedgerUndoLine(ev) {
+    ev.stopPropagation();
+    if (!game.user.isGM) return;
+    const { actorId, index } = ev.currentTarget.dataset;
+    const hero = game.actors.get(actorId);
+    const i = Number(index);
+    const history = foundry.utils.deepClone(hero?.system?.karma?.history || []);
+    const entry = history[i];
+    if (!entry) return;
+    if (!await Dialog.confirm({
+      title: "Undo Karma Entry",
+      content: `<p>Remove this entry from <strong>${hero.name}</strong>?</p><p>${entry.amount > 0 ? "+" : ""}${entry.amount} — ${entry.description || entry.type || ""}</p>`
+    })) return;
+    history.splice(i, 1);
+    const { earned, value } = computeKarmaTotals(history, { advancement: hero.system.karma?.advancement });
+    await hero.update({
+      "system.karma.history": history,
+      "system.karma.lifetime": earned,
+      "system.attributes.karma.value": value
+    });
+    this.render(false);
+  }
+
+  /** The open Team Tracker, or a hidden one that runs the award engine. */
+  static worker() {
+    const open = Object.values(ui.windows).find(w => w instanceof TeamSheet && w.rendered);
+    if (open) return open;
+    if (!TeamSheet._headless) {
+      const w = new TeamSheet();
+      w._headless = true;
+      // Never open a window from the card; keep a pop-out editor fresh.
+      w.render = () => { if (w._encEditor?.rendered) w._encEditor.render(false); return w; };
+      TeamSheet._headless = w;
+    }
+    return TeamSheet._headless;
+  }
+
+  static _encIdxById(encId) {
+    const list = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    return list.findIndex(e => e.id === encId);
+  }
+
+  static _fakeEvent(idx) {
+    return { stopPropagation() {}, preventDefault() {}, currentTarget: { dataset: { encIdx: String(idx) } } };
+  }
+
+  static _refreshOpenSheets() {
+    for (const w of Object.values(ui.windows)) if (w instanceof TeamSheet && w.rendered) w.render(false);
+  }
+
+  static async awardEncounterById(encId) {
+    const idx = TeamSheet._encIdxById(encId);
+    if (idx < 0) return;
+    await TeamSheet.worker()._onAwardEncounterToHeroes(TeamSheet._fakeEvent(idx));
+    TeamSheet._refreshOpenSheets();
+  }
+
+  static async undoEncounterById(encId) {
+    const idx = TeamSheet._encIdxById(encId);
+    if (idx < 0) return;
+    await TeamSheet.worker()._onUndoAward(TeamSheet._fakeEvent(idx));
+    TeamSheet._refreshOpenSheets();
+  }
+
+  static editEncounterById(encId) {
+    const idx = TeamSheet._encIdxById(encId);
+    if (idx < 0) return;
+    TeamSheet.worker()._onPopoutEncounter(TeamSheet._fakeEvent(idx));
   }
 
   _calculateAvailableKarma(actor) {
@@ -625,6 +785,11 @@ export class TeamSheet extends Application {
 
     // Pop encounter into its own editor window
     html.find('.popout-encounter').click(ev => this._onPopoutEncounter(ev));
+    html.find('.ledger-award').click(ev => this._onAwardEncounterToHeroes(ev));
+    html.find('.ledger-undo-line').click(ev => this._onLedgerUndoLine(ev));
+    html.find('.ledger-hero-filter').change(ev => { this._ledgerHero = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
+    html.find('.ledger-kind-filter').change(ev => { this._ledgerKind = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
+    html.find('.ledger-more').click(() => { this._ledgerLimit = (this._ledgerLimit || 60) + 60; this.render(false); });
 
     // Encounter controls
     html.find('.hero-present-toggle').change(ev => this._onToggleHeroPresent(ev));
@@ -2405,6 +2570,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
   // ===== COMBAT HOOK =====
 
   static registerCombatHook() {
+    registerBattleReportHooks();
     Hooks.on("deleteCombat", (combat) => {
       if (!game.user.isGM) return;
       console.log("[FASERIP] deleteCombat hook fired, combatants:", combat.combatants?.size);
@@ -2474,8 +2640,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
     const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
     const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const newEncId = `enc_${Date.now()}`;
     encounters.push({
-      id: `enc_${Date.now()}`,
+      id: newEncId,
       villains,
       presentHeroIds: [...heroCombatantIds],
       crimes: [],
@@ -2491,6 +2658,8 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     for (const w of Object.values(ui.windows)) {
       if (w instanceof TeamSheet) w.render(true);
     }
+    try { await postBattleReport(newEncId); }
+    catch (e) { console.error("[FASERIP] Battle report card failed:", e); }
   }
 
   // ===== TIME =====

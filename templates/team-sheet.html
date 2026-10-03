@@ -32,8 +32,8 @@
       {{#if teamMembers.length}}<span class="tt-tab-count">{{teamMembers.length}}</span>{{/if}}
     </button>
     <button type="button" class="tt-tab {{#if isEncountersTab}}active{{/if}}" data-tab="encounters">
-      <i class="fas fa-skull"></i> Encounters
-      {{#if encounterCount}}<span class="tt-tab-count">{{encounterCount}}</span>{{/if}}
+      <i class="fas fa-book"></i> Ledger
+      {{#if pendingCount}}<span class="tt-tab-count" title="Pending awards">{{pendingCount}}</span>{{/if}}
     </button>
     <button type="button" class="tt-tab {{#if isHqTab}}active{{/if}}" data-tab="hq">
       <i class="fas fa-building"></i> HQ
@@ -153,64 +153,83 @@
     {{/if}}
     <!-- ═══ END HQ TAB ═══ -->
 
-    <!-- ═══ ENCOUNTERS TAB ═══ -->
+    <!-- ═══ LEDGER TAB ═══ -->
     {{#if isEncountersTab}}
-    <div class="tt-panel tt-panel-encounters">
+    <div class="tt-panel tt-panel-ledger">
     {{#if isGM}}
-    <div class="encounters-section">
       <div class="section-header">
-        <h3>Encounters ({{encounterCount}})</h3>
+        <h3>Pending ({{pendingCount}})</h3>
         <div class="section-btns">
           <button type="button" class="import-encounter-text" title="Import an encounter from pasted text (module karma awards)"><i class="fas fa-file-import"></i> Import</button>
-          <button type="button" class="add-encounter-manual"><i class="fas fa-plus"></i> Add Encounter</button>
+          <button type="button" class="add-encounter-manual"><i class="fas fa-plus"></i> Add</button>
         </div>
       </div>
-
-      {{#if encounters.length}}
-      <div class="encounters-list">
-        {{#each encounters as |enc|}}
-        <div class="encounter-entry {{#if enc.awarded}}awarded{{/if}} {{#if enc.expanded}}expanded{{/if}}" data-enc-idx="{{@index}}">
-
-          <!-- Header (collapsed row) -->
-          <div class="encounter-header" data-enc-idx="{{@index}}">
-            <span class="expand-toggle"><i class="fas fa-chevron-{{#if enc.expanded}}down{{else}}right{{/if}}"></i></span>
-            <i class="{{enc.iconClass}} enc-type-icon" title="{{enc.typeLabel}}"></i>
-            <span class="enc-label">{{enc.typeLabel}}</span>
-            {{#if enc.dateDisplay}}<span class="enc-date">{{enc.dateDisplay}}</span>{{/if}}
-            <span class="enc-villains-summary">{{enc.displayName}}</span>
-            {{#if enc.hasPositive}}
-            <span class="karma-val">+{{enc.positiveTotal}}</span>
-            {{else}}
-            <span class="karma-val no-award">--</span>
-            {{/if}}
-            {{#if enc.awarded}}
-            <span class="awarded-badge" title="Awarded"><i class="fas fa-check-circle"></i></span>
-            <button type="button" class="undo-award btn-undo" data-enc-idx="{{@index}}" title="Undo award"><i class="fas fa-undo"></i></button>
-            {{/if}}
-            <a class="popout-encounter" data-enc-idx="{{@index}}" title="Edit in window"><i class="fas fa-window-restore"></i></a>
-            <a class="delete-encounter" data-enc-idx="{{@index}}" title="Delete"><i class="fas fa-times"></i></a>
+      {{#if pending.length}}
+      <div class="ledger-pending">
+        {{#each pending as |enc|}}
+        <div class="ledger-pending-row">
+          <i class="{{enc.iconClass}} enc-type-icon" title="{{enc.typeLabel}}"></i>
+          <div class="lp-main">
+            <div class="lp-title">{{enc.displayName}}</div>
+            <div class="lp-sub">{{enc.dateDisplay}}{{#if enc.heroesLabel}} · {{enc.heroesLabel}}{{/if}}</div>
           </div>
-
-          <!-- Expanded detail -->
-          {{#if enc.expanded}}
-          <div class="encounter-detail">
-            {{> "systems/msh-faserip/templates/parts/encounter-editor-body.hbs" enc=enc encIdx=@index sections=enc.sections useKarmaPool=@root.useKarmaPool showCloseButton=false}}
-          </div>
-          {{/if}}
+          {{#if enc.hasPositive}}<span class="karma-val">+{{enc.positiveTotal}}</span>{{else}}<span class="karma-val no-award">--</span>{{/if}}
+          <button type="button" class="ledger-award" data-enc-idx="{{enc.idx}}" title="Award"><i class="fas fa-check"></i> Award</button>
+          <a class="popout-encounter" data-enc-idx="{{enc.idx}}" title="Edit"><i class="fas fa-pen"></i></a>
+          <a class="delete-encounter" data-enc-idx="{{enc.idx}}" title="Delete"><i class="fas fa-times"></i></a>
         </div>
         {{/each}}
       </div>
       {{else}}
-      <p class="no-encounters">No encounters yet. Foes auto-capture from combat.</p>
+      <p class="no-encounters">Nothing waiting. Battle reports land here when combat ends.</p>
       {{/if}}
-    </div>
-    {{else}}
-    <p class="no-encounters">Encounters are managed by the GM.</p>
-    {{/if}}
 
+      <div class="section-header ledger-header">
+        <h3>Ledger</h3>
+        <div class="section-btns">
+          <select class="ledger-hero-filter" aria-label="Hero">
+            <option value="all">All heroes</option>
+            {{#each ledgerHeroOptions as |o|}}<option value="{{o.id}}" {{#if o.selected}}selected{{/if}}>{{o.name}}</option>{{/each}}
+          </select>
+          <select class="ledger-kind-filter" aria-label="Kind">
+            {{#each ledgerKindOptions as |o|}}<option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>{{/each}}
+          </select>
+        </div>
+      </div>
+      {{#if ledger.length}}
+      <div class="ledger-list">
+        {{#each ledger as |g|}}
+        <div class="ledger-group">
+          <div class="lg-head">
+            <span class="lg-title">{{g.title}}</span>
+            <span class="lg-date">{{g.gameDate}}</span>
+            <span class="lg-total {{#if g.totalPositive}}pos{{else}}neg{{/if}}">{{g.totalDisplay}}</span>
+            {{#if g.isEncounter}}
+              {{#if g.canUndoEncounter}}<button type="button" class="undo-award btn-undo" data-enc-idx="{{g.encIdx}}" title="Undo this award for every hero"><i class="fas fa-undo"></i></button>{{/if}}
+            {{else}}
+              <button type="button" class="ledger-undo-line btn-undo" data-actor-id="{{g.singleActorId}}" data-index="{{g.singleIndex}}" title="Undo this entry"><i class="fas fa-undo"></i></button>
+            {{/if}}
+          </div>
+          {{#each g.lines as |l|}}
+          <div class="lg-line">
+            <span class="lg-hero">{{l.heroName}}</span>
+            <span class="lg-desc">{{l.description}}</span>
+            <span class="lg-amt {{#if l.positive}}pos{{else}}neg{{/if}}">{{l.amountDisplay}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/each}}
+      </div>
+      {{#if ledgerMore}}<button type="button" class="ledger-more">Show more</button>{{/if}}
+      {{else}}
+      <p class="no-encounters">No karma entries match.</p>
+      {{/if}}
+    {{else}}
+    <p class="no-encounters">The ledger is kept by the GM.</p>
+    {{/if}}
     </div>
     {{/if}}
-    <!-- ═══ END ENCOUNTERS TAB ═══ -->
+    <!-- ═══ END LEDGER TAB ═══ -->
 
   </div>
 </form>

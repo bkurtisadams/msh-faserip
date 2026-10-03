@@ -1,3 +1,6 @@
+// chat-hooks.js v1.8.4 - 2026-10-01
+// v1.8.4: battle report card buttons (br-award / br-edit / br-undo) wired to
+//         apps/battle-report.js.
 // chat-hooks.js v1.8.3 - 2026-10-01
 // v1.8.3: dying-refeat-200 rolls at -2CS while Endurance is impaired
 //         (selfPenaltyCS; RAW Impaired Abilities).
@@ -840,6 +843,14 @@ export function installActionChatHandlers() {
           });
         }
       } catch (e) { console.error("[FASERIP] dying-refeat-200 handler failed:", e); }
+    });
+
+    html.on("click", '[data-action="br-award"], [data-action="br-edit"], [data-action="br-undo"]', async (ev) => {
+      ev.preventDefault();
+      try {
+        const { handleBattleReportClick } = await import("../../apps/battle-report.js");
+        await handleBattleReportClick(ev.currentTarget);
+      } catch (e) { console.error("[FASERIP] battle report handler failed:", e); }
     });
 
     html.on("click", '[data-action="stun-recovery-roll"]', async (ev) => {
