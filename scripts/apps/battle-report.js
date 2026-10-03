@@ -1,17 +1,27 @@
-// scripts/apps/battle-report.js v1.0.0 - 2026-10-01
+// scripts/apps/battle-report.js v1.1.0 - 2026-10-01
+// v1.1.0: Karma UI slice 2 — the card edits in place, retiring the pop-out
+//         encounter editor. Edit (GM) opens an edit view on the card: name,
+//         heroes present, foe counts (0 removes) and "Add selected tokens",
+//         crimes (type, stopped, arrested), rescues, losses each, GM award.
+//         Every change writes the encounter record and the card redraws with
+//         new totals. Edit mode is per client (a Set of encounter ids,
+//         re-applied on render). openBattleReportEditor posts a fresh card in
+//         edit mode and removes older cards for the same encounter, so each
+//         encounter has one live card; the Ledger's Edit and Add/Import use it.
 // v1.0.0: Battle report chat card (karma UI refactor, slice 1).
-//         When combat ends and foes were captured, a GM-whispered card shows
-//         the foes defeated (with counts and karma), the heroes present and
-//         the per-hero result, with Award / Edit / Undo buttons. The card is
-//         a view of the pending encounter record (defeatedVillains setting),
-//         so the Team Tracker Ledger, the encounter editor and the card all
-//         act on the same data; cards refresh whenever that setting changes.
-//         Award, Undo and Edit run through the TeamSheet award engine
-//         (TeamSheet.awardEncounterById / undoEncounterById /
-//         editEncounterById), so the karma math stays in one place.
 
 const SCOPE = "msh-faserip";
 const FLAG = "battleReport";
+const editing = new Set();
+
+const CRIME_OPTIONS = [
+  ["", "— Crime —"],
+  ["violent", "Violent (30/15)"], ["destructive", "Destructive (20/10)"],
+  ["theft", "Theft (10/5)"], ["robbery", "Robbery (20/10)"],
+  ["misdemeanor", "Misdemeanor (5/5)"], ["national", "National Offense (20/10)"],
+  ["localConspiracy", "Local Conspiracy (30/15)"], ["nationalConspiracy", "National Conspiracy (40/20)"],
+  ["globalConspiracy", "Global Conspiracy (50/25)"], ["other", "Other Crimes (15/5)"]
+];
 
 function encounters() {
   return game.settings.get(SCOPE, "defeatedVillains") || [];
@@ -26,27 +36,68 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function editHtml(encId, raw, TeamSheet) {
+  const teamIds = game.settings.get(SCOPE, "teamMembers") || [];
+  const present = new Set(raw.presentHeroIds || []);
+  const heroes = teamIds.map(id => game.actors.get(id)).filter(Boolean).map(a =>
+    `<label class="br-chip"><input type="checkbox" data-br="hero" data-id="${a.id}" ${present.has(a.id) ? "checked" : ""}> ${esc(a.name)}</label>`
+  ).join("") || "<em>No team members.</em>";
+
+  const foes = (raw.villains || []).map((v, i) => `<div class="br-erow">
+      <span class="br-name">${esc(v.name)}</span>
+      <span class="br-rank">${esc(v.rankLabel || "")} ${Number(v.rankValue) || ""}</span>
+      <input type="number" min="0" max="99" data-br="foe-count" data-i="${i}" value="${Math.max(1, Number(v.count) || 1)}" aria-label="Count of ${esc(v.name)}">
+      <button type="button" data-br="foe-remove" data-i="${i}" aria-label="Remove ${esc(v.name)}"><i class="fas fa-times"></i></button>
+    </div>`).join("");
+
+  const crimes = TeamSheet._normalizeCrimes(raw).map((c, i) => `<div class="br-erow">
+      <select data-br="crime-type" data-i="${i}" aria-label="Crime type">
+        ${CRIME_OPTIONS.map(([v, l]) => `<option value="${v}" ${c.type === v ? "selected" : ""}>${l}</option>`).join("")}
+      </select>
+      <label><input type="checkbox" data-br="crime-stopped" data-i="${i}" ${c.stopped ? "checked" : ""}> Stopped</label>
+      <label><input type="checkbox" data-br="crime-arrested" data-i="${i}" ${c.arrested ? "checked" : ""}> Arrested</label>
+      <button type="button" data-br="crime-remove" data-i="${i}" aria-label="Remove crime"><i class="fas fa-times"></i></button>
+    </div>`).join("");
+
+  const num = (field, label, title) => `<label class="br-num" title="${title}">${label}
+      <input type="number" min="0" max="9999" data-br="num" data-field="${field}" value="${Number(raw[field]) || 0}"></label>`;
+
+  return `<div class="br-edit">
+    <label class="br-erow br-namerow">Name <input type="text" data-br="name" value="${esc(raw.name || "")}" placeholder="Battle name"></label>
+    <div class="br-label">Heroes present</div>
+    <div class="br-chips">${heroes}</div>
+    <div class="br-label">Foes defeated</div>
+    ${foes || "<em class=\"br-none\">No foes.</em>"}
+    <button type="button" class="br-small" data-br="foe-add-selected"><i class="fas fa-crosshairs"></i> Add selected tokens</button>
+    <div class="br-label">Crimes</div>
+    ${crimes}
+    <button type="button" class="br-small" data-br="crime-add"><i class="fas fa-plus"></i> Crime</button>
+    <div class="br-label">Other</div>
+    <div class="br-nums">
+      ${num("rescues", "Rescues", "20 each, at most 100 per rescue action")}
+      ${num("losses", "Losses each", "Each present hero loses this amount (losses are individual)")}
+      ${num("gmAward", "GM award", "Task or milestone karma, shared like the rest")}
+    </div>
+  </div>`;
+}
+
 /** Card HTML for one encounter, from the TeamSheet's own encounter context. */
 async function buildCardHtml(encId) {
   const TeamSheet = await teamSheetClass();
   const ctx = TeamSheet.worker().getData();
   const enc = (ctx.encounters || []).find(e => e.id === encId);
-  if (!enc) {
+  const raw = encounters().find(e => e.id === encId);
+  if (!enc || !raw) {
     return `<div class="faserip-battle-report br-gone"><div class="br-head"><strong>Battle Report</strong></div>
       <div class="br-body"><em>This encounter was deleted.</em></div></div>`;
   }
 
-  const foes = (enc.villainRows || enc.villains || []).map(v => {
-    const count = Number(v.count) || 1;
-    const each = Number(v.rankValue) || 0;
-    const karma = v.eligible === false ? "—" : (v.foeKarma ?? "");
-    return `<div class="br-foe">
-      <span class="br-count">${count}×</span>
+  const foes = (enc.villainRows || []).map(v => `<div class="br-foe">
+      <span class="br-count">${Number(v.count) || 1}×</span>
       <span class="br-name">${esc(v.name)}</span>
-      <span class="br-rank">${esc(v.rankLabel || "")}${each ? ` ${each}` : ""}</span>
-      <span class="br-karma">${karma === "" ? "" : (karma === "—" ? "—" : `+${karma}`)}</span>
-    </div>`;
-  }).join("");
+      <span class="br-rank">${esc(v.rankLabel || "")}${v.rankValue ? ` ${v.rankValue}` : ""}</span>
+      <span class="br-karma">${v.eligible ? `+${v.foeKarma}` : "—"}</span>
+    </div>`).join("");
 
   const heroes = (enc.heroChecks || []).filter(h => h.present).map(h => esc(h.name)).join(", ") || "<em>none marked present</em>";
   const extras = [];
@@ -58,38 +109,52 @@ async function buildCardHtml(encId) {
 
   const title = esc(enc.displayName || "Battle");
   const when = esc(enc.dateDisplay || "");
-  const status = enc.awarded
-    ? `<div class="br-status br-awarded"><i class="fas fa-check-circle"></i> Awarded</div>`
-    : "";
   const buttons = enc.awarded
     ? `<button type="button" data-action="br-undo" data-enc-id="${encId}"><i class="fas fa-undo"></i> Undo</button>`
-    : `<button type="button" data-action="br-edit" data-enc-id="${encId}"><i class="fas fa-pen"></i> Edit</button>
+    : `<button type="button" class="br-edit-btn" data-action="br-edit" data-enc-id="${encId}"><i class="fas fa-pen"></i> <span class="br-edit-label">Edit</span><span class="br-done-label">Done</span></button>
        <button type="button" class="br-primary" data-action="br-award" data-enc-id="${encId}"><i class="fas fa-check"></i> Award</button>`;
 
-  return `<div class="faserip-battle-report${enc.awarded ? " is-awarded" : ""}">
+  return `<div class="faserip-battle-report${enc.awarded ? " is-awarded" : ""}" data-enc-id="${encId}">
     <div class="br-head"><strong>Battle Report — ${title}</strong><span class="br-when">${when}</span></div>
     <div class="br-body">
-      ${foes ? `<div class="br-label">Foes defeated</div>${foes}` : ""}
-      ${extras.length ? `<div class="br-extras">${extras.join(" · ")}</div>` : ""}
-      <div class="br-label">Heroes present</div>
-      <div class="br-heroes">${heroes}</div>
-      ${enc.summaryLine ? `<div class="br-summary">${enc.summaryLine}</div>` : ""}
-      ${status}
+      <div class="br-view">
+        ${foes ? `<div class="br-label">Foes defeated</div>${foes}` : ""}
+        ${extras.length ? `<div class="br-extras">${extras.join(" · ")}</div>` : ""}
+        <div class="br-label">Heroes present</div>
+        <div class="br-heroes">${heroes}</div>
+      </div>
+      ${enc.awarded ? "" : editHtml(encId, raw, TeamSheet)}
+      ${enc.summaryLine ? `<div class="br-summary">${enc.summaryLine}</div>` : `<div class="br-summary"><em>No karma yet.</em></div>`}
+      ${enc.awarded ? `<div class="br-status"><i class="fas fa-check-circle"></i> Awarded</div>` : ""}
     </div>
     <div class="br-buttons">${buttons}</div>
   </div>`;
 }
 
-/** Post the GM-whispered battle report for a captured encounter. */
+function gmIds() {
+  return game.users.filter(u => u.isGM).map(u => u.id);
+}
+
+/** Post the GM-whispered battle report for an encounter. */
 export async function postBattleReport(encId) {
   if (!game.user.isGM) return;
   const content = await buildCardHtml(encId);
   await ChatMessage.create({
     content,
-    whisper: game.users.filter(u => u.isGM).map(u => u.id),
+    whisper: gmIds(),
     speaker: { alias: "Battle Report" },
     flags: { [SCOPE]: { [FLAG]: encId } }
   });
+}
+
+/** Post a fresh card in edit mode; older cards for this encounter are removed. */
+export async function openBattleReportEditor(encId) {
+  if (!game.user.isGM) return;
+  const old = game.messages.filter(m => m.getFlag(SCOPE, FLAG) === encId).map(m => m.id);
+  if (old.length) await ChatMessage.deleteDocuments(old);
+  editing.add(encId);
+  await postBattleReport(encId);
+  ui.sidebar?.changeTab?.("chat", "primary");
 }
 
 let _refreshTimer = null;
@@ -98,36 +163,125 @@ export function refreshBattleReports() {
   if (!game.user.isGM) return;
   clearTimeout(_refreshTimer);
   _refreshTimer = setTimeout(async () => {
-    const msgs = game.messages.filter(m => m.getFlag(SCOPE, FLAG));
-    for (const m of msgs) {
+    for (const m of game.messages.filter(msg => msg.getFlag(SCOPE, FLAG))) {
       const html = await buildCardHtml(m.getFlag(SCOPE, FLAG));
       if (html !== m.content) await m.update({ content: html });
     }
-  }, 200);
+  }, 150);
 }
 
-/** Chat button handler (wired in chat-hooks.js). */
+/** Change the stored encounter; the setting hook redraws the cards. */
+async function mutate(encId, fn) {
+  const list = foundry.utils.deepClone(encounters());
+  const enc = list.find(e => e.id === encId);
+  if (!enc || enc.awarded) return;
+  await fn(enc);
+  await game.settings.set(SCOPE, "defeatedVillains", list);
+}
+
+async function onEditControl(el, encId) {
+  const TeamSheet = await teamSheetClass();
+  const i = Number(el.dataset.i);
+  switch (el.dataset.br) {
+    case "name":
+      return mutate(encId, e => { e.name = el.value.trim(); });
+    case "hero":
+      return mutate(encId, e => {
+        const ids = new Set(e.presentHeroIds || []);
+        if (el.checked) ids.add(el.dataset.id); else ids.delete(el.dataset.id);
+        e.presentHeroIds = [...ids];
+      });
+    case "foe-count":
+      return mutate(encId, e => {
+        const n = Math.max(0, Math.floor(Number(el.value) || 0));
+        if (n === 0) e.villains.splice(i, 1);
+        else if (e.villains[i]) e.villains[i].count = n;
+      });
+    case "foe-remove":
+      return mutate(encId, e => { e.villains.splice(i, 1); });
+    case "foe-add-selected": {
+      const team = new Set(game.settings.get(SCOPE, "teamMembers") || []);
+      const actors = (canvas?.tokens?.controlled || []).map(t => t.actor).filter(a => a && !team.has(a.id));
+      if (!actors.length) { ui.notifications.warn("Select the foes' tokens first."); return; }
+      return mutate(encId, e => {
+        e.villains ??= [];
+        for (const a of actors) {
+          const hit = e.villains.find(v => v.actorId === a.id);
+          if (hit) { hit.count = (Number(hit.count) || 1) + 1; continue; }
+          const { rankValue, rankLabel } = TeamSheet.getHighestRank(a);
+          e.villains.push({ name: a.name, img: a.img || "icons/svg/mystery-man.svg", actorId: a.id, rankValue, rankLabel, count: 1 });
+        }
+      });
+    }
+    case "crime-add":
+      return mutate(encId, e => {
+        e.crimes = [...TeamSheet._normalizeCrimes(e), { type: "", stopped: false, arrested: false }];
+        delete e.crimeType; delete e.stopped; delete e.arrested;
+      });
+    case "crime-remove":
+    case "crime-type":
+    case "crime-stopped":
+    case "crime-arrested":
+      return mutate(encId, e => {
+        const crimes = [...TeamSheet._normalizeCrimes(e)].map(c => ({ ...c }));
+        if (el.dataset.br === "crime-remove") crimes.splice(i, 1);
+        else if (crimes[i]) {
+          if (el.dataset.br === "crime-type") crimes[i].type = el.value;
+          if (el.dataset.br === "crime-stopped") crimes[i].stopped = el.checked;
+          if (el.dataset.br === "crime-arrested") crimes[i].arrested = el.checked;
+        }
+        e.crimes = crimes;
+        delete e.crimeType; delete e.stopped; delete e.arrested;
+      });
+    case "num":
+      return mutate(encId, e => { e[el.dataset.field] = Math.max(0, Math.floor(Number(el.value) || 0)); });
+  }
+}
+
+/** Chat button handler for Award / Edit / Undo (wired in chat-hooks.js). */
 export async function handleBattleReportClick(btn) {
   if (!game.user.isGM) { ui.notifications.warn("Only the GM can award karma."); return; }
   const encId = btn.dataset.encId;
+  if (btn.dataset.action === "br-edit") {
+    const card = btn.closest(".faserip-battle-report");
+    if (editing.has(encId)) editing.delete(encId); else editing.add(encId);
+    card?.classList.toggle("br-editing", editing.has(encId));
+    return;
+  }
   if (!encounters().some(e => e.id === encId)) {
     ui.notifications.warn("That encounter no longer exists.");
     return;
   }
   const TeamSheet = await teamSheetClass();
-  switch (btn.dataset.action) {
-    case "br-award": await TeamSheet.awardEncounterById(encId); break;
-    case "br-undo": await TeamSheet.undoEncounterById(encId); break;
-    case "br-edit": TeamSheet.editEncounterById(encId); break;
-  }
+  if (btn.dataset.action === "br-award") { editing.delete(encId); await TeamSheet.awardEncounterById(encId); }
+  if (btn.dataset.action === "br-undo") await TeamSheet.undoEncounterById(encId);
   refreshBattleReports();
 }
 
-/** Keep cards in sync with edits made anywhere (editor, Ledger, card). */
+/** Keep cards in sync with edits made anywhere; bind the card's edit controls. */
 export function registerBattleReportHooks() {
   const onSetting = (setting) => {
     if (setting?.key === `${SCOPE}.defeatedVillains`) refreshBattleReports();
   };
   Hooks.on("updateSetting", onSetting);
   Hooks.on("createSetting", onSetting);
+
+  Hooks.on("renderChatMessageHTML", (message, el) => {
+    const encId = message.getFlag?.(SCOPE, FLAG);
+    if (!encId) return;
+    const card = el.querySelector?.(".faserip-battle-report");
+    if (!card) return;
+    card.classList.toggle("br-editing", editing.has(encId));
+    if (!game.user.isGM) return;
+    card.addEventListener("change", (ev) => {
+      const t = ev.target.closest("[data-br]");
+      if (t && t.tagName !== "BUTTON") onEditControl(t, encId);
+    });
+    card.addEventListener("click", (ev) => {
+      const t = ev.target.closest("button[data-br]");
+      if (!t) return;
+      ev.preventDefault();
+      onEditControl(t, encId);
+    });
+  });
 }

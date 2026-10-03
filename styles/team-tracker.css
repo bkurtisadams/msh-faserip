@@ -1,4 +1,7 @@
-/* team-tracker.css v4.5.0 - 2026-10-01
+/* team-tracker.css v4.6.0 - 2026-10-01
+ * v4.6.0: Battle report card edit view (.br-edit, shown with .br-editing).
+ *
+ * team-tracker.css v4.5.0 - 2026-10-01
  * v4.5.0: Ledger tab (pending tray, filters, grouped entries) and the
  *         battle report chat card (.faserip-battle-report).
  *
@@ -932,3 +935,27 @@
 .faserip-battle-report .br-buttons { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid #ddd; }
 .faserip-battle-report .br-buttons button { flex: 1; height: 28px; font-size: 12px; }
 .faserip-battle-report .br-buttons .br-primary { background: #8b0000; color: #fff; font-weight: 700; }
+
+/* Battle report edit view */
+.faserip-battle-report .br-edit { display: none; flex-direction: column; gap: 4px; }
+.faserip-battle-report.br-editing .br-edit { display: flex; }
+.faserip-battle-report.br-editing .br-view { display: none; }
+.faserip-battle-report .br-done-label { display: none; }
+.faserip-battle-report.br-editing .br-done-label { display: inline; }
+.faserip-battle-report.br-editing .br-edit-label { display: none; }
+.faserip-battle-report .br-erow { display: flex; align-items: center; gap: 6px; }
+.faserip-battle-report .br-erow input[type="number"] { width: 48px; flex: 0 0 auto; height: 24px; }
+.faserip-battle-report .br-erow select { flex: 1; min-width: 0; height: 24px; font-size: 12px; }
+.faserip-battle-report .br-erow label { display: flex; align-items: center; gap: 2px; font-size: 12px; white-space: nowrap; }
+.faserip-battle-report .br-erow button { width: 24px; height: 24px; flex: 0 0 auto; padding: 0; line-height: 1; }
+.faserip-battle-report .br-namerow input { flex: 1; height: 26px; }
+.faserip-battle-report .br-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.faserip-battle-report .br-chip {
+  display: flex; align-items: center; gap: 3px; padding: 0 6px; height: 24px;
+  border: 1px solid #bbb; border-radius: 12px; background: #fff; font-size: 12px;
+}
+.faserip-battle-report .br-small { width: auto; align-self: flex-start; height: 24px; font-size: 11px; padding: 0 8px; }
+.faserip-battle-report .br-nums { display: flex; gap: 6px; flex-wrap: wrap; }
+.faserip-battle-report .br-num { display: flex; flex-direction: column; font-size: 11px; color: #555; }
+.faserip-battle-report .br-num input { width: 64px; height: 24px; }
+.faserip-battle-report .br-none { font-size: 12px; color: #777; }

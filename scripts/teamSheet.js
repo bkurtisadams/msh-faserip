@@ -1,3 +1,9 @@
+// teamSheet.js v4.16.0 - 2026-10-01
+// v4.16.0: Karma UI slice 2. Editing moves onto the battle report card:
+//          the Ledger's Edit, Add and Import open the encounter's card in
+//          edit mode (openBattleReportEditor) instead of the pop-out editor,
+//          which is no longer opened from anywhere (apps/encounter-editor.js
+//          and the inline form handlers stay for now, unused).
 // teamSheet.js v4.15.0 - 2026-10-01
 // v4.15.0: Karma UI refactor, slice 1 (ledger + battle report).
 //          - Encounters tab becomes the Ledger: a pending tray (unawarded
@@ -164,7 +170,7 @@ import { RANKS_ORDERED, rankValueForStorage } from "./rules/rules-reference.js";
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey, computeKarmaTotals } from "./karma-rules.js";
 import { EncounterEditor } from "./apps/encounter-editor.js";
-import { postBattleReport, registerBattleReportHooks } from "./apps/battle-report.js";
+import { postBattleReport, openBattleReportEditor, registerBattleReportHooks } from "./apps/battle-report.js";
 import { foeDefeatAward, poolAbsorbLoss } from "./lib/faserip-rules/faserip-karma.js";
 
 export class TeamSheet extends Application {
@@ -692,9 +698,8 @@ export class TeamSheet extends Application {
   }
 
   static editEncounterById(encId) {
-    const idx = TeamSheet._encIdxById(encId);
-    if (idx < 0) return;
-    TeamSheet.worker()._onPopoutEncounter(TeamSheet._fakeEvent(idx));
+    if (TeamSheet._encIdxById(encId) < 0) return;
+    return openBattleReportEditor(encId);
   }
 
   _calculateAvailableKarma(actor) {
@@ -786,6 +791,7 @@ export class TeamSheet extends Application {
     // Pop encounter into its own editor window
     html.find('.popout-encounter').click(ev => this._onPopoutEncounter(ev));
     html.find('.ledger-award').click(ev => this._onAwardEncounterToHeroes(ev));
+    html.find('.ledger-edit').click(ev => { ev.stopPropagation(); TeamSheet.editEncounterById(ev.currentTarget.dataset.encId); });
     html.find('.ledger-undo-line').click(ev => this._onLedgerUndoLine(ev));
     html.find('.ledger-hero-filter').change(ev => { this._ledgerHero = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-kind-filter').change(ev => { this._ledgerKind = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
@@ -1422,11 +1428,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
             const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
             encounters.push(parsedEnc);
             await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-            // Auto-expand the new encounter so GM can review/edit
-            const newIdx = encounters.length - 1;
-            this._expandedEncounters.add(newIdx);
             ui.notifications.info(`Imported encounter: ${parsedEnc.name || "(unnamed)"}`);
-            this.render(true);
+            this.render(false);
+            await openBattleReportEditor(parsedEnc.id);
           }
         },
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
@@ -1641,8 +1645,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
             const teamIds = game.settings.get("msh-faserip", "teamMembers") || [];
 
             const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+            const addedId = `enc_${Date.now()}`;
             encounters.push({
-              id: `enc_${Date.now()}`,
+              id: addedId,
               name: encName,
               villains: [...foeList],
               presentHeroIds: [...teamIds],
@@ -1655,8 +1660,8 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
               timestamp: new Date().toISOString()
             });
             await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-            this._expandedEncounters.add(encounters.length - 1);
-            this.render(true);
+            this.render(false);
+            await openBattleReportEditor(addedId);
           }
         },
         cancel: { label: "Cancel" }

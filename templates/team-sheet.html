@@ -175,7 +175,7 @@
           </div>
           {{#if enc.hasPositive}}<span class="karma-val">+{{enc.positiveTotal}}</span>{{else}}<span class="karma-val no-award">--</span>{{/if}}
           <button type="button" class="ledger-award" data-enc-idx="{{enc.idx}}" title="Award"><i class="fas fa-check"></i> Award</button>
-          <a class="popout-encounter" data-enc-idx="{{enc.idx}}" title="Edit"><i class="fas fa-pen"></i></a>
+          <a class="ledger-edit" data-enc-id="{{enc.id}}" title="Edit on its battle report card"><i class="fas fa-pen"></i></a>
           <a class="delete-encounter" data-enc-idx="{{enc.idx}}" title="Delete"><i class="fas fa-times"></i></a>
         </div>
         {{/each}}
