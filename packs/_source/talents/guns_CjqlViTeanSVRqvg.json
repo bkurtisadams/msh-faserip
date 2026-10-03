@@ -1,9 +1,8 @@
 {
   "_id": "CjqlViTeanSVRqvg",
-  "_key": "!items!CjqlViTeanSVRqvg",
   "name": "Guns",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
     "description": "Individuals without this Talent fire guns (all handguns, rifles, and submachine guns, including laser, stun, and concussion varieties) at their Agility rank. Those with this Talent fire such weapons at +1CS.",
     "bonus": "+1CS",
@@ -13,13 +12,32 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": true,
-    "appliesTo": [
-      "shooting"
-    ],
-    "flags": [],
     "notes": "",
     "category": "Weapon Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [
+      "shooting"
+    ],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798167,
+    "modifiedTime": 1791036971100,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!CjqlViTeanSVRqvg"
 }

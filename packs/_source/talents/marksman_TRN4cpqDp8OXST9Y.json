@@ -1,9 +1,8 @@
 {
   "_id": "TRN4cpqDp8OXST9Y",
-  "_key": "!items!TRN4cpqDp8OXST9Y",
   "name": "Marksman",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
     "description": "The character with this Talent gains a +1CS to hit with any distance weapon that requires line of sight to hit (the character could benefit when firing heavy artillery, but not when controlling a tele-guided missile). Such a weapon in the hands of a marksman does not suffer penalties to hit from range.",
     "bonus": "+1CS",
@@ -13,6 +12,10 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": true,
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": "",
     "appliesTo": [
       "shooting",
       "energy",
@@ -20,10 +23,25 @@
     ],
     "flags": [
       "no-range-penalty"
-    ],
-    "notes": "",
-    "category": "Weapon Skills",
-    "categoryRoll": "",
-    "grantsContact": ""
-  }
+    ]
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798168,
+    "modifiedTime": 1791036971101,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!TRN4cpqDp8OXST9Y"
 }

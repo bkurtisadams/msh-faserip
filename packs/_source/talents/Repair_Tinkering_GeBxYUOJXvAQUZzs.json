@@ -1,9 +1,8 @@
 {
   "_id": "GeBxYUOJXvAQUZzs",
-  "_key": "!items!GeBxYUOJXvAQUZzs",
   "name": "Repair/Tinkering",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/other_talents.png",
   "system": {
     "description": "The character with this Talent gains a +1CS to any Reason FEATs involving the repair and modification of existing items, but not the building of new items. This +1CS may be added to any other bonuses gained from other Talents, so that an Engineer with Tinkering Talent would gain a +2CS on repair.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Other Talents",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798171,
+    "modifiedTime": 1791036971100,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!GeBxYUOJXvAQUZzs"
 }

@@ -1,9 +1,8 @@
 {
   "_id": "bNkWHmDm5zMIksz9",
-  "_key": "!items!bNkWHmDm5zMIksz9",
   "name": "Mystic Background",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/mystic-mental%20skills.png",
   "system": {
     "description": "In the Marvel Universe, all humankind has the potential for developing magical Powers. This \"Talent\" shows that the character has some background with magical forces. Heroes may have derived their powers from these forces if they choose this Talent. A character with this Talent may have Magical Powers, with the approval of the Judge. If the Judge allows magical player characters, then any of the initial Powers created may be spells, and should be noted as deriving from Personal, Universal, or Dimensional energies.",
     "bonus": "Special",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Mystic and Mental Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798170,
+    "modifiedTime": 1791036971102,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!bNkWHmDm5zMIksz9"
 }

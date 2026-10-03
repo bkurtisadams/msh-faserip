@@ -1,23 +1,25 @@
 {
-  "_id": "E9sVedlxiKW844iv",
-  "name": "Military",
+  "_id": "MLND4wOYy2KESTpX",
+  "name": "Oriental Weapons",
   "type": "talent",
-  "img": "systems/msh-faserip/assets/icons/talents/professional_skills.png",
+  "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
-    "description": "The hero has had some dealings with one of the armed services. In military matters, the hero gets a +1CS to all FEAT rolls, and in addition may take a member of the armed services as a Contact.",
+    "description": "This is a special category that grants the character a +1CS to Fighting or Agility when using the following weapons: shuriken, crossbows, sais (treat as swords), and oriental swords and daggers (including the katana and the kris).",
     "bonus": "+1CS",
     "abilityModified": "",
-    "type": "Professional Skill",
-    "specialty": "Military",
+    "type": "Weapon Skill",
+    "specialty": "Oriental Weapons",
     "rankOverride": "",
     "isCumulative": false,
-    "isWeaponTalent": false,
+    "isWeaponTalent": true,
     "notes": "",
-    "category": "Professional Skills",
+    "category": "Weapon Skills",
     "categoryRoll": "",
     "grantsContact": "",
     "appliesTo": [
-      "shooting"
+      "shooting",
+      "blunt-attack",
+      "edged-attack"
     ],
     "flags": []
   },
@@ -39,5 +41,5 @@
     "default": 0
   },
   "flags": {},
-  "_key": "!items!E9sVedlxiKW844iv"
+  "_key": "!items!MLND4wOYy2KESTpX"
 }

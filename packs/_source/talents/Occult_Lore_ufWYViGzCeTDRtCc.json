@@ -1,9 +1,8 @@
 {
   "_id": "ufWYViGzCeTDRtCc",
-  "_key": "!items!ufWYViGzCeTDRtCc",
   "name": "Occult Lore",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/mystic-mental%20skills.png",
   "system": {
     "description": "The character with this Talent has a knowledge of magical societies, antiquities, runes, and a general understanding of forgotten lore. The character gains a +1CS to Reason FEATs involving items of a magical nature.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Mystic and Mental Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798170,
+    "modifiedTime": 1791036971103,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!ufWYViGzCeTDRtCc"
 }

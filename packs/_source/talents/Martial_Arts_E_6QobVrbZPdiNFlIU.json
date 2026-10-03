@@ -1,9 +1,8 @@
 {
   "_id": "6QobVrbZPdiNFlIU",
-  "_key": "!items!6QobVrbZPdiNFlIU",
   "name": "Martial Arts E",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/fighting_skills.png",
   "system": {
     "description": "This form of martial arts encourages quick striking to catch the opponent off-guard. Heroes with this form of Martial Arts are at a +1 to initiative rolls in unarmed combat.",
     "bonus": "Special",
@@ -13,6 +12,10 @@
     "rankOverride": "",
     "isCumulative": true,
     "isWeaponTalent": false,
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": "",
     "appliesTo": [
       "blunt-attack",
       "edged-attack",
@@ -26,10 +29,25 @@
     ],
     "flags": [
       "initiative"
-    ],
-    "notes": "",
-    "category": "Fighting Skills",
-    "categoryRoll": "",
-    "grantsContact": ""
-  }
+    ]
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798169,
+    "modifiedTime": 1791036971099,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!6QobVrbZPdiNFlIU"
 }

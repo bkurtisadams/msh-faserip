@@ -1,9 +1,8 @@
 {
   "_id": "v2vIeazl3jTSyPnl",
-  "_key": "!items!v2vIeazl3jTSyPnl",
   "name": "Psychiatry",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/professional_skills.png",
   "system": {
     "description": "The hero with this Talent has a background in studies of the mind, and as such gains a +1CS on all FEATs involving the mind. This is a popular Talent with those heroes and villains with Mental Powers, and the character with these Talents gains a +1CS on FEATs involving Mental Control, Domination, Hypnosis, Emotion Control, and Mental Probe Powers.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Professional Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798170,
+    "modifiedTime": 1791036971103,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!v2vIeazl3jTSyPnl"
 }

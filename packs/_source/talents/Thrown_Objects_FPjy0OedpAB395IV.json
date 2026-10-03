@@ -1,9 +1,8 @@
 {
   "_id": "FPjy0OedpAB395IV",
-  "_key": "!items!FPjy0OedpAB395IV",
   "name": "Thrown Objects",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/fighting_skills.png",
   "system": {
     "description": "The hero with this Talent gains a +1CS with all Throwing attacks (both Edged and Blunt), and +1CS on Catching. This applies to both thrown weapons and normal items. If the hero has the Thrown Weapons Talent as well, the modification is +2CS when using thrown weapons.",
     "bonus": "+1CS",
@@ -13,14 +12,33 @@
     "rankOverride": "",
     "isCumulative": true,
     "isWeaponTalent": false,
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": "",
     "appliesTo": [
       "throwing-blunt",
       "throwing-edged"
     ],
-    "flags": [],
-    "notes": "",
-    "category": "Fighting Skills",
-    "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798171,
+    "modifiedTime": 1791036971100,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!FPjy0OedpAB395IV"
 }

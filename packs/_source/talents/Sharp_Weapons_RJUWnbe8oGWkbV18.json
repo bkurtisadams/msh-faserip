@@ -1,9 +1,8 @@
 {
   "_id": "RJUWnbe8oGWkbV18",
-  "_key": "!items!RJUWnbe8oGWkbV18",
   "name": "Sharp Weapons",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
     "description": "Characters with this Talent gain a +1CS to hit when attacking with a weapon that resolves attacks on the Edged Attack column of the Battle Effects Table. This includes swords, daggers (unless thrown), and spears, but excludes claws and other natural extensions that inflict this type of damage.",
     "bonus": "+1CS",
@@ -13,14 +12,33 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": true,
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": "",
     "appliesTo": [
       "edged-attack",
       "throwing-edged"
     ],
-    "flags": [],
-    "notes": "",
-    "category": "Weapon Skills",
-    "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798171,
+    "modifiedTime": 1791036971101,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!RJUWnbe8oGWkbV18"
 }

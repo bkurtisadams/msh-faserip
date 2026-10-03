@@ -1,9 +1,8 @@
 {
   "_id": "FfuNGruyvqM8f653",
-  "_key": "!items!FfuNGruyvqM8f653",
   "name": "Biology",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/scientific_skills.png",
   "system": {
     "description": "A +1CS on matters of biology, including animal and plant identification, finding cures for organic poisons, and researching diseases and their cures.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Scientific Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798164,
+    "modifiedTime": 1791036971100,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!FfuNGruyvqM8f653"
 }

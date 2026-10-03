@@ -1,9 +1,8 @@
 {
   "_id": "VRS0JS2ohDpvtnO7",
-  "_key": "!items!VRS0JS2ohDpvtnO7",
   "name": "Medicine",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/professional_skills.png",
   "system": {
     "description": "The hero with this Talent has extensive knowledge of medicine, and as such limited Talents in healing. In general, a character losing Endurance ranks as the result of a lethal situation can have those losses stopped by any character checking on him. The individual with Medicine Talent may bring back characters that have reached the Shift 0 level up to 20 turns after they have reached that level. A character with this Talent may restore one rank of Endurance to a wounded character per week, in addition to natural healing. Finally, the character with Medicine as a Talent is +1CS on Reason FEATs that involve medical problems, medications, poisons, and surgery.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Professional Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798169,
+    "modifiedTime": 1791036971101,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!VRS0JS2ohDpvtnO7"
 }

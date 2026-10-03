@@ -1,9 +1,8 @@
 {
   "_id": "z35W2iBNtkfC8t98",
-  "_key": "!items!z35W2iBNtkfC8t98",
   "name": "Student",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/other_talents.png",
   "system": {
     "description": "Similar to Heir to Fortune, this Talent may only be chosen at the start of play, and may not be gained through experience. The Student character has no other initial Talents, but may gain other Talents at a discounted price. New Talents cost 1000 Karma points if learned from another player character, 800 if learned from outside. Students may maintain Advancement Totals for a Talent along with other forms of Advancement funds.",
     "bonus": "Special",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Other Talents",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798171,
+    "modifiedTime": 1791036971103,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!z35W2iBNtkfC8t98"
 }

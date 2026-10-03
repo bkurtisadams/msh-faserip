@@ -1,9 +1,8 @@
 {
   "_id": "4ihgFoQauMautnPI",
-  "_key": "!items!4ihgFoQauMautnPI",
   "name": "Wrestling",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/fighting_skills.png",
   "system": {
     "description": "The hero with this Talent is proficient in applying holds. It includes familiar types of wrestling as well as the sumo forms of the art. The hero with this Talent gains a +2CS when making Grappling attacks, but gains no benefit in damage. (A hero with Martial Arts B and this Talent gains a +3CS to hit in a Grappling attack, and a +1CS for damage.)",
     "bonus": "+2CS",
@@ -13,13 +12,32 @@
     "rankOverride": "",
     "isCumulative": true,
     "isWeaponTalent": false,
-    "appliesTo": [
-      "grappling"
-    ],
-    "flags": [],
     "notes": "",
     "category": "Fighting Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [
+      "grappling"
+    ],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798172,
+    "modifiedTime": 1791036971099,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!4ihgFoQauMautnPI"
 }

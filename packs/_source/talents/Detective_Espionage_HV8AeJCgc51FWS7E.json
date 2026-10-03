@@ -1,9 +1,8 @@
 {
   "_id": "HV8AeJCgc51FWS7E",
-  "_key": "!items!HV8AeJCgc51FWS7E",
   "name": "Detective/Espionage",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/professional_skills.png",
   "system": {
     "description": "The hero with this Talent has been trained to notice small clues in solving crimes. The character with this Talent gains a +1CS to discover clues to a crime, and in addition gains a Contact in either crime, law enforcement, law, or espionage.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Professional Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798166,
+    "modifiedTime": 1791036971100,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!HV8AeJCgc51FWS7E"
 }

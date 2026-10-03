@@ -1,9 +1,8 @@
 {
   "_id": "2GFvJaH7h2C99gcw",
-  "_key": "!items!2GFvJaH7h2C99gcw",
   "name": "Trance",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/mystic-mental%20skills.png",
   "system": {
     "description": "The character may place himself into a trance. While in a trance the character slows his body functions to such a level that he may be assumed to be deceased (Intuition FEAT for the character checking). A character in a trance reduces needs for food and water to a minimal level, and may regain Endurance ranks at one rank per day.",
     "bonus": "Special",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Mystic and Mental Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798171,
+    "modifiedTime": 1791036971098,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!2GFvJaH7h2C99gcw"
 }

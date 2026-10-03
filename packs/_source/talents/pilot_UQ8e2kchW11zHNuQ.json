@@ -1,9 +1,8 @@
 {
   "_id": "UQ8e2kchW11zHNuQ",
-  "_key": "!items!UQ8e2kchW11zHNuQ",
   "name": "Pilot",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/professional_skills.png",
   "system": {
     "description": "The character with this Talent has a working knowledge of most aircraft, and receives a +1CS for all FEAT rolls involving an aircraft that character is controlling (including Control FEATs, Agility FEATs, and Reason FEATs involving aircraft handling and design). A character with a background that would permit it (a hero who is an alien) may extend this Talent to spacecraft as well.",
     "bonus": "+1CS",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Professional Skills",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798170,
+    "modifiedTime": 1791036971101,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!UQ8e2kchW11zHNuQ"
 }

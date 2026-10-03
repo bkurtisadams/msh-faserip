@@ -1,9 +1,8 @@
 {
   "_id": "pjJBBkZRND92hEl9",
-  "_key": "!items!pjJBBkZRND92hEl9",
   "name": "First Aid",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/other_talents.png",
   "system": {
     "description": "The Medicine Talent notes that the loss of Endurance ranks may be halted by someone checking on the dying character and administering some form of aid. The First Aid Talent grants the character this immediate halt to Endurance rank loss, the recovery of one rank immediately (one use only per situation), and in addition, the hero with this Talent can stabilize a dying character at Shift 0 Health up to 5 rounds after that character reaches that level.",
     "bonus": "Special",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Other Talents",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798167,
+    "modifiedTime": 1791036971103,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!pjJBBkZRND92hEl9"
 }

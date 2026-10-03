@@ -1,24 +1,24 @@
 {
-  "_id": "USHl19bAFDpY7OBH",
-  "name": "Acrobatics",
+  "_id": "WbONvmuNbgzsoJAt",
+  "name": "Thrown Weapons",
   "type": "talent",
-  "img": "systems/msh-faserip/assets/icons/talents/fighting_skills.png",
+  "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
-    "description": "The hero with this Talent is very limber and as such gains advantages when under attack. The hero has a +1CS when dodging, evading, and escaping.",
+    "description": "Characters with this Talent toss weapons designed to be thrown (including spears, daggers, shuriken, disks, and snowballs) at +1CS to their Agility.",
     "bonus": "+1CS",
     "abilityModified": "agility",
-    "type": "Fighting Skill",
-    "specialty": "Acrobatics",
+    "type": "Weapon Skill",
+    "specialty": "Thrown Weapons",
     "rankOverride": "",
-    "isCumulative": true,
-    "isWeaponTalent": false,
+    "isCumulative": false,
+    "isWeaponTalent": true,
     "notes": "",
-    "category": "Fighting Skills",
+    "category": "Weapon Skills",
     "categoryRoll": "",
     "grantsContact": "",
     "appliesTo": [
-      "dodging",
-      "escaping"
+      "throwing-blunt",
+      "throwing-edged"
     ],
     "flags": []
   },
@@ -27,7 +27,7 @@
     "coreVersion": "14.368",
     "systemId": "msh-faserip",
     "systemVersion": "2.25.12",
-    "createdTime": 1785839798162,
+    "createdTime": 1785839798171,
     "modifiedTime": 1791036971101,
     "lastModifiedBy": "UR9o2ayFEJZOBuOD",
     "compendiumSource": null,
@@ -40,5 +40,5 @@
     "default": 0
   },
   "flags": {},
-  "_key": "!items!USHl19bAFDpY7OBH"
+  "_key": "!items!WbONvmuNbgzsoJAt"
 }

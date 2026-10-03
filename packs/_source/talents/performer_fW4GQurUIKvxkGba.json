@@ -1,9 +1,8 @@
 {
   "_id": "fW4GQurUIKvxkGba",
-  "_key": "!items!fW4GQurUIKvxkGba",
   "name": "Performer",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/other_talents.png",
   "system": {
     "description": "The character is someone who acts, sings, dances, mimes, or otherwise uses his Talents to entertain (this is related to the Artist, the key difference being that the Artist may leave the scene of creation; the Performer is identified with that creation directly). A Performer receives 10 Karma points for a week's worth of performance, whether in a play, doing a nightclub routine, or working for a movie.",
     "bonus": "Special",
@@ -13,11 +12,30 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": false,
-    "appliesTo": [],
-    "flags": [],
     "notes": "",
     "category": "Other Talents",
     "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "grantsContact": "",
+    "appliesTo": [],
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798170,
+    "modifiedTime": 1791036971102,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!fW4GQurUIKvxkGba"
 }

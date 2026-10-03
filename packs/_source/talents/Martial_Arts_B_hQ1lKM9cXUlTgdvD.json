@@ -1,9 +1,8 @@
 {
   "_id": "hQ1lKM9cXUlTgdvD",
-  "_key": "!items!hQ1lKM9cXUlTgdvD",
   "name": "Martial Arts B",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/fighting_skills.png",
   "system": {
     "description": "This form of martial arts is keyed on offense and inflicting damage in short, quick bursts, and includes such disciplines as boxing. The practitioner of this form of martial arts gains a +1CS to Fighting ability when engaged in unarmed combat.",
     "bonus": "+1CS",
@@ -13,15 +12,34 @@
     "rankOverride": "",
     "isCumulative": true,
     "isWeaponTalent": false,
+    "notes": "",
+    "category": "Fighting Skills",
+    "categoryRoll": "",
+    "grantsContact": "",
     "appliesTo": [
       "blunt-attack",
       "edged-attack",
       "grappling"
     ],
-    "flags": [],
-    "notes": "",
-    "category": "Fighting Skills",
-    "categoryRoll": "",
-    "grantsContact": ""
-  }
+    "flags": []
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798169,
+    "modifiedTime": 1791036971102,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!hQ1lKM9cXUlTgdvD"
 }

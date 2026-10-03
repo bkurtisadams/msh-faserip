@@ -1,14 +1,14 @@
 {
-  "_id": "USHl19bAFDpY7OBH",
-  "name": "Acrobatics",
+  "_id": "UvwJukVSGrt29gIb",
+  "name": "Martial Arts C",
   "type": "talent",
   "img": "systems/msh-faserip/assets/icons/talents/fighting_skills.png",
   "system": {
-    "description": "The hero with this Talent is very limber and as such gains advantages when under attack. The hero has a +1CS when dodging, evading, and escaping.",
+    "description": "This form of martial arts concentrates on holds and escapes. The practitioner of this form gains a +1CS to his Strength for Grappling attacks (including damage), a +1CS to Strength for Escaping, and a +1CS to Agility for purposes of Dodging.",
     "bonus": "+1CS",
-    "abilityModified": "agility",
+    "abilityModified": "",
     "type": "Fighting Skill",
-    "specialty": "Acrobatics",
+    "specialty": "Martial Arts C",
     "rankOverride": "",
     "isCumulative": true,
     "isWeaponTalent": false,
@@ -17,8 +17,9 @@
     "categoryRoll": "",
     "grantsContact": "",
     "appliesTo": [
-      "dodging",
-      "escaping"
+      "grappling",
+      "escaping",
+      "dodging"
     ],
     "flags": []
   },
@@ -27,7 +28,7 @@
     "coreVersion": "14.368",
     "systemId": "msh-faserip",
     "systemVersion": "2.25.12",
-    "createdTime": 1785839798162,
+    "createdTime": 1785839798169,
     "modifiedTime": 1791036971101,
     "lastModifiedBy": "UR9o2ayFEJZOBuOD",
     "compendiumSource": null,
@@ -40,5 +41,5 @@
     "default": 0
   },
   "flags": {},
-  "_key": "!items!USHl19bAFDpY7OBH"
+  "_key": "!items!UvwJukVSGrt29gIb"
 }

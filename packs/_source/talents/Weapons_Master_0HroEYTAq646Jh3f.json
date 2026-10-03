@@ -1,14 +1,14 @@
 {
-  "_id": "lVHYZipsp2gIGKRd",
-  "name": "Bows",
+  "_id": "0HroEYTAq646Jh3f",
+  "name": "Weapons Master",
   "type": "talent",
   "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
-    "description": "Bows are tricky items to operate, such that those who have not been trained fire them at -1CS to their Agility. Those with this Talent gain a +1CS to hit with all bows, including crossbows, and may fire and reload in a single round. They may fire multiple arrows on a successful Agility FEAT.",
+    "description": "The character with this Talent gains a +1CS to hit with any weapon that requires a Fighting FEAT to hit.",
     "bonus": "+1CS",
-    "abilityModified": "agility",
+    "abilityModified": "fighting",
     "type": "Weapon Skill",
-    "specialty": "Bows",
+    "specialty": "Weapons Master",
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": true,
@@ -17,7 +17,8 @@
     "categoryRoll": "",
     "grantsContact": "",
     "appliesTo": [
-      "shooting"
+      "blunt-attack",
+      "edged-attack"
     ],
     "flags": []
   },
@@ -26,8 +27,8 @@
     "coreVersion": "14.368",
     "systemId": "msh-faserip",
     "systemVersion": "2.25.12",
-    "createdTime": 1785839798164,
-    "modifiedTime": 1791036971103,
+    "createdTime": 1785839798172,
+    "modifiedTime": 1791036971098,
     "lastModifiedBy": "UR9o2ayFEJZOBuOD",
     "compendiumSource": null,
     "duplicateSource": null,
@@ -39,5 +40,5 @@
     "default": 0
   },
   "flags": {},
-  "_key": "!items!lVHYZipsp2gIGKRd"
+  "_key": "!items!0HroEYTAq646Jh3f"
 }

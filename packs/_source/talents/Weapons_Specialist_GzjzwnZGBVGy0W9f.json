@@ -1,9 +1,8 @@
 {
   "_id": "GzjzwnZGBVGy0W9f",
-  "_key": "!items!GzjzwnZGBVGy0W9f",
   "name": "Weapons Specialist",
   "type": "talent",
-  "img": "icons/svg/item-bag.svg",
+  "img": "systems/msh-faserip/assets/icons/talents/weapon_skills.png",
   "system": {
     "description": "The character with this Talent gains a +2CS with a single weapon of choice. This may be any type of weapon, missile or melee. The character who is a weapon specialist will also increase his initiative when using this weapon by 1.",
     "bonus": "+2CS",
@@ -13,6 +12,10 @@
     "rankOverride": "",
     "isCumulative": false,
     "isWeaponTalent": true,
+    "notes": "",
+    "category": "Weapon Skills",
+    "categoryRoll": "",
+    "grantsContact": "",
     "appliesTo": [
       "shooting",
       "blunt-attack",
@@ -22,10 +25,25 @@
     ],
     "flags": [
       "initiative"
-    ],
-    "notes": "",
-    "category": "Weapon Skills",
-    "categoryRoll": "",
-    "grantsContact": ""
-  }
+    ]
+  },
+  "effects": [],
+  "_stats": {
+    "coreVersion": "14.368",
+    "systemId": "msh-faserip",
+    "systemVersion": "2.25.12",
+    "createdTime": 1785839798172,
+    "modifiedTime": 1791036971100,
+    "lastModifiedBy": "UR9o2ayFEJZOBuOD",
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null
+  },
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0
+  },
+  "flags": {},
+  "_key": "!items!GzjzwnZGBVGy0W9f"
 }
