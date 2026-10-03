@@ -1,4 +1,7 @@
-﻿// init.js v1.19.5 - 2026-10-01
+﻿// init.js v1.19.6 - 2026-10-01
+// v1.19.6: registerQuickKarma (apps/quick-karma.js): token HUD Karma button
+//          and the K keybinding for immediate karma awards.
+// init.js v1.19.5 - 2026-10-01
 // v1.19.5: Karma settings move to karma-multipliers.js registerKarmaSettings
 //          (grouped in the settings window) with migrateKarmaSettings in the
 //          ready hook. Removed here: karmaPromptActorTypes, useKarmaPool,
@@ -219,6 +222,7 @@ import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 import { migrateApCsDocuments } from "./ap-cs-migration.js";
 import { migrateAbsorption } from "./absorption-migration.js";
 import { registerKarmaSettings, migrateKarmaSettings } from "./karma-multipliers.js";
+import { registerQuickKarma } from "./apps/quick-karma.js";
 
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
@@ -1141,6 +1145,9 @@ Hooks.once("init", async () => {
       }
     }
   });
+
+  // Immediate karma awards: token HUD button + K keybinding
+  registerQuickKarma();
 
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {

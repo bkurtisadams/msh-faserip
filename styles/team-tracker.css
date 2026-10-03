@@ -1,4 +1,7 @@
-/* team-tracker.css v4.7.0 - 2026-10-01
+/* team-tracker.css v4.8.0 - 2026-10-01
+ * v4.8.0: Award Karma dialog (.faserip-quick-karma).
+ *
+ * team-tracker.css v4.7.0 - 2026-10-01
  * v4.7.0: Ledger redesign — one-line pending rows, date-grouped one-line
  *         event rows with expandable detail, and the By hero grid.
  *
@@ -1006,3 +1009,24 @@
 .faserip-battle-report .br-num { display: flex; flex-direction: column; font-size: 11px; color: #555; }
 .faserip-battle-report .br-num input { width: 64px; height: 24px; }
 .faserip-battle-report .br-none { font-size: 12px; color: #777; }
+
+/* ===== AWARD KARMA DIALOG (token HUD / K) ===== */
+.faserip-quick-karma { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.faserip-quick-karma .qk-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-top: 6px;
+}
+.faserip-quick-karma .qk-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.faserip-quick-karma .qk-row select { flex: 1; min-width: 140px; }
+.faserip-quick-karma .qk-row label { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.faserip-quick-karma input[type="number"] { width: 56px; }
+.faserip-quick-karma .qk-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.faserip-quick-karma .qk-chip {
+  display: flex; align-items: center; gap: 3px; padding: 0 8px; height: 26px;
+  border: 1px solid #bbb; border-radius: 13px; background: #fff;
+}
+.faserip-quick-karma .qk-foe { display: flex; align-items: center; gap: 6px; }
+.faserip-quick-karma .qk-dim { color: #666; font-size: 11px; }
+.faserip-quick-karma .qk-amt { margin-left: auto; font-weight: 700; color: #1b5e20; }
+.faserip-quick-karma .qk-preview {
+  margin-top: 8px; padding: 6px 8px; background: #f3ece0; border-radius: 3px; font-size: 12px;
+}

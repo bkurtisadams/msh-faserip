@@ -1,3 +1,7 @@
+// teamSheet.js v4.17.1 - 2026-10-01
+// v4.17.1: Ledger rows for immediate awards (types "Immediate Award" /
+//          "Immediate Loss", apps/quick-karma.js) take their description as
+//          the title, e.g. "Stopped Robbery, Rescue ×2".
 // teamSheet.js v4.17.0 - 2026-10-01
 // v4.17.0: Ledger redesign. One line per event (an encounter, or a batch:
 //          same type entered in the same minute across heroes, e.g. one R+I+P
@@ -615,7 +619,8 @@ export class TeamSheet extends Application {
           g = {
             key, encounterId: e.encounterId || null,
             encIdx: enc ? enc.idx : null,
-            title: enc ? enc.displayName : (e.type || "Karma"),
+            title: enc ? enc.displayName
+              : (/^Immediate/.test(e.type || "") && e.description ? e.description.replace(/ \(capped at .*\)$/, "") : (e.type || "Karma")),
             type: e.type || "",
             gameDate: e.gameDate || e.realDate || "",
             timestamp: e.timestamp || "",
