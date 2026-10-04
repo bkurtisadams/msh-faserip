@@ -1,4 +1,7 @@
-/* team-tracker.css v4.10.0 - 2026-10-03
+/* team-tracker.css v4.10.1 - 2026-10-04
+ * v4.10.1: Ledger search row (.ledger-search-row).
+ *
+ * team-tracker.css v4.10.0 - 2026-10-03
  * v4.10.0: Battle report revise note, add-foe-by-name row, awards and
  *          penalties rows; Save changes table.
  *
@@ -1153,3 +1156,8 @@
 .faserip-battle-report .br-bonus-label { width: 100%; height: 24px; font-size: 12px; }
 .msh-revise-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 13px; }
 .msh-revise-table th, .msh-revise-table td { text-align: left; padding: 3px 6px; border-bottom: 1px solid rgba(0,0,0,0.15); }
+
+/* Ledger search row (v4.10.1) */
+.faserip.sheet.team-tracker .ledger-search-row { display: flex; gap: 6px; align-items: center; margin: 6px 0 4px; }
+.faserip.sheet.team-tracker .ledger-search-row .ledger-search { flex: 1 1 auto; min-width: 0; height: 28px; font-size: 13px; padding: 0 8px; }
+.faserip.sheet.team-tracker .ledger-search-row .ledger-sort { flex: 0 0 auto; width: auto; height: 28px; font-size: 12px; }

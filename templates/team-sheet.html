@@ -198,8 +198,14 @@
           </div>
         </div>
       </div>
+      <div class="ledger-search-row">
+        <input type="search" class="ledger-search" value="{{ledgerSearch}}" placeholder="Search the ledger: foe, hero, crime, date..." aria-label="Search the ledger">
+        <select class="ledger-sort" aria-label="Sort">
+          {{#each ledgerSortOptions as |o|}}<option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>{{/each}}
+        </select>
+      </div>
       {{#if ledgerEmpty}}
-      <p class="no-encounters">No karma entries match.</p>
+      <p class="no-encounters">{{#if ledgerEmptyText}}{{ledgerEmptyText}}{{else}}No karma entries match.{{/if}}</p>
       {{else}}
       {{#if ledgerIsGrid}}
       <div class="ledger-grid-wrap">

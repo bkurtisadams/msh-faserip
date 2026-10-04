@@ -1,3 +1,12 @@
+// teamSheet.js v4.20.0 - 2026-10-04
+// v4.20.0: R+I+P bonus entries are typed "R+I+P Bonus" and described "R+I+P
+//          karma bonus (house rule)"; older multi-hero "Session Award"
+//          batches show under that title in the Ledger. Ledger search box
+//          (every word must match: title, heroes, foes, crimes, labels,
+//          descriptions, date) filters before the show-more limit. Sorting
+//          fixed: timestamps compared as times, not strings, and a Sort
+//          choice: by game date (default; time-travel dates such as 1944 sit
+//          where the calendar puts them) or by order awarded.
 // teamSheet.js v4.19.0 - 2026-10-03
 // v4.19.0: Awarded encounters can be edited. The Ledger's pencil reopens the
 //          battle report card on that encounter; Save changes compares what
@@ -622,6 +631,22 @@ export class TeamSheet extends Application {
     return /die roll|advancement|addition|pool contribution|pool withdrawal|pool refund|stunt|spend|build|purchase|invent/i.test(t);
   }
 
+  /** "M/D/YYYY" (or anything Date can read) to a sortable day number. */
+  static _gameDateKey(str) {
+    const m = /^\s*(\d{1,2})\/(\d{1,2})\/(-?\d{1,6})/.exec(String(str || ""));
+    if (m) return Number(m[3]) * 10000 + Number(m[1]) * 100 + Number(m[2]);
+    const t = Date.parse(String(str || ""));
+    if (Number.isFinite(t)) { const d = new Date(t); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+    return null;
+  }
+
+  static _entryTime(e) {
+    const t = Date.parse(String(e?.timestamp || ""));
+    if (Number.isFinite(t)) return t;
+    const r = Date.parse(String(e?.realDate || ""));
+    return Number.isFinite(r) ? r : 0;
+  }
+
   /** An encounter's karma parts from its stored record, for the Ledger. */
   static _encounterBreakdown(enc) {
     const sign = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}`;
@@ -671,6 +696,8 @@ export class TeamSheet extends Application {
     const kind = ["awards", "losses"].includes(this._ledgerKind) ? this._ledgerKind : "awardsLosses";
     const view = this._ledgerView || "list";
     const limit = this._ledgerLimit || 60;
+    const sortBy = this._ledgerSort === "awarded" ? "awarded" : "game";
+    const words = String(this._ledgerSearch || "").toLowerCase().split(/\s+/).filter(Boolean);
     const expanded = this._ledgerExpanded ??= new Set();
     const encById = new Map((context.encounters || []).map((e, idx) => [e.id, { ...e, idx }]));
     const rawEncById = new Map((game.settings.get("msh-faserip", "defeatedVillains") || []).map(e => [e.id, e]));
@@ -699,12 +726,13 @@ export class TeamSheet extends Application {
               : (/^Immediate/.test(e.type || "") && e.description ? e.description.replace(/ \(capped at .*\)$/, "") : (e.type || "Karma")),
             type: e.type || "",
             gameDate: e.gameDate || e.realDate || "",
-            timestamp: e.timestamp || "",
-            byHero: new Map(), entries: [], total: 0
+            time: TeamSheet._entryTime(e),
+            byHero: new Map(), entries: [], total: 0, text: []
           };
           groups.set(key, g);
         }
-        if (String(e.timestamp || "") > g.timestamp) g.timestamp = e.timestamp;
+        g.time = Math.max(g.time, TeamSheet._entryTime(e));
+        g.text.push(e.type || "", e.description || "");
         if (!g.gameDate && (e.gameDate || e.realDate)) g.gameDate = e.gameDate || e.realDate;
         g.total += amount;
         const h = g.byHero.get(tm.id) || { id: tm.id, name: tm.name, amount: 0, descriptions: [] };
@@ -715,8 +743,30 @@ export class TeamSheet extends Application {
       });
     }
 
-    const rows = [...groups.values()]
-      .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+    const ripTitle = "R+I+P karma bonus (house rule)";
+    for (const g of groups.values()) {
+      if (g.type === "R+I+P Bonus" || (g.type === "Session Award" && !g.encounterId && g.byHero.size > 1)) g.title = ripTitle;
+    }
+    let matched = [...groups.values()];
+    if (words.length) {
+      matched = matched.filter(g => {
+        const parts = [g.title, g.gameDate, ...g.text, ...[...g.byHero.values()].map(h => h.name)];
+        const raw = g.encounterId ? rawEncById.get(g.encounterId) : null;
+        if (raw) {
+          parts.push(raw.name || "", ...(raw.villains || []).map(v => `${v.name} ${v.rankLabel || ""}`));
+          parts.push(...TeamSheet._normalizeCrimes(raw).map(c => `${c.type || ""} ${this._crimeLabel(c.type || "")}`));
+          parts.push(...(raw.bonuses || []).map(b => b.label || ""));
+        }
+        const hay = parts.join(" ").toLowerCase();
+        return words.every(w => hay.includes(w));
+      });
+    }
+    const dayKey = g => TeamSheet._gameDateKey(g.gameDate) ?? -Infinity;
+    matched.sort(sortBy === "awarded"
+      ? (a, b) => b.time - a.time
+      : (a, b) => (dayKey(b) - dayKey(a)) || (b.time - a.time));
+
+    const rows = matched
       .slice(0, limit)
       .map(g => {
         const list = [...g.byHero.values()];
@@ -751,7 +801,7 @@ export class TeamSheet extends Application {
         }
         const icon = g.encounterId ? "fas fa-skull"
           : g.total < 0 ? "fas fa-minus-circle"
-          : /session/i.test(g.type) ? "fas fa-star"
+          : /session|R\+I\+P/i.test(g.type) ? "fas fa-star"
           : "fas fa-hand-sparkles";
         return {
           key: g.key, title: g.title, icon, gameDate: g.gameDate,
@@ -783,7 +833,11 @@ export class TeamSheet extends Application {
     return {
       ledgerDays: days,
       ledgerEmpty: !rows.length,
-      ledgerMore: groups.size > limit,
+      ledgerEmptyText: words.length ? "No ledger entries match that search." : "",
+      ledgerMore: matched.length > limit,
+      ledgerSearch: this._ledgerSearch || "",
+      ledgerSortOptions: [["game", "By game date"], ["awarded", "By order awarded"]]
+        .map(([value, label]) => ({ value, label, selected: value === sortBy })),
       ledgerIsGrid: view === "grid",
       ledgerGridHeroes: heroes.map(tm => ({ name: tm.name, short: tm.name.slice(0, 3) })),
       ledgerHeroOptions: (context.teamMembers || []).map(tm => ({ id: tm.id, name: tm.name, selected: tm.id === heroFilter })),
@@ -1069,6 +1123,25 @@ export class TeamSheet extends Application {
     html.find('.ledger-hero-filter').change(ev => { this._ledgerHero = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-kind-filter').change(ev => { this._ledgerKind = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-more').click(() => { this._ledgerLimit = (this._ledgerLimit || 60) + 60; this.render(false); });
+    html.find('.ledger-sort').change(ev => { this._ledgerSort = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
+    const search = html.find('.ledger-search')[0];
+    if (search) {
+      search.addEventListener("input", () => {
+        clearTimeout(this._ledgerSearchTimer);
+        this._ledgerSearchTimer = setTimeout(() => {
+          this._ledgerSearch = search.value;
+          this._ledgerLimit = 60;
+          this._ledgerSearchFocus = true;
+          this.render(false);
+        }, 250);
+      });
+      search.addEventListener("blur", () => { this._ledgerSearchFocus = false; });
+      if (this._ledgerSearchFocus) {
+        search.focus();
+        const end = search.value.length;
+        search.setSelectionRange(end, end);
+      }
+    }
 
     // Encounter controls
     html.find('.hero-present-toggle').change(ev => this._onToggleHeroPresent(ev));
@@ -2570,8 +2643,8 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       title: "Session Bonus (R+I+P)",
       content: `<form>
         <div style="margin-bottom:8px;">
-          <label style="font-weight:600;">Session Name:</label>
-          <input type="text" name="reason" value="Session Award" style="width:100%;margin-top:2px;" />
+          <label style="font-weight:600;">Session name:</label>
+          <input type="text" name="reason" value="" placeholder="Optional, e.g. Session 12" style="width:100%;margin-top:2px;" />
         </div>
         <p style="font-size:.85em;color:#666;">Each hero receives their Reason + Intuition + Psyche as bonus karma. Adjust individually.</p>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -2588,15 +2661,15 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       buttons: {
         award: { icon: '<i class="fas fa-star"></i>', label: "Award",
           callback: async (html) => {
-            const reason = html.find('[name="reason"]').val() || "Session Award";
+            const reason = String(html.find('[name="reason"]').val() || "").trim();
             let count = 0, total = 0;
             for (const hero of heroes) {
               if (!html.find(`[name="inc-${hero.id}"]`).is(':checked')) continue;
               const amount = Number(html.find(`[name="amt-${hero.id}"]`).val()) || 0;
               if (amount <= 0) continue;
               await this._addHeroKarmaEvent(hero, {
-                amount, type: "Session Award",
-                description: reason
+                amount, type: "R+I+P Bonus",
+                description: `R+I+P karma bonus (house rule)${reason ? `, ${reason}` : ""}`
               });
               count++; total += amount;
             }

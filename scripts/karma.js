@@ -1,3 +1,6 @@
+// karma.js v2.3.1 - 2026-10-04
+// v2.3.1: "R+I+P Bonus" history entries (Team Tracker house-rule bonus)
+//         get the R+I+P pill and the session-award styling.
 // karma.js v2.3.0 - 2026-09-05
 // v2.3.0: Parked sweep — Defeated Foe gate. The award is the opponent's
 //         highest rank NUMBER and is paid only for an ability or Power of
@@ -164,6 +167,7 @@ export class KarmaSheet extends DocumentSheet {
       "Die Roll": "DIE ROLL",
       "Power Stunt": "STUNT",
       "Session Award": "SESSION",
+      "R+I+P Bonus": "R+I+P",
       "Resource FEAT": "RESOURCE",
       "Popularity FEAT": "POP FEAT",
       "Encounter Award": "ENCOUNTER",
@@ -234,7 +238,7 @@ export class KarmaSheet extends DocumentSheet {
     context.system.karma.history.forEach(event => {
       if (event.type === "Die Roll") event.cssClass = "karma-die-roll";
       else if (event.type === "Power Stunt") event.cssClass = "karma-power-stunt";
-      else if (event.type === "Session Award") event.cssClass = "karma-session-award";
+      else if (event.type === "Session Award" || event.type === "R+I+P Bonus") event.cssClass = "karma-session-award";
       else if (event.type === "Resource FEAT") event.cssClass = "karma-resource-feat";
       else if (event.type === "Popularity FEAT") event.cssClass = "karma-popularity-feat";
       else if (event.type === "Pool Contribution" || event.type === "Pool Withdrawal" || event.type === "Pool Refund") event.cssClass = "karma-pool-event";

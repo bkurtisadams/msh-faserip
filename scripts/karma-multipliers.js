@@ -1,3 +1,5 @@
+// karma-multipliers.js v1.3.2 - 2026-10-04
+// v1.3.2: "R+I+P Bonus" entries count as gaming awards.
 // karma-multipliers.js v1.3.1 - 2026-10-03
 // v1.3.1: fixed-bug: wrapUpLastWeekly registered with default null threw in
 //         Foundry v14 (an Object setting may not default to null), which
@@ -58,7 +60,7 @@ const CATEGORY_BY_EVENT = {
   "Charity - Donation": "personal",
 
   "Role-Playing": "gaming", "Stump the Judge": "gaming",
-  "Humor Award": "gaming", "Session Award": "gaming",
+  "Humor Award": "gaming", "Session Award": "gaming", "R+I+P Bonus": "gaming",
 
   "Failing Commitment": "penalty", "Leaving Early": "penalty",
   "Negative Popularity": "penalty",
