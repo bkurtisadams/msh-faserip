@@ -1,4 +1,11 @@
-/* team-tracker.css v4.9.1 - 2026-10-03
+/* team-tracker.css v4.10.0 - 2026-10-03
+ * v4.10.0: Battle report revise note, add-foe-by-name row, awards and
+ *          penalties rows; Save changes table.
+ *
+ * team-tracker.css v4.9.2 - 2026-10-03
+ * v4.9.2: Ledger encounter breakdown (.lr-breakdown).
+ *
+ * team-tracker.css v4.9.1 - 2026-10-03
  * v4.9.1: Battle report crime editor: dropdown row, then Stopped /
  *         Arrested row (.br-crime).
  *
@@ -1126,3 +1133,23 @@
 .faserip-battle-report .br-crime { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; border-bottom: 1px dashed rgba(0,0,0,0.2); }
 .faserip-battle-report .br-crime-type select { flex: 1 1 auto; min-width: 0; width: 100%; }
 .faserip-battle-report .br-crime-flags { gap: 14px; padding-left: 2px; }
+
+/* Ledger encounter breakdown (v4.9.2) */
+.faserip.sheet.team-tracker .lr-breakdown { margin: 2px 0 6px; padding: 4px 8px; background: rgba(139,0,0,0.05); border-left: 2px solid #8b0000; }
+.faserip.sheet.team-tracker .lr-bline { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.faserip.sheet.team-tracker .lr-bline.zero { color: #777; }
+.faserip.sheet.team-tracker .lr-blabel { flex: 1; min-width: 0; }
+.faserip.sheet.team-tracker .lr-bnote { margin-top: 3px; font-size: 12px; font-style: italic; color: #555; }
+
+/* Battle report revise + editor additions (v4.10.0) */
+.faserip-battle-report .br-revise-note { font-size: 12px; padding: 4px 6px; background: #fff1d6; border: 1px solid #c98a2b; color: #5a3a00; }
+.faserip-battle-report .br-foe-add { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+.faserip-battle-report .br-foe-add input[type="text"] { width: 100%; height: 24px; font-size: 12px; }
+.faserip-battle-report .br-foe-add .br-erow select { flex: 1 1 auto; min-width: 0; }
+.faserip-battle-report .br-erow .br-add-btn { width: auto; padding: 0 8px; }
+.faserip-battle-report .br-bonus { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; border-bottom: 1px dashed rgba(0,0,0,0.2); }
+.faserip-battle-report .br-bonus .br-erow select { flex: 1 1 auto; min-width: 0; }
+.faserip-battle-report .br-bonus .br-erow input[type="number"] { width: 60px; }
+.faserip-battle-report .br-bonus-label { width: 100%; height: 24px; font-size: 12px; }
+.msh-revise-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 13px; }
+.msh-revise-table th, .msh-revise-table td { text-align: left; padding: 3px 6px; border-bottom: 1px solid rgba(0,0,0,0.15); }

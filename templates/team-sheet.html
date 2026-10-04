@@ -232,12 +232,20 @@
               <span class="lr-total {{#if r.totalPositive}}pos{{else}}neg{{/if}}">{{r.totalDisplay}}</span>
             </div>
             {{#if r.isEncounter}}
-              {{#if r.canUndoEncounter}}<button type="button" class="undo-award btn-undo" data-enc-idx="{{r.encIdx}}" title="Undo this award"><i class="fas fa-undo"></i></button>{{/if}}
+              {{#if r.canUndoEncounter}}<button type="button" class="ledger-edit-encounter btn-undo" data-enc-id="{{r.encId}}" title="Edit this award"><i class="fas fa-pen"></i></button><button type="button" class="undo-award btn-undo" data-enc-idx="{{r.encIdx}}" title="Undo this award"><i class="fas fa-undo"></i></button>{{/if}}
             {{else}}
               <button type="button" class="ledger-undo-batch btn-undo" data-entries="{{r.entries}}" title="Undo"><i class="fas fa-undo"></i></button>
             {{/if}}
             {{#if r.expanded}}
             <div class="lr-detail">
+              {{#if r.hasBreakdown}}
+              <div class="lr-breakdown">
+                {{#each r.breakdown as |b|}}
+                <div class="lr-bline {{#if b.zero}}zero{{/if}}"><span class="lr-blabel">{{b.label}}</span><span class="{{#if b.positive}}pos{{else}}{{#unless b.zero}}neg{{/unless}}{{/if}}">{{b.display}}</span></div>
+                {{/each}}
+                {{#if r.breakdownNote}}<div class="lr-bnote">{{r.breakdownNote}}</div>{{/if}}
+              </div>
+              {{/if}}
               {{#each r.detail as |h|}}
               <div class="lr-dline"><span class="lr-dname">{{h.name}}</span><span class="lr-ddesc">{{h.description}}</span><span class="{{#if h.positive}}pos{{else}}neg{{/if}}">{{h.amountDisplay}}</span></div>
               {{/each}}

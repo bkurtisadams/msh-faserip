@@ -1,3 +1,21 @@
+// teamSheet.js v4.19.0 - 2026-10-03
+// v4.19.0: Awarded encounters can be edited. The Ledger's pencil reopens the
+//          battle report card on that encounter; Save changes compares what
+//          each hero should get now (_planHeroAward, the same plan the Award
+//          button writes) with what they were paid, then either records only
+//          (karma unchanged; the record is marked recordOnly and the Ledger
+//          shows a "kept as originally awarded" line) or writes an Encounter
+//          Adjustment entry per hero for the difference. Either way the
+//          descriptions on that encounter's history entries are rewritten to
+//          the new parts; amounts never change. Pool mode: record only.
+// teamSheet.js v4.18.2 - 2026-10-03
+// v4.18.2: An expanded encounter row in the Ledger shows why: the
+//          encounter's parts rebuilt from its record (each foe with rank
+//          and award, below-Remarkable foes at +0, crimes stopped and
+//          arrested, rescues, GM award, bonuses, losses) and how it reached
+//          the heroes (full to each hero, or split N ways). Works for old
+//          awards whose stored descriptions were bare. Per-hero lines keep a
+//          description only when that hero's amount differs.
 // teamSheet.js v4.18.1 - 2026-10-03
 // v4.18.1: Ledger rows show what each hero got, not the sum across heroes:
 //          "+200 each" when equal, "+18 to +80" when not, the bare amount for
@@ -604,6 +622,49 @@ export class TeamSheet extends Application {
     return /die roll|advancement|addition|pool contribution|pool withdrawal|pool refund|stunt|spend|build|purchase|invent/i.test(t);
   }
 
+  /** An encounter's karma parts from its stored record, for the Ledger. */
+  static _encounterBreakdown(enc) {
+    const sign = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}`;
+    const lines = [];
+    for (const v of enc.villains || []) {
+      const count = Math.max(1, Number(v.count) || 1);
+      const rank = Number(v.rankValue) || 0;
+      const each = foeDefeatAward(rank);
+      const who = `${v.name}${count > 1 ? ` ×${count}` : ""} (${[v.rankLabel, rank || ""].filter(Boolean).join(" ")})`;
+      lines.push(each
+        ? { label: `Foe: ${who}`, amount: each * count }
+        : { label: `Foe: ${who}, below Remarkable`, amount: 0 });
+    }
+    const crimeName = { violent: "Violent Crime", destructive: "Destructive Crime", theft: "Theft",
+      robbery: "Robbery", misdemeanor: "Misdemeanor", national: "National Offense",
+      localConspiracy: "Local Conspiracy", nationalConspiracy: "National Conspiracy",
+      globalConspiracy: "Global Conspiracy", other: "Other Crime" };
+    for (const c of TeamSheet._normalizeCrimes(enc)) {
+      const cv = c.type ? TeamSheet.CRIME_VALUES[c.type] : null;
+      if (!cv) continue;
+      const name = crimeName[c.type] || c.type;
+      if (c.stopped) lines.push({ label: `Stopped ${name}`, amount: cv.stop });
+      if (c.arrested) lines.push({ label: `Arrested ${name}`, amount: cv.arrest });
+    }
+    if (enc.rescues > 0) lines.push({ label: `Rescues ×${enc.rescues}${enc.rescues * 20 > 100 ? " (100 max)" : ""}`, amount: Math.min(enc.rescues * 20, 100) });
+    if (enc.gmAward > 0) lines.push({ label: "GM award", amount: Number(enc.gmAward) });
+    let shared = lines.reduce((s, l) => s + l.amount, 0);
+    for (const b of Array.isArray(enc.bonuses) ? enc.bonuses : []) {
+      const amt = Number(b.amount) || 0;
+      if (!amt) continue;
+      const scope = b.scope || "split";
+      const who = scope === "individual" ? (game.actors.get(b.heroId)?.name || "one hero") : null;
+      const tag = scope === "per_hero" ? " (each hero)" : who ? ` (${who})` : "";
+      lines.push({ label: `${b.label || (amt > 0 ? "Award" : "Penalty")}${tag}`, amount: amt });
+      if (scope === "split" && amt > 0) shared += amt;
+    }
+    if (enc.losses > 0) lines.push({ label: "Losses (each hero)", amount: -Number(enc.losses) });
+    return {
+      shared,
+      lines: lines.map(l => ({ ...l, display: sign(l.amount), positive: l.amount > 0, zero: l.amount === 0 }))
+    };
+  }
+
   /** Ledger view: one row per event, grouped by game date; optional grid. */
   _buildLedger(context) {
     const heroFilter = this._ledgerHero || "all";
@@ -612,6 +673,7 @@ export class TeamSheet extends Application {
     const limit = this._ledgerLimit || 60;
     const expanded = this._ledgerExpanded ??= new Set();
     const encById = new Map((context.encounters || []).map((e, idx) => [e.id, { ...e, idx }]));
+    const rawEncById = new Map((game.settings.get("msh-faserip", "defeatedVillains") || []).map(e => [e.id, e]));
     const heroes = (context.teamMembers || []).filter(tm => heroFilter === "all" || tm.id === heroFilter);
     const groups = new Map();
     const sign = (n) => `${n > 0 ? "+" : ""}${n}`;
@@ -665,6 +727,28 @@ export class TeamSheet extends Application {
         const perHero = n === 1 || min === max
           ? `${sign(min)}${n > 1 ? " each" : ""}`
           : `${sign(min)} to ${sign(max)}`;
+        let breakdown = [], breakdownNote = "";
+        const rawEnc = g.encounterId ? rawEncById.get(g.encounterId) : null;
+        if (rawEnc) {
+          const b = TeamSheet._encounterBreakdown(rawEnc);
+          breakdown = b.lines;
+          if (rawEnc.recordOnly) {
+            const { rows: rv } = this._revisionRows(rawEnc);
+            const diffs = [...new Set(rv.map(r => r.paid - r.target))];
+            if (diffs.length === 1 && diffs[0]) {
+              breakdown.push({ label: "Kept as originally awarded (each hero)", amount: diffs[0], display: sign(diffs[0]), positive: diffs[0] > 0, zero: false });
+            } else if (diffs.some(Boolean)) {
+              breakdown.push({ label: "Kept as originally awarded (differs by hero)", amount: 0, display: "", positive: false, zero: true });
+            }
+          }
+          if (b.shared > 0 && min === max) {
+            if (min === b.shared) breakdownNote = `Worth ${sign(b.shared)}, given in full to each of ${n} hero${n === 1 ? "" : "es"}.`;
+            else if (min === Math.floor(b.shared / n)) breakdownNote = `Worth ${sign(b.shared)}, split ${n} ways: ${sign(min)} each.`;
+            else breakdownNote = `Worth ${sign(b.shared)} shared; each hero got ${sign(min)} after multipliers, bonuses and losses.`;
+          } else if (b.shared > 0) {
+            breakdownNote = `Worth ${sign(b.shared)} shared; heroes differ because of individual bonuses or losses.`;
+          }
+        }
         const icon = g.encounterId ? "fas fa-skull"
           : g.total < 0 ? "fas fa-minus-circle"
           : /session/i.test(g.type) ? "fas fa-star"
@@ -676,7 +760,9 @@ export class TeamSheet extends Application {
           expanded: expanded.has(g.key),
           isEncounter: !!g.encounterId, encIdx: g.encIdx, canUndoEncounter: g.encIdx !== null,
           entries: g.entries.join(";"),
-          detail: list.map(h => ({ name: h.name, amountDisplay: sign(h.amount), positive: h.amount > 0, description: [...new Set(h.descriptions)].join(" · ") })),
+          breakdown, breakdownNote, hasBreakdown: breakdown.length > 0, encId: g.encounterId,
+          detail: list.map(h => ({ name: h.name, amountDisplay: sign(h.amount), positive: h.amount > 0,
+            description: breakdown.length && min === max ? "" : [...new Set(h.descriptions)].join(" · ") })),
           cells: (context.teamMembers || []).filter(tm => heroFilter === "all" || tm.id === heroFilter).map(tm => {
             const h = g.byHero.get(tm.id);
             return h ? { value: sign(h.amount), positive: h.amount > 0, absent: false } : { value: "·", absent: true };
@@ -782,6 +868,104 @@ export class TeamSheet extends Application {
   static editEncounterById(encId) {
     if (TeamSheet._encIdxById(encId) < 0) return;
     return openBattleReportEditor(encId);
+  }
+
+  static reviseEncounterById(encId) {
+    if (TeamSheet._encIdxById(encId) < 0) return;
+    return openBattleReportEditor(encId, { revise: true });
+  }
+
+  static async saveEncounterRevision(encId) {
+    const saved = await TeamSheet.worker()._saveEncounterRevision(encId);
+    if (saved) TeamSheet._refreshOpenSheets();
+    return saved;
+  }
+
+  /** Paid vs now-owed per hero for an awarded encounter. */
+  _revisionRows(enc) {
+    const plan = this._planHeroAward(enc);
+    const target = {};
+    for (const e of plan.entries) target[e.heroId] = (target[e.heroId] || 0) + e.amount;
+    const paid = {};
+    for (const a of game.actors) {
+      const hits = (a.system?.karma?.history || []).filter(h => h.encounterId === enc.id);
+      if (hits.length) paid[a.id] = hits.reduce((sum, h) => sum + (Number(h.amount) || 0), 0);
+    }
+    const ids = [...new Set([...Object.keys(target), ...Object.keys(paid)])];
+    const rows = ids.map(id => {
+      const t = target[id] || 0, p = paid[id] || 0;
+      return { id, name: game.actors.get(id)?.name || "Unknown", paid: p, target: t, diff: t - p };
+    });
+    return { plan, rows };
+  }
+
+  async _saveEncounterRevision(encId) {
+    if (!game.user.isGM) return false;
+    const list = foundry.utils.deepClone(game.settings.get("msh-faserip", "defeatedVillains") || []);
+    const idx = list.findIndex(e => e.id === encId);
+    if (idx < 0) return false;
+    const enc = list[idx];
+    const pool = getGroupAwardMode() === "pool";
+    const { plan, rows } = this._revisionRows(enc);
+    const anyDiff = rows.some(r => r.diff);
+    const sg = n => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
+    const esc = v => foundry.utils.escapeHTML(String(v ?? ""));
+    const table = `<table class="msh-revise-table"><thead><tr><th>Hero</th><th>Paid</th><th>Now</th><th>Difference</th></tr></thead><tbody>${
+      rows.map(r => `<tr><td>${esc(r.name)}</td><td>${sg(r.paid)}</td><td>${sg(r.target)}</td><td><strong>${r.diff ? sg(r.diff) : "none"}</strong></td></tr>`).join("")
+    }</tbody></table>`;
+    const intro = anyDiff
+      ? (pool
+        ? "<p>The team pool is on, so changes are recorded only. Karma stays as paid.</p>"
+        : "<p><strong>Record only</strong> keeps karma as paid. <strong>Adjust karma</strong> adds the difference to each hero as an Encounter Adjustment. Losses never take a hero below 0.</p>")
+      : "<p>Karma already matches. Saving updates the record and the history descriptions.</p>";
+    const buttons = [{ action: "record", label: anyDiff ? "Record only" : "Save", default: true }];
+    if (anyDiff && !pool) buttons.push({ action: "adjust", label: "Adjust karma" });
+    buttons.push({ action: "cancel", label: "Keep editing" });
+    const choice = await foundry.applications.api.DialogV2.wait({
+      window: { title: `Save changes — ${plan.encLabel}` },
+      content: `${intro}${table}`,
+      buttons,
+      rejectClose: false
+    });
+    if (!choice || choice === "cancel") return false;
+
+    const byHero = {};
+    for (const e of plan.entries) (byHero[e.heroId] ||= []).push(e);
+    for (const r of rows) {
+      const hero = game.actors.get(r.id);
+      if (!hero) continue;
+      const mine = byHero[r.id] || [];
+      const posDesc = mine.filter(e => e.amount > 0).map(e => e.description).join(" · ");
+      const negDesc = mine.filter(e => e.amount < 0).map(e => e.description).join(" · ");
+      const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+      let changed = false;
+      for (const h of history) {
+        if (h.encounterId !== encId || h.type === "Encounter Adjustment") continue;
+        const text = h.amount > 0 ? posDesc : h.amount < 0 ? negDesc : "";
+        if (text && h.description !== text) { h.description = text; changed = true; }
+      }
+      if (changed) await hero.update({ "system.karma.history": history });
+    }
+
+    if (choice === "adjust") {
+      const gameDate = TeamSheet._getGameDateTimeStatic().gameDate;
+      for (const r of rows) {
+        const hero = game.actors.get(r.id);
+        if (!hero || !r.diff) continue;
+        await this._addHeroKarmaEvent(hero, {
+          amount: r.diff, type: "Encounter Adjustment",
+          description: `Adjusted after edit: ${plan.encLabel}`, gameDate, encounterId: encId
+        });
+      }
+      delete enc.recordOnly;
+    } else {
+      if (anyDiff) enc.recordOnly = true; else delete enc.recordOnly;
+    }
+    await game.settings.set("msh-faserip", "defeatedVillains", list);
+    ui.notifications.info(choice === "adjust"
+      ? `${plan.encLabel}: karma adjusted for ${rows.filter(r => r.diff).length} hero(es).`
+      : `${plan.encLabel}: record updated; karma unchanged.`);
+    return true;
   }
 
   _calculateAvailableKarma(actor) {
@@ -905,6 +1089,10 @@ export class TeamSheet extends Application {
     html.find('.award-encounter-heroes').click(ev => this._onAwardEncounterToHeroes(ev));
     html.find('.award-encounter-pool').click(ev => this._onAwardEncounterToPool(ev));
     html.find('.undo-award').click(ev => this._onUndoAward(ev));
+    html.find('.ledger-edit-encounter').click(ev => {
+      ev.stopPropagation();
+      TeamSheet.reviseEncounterById(ev.currentTarget.dataset.encId);
+    });
     html.find('.gm-award-amount').change(ev => this._onEncNumericChange(ev, 'gmAward'));
     html.find('.add-bonus-item').click(ev => this._onAddBonusItem(ev));
     html.find('.delete-bonus').click(ev => this._onDeleteBonusItem(ev));
@@ -1956,55 +2144,19 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const mode = getGroupAwardMode();
     if (mode === "pool") return this._onAwardEncounterToPool(ev);
 
-    const heroes = this._presentTeamIds(enc).map(id => game.actors.get(id)).filter(Boolean);
+    const plan = this._planHeroAward(enc);
+    const { heroes, encLabel } = plan;
     if (!heroes.length) { ui.notifications.warn("No heroes marked as present"); return; }
-
-    const t = this._calcEncounterTotals(enc);
-    const {
-      splitPositive, splitLoss,
-      perHeroPositive, perHeroLoss,
-      individualByHero
-    } = t;
-
-    // Split pool math
-    const splitAward = computeGroupAward({
-      eventType: "Encounter Award",
-      baseAmount: splitPositive,
-      heroCount: heroes.length,
-      groupMode: mode
-    });
-    const perHeroFromSplit = splitAward.perHero;
-    const multiplier = splitAward.multiplier;
-
-    // Per-hero scope math (full amount to each present hero, mult applied)
-    const penMult = getCategoryMultiplier("penalty");
-    const lossMult = penMult;
-    const perHeroPosShown = perHeroPositive ? Math.floor(perHeroPositive * multiplier) : 0;
-    const perHeroLossShown = perHeroLoss ? Math.ceil(perHeroLoss * lossMult) : 0;
-    const splitLossPerHero = splitLoss ? computeLossAmount(splitLoss, heroes.length, mode) : 0;
-
-    const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
     const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
     const realDate = enc.realDate || new Date().toLocaleDateString();
 
-    // Build breakdown + confirmation summary
-    const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length);
-    const perHeroCommon = perHeroFromSplit + perHeroPosShown + splitLossPerHero + perHeroLossShown;
-    const indLines = [];
-    for (const h of heroes) {
-      const items = individualByHero[h.id] || [];
-      if (!items.length) continue;
-      const sum = items.reduce((s, it) => s + it.amount, 0);
-      indLines.push(`${h.name}: ${sum > 0 ? '+' : ''}${sum}`);
-    }
-    const pending = t.pendingHeroAssignment || [];
-    const pendingWarning = pending.length
-      ? `<p style="color:#c00;"><strong>⚠ Skipping ${pending.length} bonus${pending.length === 1 ? '' : 'es'} — needs hero assignment:</strong> ${pending.map(p => `${p.label || 'Award'} ${p.amount > 0 ? '+' : ''}${p.amount}`).join('; ')}</p>`
+    const pendingWarning = plan.pending.length
+      ? `<p style="color:#c00;"><strong>⚠ Skipping ${plan.pending.length} bonus${plan.pending.length === 1 ? '' : 'es'} — needs hero assignment:</strong> ${plan.pending.map(p => `${p.label || 'Award'} ${p.amount > 0 ? '+' : ''}${p.amount}`).join('; ')}</p>`
       : '';
     const confirmBody = [
-      `<p>${breakdown}</p>`,
-      `<p>Base per hero (shared + per-hero scope): <strong>${perHeroCommon}</strong></p>`,
-      indLines.length ? `<p>Plus individual: ${indLines.join('; ')}</p>` : '',
+      `<p>${plan.breakdown}</p>`,
+      `<p>Base per hero (shared + per-hero scope): <strong>${plan.perHeroCommon}</strong></p>`,
+      plan.indLines.length ? `<p>Plus individual: ${plan.indLines.join('; ')}</p>` : '',
       pendingWarning,
       `<p>Apply to <strong>${heroes.length}</strong> hero${heroes.length === 1 ? '' : 'es'}?</p>`
     ].join('');
@@ -2013,8 +2165,63 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       content: confirmBody
     })) return;
 
-    // Description parts (shared across hero entries)
-    const foeNames = enc.villains.filter(v => foeDefeatAward(Number(v.rankValue) || 0) > 0).map(v => `${v.name}(${v.rankValue})`).join('+');
+    for (const e of plan.entries) {
+      const hero = game.actors.get(e.heroId);
+      if (!hero) continue;
+      await this._addHeroKarmaEvent(hero, {
+        amount: e.amount, type: e.type, description: e.description,
+        gameDate, realDate, encounterId: enc.id
+      });
+    }
+
+    encounters[idx].awarded = true;
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    ui.notifications.info(`${encLabel}: awarded to ${heroes.length} hero${heroes.length === 1 ? '' : 'es'}.`);
+    this.render(true);
+  }
+
+  /**
+   * Hero-mode award for an encounter as a list of entries, without writing
+   * anything. The Award button writes these; editing an awarded encounter
+   * compares them with what was paid. Pool mode has its own path.
+   */
+  _planHeroAward(enc) {
+    const mode = getGroupAwardMode();
+    const heroes = this._presentTeamIds(enc).map(id => game.actors.get(id)).filter(Boolean);
+    const t = this._calcEncounterTotals(enc);
+    const {
+      splitPositive, splitLoss,
+      perHeroPositive, perHeroLoss,
+      individualByHero
+    } = t;
+    const heroCount = Math.max(1, heroes.length);
+
+    const splitAward = computeGroupAward({
+      eventType: "Encounter Award",
+      baseAmount: splitPositive,
+      heroCount,
+      groupMode: mode
+    });
+    const perHeroFromSplit = splitAward.perHero;
+    const multiplier = splitAward.multiplier;
+
+    const lossMult = getCategoryMultiplier("penalty");
+    const perHeroPosShown = perHeroPositive ? Math.floor(perHeroPositive * multiplier) : 0;
+    const perHeroLossShown = perHeroLoss ? Math.ceil(perHeroLoss * lossMult) : 0;
+    const splitLossPerHero = splitLoss ? computeLossAmount(splitLoss, heroCount, mode) : 0;
+
+    const encLabel = enc.name || (enc.villains || []).map(v => v.name).join(', ') || "Encounter";
+    const breakdown = this._buildBreakdownText(enc, multiplier, heroCount);
+    const perHeroCommon = perHeroFromSplit + perHeroPosShown + splitLossPerHero + perHeroLossShown;
+    const indLines = [];
+    for (const h of heroes) {
+      const items = individualByHero[h.id] || [];
+      if (!items.length) continue;
+      const sum = items.reduce((s, it) => s + it.amount, 0);
+      indLines.push(`${h.name}: ${sum > 0 ? '+' : ''}${sum}`);
+    }
+
+    const foeNames = (enc.villains || []).filter(v => foeDefeatAward(Number(v.rankValue) || 0) > 0).map(v => `${v.name}(${v.rankValue})`).join('+');
     const sharedDescParts = [];
     if (enc.name) sharedDescParts.push(enc.name);
     if (foeNames) sharedDescParts.push(`Foe: ${foeNames}`);
@@ -2032,35 +2239,19 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const perHeroBonuses = (enc.bonuses || []).filter(b => b.scope === "per_hero" && b.amount);
     const desc = sharedDescParts.join(', ');
     const fullShare = getCombatAwardScope() === "individual";
-    const baseNote = `(split base ${splitPositive} ×${multiplier} ÷${heroes.length})`;
+    const baseNote = `(split base ${splitPositive} ×${multiplier} ÷${heroCount})`;
 
+    const entries = [];
     for (const hero of heroes) {
-      // Shared split award
-      if (perHeroFromSplit > 0) {
-        await this._addHeroKarmaEvent(hero, {
-          amount: perHeroFromSplit, type: "Encounter Award",
-          description: `${desc} ${baseNote}`, gameDate, realDate, encounterId: enc.id
-        });
-      }
-      // Per-hero scope positive
+      const add = (amount, type, description) => entries.push({ heroId: hero.id, amount, type, description });
+      if (perHeroFromSplit > 0) add(perHeroFromSplit, "Encounter Award", `${desc} ${baseNote}`);
       if (perHeroPosShown > 0) {
         const phLabels = perHeroBonuses.filter(b => b.amount > 0).map(b => `${b.label || 'Award'} +${b.amount}`).join(', ');
-        await this._addHeroKarmaEvent(hero, {
-          amount: perHeroPosShown, type: "Encounter Award",
-          description: fullShare
-            ? `${[desc, phLabels].filter(Boolean).join(', ')} (full award to each hero ×${multiplier})`
-            : `Per-hero: ${phLabels} (×${multiplier})`,
-          gameDate, realDate, encounterId: enc.id
-        });
+        add(perHeroPosShown, "Encounter Award", fullShare
+          ? `${[desc, phLabels].filter(Boolean).join(', ')} (full award to each hero ×${multiplier})`
+          : `Per-hero: ${phLabels} (×${multiplier})`);
       }
-      // Split losses
-      if (splitLossPerHero < 0) {
-        await this._addHeroKarmaEvent(hero, {
-          amount: splitLossPerHero, type: "Encounter Loss",
-          description: `Shared losses — ${encLabel}`, gameDate, realDate, encounterId: enc.id
-        });
-      }
-      // Losses: always individual (Losses field, negative Split and Per-hero bonuses)
+      if (splitLossPerHero < 0) add(splitLossPerHero, "Encounter Loss", `Shared losses — ${encLabel}`);
       if (perHeroLossShown < 0) {
         const phLossLabels = perHeroBonuses.filter(b => b.amount < 0).map(b => `${b.label || 'Penalty'} ${b.amount}`).join(', ');
         const lossDesc = [
@@ -2068,32 +2259,19 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           ...splitBonuses.filter(b => b.amount < 0).map(b => `${b.label || 'Penalty'} ${b.amount}`),
           phLossLabels
         ].filter(Boolean).join(', ') || `Per-hero losses — ${encLabel}`;
-        await this._addHeroKarmaEvent(hero, {
-          amount: perHeroLossShown, type: "Encounter Loss",
-          description: lossDesc, gameDate, realDate, encounterId: enc.id
-        });
+        add(perHeroLossShown, "Encounter Loss", lossDesc);
       }
-      // Individual bonuses for this hero
-      const items = individualByHero[hero.id] || [];
-      for (const it of items) {
+      for (const it of individualByHero[hero.id] || []) {
         if (!it.amount) continue;
         const indMult = it.amount > 0 ? multiplier : lossMult;
-        const indAmt = it.amount > 0
-          ? Math.floor(it.amount * indMult)
-          : Math.ceil(it.amount * indMult);
-        await this._addHeroKarmaEvent(hero, {
-          amount: indAmt,
-          type: it.amount > 0 ? "Encounter Award" : "Encounter Loss",
-          description: `${it.label || 'Individual'} (×${indMult})`,
-          gameDate, realDate, encounterId: enc.id
-        });
+        const indAmt = it.amount > 0 ? Math.floor(it.amount * indMult) : Math.ceil(it.amount * indMult);
+        add(indAmt, it.amount > 0 ? "Encounter Award" : "Encounter Loss", `${it.label || 'Individual'} (×${indMult})`);
       }
     }
-
-    encounters[idx].awarded = true;
-    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    ui.notifications.info(`${encLabel}: awarded to ${heroes.length} hero${heroes.length === 1 ? '' : 'es'}.`);
-    this.render(true);
+    return {
+      heroes, encLabel, entries, breakdown, perHeroCommon, indLines,
+      pending: t.pendingHeroAssignment || [], multiplier, sharedDesc: desc
+    };
   }
 
   async _onAwardEncounterToPool(ev) {

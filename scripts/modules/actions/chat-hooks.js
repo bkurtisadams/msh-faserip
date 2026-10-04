@@ -1,3 +1,6 @@
+// chat-hooks.js v1.8.5 - 2026-10-03
+// v1.8.5: battle report revise buttons (br-revise / br-revise-cancel /
+//         br-revise-save).
 // chat-hooks.js v1.8.4 - 2026-10-01
 // v1.8.4: battle report card buttons (br-award / br-edit / br-undo) wired to
 //         apps/battle-report.js.
@@ -845,7 +848,7 @@ export function installActionChatHandlers() {
       } catch (e) { console.error("[FASERIP] dying-refeat-200 handler failed:", e); }
     });
 
-    html.on("click", '[data-action="br-award"], [data-action="br-edit"], [data-action="br-undo"]', async (ev) => {
+    html.on("click", '[data-action="br-award"], [data-action="br-edit"], [data-action="br-undo"], [data-action="br-revise"], [data-action="br-revise-cancel"], [data-action="br-revise-save"]', async (ev) => {
       ev.preventDefault();
       try {
         const { handleBattleReportClick } = await import("../../apps/battle-report.js");
