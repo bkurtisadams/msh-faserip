@@ -1,3 +1,13 @@
+// teamSheet.js v4.20.2 - 2026-10-04
+// v4.20.2: Old "Daily Roll" entries with a negative amount (karma spent on a
+//          FEAT roll, from the daily-bonus era) count as spending and stay
+//          off the Ledger; they remain on each hero's Karma History.
+// teamSheet.js v4.20.1 - 2026-10-04
+// v4.20.1: Ledger dates are game dates only: an entry without one goes
+//          under "No game date" (last when sorted by game date) instead of
+//          its real-world date. Day headers collapse: the newest day starts
+//          open, the rest closed with an entry count; click to toggle. A
+//          search opens every matching day.
 // teamSheet.js v4.20.0 - 2026-10-04
 // v4.20.0: R+I+P bonus entries are typed "R+I+P Bonus" and described "R+I+P
 //          karma bonus (house rule)"; older multi-hero "Session Award"
@@ -711,6 +721,7 @@ export class TeamSheet extends Application {
         const amount = Number(e.amount) || 0;
         if (!amount) return;
         if (TeamSheet._isSpendingType(e.type)) return;
+        if (amount < 0 && /^daily roll$/i.test(String(e.type || "").trim())) return;
         if (kind === "awards" && amount < 0) return;
         if (kind === "losses" && amount > 0) return;
 
@@ -725,7 +736,7 @@ export class TeamSheet extends Application {
             title: enc ? enc.displayName
               : (/^Immediate/.test(e.type || "") && e.description ? e.description.replace(/ \(capped at .*\)$/, "") : (e.type || "Karma")),
             type: e.type || "",
-            gameDate: e.gameDate || e.realDate || "",
+            gameDate: e.gameDate || "",
             time: TeamSheet._entryTime(e),
             byHero: new Map(), entries: [], total: 0, text: []
           };
@@ -733,7 +744,7 @@ export class TeamSheet extends Application {
         }
         g.time = Math.max(g.time, TeamSheet._entryTime(e));
         g.text.push(e.type || "", e.description || "");
-        if (!g.gameDate && (e.gameDate || e.realDate)) g.gameDate = e.gameDate || e.realDate;
+        if (!g.gameDate && e.gameDate) g.gameDate = e.gameDate;
         g.total += amount;
         const h = g.byHero.get(tm.id) || { id: tm.id, name: tm.name, amount: 0, descriptions: [] };
         h.amount += amount;
@@ -820,15 +831,21 @@ export class TeamSheet extends Application {
         };
       });
 
-    // Group rows under game-date headers, newest first, with day totals.
+    // Group rows under game-date headers; only open days list their rows.
     const days = [];
     for (const r of rows) {
       let d = days[days.length - 1];
-      if (!d || d.date !== r.gameDate) { d = { date: r.gameDate || "Undated", total: 0, rows: [] }; days.push(d); }
+      const date = r.gameDate || "No game date";
+      if (!d || d.date !== date) { d = { date, key: r.gameDate || "__none", total: 0, rows: [] }; days.push(d); }
       d.rows.push(r);
       d.total += r.total;
     }
-    for (const d of days) { d.totalDisplay = sign(d.total); d.totalPositive = d.total > 0; }
+    if (!this._ledgerDaysOpen) this._ledgerDaysOpen = new Set(days.length ? [days[0].key] : []);
+    for (const d of days) {
+      d.totalDisplay = sign(d.total); d.totalPositive = d.total > 0;
+      d.open = words.length > 0 || this._ledgerDaysOpen.has(d.key);
+      d.countText = `${d.rows.length} entr${d.rows.length === 1 ? "y" : "ies"}`;
+    }
 
     return {
       ledgerDays: days,
@@ -1120,6 +1137,12 @@ export class TeamSheet extends Application {
       this.render(false);
     });
     html.find('.ledger-view-toggle').click(ev => { this._ledgerView = ev.currentTarget.dataset.view; this.render(false); });
+    html.find('.ld-toggle').click(ev => {
+      const key = ev.currentTarget.dataset.day;
+      this._ledgerDaysOpen ??= new Set();
+      if (this._ledgerDaysOpen.has(key)) this._ledgerDaysOpen.delete(key); else this._ledgerDaysOpen.add(key);
+      this.render(false);
+    });
     html.find('.ledger-hero-filter').change(ev => { this._ledgerHero = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-kind-filter').change(ev => { this._ledgerKind = ev.currentTarget.value; this._ledgerLimit = 60; this.render(false); });
     html.find('.ledger-more').click(() => { this._ledgerLimit = (this._ledgerLimit || 60) + 60; this.render(false); });
