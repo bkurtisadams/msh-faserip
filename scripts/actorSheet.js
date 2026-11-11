@@ -1,3 +1,14 @@
+// actorSheet.js v2.17.0 - 2026-11-11
+// v2.17.0: Fixed-bug: three places read the sheet's root as
+//          `this.element?.[0] ?? this.element`. Under the V2 sheet,
+//          this.element is the <form> itself, and form[0] is its first
+//          control, so the "root" was a single input. The sheet-level drop
+//          listener was being bound to that one control, and focus capture
+//          and scroll lookup were searching inside it. All three now use
+//          sheetRootOf(). Under the V2 adapter the sheet-level drop listener
+//          is not bound at all: the V2 sheet owns sheet-level drops (it has
+//          in practice all along) and the tab drop zones here still handle
+//          drops on the item tabs.
 // actorSheet.js v2.16.0 - 2026-11-11
 // v2.16.0: Two steps toward leaving the V1 framework. getData() builds its
 //          base context itself (_baseSheetContext) instead of calling the V1
@@ -422,6 +433,13 @@ function buildDropFingerprint(actor, data) {
     droppedData._id ?? droppedData.id ?? "",
     droppedData.name ?? data.name ?? ""
   ].join("|");
+}
+
+/** The sheet's root element, whether this.element is a jQuery wrapper (V1) or the element itself (V2). */
+function sheetRootOf(sheet) {
+  const el = sheet?.element;
+  if (!el) return null;
+  return el instanceof HTMLElement ? el : (el[0] ?? null);
 }
 
 export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
@@ -1005,7 +1023,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     return "Active Effect";
   }
 
-  _findSheetScroller(root = this.element?.[0] ?? this.element) {
+  _findSheetScroller(root = sheetRootOf(this)) {
     if (!root) return null;
     const candidates = [
       root.querySelector?.('.sheet-tab-content'),
@@ -1020,7 +1038,7 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   }
 
   _captureSheetFocus() {
-    const root = this.element?.[0] ?? this.element;
+    const root = sheetRootOf(this);
     const active = document.activeElement;
     if (!root?.contains?.(active) || !active?.name) return;
 
@@ -2478,21 +2496,24 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     // V14 (core 14.364): appv1 DragDrop no longer delivers sheet-level
     // drops. Bind natively on the form; _onDrop dedupes via its
     // same-event guard if core delivery ever resumes.
-    const dropEl = this.element?.[0] ?? this.element;
+    const dropEl = sheetRootOf(this);
     if (dropEl) {
       // Re-bind every render (remove prior handler, then add) so the CURRENT
       // element always has exactly one live drop listener. The previous
       // once-only __mshDropBound guard did not survive appv1-on-14.364
       // re-renders: the drop worked once, then the re-rendered element had
       // no live listener.
-      if (this._mshDropHandler) {
-        dropEl.removeEventListener("dragover", this._mshDragoverHandler);
-        dropEl.removeEventListener("drop", this._mshDropHandler);
+      // Under the V2 adapter the V2 sheet binds the sheet-level drop itself.
+      if (!this._isV2Adapter) {
+        if (this._mshDropHandler) {
+          dropEl.removeEventListener("dragover", this._mshDragoverHandler);
+          dropEl.removeEventListener("drop", this._mshDropHandler);
+        }
+        this._mshDragoverHandler = ev => ev.preventDefault();
+        this._mshDropHandler = ev => this._onDrop(ev);
+        dropEl.addEventListener("dragover", this._mshDragoverHandler);
+        dropEl.addEventListener("drop", this._mshDropHandler);
       }
-      this._mshDragoverHandler = ev => ev.preventDefault();
-      this._mshDropHandler = ev => this._onDrop(ev);
-      dropEl.addEventListener("dragover", this._mshDragoverHandler);
-      dropEl.addEventListener("drop", this._mshDropHandler);
 
       // V14 (core 14.364): appv1's base img[data-edit] click binding is as
       // unreliable as its DragDrop delivery — the portrait was unclickable

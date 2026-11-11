@@ -1,3 +1,7 @@
+// scripts/dev/actor-sheet-runtime-tests.js v1.4.0 - 2026-11-11
+// v1.4.0: Checks that the edited field keeps keyboard focus through the
+//         re-render, drops an item on an item tab (the tab drop-zone path)
+//         as well as on the sheet body, and drops a passenger on the vehicle.
 // scripts/dev/actor-sheet-runtime-tests.js v1.3.0 - 2026-11-11
 // v1.3.0: Vehicle sheet: quick damage button, dropping an actor on the
 //         Driver slot and removing them again, and (on the V2 shell) that
@@ -144,7 +148,7 @@ async function applyEditInner(sheet, actor, edit, updateCount) {
   el.dispatchEvent(new Event("change", { bubbles: true }));
   const saved = await waitFor(() => JSON.stringify(pickKeys(edit.read(actor), edit.expect)) === JSON.stringify(edit.expect), { timeout: 2500 });
   await sleep(400);
-  return { found: true, saved: !!saved, updates: updateCount(), result: pickKeys(edit.read(actor), edit.expect) };
+  return { found: true, saved: !!saved, updates: updateCount(), focusKept: document.activeElement?.name === edit.field, focusOn: document.activeElement?.name ?? document.activeElement?.tagName, result: pickKeys(edit.read(actor), edit.expect) };
 }
 
 const elementOf = (sheet) => (sheet?.element?.jquery ? sheet.element[0] : sheet?.element) ?? null;
@@ -271,6 +275,18 @@ async function dropTest(recorder, sheet, actor, donor) {
   await waitFor(() => count() > 0, { timeout: 3000 });
   await sleep(800);
   recorder.assert(count() === 1, "Drop: an item dropped from another actor is added exactly once", { copies: count() });
+
+  const gift2 = donor.items.getName("Runtime Blast");
+  const tab = content(sheet)?.querySelector('.sheet-tab-content .tab[data-tab="powers"]');
+  if (!gift2 || !tab) return recorder.skip("Drop: item onto the Powers tab", { reason: "no donor item or Powers tab" });
+  const before = actor.items.filter(i => i.name === "Runtime Blast").length;
+  const dt2 = new DataTransfer();
+  dt2.setData("text/plain", JSON.stringify({ type: "Item", uuid: gift2.uuid }));
+  tab.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt2 }));
+  await waitFor(() => actor.items.filter(i => i.name === "Runtime Blast").length > before, { timeout: 3000 });
+  await sleep(800);
+  const added = actor.items.filter(i => i.name === "Runtime Blast").length - before;
+  recorder.assert(added === 1, "Drop: an item dropped on the Powers tab is added exactly once", { added });
 }
 
 async function readOnlyTest(recorder, actor) {
@@ -344,7 +360,8 @@ async function vehicleTest(recorder, vehicle, crewActor) {
       await sleep(400);
       recorder.assert(!!seated, "Vehicle: dropping an actor on the Driver slot makes them the driver", { driverUuid: vehicle.system.driverUuid });
       const shownName = root().querySelector('.crew-link')?.textContent?.trim() ?? "";
-      recorder.assert(!seated || shownName.length > 0, "Vehicle: the driver is listed on the Crew tab", { shownName });
+      if (seated) recorder.assert(shownName.length > 0, "Vehicle: the driver is listed on the Crew tab", { shownName });
+      else recorder.skip("Vehicle: the driver is listed on the Crew tab", { reason: "no driver was seated" });
       const remove = root().querySelector('.crew-remove[data-slot="driver"]');
       if (remove) {
         remove.click();
@@ -352,6 +369,18 @@ async function vehicleTest(recorder, vehicle, crewActor) {
         await sleep(300);
         recorder.assert(!!cleared, "Vehicle: the remove button clears the driver", { driverUuid: vehicle.system.driverUuid });
       } else if (seated) recorder.fail("Vehicle: the remove button clears the driver", { reason: "no .crew-remove[data-slot=driver] after seating" });
+
+      const pZone = root().querySelector('.crew-drop-zone[data-slot="passenger"]');
+      if (!pZone) recorder.skip("Vehicle: passenger drop", { reason: "no passenger drop zone" });
+      else {
+        const dt2 = new DataTransfer();
+        dt2.setData("text/plain", JSON.stringify({ type: "Actor", uuid: crewActor.uuid }));
+        pZone.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt2 }));
+        await waitFor(() => (vehicle.system.passengerUuids ?? []).includes(crewActor.uuid), { timeout: 3000 });
+        await sleep(500);
+        const copies = (vehicle.system.passengerUuids ?? []).filter(u => u === crewActor.uuid).length;
+        recorder.assert(copies === 1, "Vehicle: dropping an actor on the Passenger slot seats them once", { passengerUuids: vehicle.system.passengerUuids });
+      }
     }
   }
 
@@ -463,6 +492,7 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
       content(sheet).querySelector('.sheet-tabs-navigation .item[data-tab="talents"]')?.click();
       await sleep(120);
       const updateCounts = {};
+      const focus = {};
       for (const edit of EDITS) {
         let o;
         try { o = await applyEdit(sheet, actor, edit); } catch (e) { o = { error: e?.message ?? String(e) }; }
@@ -470,8 +500,10 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
         else {
           recorder.assert(o.saved === true, `Edits: ${edit.label} saves ${JSON.stringify(edit.expect)}`, o);
           updateCounts[edit.label] = o.updates;
+          focus[edit.label] = o.focusKept ? "kept" : `lost (now on ${o.focusOn})`;
         }
       }
+      recorder.assert(Object.values(focus).every(v => v === "kept"), "Edits: the edited field keeps keyboard focus through the re-render", focus);
       recorder.assert(Object.values(updateCounts).every(n => n === 1), "Edits: each edit makes exactly one actor update", updateCounts);
       const tabAfterEdits = content(sheet).querySelector(".sheet-tabs-navigation .item.active")?.dataset.tab;
       recorder.assert(tabAfterEdits === "talents", "Edits: the sheet stays on the Talents tab through the re-renders", { tabAfterEdits });

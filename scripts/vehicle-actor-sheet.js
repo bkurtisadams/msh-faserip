@@ -1,3 +1,7 @@
+// scripts/vehicle-actor-sheet.js v3.3.1 - 2026-11-11
+// v3.3.1: Fixed-bug: an actor dropped on a crew slot of the V2 vehicle sheet
+//         did nothing. The V2 sheet now hands Actor drops to the crew logic
+//         in MSHVehicleActorSheet._onDropActor.
 // scripts/vehicle-actor-sheet.js v3.3.0 - 2026-11-11
 // v3.3.0: MSHVehicleActorSheetV2, the registered vehicle sheet. It is the same
 //         V2 shell the character sheet uses, pointed at the vehicle template
@@ -308,5 +312,11 @@ export class MSHVehicleActorSheetV2 extends FaseripActorSheetV2 {
   /** @override */
   async _historyEditorHtml() {
     return "";
+  }
+
+  /** @override */
+  async _onDropActor(event, data) {
+    const v1 = this._v1();
+    return v1._onDropActor.call(this._adapterThis(v1), event, data);
   }
 }

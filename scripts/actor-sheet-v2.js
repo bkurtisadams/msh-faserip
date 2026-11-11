@@ -1,3 +1,8 @@
+// scripts/actor-sheet-v2.js v1.5.1 - 2026-11-11
+// v1.5.1: An Actor dropped on the sheet goes to _onDropActor (a no-op here,
+//         overridden by the vehicle sheet for its crew slots). It used to be
+//         discarded, which is why crew drops stopped working on the V2
+//         vehicle sheet.
 // scripts/actor-sheet-v2.js v1.5.0 - 2026-11-11
 // v1.5.0: Three things a subclass can now set, so the vehicle sheet can use
 //         this shell: the tab selectors (TABS_SHIM), the full-size window
@@ -396,8 +401,13 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
       case "Item":         return this._onDropItem(event, data);
       case "ActiveEffect": return this._onDropActiveEffect(event, data);
       case "Folder":       return this._onDropFolder(event, data);
-      case "Actor":        return false;
+      case "Actor":        return this._onDropActor(event, data);
     }
+  }
+
+  /** Handle an Actor dropped on the sheet. Character sheets ignore it. */
+  async _onDropActor(_event, _data) {
+    return false;
   }
 
   async _onDropItem(event, data) {
