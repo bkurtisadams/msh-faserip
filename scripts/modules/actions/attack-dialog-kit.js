@@ -1,3 +1,5 @@
+// scripts/modules/actions/attack-dialog-kit.js v1.5.0 - 2026-11-11
+// v1.5.0: footerHtml rollLabel (the grenade dialog's button reads Throw).
 // scripts/modules/actions/attack-dialog-kit.js v1.4.0 - 2026-11-11
 // v1.4.0: paidEffectRowHtml cap labels (Shooting caps at Bullseye, not Stun).
 // scripts/modules/actions/attack-dialog-kit.js v1.3.0 - 2026-11-11
@@ -187,12 +189,12 @@ export function fxGridHtml(effects, tips = {}) {
       </div>`;
 }
 
-export function footerHtml({ remember, skipDice, ids = true }) {
+export function footerHtml({ remember, skipDice, ids = true, rollLabel = "Roll" }) {
   const id = (value) => ids ? ` id="${value}"` : '';
   return `
       <div class="frp-foot">
         <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-roll" id="frp-roll">${rollLabel}</button>
           <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
         </div>
         <div class="frp-foot-checks">

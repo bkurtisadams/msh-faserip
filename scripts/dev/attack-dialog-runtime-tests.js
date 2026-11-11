@@ -1,3 +1,7 @@
+// scripts/dev/attack-dialog-runtime-tests.js v1.5.0 - 2026-11-11
+// v1.5.0: Grenade throw dialog (compact layout). The dialog is checked and
+//         then cancelled; a real throw needs a landing-zone click on the
+//         canvas, so the blast itself is not exercised here.
 // scripts/dev/attack-dialog-runtime-tests.js v1.4.0 - 2026-11-11
 // v1.4.0: Charging and Shooting dialogs.
 // scripts/dev/attack-dialog-runtime-tests.js v1.3.0 - 2026-11-11
@@ -36,6 +40,7 @@ import { GrabbingAction } from "../modules/actions/grabbing-action.js";
 import { EscapingAction } from "../modules/actions/escaping-action.js";
 import { ChargingAction } from "../modules/actions/charging-action.js";
 import { ShootingAction } from "../modules/actions/shooting-action.js";
+import { GrenadeAction } from "../modules/actions/grenade-action.js";
 import { getBodyArmorValues } from "../modules/actions/action-utils.js";
 import { getAvailableKarma } from "../modules/dice/dice-roller.js";
 
@@ -43,7 +48,7 @@ const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Attack Dialog Runtime";
 const DEFAULT_TIMEOUT = 6000;
 const DIALOG_WIDTH = 360;
-const PREF_KEYS = ["energy", "force", "te", "tb", "ba", "ea", "charging", "shooting"].flatMap(k => [`msh.${k}.remember`, `msh.${k}.skipDice`]);
+const PREF_KEYS = ["energy", "force", "te", "tb", "ba", "ea", "charging", "shooting", "grenade"].flatMap(k => [`msh.${k}.remember`, `msh.${k}.skipDice`]);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -91,6 +96,7 @@ const ATTACKER_ITEMS = [
   weapon("Test Mace", { damageType: "BA", damage: "15", materialStrength: "Good" }),
   weapon("Test Rock", { damageType: "TB", damage: "0", materialStrength: "Typical" }),
   weapon("Test Girder", { damageType: "TB", damage: "0", materialStrength: "Remarkable" }),
+  { name: "Test Grenade", type: "equipment", system: { category: "other", weaponType: "grenade", damage: "30", damageType: "EA", areaRadius: 1, shots: "3", shotsRemaining: 3 } },
   { name: "Test Pistol", type: "equipment", system: { category: "weapon", weaponType: "shooting", damageType: "S", damage: "10", range: "5", shots: "6", shotsRemaining: 6, rate: "1", materialStrength: "Good" } }
 ];
 
@@ -546,6 +552,40 @@ async function chargingAndShootingTests(recorder, { attacker, targetA }) {
   });
 }
 
+async function grenadeTests(recorder, { attacker }) {
+  const actor = attacker.actor;
+  const item = actor.items.getName("Test Grenade");
+  await setTargets([]);
+  const result = await withDialog(recorder, "Grenade", GrenadeAction, { actor, actionType: "grenade", abilityName: "agility", opts: { item } }, async (d) => {
+    const { $html } = d;
+    recorder.equal(d.width(), DIALOG_WIDTH, "Grenade: dialog opens at its pinned width");
+    recorder.assert($html.find(".h-verb").text() === "throws at" && $html.find(".h-target").text() === "landing zone", "Grenade: header reads ... throws at landing zone",
+      { verb: $html.find(".h-verb").text(), target: $html.find(".h-target").text() });
+    recorder.assert($html.find(".frp-dmg-box").text().includes("Test Grenade") && $html.find("#dmg-val").text() === "30" && $html.find(".frp-dmg-after").text() === "edged, all in area",
+      "Grenade: box shows name, damage and type", { text: $html.find(".frp-dmg-box").text().replace(/\s+/g, " ").trim() });
+    recorder.assert(/Blast radius:\s*1 area/.test($html.find(".frp-dmg-box").text()) && /3\s*remaining/.test($html.find(".frp-dmg-box").text()), "Grenade: box shows blast radius and count remaining");
+    recorder.assert($html.find(".frp-fx-cell.w").text().includes("scatters") && $html.find(".frp-fx-cell.r").text().includes("all in area"), "Grenade: effect grid reads Miss scatters / Hit all in area");
+    recorder.equal($html.find("#frp-roll").text(), "Throw", "Grenade: the roll button reads Throw");
+    recorder.assert($html.find("#msh-remember-settings").length === 1 && $html.find("#msh-skip-dice").length === 1, "Grenade: footer has Remember and Skip dice");
+    recorder.equal($html.find(".faserip-mode-row").length, 0, "Grenade: mode buttons are no longer inside the dialog body");
+    setVal($html, '[name="range"]', 2);
+    recorder.equal($html.find("#range-penalty-display").text(), "-2CS", "Grenade: range 2 at Good Strength shows -2CS");
+    recorder.equal($html.find("#frp-cs-rank").text(), "Typical", "Grenade: CS row shows Excellent shifted to Typical");
+    setVal($html, '[name="shift"]', 1);
+    recorder.assert($html.find("#frp-cs-reason-row").css("display") !== "none", "Grenade: a manual shift reveals the Reason field");
+    setVal($html, '[name="range"]', 99);
+    recorder.equal($html.find("#range-penalty-display").text(), "OUT OF RANGE", "Grenade: range box says OUT OF RANGE");
+    const refused = await d.roll();
+    recorder.assert(!refused.rolled && !d.settled && d.notes.some(n => n.level === "error" && /Beyond max throwing range/.test(n.message)),
+      "Grenade: a throw beyond range is refused and the dialog stays open", { notes: d.notes });
+    recorder.equal(d.width(), DIALOG_WIDTH, "Grenade: width holds after changes");
+    $html.find("#frp-cancel").trigger("click");
+    await waitFor(() => d.settled, { timeout: 2000 });
+  });
+  recorder.assert(result?.ret?.rawActionCancelled === true, "Grenade: Cancel reports cancellation and throws nothing", { ret: result?.ret });
+  recorder.equal(Number(item.system.shotsRemaining), 3, "Grenade: no grenade was used up");
+}
+
 async function grappleFamilyTests(recorder, { attacker, targetA }) {
   const actor = attacker.actor;
   await setTargets([targetA.token]);
@@ -641,6 +681,7 @@ export async function runAttackDialogRuntimeTests({ keepArtifacts = false, postC
       await thrownBluntTests(recorder, fixtures);
       await meleeTests(recorder, fixtures);
       await chargingAndShootingTests(recorder, fixtures);
+      await grenadeTests(recorder, fixtures);
       await grappleFamilyTests(recorder, fixtures);
     }
   } catch (error) {

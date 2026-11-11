@@ -1,3 +1,14 @@
+// scripts/modules/actions/grenade-action.js v3.6.0 - 2026-11-11
+// v3.6.0: The damage-grenade throw dialog moves to the compact layout the
+//   other attack dialogs share (approved mockup 2026-11-11), built on
+//   attack-dialog-kit.js: banner header, grenade box (damage, type, blast
+//   radius, count remaining), the shared CS row with its range term and
+//   Reason field, range box, Karma row, effect grid, Throw / Cancel footer,
+//   mode buttons in the title bar. Remember and Skip dice now work as in
+//   the other dialogs (per-browser; range, shift and reason are restored
+//   only when Remember is ticked). A range beyond the Strength maximum is
+//   refused with the dialog left open (it used to cancel the throw).
+//   Roll, range penalty, scatter, blast and saves are unchanged.
 // scripts/modules/actions/grenade-action.js v3.5.0 - 2026-09-05
 // v3.5.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
 //   own area 0, via the range kernel (thrownRangePenalty); Strength range is
@@ -52,8 +63,6 @@ import {
   buildAbilitySection,
   getTargetData,
   applyDamageToTargets,
-  buildModeSelector,
-  setupModeSelector,
   shakeProfileFor,
   getAreaRadius,
   getAreaDamage,
@@ -66,7 +75,12 @@ import {
   getAvailableKarma,
   getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
-import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { showFaseripDialog } from "./dialog-shim.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import {
+  setLS, dialogPrefs, flagRecall, saveDialogFlags, headerHtml, karmaRowHtml, fxGridHtml, footerHtml,
+  pinDialogWidth, mountDialogFrame, wireRollKeys, wireRowToggle, wirePrefToggles
+} from "./attack-dialog-kit.js";
 
 // Map raw damageType code → normalized form + human label + attack form + killing flag.
 // Kept small and flat — anything else is read from the item fields.
@@ -227,123 +241,150 @@ export class GrenadeAction extends RangedAttackAction {
 
     const availableKarma = getAvailableKarma(actor);
     const minKarma       = getMinimumKarmaCommitment(actor);
-    const hasKarma       = availableKarma > 0;
 
-    const savedRange = await actor.getFlag("msh-faserip", "lastGrenadeRange") || 1;
-    const savedShift = await actor.getFlag("msh-faserip", "lastGrenadeShift") || 0;
-    const savedSkip  = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? false;
+    const prefs = dialogPrefs("grenade");
+    const recall = flagRecall(actor, prefs.remember);
+    const savedRange = recall("lastGrenadeRange", 1);
+    const savedShift = recall.nullish("lastGrenadeShift", 0);
+    const savedReason = recall("lastGrenadeReason", "");
 
-    const { targetDisplay } = getTargetData();
+    const { targets, targetDisplay } = getTargetData();
+    const landing = targets.length ? targetDisplay : "landing zone";
+    const rangePenaltyAt = (range) => range > maxRange ? 0 : thrownRangePenalty(range, strRank); // RULED 2026-09-05
 
-    const effectDesc = `${damage} pts ${meta.label} damage to all in area`;
+    const csRowHtml = buildCSRow({
+      savedCS: savedShift,
+      savedReason,
+      abilityRank: ability.rank,
+      rangePenalty: rangePenaltyAt(savedRange),
+      showRange: true
+    });
 
     const dialogHtml = `
-      ${buildModeSelector({ mode: "semi" })}
+    <div class="frp-dlg">
+      ${headerHtml({ actor, ability: { ...ability, name: "Agility" }, targetDisplay: landing, verb: "throws at" })}
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target Area</div>
-          <div style="font-weight:600;color:#d32f2f;">${targetDisplay || "Pick landing zone after Throw"}</div>
+      <div class="frp-box frp-dmg-box">
+        <div class="frp-dmg-inline">
+          <span style="font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;flex:1;">${item.name}</span>
+          <span class="frp-dmg-num" id="dmg-val">${damage}</span>
+          <span class="frp-cs-arrow">&rarr;</span>
+          <span class="frp-dmg-after">${meta.label}, all in area</span>
         </div>
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Throw</div>
-          <div style="font-weight:600;">Agility: ${ability.rank} (${ability.value})</div>
-          <div style="color:#666;font-size:.85em;">Max range: ${rangeLabel(maxRange)} areas</div>
-        </div>
+        <div style="font-size:11px;color:#555;margin-top:2px;display:flex;gap:10px;"><span>Blast radius: <strong>${radiusInAreas} area${radiusInAreas !== 1 ? "s" : ""}</strong></span><span style="margin-left:auto;"><strong>${shotsRemaining}</strong> remaining</span></div>
       </div>
 
-      <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:3px;padding:8px;margin-bottom:8px;">
-        <div style="font-weight:700;color:#e65100;">${item.name}</div>
-        <div style="color:#555;font-size:.88em;margin-top:2px;">${effectDesc}</div>
-        <div style="color:#888;font-size:.82em;margin-top:2px;">White = miss (grenade lost). Green+ = hits target area, affects all in it.</div>
-      </div>
+      ${csRowHtml}
 
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
-        <label style="font-weight:600;">Range:</label>
-        <input type="number" name="range" value="${savedRange}" min="1" ${Number.isFinite(maxRange) ? `max="${maxRange}"` : ""} style="width:60px;padding:3px;text-align:center;box-sizing:border-box;">
-        <span style="color:#666;font-size:.85em;">areas (max ${rangeLabel(maxRange)})</span>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;border:1px solid transparent;">
-          <label style="font-weight:600;">CS:</label>
-          <input type="number" name="shift" value="${savedShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
-          <span style="color:#666;">→</span>
-          <strong id="shifted-rank-display">${shiftRank(ability.rank, savedShift)}</strong>
-          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? "visible" : "hidden"};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
-        </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? "background:#e3f2fd;border:1px solid #90caf9;" : ""}">
-          ${hasKarma ? `
-            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="checkbox" id="spend-karma" name="spendKarma">
-              <span style="font-weight:600;">Karma:</span>
-            </label>
-            <span title="Available: ${availableKarma} | Min commitment: ${minKarma}" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
-            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
-          ` : `<span style="color:#999;">No karma</span>`}
+      <div class="frp-box" style="padding:3px 8px;background:#e3f2fd;border-color:#90caf9;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+          <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
+          <input type="number" name="range" value="${savedRange}" min="0" class="frp-pull-input" style="width:36px;">
+          <span style="color:#777;">areas</span>
+          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${rangeLabel(maxRange)}</span>)</span>
+          <span id="range-penalty-display" style="margin-left:auto;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#e65100;"></span>
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
-        <label><input type="checkbox" name="skipDice" ${savedSkip ? "checked" : ""}> Skip dice</label>
-        <span style="font-size:.8em;color:#888;">${shotsRemaining} remaining</span>
+      <div class="frp-box frp-opts-box">
+        ${karmaRowHtml({ availableKarma, minKarma })}
       </div>
+
+      ${fxGridHtml({
+        white: `Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">scatters</span>`,
+        green: `Hit<br><span style="font-size:9px;font-weight:400;opacity:0.7;">all in area</span>`,
+        yellow: `Hit<br><span style="font-size:9px;font-weight:400;opacity:0.7;">all in area</span>`,
+        red: `Hit<br><span style="font-size:9px;font-weight:400;opacity:0.7;">all in area</span>`
+      })}
+      ${footerHtml({ remember: prefs.remember, skipDice: prefs.skipDice, rollLabel: "Throw" })}
+    </div>
     `;
 
     const choice = await new Promise(resolve => {
-      showFaseripButtonDialog({
-        title: `Grenade: ${actor.name}`,
+      let _csState = null;
+      let _resolved = false;
+      showFaseripDialog({
+        title: "Grenade",
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Throw",
-            callback: async (html) => {
-              const $d = sel => html.find(sel);
-              const range    = Number($d('[name="range"]').val() || 1);
-              const shift    = parseInt($d('[name="shift"]').val() || 0);
-              const skipDice = !!$d('[name="skipDice"]').is(":checked");
-              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-
-              if (range > maxRange) {
-                ui.notifications.error(`Beyond max throwing range (${maxRange} areas).`);
-                return resolve(null);
-              }
-
-              const rangeModifier = thrownRangePenalty(range, strRank); // RULED 2026-09-05
-              const totalShift = shift + rangeModifier;
-
-              await actor.setFlag("msh-faserip", "lastGrenadeRange", range);
-              await actor.setFlag("msh-faserip", "lastGrenadeShift", shift);
-
-              resolve({ range, shift, totalShift, rangeModifier, skipDice, spendKarma, karma: karmaToSpend });
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
-        render: async (html) => {
+        render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          await setupModeSelector(actor, html, this.opts || {}, "lastGrenadeMode");
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastGrenadeMode" });
 
-          html.find('input, select').on('mousedown', (e) => e.stopPropagation());
+          const rangeField = () => Number(html.find('[name="range"]').val() || 0);
 
-          const $dialog = html.closest('.dialog');
-          if ($dialog.length) $dialog[0].style.height = 'auto';
+          _csState = wireCSPanel(html, {
+            abilityRank: ability.rank,
+            getRangePenalty: () => rangePenaltyAt(rangeField()),
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+            }
+          });
 
           const update = () => {
-            const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-            const shifted = shiftRank(ability.rank, cs);
-            const $sr = html.find('#shifted-rank-display');
-            const $cf = html.find('.cs-field');
-            const $rb = html.find('.cs-reset');
-            $sr.text(shifted);
-            if (cs < 0)      { $cf.css({ background: "#ffebee", border: "1px solid #ef5350" }); $sr.css("color", "#c62828"); $rb.css("visibility", "visible"); }
-            else if (cs > 0) { $cf.css({ background: "#e8f5e9", border: "1px solid #66bb6a" }); $sr.css("color", "#2e7d32"); $rb.css("visibility", "visible"); }
-            else             { $cf.css({ background: "",         border: "1px solid transparent" }); $sr.css("color", ""); $rb.css("visibility", "hidden"); }
+            const range = rangeField();
+            const $rangePenalty = html.find('#range-penalty-display');
+            if (range > maxRange) {
+              $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
+              _csState.setRange(0);
+            } else {
+              const penalty = rangePenaltyAt(range);
+              $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
+              _csState.setRange(penalty);
+            }
+            if ($dialog.length) $dialog[0].style.height = 'auto';
+            pinDialogWidth(dlg);
           };
-          html.find('[name="shift"]').on("input change", update);
-          html.find('.cs-reset').on("click", e => { e.preventDefault(); html.find('[name="shift"]').val(0).trigger("change"); });
+
+          html.find('[name="range"]').on('input change', update);
+          wireRowToggle(html, '#spend-karma');
+          wirePrefToggles(html, prefs);
+          wireRollKeys(html, $dialog);
+
+          html.find('#frp-roll').on('click', async () => {
+            const $d = sel => html.find(sel);
+            const rememberSettings = !!$d('#msh-remember-settings').is(':checked');
+            const skipDice = !!$d('#msh-skip-dice').is(':checked');
+            setLS(prefs.rememberKey, rememberSettings ? "1" : "0");
+            setLS(prefs.skipKey, skipDice ? "1" : "0");
+
+            const range = Number($d('[name="range"]').val() || 1);
+            if (range > maxRange) {
+              ui.notifications.error(`Beyond max throwing range (${maxRange} areas).`);
+              return;
+            }
+
+            const cs = _csState.get();
+            const shift = cs.manualCS;
+            const rangeModifier = rangePenaltyAt(range);
+            const totalShift = shift + rangeModifier;
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+
+            const flagUpdate = { csNotes: cs.csNotes };
+            if (rememberSettings) {
+              Object.assign(flagUpdate, {
+                lastGrenadeRange: range,
+                lastGrenadeShift: shift,
+                lastGrenadeReason: cs.reason
+              });
+            }
+            await saveDialogFlags(actor, flagUpdate);
+
+            _resolved = true;
+            resolve({ range, shift, totalShift, rangeModifier, skipDice, spendKarma, karma: karmaToSpend });
+            dlg.close();
+          });
+
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
+          });
+
           update();
+        },
+        close: () => {
+          if (_csState) _csState.destroy();
+          if (!_resolved) resolve(null);
         }
       });
     });
