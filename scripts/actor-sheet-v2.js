@@ -1,3 +1,12 @@
+// scripts/actor-sheet-v2.js v1.2.0 - 2026-11-11
+// v1.2.0: Two gaps against the V1 sheet closed. (1) Form submits now run the
+//         same normalisation the V1 sheet applies in _updateObject (rank /
+//         number coherence, Resources sync, and the guard that stops an
+//         effect-shifted display rank being saved), via the shared
+//         actor-sheet-submit.js; the V2 sheet had been saving the raw form.
+//         (2) close() now runs the V1 teardown (Universal Table hook, world
+//         time and CTT hooks, detached table popout) before dropping the
+//         adapter; those hooks were being left registered.
 // scripts/actor-sheet-v2.js v1.1.2 - 2026-10-01
 // v1.1.2: Portrait edit and sheet-level drop listeners were guarded by
 //         instance flags but bound to this.element, which ApplicationV2
@@ -14,6 +23,7 @@
 
 import { FaseripActorSheet } from "./actorSheet.js";
 import { initSheetZoom } from "./modules/ui/sheet-zoom.js";
+import { normalizeActorSubmit } from "./actor-sheet-submit.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -414,7 +424,23 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   }
 
   /** @override */
+  async _processSubmitData(event, form, submitData, options = {}) {
+    const changedField = event?.target?.name ?? "";
+    const flat = foundry.utils.flattenObject(submitData ?? {});
+    normalizeActorSubmit(this.actor, changedField, flat);
+    return super._processSubmitData(event, form, foundry.utils.expandObject(flat), options);
+  }
+
+  /** @override */
   async close(options) {
+    const v1 = this.#v1;
+    if (v1) {
+      try {
+        await v1._teardownSheetHooks.call(this._adapterThis(v1));
+      } catch (err) {
+        console.warn("FaseripActorSheetV2 | v1 teardown failed", err);
+      }
+    }
     this.#v1 = null;
     return super.close(options);
   }
