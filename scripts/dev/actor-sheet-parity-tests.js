@@ -1,4 +1,12 @@
-// scripts/dev/actor-sheet-parity-tests.js v1.0.0 - 2026-11-11
+// scripts/dev/actor-sheet-parity-tests.js v1.1.0 - 2026-11-11
+// v1.1.0: After the first run in Foundry. Comparisons are scoped to each
+//         sheet's .window-content (the window chrome differs by design and
+//         was skewing the button count). The V1 sheet turned out to have no
+//         form element, so its change and close handlers throw: that is now
+//         reported as one finding, V1 is closed without a submit, and the
+//         edit checks run on the V2 sheet against the expected result
+//         instead of being compared with V1. Failures print their details
+//         as text so a pasted console log is complete.
 // Foundry VTT runtime suite: opens the V1 character sheet and the V2
 // character sheet on the same throwaway actor and compares them. It checks
 // that both render the same named controls, tabs and item rows, that the
@@ -32,7 +40,8 @@ function makeRecorder() {
     const entry = { status, name, details: details === undefined ? {} : (details && typeof details === "object" ? details : { value: details }) };
     results.push(entry);
     const logger = status === "FAIL" ? console.error : status === "SKIP" ? console.warn : console.log;
-    logger(`[FASERIP TEST] ${status} | ${name}`, entry.details);
+    if (status === "PASS") logger(`[FASERIP TEST] ${status} | ${name}`);
+    else logger(`[FASERIP TEST] ${status} | ${name} | ${JSON.stringify(entry.details)}`);
     return entry;
   }
   return {
@@ -69,21 +78,26 @@ function hookCounts() {
   return out;
 }
 
+const contentOf = (el) => el?.querySelector?.(".window-content") ?? el;
+
 async function openSheet(kind, actor) {
   if (kind === "V1") {
     const sheet = new FaseripActorSheet(actor, { left: 60, top: 60 });
     sheet.render(true);
     const ok = await waitFor(() => sheet.rendered && sheet.element?.[0]?.querySelector?.('[name="name"]'));
-    return { kind, sheet, ok: !!ok, root: () => sheet.element?.[0] ?? null };
+    return { kind, sheet, ok: !!ok, hasForm: !!sheet.form, root: () => contentOf(sheet.element?.[0] ?? null) };
   }
   const sheet = new FaseripActorSheetV2({ document: actor, position: { left: 820, top: 60 } });
   await sheet.render({ force: true });
   const ok = await waitFor(() => sheet.rendered && sheet.element?.querySelector?.('[name="name"]'));
-  return { kind, sheet, ok: !!ok, root: () => sheet.element ?? null };
+  return { kind, sheet, ok: !!ok, hasForm: true, root: () => contentOf(sheet.element ?? null) };
 }
 
 async function closeSheet(handle) {
-  try { await handle.sheet.close(); } catch (e) { console.warn("[FASERIP TEST] close failed", e); }
+  try {
+    if (handle.kind === "V1" && !handle.hasForm) await handle.sheet.close({ submit: false });
+    else await handle.sheet.close();
+  } catch (e) { console.warn("[FASERIP TEST] close failed", e?.message ?? e); }
   await sleep(150);
 }
 
@@ -126,7 +140,8 @@ function compareSnapshots(recorder, a, b) {
     { count: differing.length, examples: differing.slice(0, LIST_LIMIT).map(n => ({ name: n, v1: a.controls[n], v2: b.controls[n] })) });
 
   recorder.assert(JSON.stringify(a.navTabs) === JSON.stringify(b.navTabs), "Render: both sheets list the same tabs in the same order", { v1: a.navTabs, v2: b.navTabs });
-  recorder.assert(JSON.stringify(a.panels) === JSON.stringify(b.panels), "Render: both sheets have the same tab panels", { v1: a.panels, v2: b.panels });
+  recorder.assert(JSON.stringify(a.panels) === JSON.stringify(b.panels), "Render: both sheets have the same tab panels",
+    { onlyOnV1: a.panels.filter(t => !b.panels.includes(t)), onlyOnV2: b.panels.filter(t => !a.panels.includes(t)) });
   recorder.assert(a.activeNav === b.activeNav, "Render: both sheets open on the same tab", { v1: a.activeNav, v2: b.activeNav });
   recorder.assert(JSON.stringify(a.itemRows) === JSON.stringify(b.itemRows), "Render: both sheets show the same item rows per tab", { v1: a.itemRows, v2: b.itemRows });
   recorder.assert(a.rollables === b.rollables && a.buttons === b.buttons, "Render: both sheets have the same number of rollable elements and buttons",
@@ -202,6 +217,7 @@ export async function runActorSheetParityTests({ keepArtifacts = false, postChat
 
   const recorder = makeRecorder();
   let actor = null;
+  let v1HasForm = false;
   const open = [];
 
   console.group("FASERIP Sheet Parity: V1 vs V2");
@@ -218,6 +234,9 @@ export async function runActorSheetParityTests({ keepArtifacts = false, postChat
     const v2 = await openSheet("V2", actor); open.push(v2);
     recorder.assert(v2.ok, "Render: V2 sheet opens");
     await sleep(400);
+    v1HasForm = v1.hasForm;
+    recorder.assert(v1HasForm, "V1 sheet has a form element, so its field edits can save",
+      { note: "Without one, every change and close on the V1 sheet throws 'no registered form element'." });
 
     if (v1.ok && v2.ok) {
       compareSnapshots(recorder, snapshot(v1.root()), snapshot(v2.root()));
@@ -237,7 +256,7 @@ export async function runActorSheetParityTests({ keepArtifacts = false, postChat
     // Edits: one sheet open at a time so each save is that sheet's alone.
     for (const h of open.splice(0)) await closeSheet(h);
     const outcomes = { V1: {}, V2: {} };
-    for (const kind of ["V1", "V2"]) {
+    for (const kind of (v1HasForm ? ["V1", "V2"] : ["V2"])) {
       const h = await openSheet(kind, actor); open.push(h);
       if (!h.ok) { recorder.fail(`Edits: ${kind} sheet opens`); continue; }
       await sleep(300);
@@ -249,13 +268,14 @@ export async function runActorSheetParityTests({ keepArtifacts = false, postChat
     }
     for (const edit of EDITS) {
       const a = outcomes.V1[edit.label], b = outcomes.V2[edit.label];
-      if (!a?.found || !b?.found) {
-        recorder.skip(`Edits: ${edit.label}`, { reason: "control not found on a sheet", v1: a, v2: b });
+      if (!b?.found) {
+        recorder.skip(`Edits: ${edit.label}`, { reason: "control not found on the V2 sheet", v2: b });
         continue;
       }
-      for (const [kind, o] of [["V1", a], ["V2", b]]) {
-        recorder.assert(o.saved === true, `Edits: ${kind} ${edit.label} saves ${JSON.stringify(edit.expect)}`, o);
-      }
+      recorder.assert(b.saved === true, `Edits: V2 ${edit.label} saves ${JSON.stringify(edit.expect)}`, b);
+      if (!v1HasForm) continue;
+      if (!a?.found) { recorder.skip(`Edits: V1 ${edit.label}`, { reason: "control not found on the V1 sheet", v1: a }); continue; }
+      recorder.assert(a.saved === true, `Edits: V1 ${edit.label} saves ${JSON.stringify(edit.expect)}`, a);
       recorder.assert(JSON.stringify(a.result) === JSON.stringify(b.result), `Edits: ${edit.label} leaves the actor the same through both sheets`, { v1: a.result, v2: b.result });
     }
 
