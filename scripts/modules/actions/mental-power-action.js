@@ -1,4 +1,6 @@
-// scripts/modules/actions/mental-power-action.js v2.5.0 - 2026-09-03
+// scripts/modules/actions/mental-power-action.js v2.5.1 - 2026-11-10
+// v2.5.1: Roll visibility read via getRollMode() (core.messageMode on v14;
+//         core.rollMode is deprecated and removed in v16).
 // v2.5.0: Telepathy dialog offers the book's Power Stunts (Telepathic Push,
 //         Mind Link, Mental Probe -2CS) — each runs through StuntRoller and
 //         the stunt tab (stunt-mechanics presets). opts.stuntPreset drives a
@@ -34,6 +36,7 @@ import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
 import { POWER_RANGE, RANKS_ORDERED } from "../../rules/rules-reference.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { getRollMode } from "../dice/roll-mode.js";
 
 /**
  * Mental Power Action - for powers that skip to-hit roll and go straight to saves
@@ -459,7 +462,7 @@ export class MentalPowerAction extends BaseAction {
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),
           flavor: `${actor.name} — Telepathy FEAT (${powerRank})`,
-          rollMode: game.settings.get("core", "rollMode")
+          rollMode: getRollMode()
         });
 
         const color = universalColor(powerRank, rollTotal);

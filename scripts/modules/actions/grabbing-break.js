@@ -1,4 +1,6 @@
-// scripts/modules/actions/grabbing-break.js v2.0.0 - 2026-09-02
+// scripts/modules/actions/grabbing-break.js v2.0.1 - 2026-11-10
+// v2.0.1: Roll visibility read via getRollMode() (core.messageMode on v14;
+//         core.rollMode is deprecated and removed in v16).
 // v2.0.0: RAW model. The Break follow-up is a roll ON the item's material
 //         strength column: any colour = attacker keeps the item (use it or move
 //         half speed), white = item damaged/broken/goes off. The previous code
@@ -17,6 +19,7 @@
  * - Any colour (Green/Yellow/Red): item intact — use it or move up to half speed
  */
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { getRollMode } from "../dice/roll-mode.js";
 import { RANKS_ORDERED as RANKS } from "../../rules/rules-reference.js";
 import { rankDistance } from "../../lib/faserip-rules/faserip-kernel.js";
 import { resolveGrabBreak } from "../../lib/faserip-rules/faserip-effects.js";
@@ -88,7 +91,7 @@ export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName =
           await roll.toMessage({
             speaker: ChatMessage.getSpeaker({ actor }),
             flavor: `${actor?.name ?? 'Character'} — Grabbing Break Check`,
-            rollMode: game.settings.get("core", "rollMode")
+            rollMode: getRollMode()
           });
 
           const { cappedTotal, totalKarmaUsed } =

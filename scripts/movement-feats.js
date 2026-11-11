@@ -1,4 +1,6 @@
-// movement-feats.js v1.9.0 - 2026-09-04
+// movement-feats.js v1.9.1 - 2026-11-10
+// v1.9.1: Roll visibility read via getRollMode() (core.messageMode on v14;
+//         core.rollMode is deprecated and removed in v16).
 // v1.9.0: Slice 7a — movement FEATs onto the faserip-rules kernel. Colours via
 //         kernel colorForRoll, column shifts via the shared kernel shiftRank.
 //         Fixed against faserip-movement v0.7.2: extended leap is +1 area
@@ -36,6 +38,7 @@ import {
   teleportPassengerFeatColor, teleportIntoObjectDamage
 } from './lib/faserip-rules/faserip-movement.js';
 import { kernelKeyFor } from './kernel/adapter.js';
+import { getRollMode } from './modules/dice/roll-mode.js';
 
 // Exhaustion immunity: kernel rule (Unearthly+ Endurance)
 const isExhaustionImmuneRank = (rankName) => exhaustionExempt({ enduranceNumber: rankValue(rankName) });
@@ -389,7 +392,7 @@ export class MovementFeats {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         flavor: `${this.actor.name} attempts a ${distanceDisplay.toLowerCase()} leap ${direction}`,
-        rollMode: game.settings.get("core", "rollMode")
+        rollMode: getRollMode()
       });
     }
     
@@ -692,7 +695,7 @@ export class MovementFeats {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         flavor: `${this.actor.name} attempts ${featInfo.name}`,
-        rollMode: game.settings.get("core", "rollMode")
+        rollMode: getRollMode()
       });
     }
     
@@ -1138,7 +1141,7 @@ export class MovementFeats {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         flavor: `${this.actor.name} attempts ${featInfo.name}`,
-        rollMode: game.settings.get("core", "rollMode")
+        rollMode: getRollMode()
       });
     }
     
@@ -1562,7 +1565,7 @@ export class MovementFeats {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         flavor: `${this.actor.name} attempts ${featInfo.name}`,
-        rollMode: game.settings.get("core", "rollMode")
+        rollMode: getRollMode()
       });
     }
     
@@ -1921,7 +1924,7 @@ export class MovementFeats {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         flavor: `${this.actor.name} attempts ${featInfo.name}`,
-        rollMode: game.settings.get("core", "rollMode")
+        rollMode: getRollMode()
       });
     }
     

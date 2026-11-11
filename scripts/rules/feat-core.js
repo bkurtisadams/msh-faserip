@@ -1,4 +1,6 @@
-// scripts/rules/feat-core.js v1.0.0 - 2026-07-03
+// scripts/rules/feat-core.js v1.0.1 - 2026-11-10
+// v1.0.1: Roll visibility read via getRollMode() (core.messageMode on v14;
+//         core.rollMode is deprecated and removed in v16).
 // Headless FEAT resolver (powers audit Step #5, fork C(b)). Rolls d100, posts
 // the roll to chat (optional flavor), resolves the color on the Universal
 // Table, and reports success — with NO result card. The caller owns its own
@@ -10,6 +12,8 @@
 // requiredColor null  => any colored result (green/yellow/red) succeeds, white
 //                        fails (RAW: FEAT with no stated intensity).
 // requiredColor "green"|"yellow"|"red" => success if color meets/exceeds it.
+
+import { getRollMode } from "../modules/dice/roll-mode.js";
 
 const COLOR_ORDER = { white: 0, green: 1, yellow: 2, red: 3 };
 
@@ -25,7 +29,7 @@ export async function resolveFeat({ actor, rank, flavor = "", requiredColor = nu
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: flavor || undefined,
-      rollMode: game.settings.get("core", "rollMode")
+      rollMode: getRollMode()
     });
   }
   const color = game.msh.rollUniversalTable(rank, roll.total);

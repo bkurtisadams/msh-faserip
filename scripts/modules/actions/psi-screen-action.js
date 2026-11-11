@@ -1,4 +1,6 @@
-// scripts/modules/actions/psi-screen-action.js v1.0.0 - 2026-09-03
+// scripts/modules/actions/psi-screen-action.js v1.0.1 - 2026-11-10
+// v1.0.1: Roll visibility read via getRollMode() (core.messageMode on v14;
+//         core.rollMode is deprecated and removed in v16).
 // Psi-Screen (Power): extend the screen over other targets. One Power rank
 // FEAT per target, green required (RULED 2026-09-03); success grants the
 // target the protector's Psi-Screen rank against mental Powers (honoured by
@@ -10,6 +12,7 @@ import { buildCardShell, buildActorTargetHtml, buildContentBox, universalColor, 
 import { colorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
+import { getRollMode } from "../dice/roll-mode.js";
 
 export const PSI_SCREEN_PROTECT_COLOR = "green";
 
@@ -77,7 +80,7 @@ export async function showPsiScreenDialog(actor, item) {
       const r = await showKarmaDecisionDialog(actor, total, powerRank, `Psi-Screen over ${t.name}`, initial);
       total = r.finalResult; karmaUsed = r.karmaSpent;
     }
-    await roll.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${actor.name} — Psi-Screen FEAT (${powerRank}) over ${t.name}`, rollMode: game.settings.get("core", "rollMode") });
+    await roll.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${actor.name} — Psi-Screen FEAT (${powerRank}) over ${t.name}`, rollMode: getRollMode() });
     const color = String(universalColor(powerRank, total) || "white").toLowerCase();
     const ok = colorAtLeast(color, PSI_SCREEN_PROTECT_COLOR);
     const rollText = karmaUsed > 0 ? `<s>${total - karmaUsed}</s> ${total} (+${karmaUsed} K) ${color}` : `${total} ${color}`;

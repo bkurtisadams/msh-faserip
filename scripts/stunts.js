@@ -1,4 +1,6 @@
-// scripts/stunts.js v1.3.0 - 2026-09-03
+// scripts/stunts.js v1.3.1 - 2026-11-10
+// v1.3.1: Roll visibility read via getRollMode() (core.messageMode on v14;
+//         core.rollMode is deprecated and removed in v16).
 // v1.3.0: Stunt mechanics: a stunt entry may carry `mechanic` (see
 //         modules/actions/stunt-mechanics.js); it runs after a successful
 //         roll and directly when the stunt is mastered. rollStuntForPreset()
@@ -14,6 +16,7 @@
 
 import { powerStuntRequiredColor, POWER_STUNT_MASTERY } from "./lib/faserip-rules/faserip-karma.js";
 import { runStuntMechanic, ensureStuntForPreset } from "./modules/actions/stunt-mechanics.js";
+import { getRollMode } from "./modules/dice/roll-mode.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
 
@@ -186,7 +189,7 @@ export class StuntRoller {
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       flavor: `${this.actor.name} attempts Power Stunt: ${stunt.name}${declaredBoost ? ' (Karma declared)' : ''}`,
-      rollMode: game.settings.get("core", "rollMode")
+      rollMode: getRollMode()
     });
 
     const initialColor = game.msh.rollUniversalTable(resolved.rank, rollResult);

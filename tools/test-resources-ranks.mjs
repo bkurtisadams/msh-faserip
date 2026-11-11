@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
-  RANKS_ORDERED, RANK_VALUES, rankValueForStorage, valueToRank
+  RANKS_ORDERED, RANK_VALUES, BEYOND_STORAGE_SENTINEL, rankValueForStorage, valueToRank
 } from "../scripts/rules/rules-reference.js";
 
 const expected = new Map([
@@ -18,13 +18,16 @@ for (const [rank, value] of expected) {
   if (rank !== "Beyond") assert.equal(rankValueForStorage(rank), value, `${rank} storage value`);
 }
 
-assert.equal(rankValueForStorage("Beyond"), 5001, "Beyond uses document-safe sentinel");
+assert.equal(BEYOND_STORAGE_SENTINEL, Number.MAX_SAFE_INTEGER);
+assert.equal(rankValueForStorage("Beyond"), BEYOND_STORAGE_SENTINEL, "Beyond uses document-safe sentinel");
 assert.equal(valueToRank(0), "Shift-0");
 assert.equal(valueToRank(2), "Feeble");
 assert.equal(valueToRank(10), "Good");
 assert.equal(valueToRank(75), "Monstrous");
 assert.equal(valueToRank(100), "Unearthly");
 assert.equal(valueToRank(5000), "Class 5000");
-assert.equal(valueToRank(5001), "Beyond");
+assert.equal(valueToRank(5001), "Class 5000");
+assert.equal(valueToRank(BEYOND_STORAGE_SENTINEL), "Beyond");
+assert.equal(valueToRank(Infinity), "Beyond");
 
 console.log("Resources rank regression checks passed.");

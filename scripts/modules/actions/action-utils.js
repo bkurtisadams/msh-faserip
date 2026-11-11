@@ -1,4 +1,6 @@
-// action-utils.js v1.14.1 - 2026-10-01
+// action-utils.js v1.14.2 - 2026-11-10
+// v1.14.2: getRollMode() moved to ../dice/roll-mode.js (re-exported here); the
+//          two remaining bare core.rollMode reads now use it.
 // v1.14.1: _applyFourColorKnockout sets the awaitingWake flag (the wake path
 //          no longer infers unconsciousness from Health 0, since hourly
 //          Healing now ticks while a character is knocked out).
@@ -185,6 +187,7 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { absorptionFlagData, afterAbsorptionEvent, getAbsorptionPool } from "../effects/absorption-pool.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { getRollMode } from "../dice/roll-mode.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
 import { inferArmorNature } from "../effects/defense-effects.js";
 import {
@@ -303,11 +306,7 @@ export function getEffectiveArmor(base, apCS) {
   return applyArmorPiercingCS(base, apCS);
 }
 
-// Roll visibility mode with v13 fallback (messageMode renamed from rollMode).
-export function getRollMode() {
-  try { return game.settings.get("core", "messageMode"); }
-  catch { try { return game.settings.get("core", "rollMode"); } catch { return undefined; } }
-}
+export { getRollMode };
 
 export function actorForEffects(target) {
   if (!target) return null;
@@ -919,7 +918,7 @@ export async function showDiceAnimation(roll, actor, flavor, useConsolidated = f
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor,
-      rollMode: game.settings.get("core", "rollMode")
+      rollMode: getRollMode()
     });
   }
 }
@@ -961,7 +960,7 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),
           flavor: actionLabel,
-          rollMode: game.settings.get("core", "rollMode")
+          rollMode: getRollMode()
         });
       }
     }

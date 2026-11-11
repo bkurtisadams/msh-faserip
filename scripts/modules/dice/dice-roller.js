@@ -1,4 +1,6 @@
 // File: systems/msh-faserip/scripts/modules/dice/dice-roller.js
+// 2026-11-10: Roll visibility read via getRollMode() (core.messageMode on
+// v14; core.rollMode is deprecated and removed in v16).
 // 2026-10-01: Optional rule "Spend Karma in Increments of 5"
 // (karmaIncrementFive): the Phase-2 amount dialog offers and accepts only
 // multiples of 5 (spending all remaining Karma is always allowed).
@@ -27,6 +29,7 @@
 // re-triggers AppV2's auto-measure every tick. Pin position.width via
 // dlg.setPosition in render, and re-assert it inside the countdown tick.
 import { runAsGM } from '../../gm-utils.js';
+import { getRollMode } from './roll-mode.js';
 
 // Inline debug helper to avoid import issues
 function debugLog(...args) {
@@ -512,7 +515,7 @@ export async function rollD100(actor, flavorText = null, showInChat = true) {
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: flavorText || `${actor.name} rolls d100`,
-      rollMode: game.settings.get("core", "rollMode")
+      rollMode: getRollMode()
     });
   }
 
@@ -552,7 +555,7 @@ export async function rollD100AndApplyKarma(actor, options = {}) {
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: flavorText || `${actor.name} rolls d100`,
-      rollMode: game.settings.get("core", "rollMode")
+      rollMode: getRollMode()
     });
   }
 
