@@ -1,3 +1,6 @@
+// scripts/actor-sheet-v2.js v1.2.1 - 2026-11-11
+// v1.2.1: This is now the only registered character sheet (init.js v1.20.0);
+//         the opt-in setting is gone. No code change.
 // scripts/actor-sheet-v2.js v1.2.0 - 2026-11-11
 // v1.2.0: Two gaps against the V1 sheet closed. (1) Form submits now run the
 //         same normalisation the V1 sheet applies in _updateObject (rank /

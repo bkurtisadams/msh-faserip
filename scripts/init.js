@@ -1,4 +1,10 @@
-﻿// init.js v1.19.6 - 2026-10-01
+﻿// init.js v1.20.0 - 2026-11-11
+// v1.20.0: The V2 character sheet is registered unconditionally as the only
+//          sheet for hero / villain / npc. The V1 sheet is no longer
+//          registered (its template had no form element, so field edits and
+//          close threw, and it lacked the Hardware panel). The
+//          "Use V2 Character Sheet" setting is removed.
+// init.js v1.19.6 - 2026-10-01
 // v1.19.6: registerQuickKarma (apps/quick-karma.js): token HUD Karma button
 //          and the K keybinding for immediate karma awards.
 // init.js v1.19.5 - 2026-10-01
@@ -1468,16 +1474,6 @@ Hooks.once("init", async () => {
       default: false
     });
 
-    game.settings.register("msh-faserip", "useActorSheetV2", {
-      name: "Use V2 Character Sheet",
-      hint: "Render the FASERIP character sheet using the ApplicationV2 framework. Opt-in during the v14 port; defaults to off so the legacy sheet remains in use until parity is verified. Reload required.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: false,
-      requiresReload: true
-    });;
-
     // ========== Action HUD Settings ==========
     game.settings.register("msh-faserip", "actionHudEnabled", {
       name: "Action HUD: Show on Login",
@@ -2151,25 +2147,20 @@ Hooks.once("init", async () => {
   foundry.documents.collections.Actors.unregisterSheet("core", foundry.applications.sheets.ActorSheetV2);
   foundry.documents.collections.Items.unregisterSheet("core", foundry.applications.sheets.ItemSheetV2);
 
-   foundry.documents.collections.Actors.registerSheet("msh-faserip", FaseripActorSheet, {
-    types: ["hero", "villain", "npc"],
-    makeDefault: true
-  });
-
-  // V2 actor sheet (opt-in). Registered after v1 so it wins makeDefault for
-  // hero/villain/npc when the toggle is on.
-  if (game.settings.get("msh-faserip", "useActorSheetV2") === true) {
-    foundry.applications.apps.DocumentSheetConfig.registerSheet(
-      Actor,
-      "msh-faserip",
-      FaseripActorSheetV2,
-      {
-        types: ["hero", "villain", "npc"],
-        label: "MSH FASERIP V2 Sheet",
-        makeDefault: true
-      }
-    );
-  }
+  // The V2 sheet is the only character sheet. The V1 FaseripActorSheet class
+  // is no longer registered; the V2 sheet still borrows its data preparation
+  // and listeners through an adapter. An actor whose stored sheet choice was
+  // the V1 class falls back to this default.
+  foundry.applications.apps.DocumentSheetConfig.registerSheet(
+    Actor,
+    "msh-faserip",
+    FaseripActorSheetV2,
+    {
+      types: ["hero", "villain", "npc"],
+      label: "FASERIP Character Sheet",
+      makeDefault: true
+    }
+  );
   
   // Make sure to register vehicle items with FaseripItemSheet
   foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripItemSheet, { 
