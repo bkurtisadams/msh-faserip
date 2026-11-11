@@ -1,4 +1,6 @@
-// faserip-rules kernel v0.2.15
+// faserip-rules kernel v0.2.17
+// v0.2.17: ERRATA — thrown listed weapons keep their listed minimum damage
+//          (Judge, 2026-11-11); faserip-damage.js v0.10.0 thrownWeaponDamage.
 // v0.2.16: ERRATA — Recovery forfeited by a second hit inside the ten-turn
 //          window (Judge, 2026-10-01); recoveryAllowed damagedAgain now has a
 //          Foundry caller.
@@ -49,7 +51,7 @@
 // Ruling document: MSH Advanced Set, Players Book (PDF v1.1).
 // Pure rules engine. No Foundry, no DOM, no dice — callers supply rolls.
 
-export const KERNEL_VERSION = '0.2.16';
+export const KERNEL_VERSION = '0.2.17';
 
 export const COLORS = ['white', 'green', 'yellow', 'red'];
 
@@ -251,6 +253,7 @@ export function escalateForMultipleActions(neededColor) {
 
 // Source-text issues and GM rulings. Kurt (Graycloak) holds final RAW authority.
 export const ERRATA = [
+  'RULED 2026-11-11 (Judge): a thrown weapon designed for combat (weapons table type includes Blunt Throwing or Edged Throwing: Club, Boomerang, Knife, Spear, Shuriken) always inflicts at least its listed damage, up to the lesser of the thrower\'s Strength and the item\'s material strength. The Melee Weapons section defines the table\'s damage as "normal (minimum) damage" and names Blunt Throwing among the types it covers, so it governs listed weapons; the Blunt Throwing Attack sentence (lesser of Strength and material strength, no minimum) governs improvised objects with no listed damage. A Club thrown at Typical Strength inflicts 10, a rock 6. Implemented as faserip-damage thrownWeaponDamage.',
   'RULED 2026-09-05 (PR1, Judge, 2026-08): poison unconsciousness (1-10 rounds) and the re-FEAT window (1-10 turns) are separate rolls; one turn is one round for this purpose (TURN_SECONDS). Consistent with the Judge\'s Book text.',
   'RULED 2026-09-05 (PR2, Judge, 2026-08): Endurance ranks lost to poison do not by themselves impose the -2CS Impaired Abilities penalty; the lowered rank is the penalty. Departs from Life, Death, and Health ("a character who has lost Endurance ranks has a -2CS"), kept as the Judge\'s ruling. The lost ranks still heal per Impaired Abilities (one per week, one per day under care) and count at the highest number of the reduced rank.',
   'RULED 2026-09-05 (PR3): the poison FEAT is the standard intensity ladder — Endurance (or Resistance to Toxins) against the toxin Intensity: three or more ranks above automatic, one or two above green, equal yellow, below red. Consistent with the Judge\'s Book.',

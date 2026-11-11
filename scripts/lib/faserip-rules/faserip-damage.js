@@ -1,4 +1,7 @@
-// faserip-rules damage v0.9.0
+// faserip-rules damage v0.10.0
+// v0.10.0: thrownWeaponDamage — a listed weapon thrown keeps its listed
+//          minimum (RULED 2026-11-11); bluntThrowDamage stays the rule for
+//          improvised objects.
 // v0.9.0: Life, Death, and Health — regain-consciousness FEAT, impaired
 //         Endurance number (highest of the reduced rank), stabilization by
 //         aid, Shift 0 disabilities, robot reactivation, Recovery gate and
@@ -14,7 +17,7 @@ import {
   requiredColor, colorForRoll, colorAtLeast, resolveFeat, RANKS,
 } from './faserip-kernel.js';
 
-export const DAMAGE_VERSION = '0.9.0';
+export const DAMAGE_VERSION = '0.10.0';
 export const DAMAGE_CERTIFIED = true;
 
 // --- Damage by attack form ---------------------------------------------
@@ -41,9 +44,18 @@ export function meleeWeaponDamage({ listedDamage, strength, weaponMaterialRank }
   return { min: listedDamage, max: Math.max(listedDamage, cap) };
 }
 
-// Blunt thrown: lesser of thrower's Strength and item material strength.
+// Blunt thrown (improvised object: rock, bus, chair): lesser of thrower's
+// Strength and item material strength.
 export function bluntThrowDamage({ strength, itemMaterialRank }) {
   return Math.min(strength, rankByKey(itemMaterialRank).standard);
+}
+
+// Thrown weapon designed for combat (weapons table type includes Blunt
+// Throwing or Edged Throwing): always at least the listed damage, up to the
+// lesser of Strength and material strength. With no listed damage this is
+// bluntThrowDamage. RULED 2026-11-11.
+export function thrownWeaponDamage({ listedDamage = 0, strength, itemMaterialRank }) {
+  return Math.max(Number(listedDamage) || 0, bluntThrowDamage({ strength, itemMaterialRank }));
 }
 
 // Charging: higher of current Endurance or Body Armor rank number,

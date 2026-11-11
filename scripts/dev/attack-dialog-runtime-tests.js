@@ -1,3 +1,6 @@
+// scripts/dev/attack-dialog-runtime-tests.js v1.1.0 - 2026-11-11
+// v1.1.0: Throwing Blunt: listed-minimum damage ruling (2026-11-11) and the
+//         Bullseye labels.
 // scripts/dev/attack-dialog-runtime-tests.js v1.0.1 - 2026-11-11
 // v1.0.1: The Energy Generation cap check expected a computed display of
 //         inline-flex; a browser reports flex for a child of a flex row.
@@ -66,7 +69,10 @@ const ATTACKER_ITEMS = [
   power("Force Bolt", { rank: "Unearthly", value: 100, isForceAttack: true, range: "rank" }),
   power("Slashing Missile", { rank: "Remarkable", value: 30, type: "Slashing Missile", range: "rank" }),
   weapon("Test Shuriken", { damageType: "EA", damage: "10", materialStrength: "Excellent", armorPiercingCS: 1 }),
-  weapon("Test Club", { damageType: "BA", damage: "10", materialStrength: "Good" })
+  weapon("Test Club", { damageType: "BA", damage: "10", materialStrength: "Good" }),
+  weapon("Test Mace", { damageType: "BA", damage: "15", materialStrength: "Good" }),
+  weapon("Test Rock", { damageType: "TB", damage: "0", materialStrength: "Typical" }),
+  weapon("Test Girder", { damageType: "TB", damage: "0", materialStrength: "Remarkable" })
 ];
 
 async function createCombatant(state, name, { x, y, disposition, system = {}, items = [] }) {
@@ -354,6 +360,13 @@ async function thrownBluntTests(recorder, { attacker, targetA }) {
     $html.find('[name="src"][value="carried"]').prop("checked", true).trigger("change");
     setVal($html, "#damage-source-select", clubId);
     recorder.equal($html.find("#after-armor-display").text(), "0 after armor", "Throwing Blunt: preview shows Good armor stopping 10 damage");
+    const dmgFor = (name) => { setVal($html, "#damage-source-select", actor.items.getName(name).id); return $html.find("#dmg-val").text(); };
+    recorder.equal(dmgFor("Test Mace"), "15", "Throwing Blunt: a listed weapon keeps its listed minimum (15 at Good Strength)");
+    recorder.equal(dmgFor("Test Rock"), "6", "Throwing Blunt: an improvised object is capped by its material (Typical 6)");
+    recorder.equal(dmgFor("Test Girder"), "10", "Throwing Blunt: an improvised object is capped by Strength (Good 10)");
+    setVal($html, "#damage-source-select", clubId);
+    recorder.equal($html.find(".frp-fx-cell.y").text(), "Bullseye", "Throwing Blunt: effect grid names yellow Bullseye");
+    recorder.equal($html.find('[name="resultCap"] option[value="yellow"]').text(), "Bullseye", "Throwing Blunt: yellow Cap is labelled Bullseye");
     recorder.assert($html.find('[name="resultCap"]').prop("disabled"), "Throwing Blunt: Cap is disabled until Pull is ticked");
     setChk($html, "#pull-punch-enabled", true);
     setVal($html, '[name="pulledDamage"]', 3);

@@ -2,7 +2,7 @@
 // [CERT] tests certify against Players Book worked examples and prose.
 
 import {
-  bluntDamage, meleeWeaponDamage, bluntThrowDamage, chargeDamage, chargeDamageParts,
+  bluntDamage, meleeWeaponDamage, bluntThrowDamage, thrownWeaponDamage, chargeDamage, chargeDamageParts,
   chargeToHitShift, chargeMissContinuation, MATERIAL_EXAMPLES, INDESTRUCTIBLE_MATERIAL_RANKS,
   defenseValue, applyDefense, resolveChargeImpact, forceFieldBreach,
   resolveResistance, enduranceLossStep, recoveryAmount, healingPerHour,
@@ -51,6 +51,21 @@ t('[CERT] weak wielder never drops a designed weapon below its listed damage', (
 t('[CERT] blunt thrown: lesser of Strength and item material strength', () => {
   eq(bluntThrowDamage({ strength: 100, itemMaterialRank: 'GD' }), 10);
   eq(bluntThrowDamage({ strength: 6, itemMaterialRank: 'RM' }), 6);
+});
+
+t('[RULED 2026-11-11] a listed weapon thrown keeps its listed minimum (Club 10, Good material)', () => {
+  eq(thrownWeaponDamage({ listedDamage: 10, strength: 6, itemMaterialRank: 'GD' }), 10);
+  eq(thrownWeaponDamage({ listedDamage: 10, strength: 2, itemMaterialRank: 'GD' }), 10);
+});
+
+t('[RULED 2026-11-11] a listed weapon thrown rises to the lesser of Strength and material', () => {
+  eq(thrownWeaponDamage({ listedDamage: 10, strength: 100, itemMaterialRank: 'EX' }), 20);
+  eq(thrownWeaponDamage({ listedDamage: 10, strength: 16, itemMaterialRank: 'EX' }), 16);
+});
+
+t('[CERT] an improvised thrown object has no minimum', () => {
+  eq(thrownWeaponDamage({ strength: 6, itemMaterialRank: 'RM' }), 6);
+  eq(thrownWeaponDamage({ listedDamage: 0, strength: 100, itemMaterialRank: 'GD' }), 10);
 });
 
 t('[CERT] charging example: Endurance Good(10), 10 areas -> 10 + 2x10 = 30', () => {

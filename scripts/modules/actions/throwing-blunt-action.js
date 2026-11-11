@@ -1,3 +1,9 @@
+// throwing-blunt-action.js v3.7.0 - 2026-11-11
+// v3.7.0: RULED 2026-11-11: a listed weapon thrown keeps its listed minimum
+//         damage; an improvised object has none. Carried damage now comes
+//         from the kernel thrownWeaponDamage (same numbers as before).
+//         Fixed-bug: the effect grid and Cap select named yellow "Hit" and
+//         green "Miss"; Blunt Throwing is Miss / Hit / Bullseye / Stun.
 // throwing-blunt-action.js v3.6.0 - 2026-11-10
 // v3.6.0: Dialog flow moved to the shared ThrownWeaponAction base
 //         (thrown-weapon-action.js) over attack-dialog-kit.js. This file
@@ -43,6 +49,8 @@ import { ThrownWeaponAction } from "./thrown-weapon-action.js";
 import { derivePowerDamage } from "./action-utils.js";
 import { pullDamageInputHtml } from "./attack-dialog-kit.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
+import { thrownWeaponDamage } from "../../lib/faserip-rules/faserip-damage.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
 
 const THROWING_BLUNT_POWER_TYPES = ["ice generation"];
 
@@ -64,18 +72,19 @@ function computeThrowingBluntDamage(actor, item) {
   return computeThrownBluntDamage(actor, item);
 }
 
-// Thrown blunt damage per RAW (Advanced Set Combat, Blunt Throwing Attack):
-// "A blunt thrown weapon inflicts damage equal to the Strength of the thrower,
-//  or the material strength of the thrown item, whichever is less."
-// No bump-to-next-rank rule (melee-blunt only). Weapon printed damage is a floor.
+// Lesser of Strength and material strength; a listed weapon never drops
+// below its listed damage (RULED 2026-11-11). No bump-to-next-rank rule
+// (melee-blunt only).
 function computeThrownBluntDamage(actor, weaponItem) {
   if (!weaponItem) return 0;
   const s = actor?.system?.abilities?.strength || {};
   const strVal = Number(s.value || game.msh.getRankValue(s.rank) || 0);
   const matRank = getItemMaterialRank(weaponItem) || "Typical";
-  const matVal = Number(game.msh.getRankValue(matRank) || 0);
-  const weaponBase = Number(weaponItem?.system?.damage || 0);
-  return Math.max(weaponBase, Math.min(strVal, matVal));
+  return thrownWeaponDamage({
+    listedDamage: Number(weaponItem?.system?.damage || 0),
+    strength: strVal,
+    itemMaterialRank: kernelKeyFor(matRank) ?? kernelKeyFor("Typical")
+  });
 }
 
 export class ThrowingBluntAction extends ThrownWeaponAction {
@@ -95,7 +104,7 @@ export class ThrowingBluntAction extends ThrownWeaponAction {
     validateAdhocDamage: true,
     selectError: "Select a carried thrown-blunt weapon or use ad-hoc.",
     sourceName: "Thrown Blunt",
-    fx: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }
+    fx: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }
   };
 
   _isPower(item) { return isThrowingBluntPower(item); }
@@ -110,8 +119,8 @@ export class ThrowingBluntAction extends ThrownWeaponAction {
           <span style="font-size:11px;color:#777;">Cap:</span>
           <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;" name="resultCap" ${!saved.pull ? 'disabled' : ''}>
             <option value="none" ${saved.resultCap === 'none' ? 'selected' : ''}>None</option>
-            <option value="yellow" ${saved.resultCap === 'yellow' ? 'selected' : ''}>Hit</option>
-            <option value="green" ${saved.resultCap === 'green' ? 'selected' : ''}>Miss</option>
+            <option value="yellow" ${saved.resultCap === 'yellow' ? 'selected' : ''}>Bullseye</option>
+            <option value="green" ${saved.resultCap === 'green' ? 'selected' : ''}>Hit</option>
           </select>
         </div>`;
   }
