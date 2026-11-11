@@ -1,4 +1,7 @@
-// scripts/dev/attack-dialog-runtime-tests.js v1.0.0 - 2026-11-11
+// scripts/dev/attack-dialog-runtime-tests.js v1.0.1 - 2026-11-11
+// v1.0.1: The Energy Generation cap check expected a computed display of
+//         inline-flex; a browser reports flex for a child of a flex row.
+//         It now asserts the controls are not hidden.
 // Foundry VTT runtime suite for the shared attack dialogs (Energy, Force,
 // Throwing Edged, Throwing Blunt). It builds a throwaway attacker and two
 // targets with tokens on the current scene, opens each real dialog, drives
@@ -210,7 +213,8 @@ async function energyTests(recorder, { attacker, targetA }) {
     recorder.assert($html.find("#magical-enabled").prop("checked") && !$html.find("#multi-enabled").prop("checked"), "Energy reopen: Magical on, Multi off");
 
     setVal($html, "#power-source-select", optionValue($html, "#power-source-select", "Energy Generation"));
-    recorder.equal($html.find(".result-cap-controls").css("display"), "inline-flex", "Energy Generation: result cap radios appear");
+    const capDisplay = $html.find(".result-cap-controls").css("display");
+    recorder.assert(!!capDisplay && capDisplay !== "none", "Energy Generation: result cap radios appear", { display: capDisplay });
     setChk($html, "#reduce-damage-enabled", true);
     setVal($html, '[name="reducedDamage"]', 5);
     $html.find('[name="resultCap"][value="yellow"]').prop("checked", true).trigger("change");
