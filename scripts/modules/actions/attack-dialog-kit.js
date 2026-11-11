@@ -1,4 +1,6 @@
-// scripts/modules/actions/attack-dialog-kit.js v1.0.0 - 2026-11-10
+// scripts/modules/actions/attack-dialog-kit.js v1.1.0 - 2026-11-10
+// v1.1.0: headerHtml titles option (thrown dialogs render no hover titles);
+//         pullDamageInputHtml.
 // Shared pieces of the v3 compact attack dialogs: prefs and remembered flags,
 // target summary, header / option rows / footer markup, dialog frame setup
 // and the common control wiring. Markup matches what the per-type dialogs
@@ -48,11 +50,12 @@ export function targetSummary(targetActor) {
   return { healthStr, statusStr };
 }
 
-export function headerHtml({ actor, ability, targetDisplay }) {
+export function headerHtml({ actor, ability, targetDisplay, titles = true }) {
   const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
+  const tip = (text) => titles ? ` title="${text}"` : '';
   return `
       <div class="frp-header-v3">
-        <span class="h-actor" title="${actor.name}">${actor.name}</span>
+        <span class="h-actor"${tip(actor.name)}>${actor.name}</span>
         <span class="h-paren">(</span>
         <span class="h-stat">
           <span class="h-stat-label">Base ${ability.name}:</span>
@@ -60,7 +63,7 @@ export function headerHtml({ actor, ability, targetDisplay }) {
         </span>
         <span class="h-paren">)</span>
         ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
+          ? `<span class="h-verb">attacks</span><span class="h-target"${tip(targetDisplay)}>${targetDisplay}</span>`
           : ''}
       </div>`;
 }
@@ -136,6 +139,10 @@ export function blindsideRowHtml() {
           <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
           <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
         </div>`;
+}
+
+export function pullDamageInputHtml({ enabled, pulledDamage, initialDamage }) {
+  return `<input type="number" class="frp-pull-input" name="pulledDamage" value="${enabled && pulledDamage > 0 ? pulledDamage : initialDamage}" min="0" max="${initialDamage}" ${!enabled ? 'disabled' : ''}>`;
 }
 
 export function fxGridHtml(effects) {

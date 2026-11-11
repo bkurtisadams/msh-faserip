@@ -1,4 +1,5 @@
-// tools/test-initiative-declaration-workflow.mjs v3.1.3 - 2026-11-10
+// tools/test-initiative-declaration-workflow.mjs v3.1.4 - 2026-11-10
+// v3.1.4: Throwing dialogs live in thrown-weapon-action.js.
 // v3.1.3: Energy and Force dialogs live in power-blast-action.js; its source
 //         is read with theirs.
 // v3.1.2: v14 tracker context hook name.
@@ -33,7 +34,8 @@ const attackFiles = [
   'throwing-blunt-action.js','energy-action.js','force-action.js','mental-power-action.js','grenade-action.js',
   'grappling-action.js','grabbing-action.js','charging-action.js'
 ].map(f => read(`scripts/modules/actions/${f}`)
-  + (/^(energy|force)-action\.js$/.test(f) ? read('scripts/modules/actions/power-blast-action.js') : ''));
+  + (/^(energy|force)-action\.js$/.test(f) ? read('scripts/modules/actions/power-blast-action.js') : '')
+  + (/^throwing-(edged|blunt)-action\.js$/.test(f) ? read('scripts/modules/actions/thrown-weapon-action.js') : ''));
 
 let n = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); n++; };

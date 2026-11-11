@@ -1,4 +1,5 @@
-// scripts/dev/kernel-blindside-diff.mjs v1.2.0 - 2026-11-10
+// scripts/dev/kernel-blindside-diff.mjs v1.3.0 - 2026-11-10
+// v1.3.0: Throwing Edged / Blunt build theirs in thrown-weapon-action.js.
 // v1.2.0: Energy and Force build their dialog in power-blast-action.js over
 //         attack-dialog-kit.js; those sources are read with the dialog file.
 // v1.1.0: +2CS to-hit anchor (attack-action 1.16.0) replaces the GAP line.
@@ -53,6 +54,8 @@ const DIALOGS = [
 const SHARED = {
   "scripts/modules/actions/energy-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/force-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
+  "scripts/modules/actions/throwing-edged-action.js": ["scripts/modules/actions/thrown-weapon-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
+  "scripts/modules/actions/throwing-blunt-action.js": ["scripts/modules/actions/thrown-weapon-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
 };
 for (const p of DIALOGS) {
   const src = [p, ...(SHARED[p] ?? [])].map(read).join("\n");
