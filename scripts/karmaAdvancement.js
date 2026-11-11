@@ -1,5 +1,12 @@
+// karmaAdvancement.js v1.1.0 - 2026-11-11
+// v1.1.0: The eight V1 dialogs here (Allocate, Reset Fund, Confirm
+//         Advancement, the cost prompt and the four cost calculators) open
+//         as V2 dialogs through dialog-shim.js; <form> wrappers inside their
+//         content became <div>.
 // karmaAdvancement.js v1.0.1 - 2026-08-01
 // v1.0.1: Preserve Shift-0 Resources value 0 during advancement.
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
+
 export class KarmaAdvancementSheet extends DocumentSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -93,10 +100,10 @@ export class KarmaAdvancementSheet extends DocumentSheet {
     
     const currentKarma = this._getCurrentKarma();
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Allocate Karma for Advancement",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Current Available Karma: ${currentKarma}</label>
           </div>
@@ -104,7 +111,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
             <label>Amount to Allocate:</label>
             <input type="number" name="amount" value="0" min="0" max="${currentKarma}">
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         allocate: {
@@ -138,7 +145,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         }
       },
       default: "allocate"
-    }).render(true);
+    });
   }
 
   _onResetAdvancement(event) {
@@ -152,7 +159,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
       return;
     }
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Reset Advancement Fund",
       content: `
         <p>Are you sure you want to reset the advancement fund?</p>
@@ -183,7 +190,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         }
       },
       default: "cancel"
-    }).render(true);
+    });
   }
 
   async _onPurchaseAdvancement(event) {
@@ -316,7 +323,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
     }
 
     const confirm = await new Promise(resolve => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Confirm Advancement",
         content: `
           <p><strong>${description}</strong></p>
@@ -336,7 +343,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
           }
         },
         default: "confirm"
-      }).render(true);
+      });
     });
 
     if (!confirm) return;
@@ -382,15 +389,15 @@ export class KarmaAdvancementSheet extends DocumentSheet {
 
   _askForCustomCost(title, message) {
     return new Promise((resolve) => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: title,
         content: `
-          <form>
+          <div>
             <div class="form-group">
               <label>${message}</label>
               <input type="number" name="cost" value="100" min="1">
             </div>
-          </form>
+          </div>
         `,
         buttons: {
           ok: {
@@ -406,7 +413,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
           }
         },
         default: "ok"
-      }).render(true);
+      });
     });
   }
 
@@ -514,10 +521,10 @@ export class KarmaAdvancementSheet extends DocumentSheet {
 
 async _getPowerAdvancementCost() {
   return new Promise((resolve) => {
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Power Advancement Cost",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Power Name:</label>
             <input type="text" name="powerName" placeholder="Enter power name">
@@ -535,7 +542,7 @@ async _getPowerAdvancementCost() {
               <input type="checkbox" name="cresting"> Cresting to next rank tier (+500 karma)
             </label>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         calculate: {
@@ -562,16 +569,16 @@ async _getPowerAdvancementCost() {
         }
       },
       default: "calculate"
-    }).render(true);
+    });
   });
 }
 
 async _getPowerAdditionCost() {
   return new Promise((resolve) => {
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Power Addition Cost",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>New Power Name:</label>
             <input type="text" name="powerName" placeholder="Enter new power name">
@@ -580,7 +587,7 @@ async _getPowerAdditionCost() {
             <label>Starting Rank Number:</label>
             <input type="number" name="startingRank" value="6" min="1">
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         calculate: {
@@ -603,16 +610,16 @@ async _getPowerAdditionCost() {
         }
       },
       default: "calculate"
-    }).render(true);
+    });
   });
 }
 
 async _getTalentAdditionCost() {
   return new Promise((resolve) => {
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Talent Addition Cost",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Talent Name:</label>
             <input type="text" name="talentName" placeholder="Enter talent name">
@@ -624,7 +631,7 @@ async _getTalentAdditionCost() {
               <option value="npc">NPC (1000 karma)</option>
             </select>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         calculate: {
@@ -647,16 +654,16 @@ async _getTalentAdditionCost() {
         }
       },
       default: "calculate"
-    }).render(true);
+    });
   });
 }
 
 async _getContactAdditionCost() {
   return new Promise((resolve) => {
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Contact Addition Cost",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Contact Name:</label>
             <input type="text" name="contactName" placeholder="Enter contact name">
@@ -676,7 +683,7 @@ async _getContactAdditionCost() {
               <option value="100">Unearthly (100)</option>
             </select>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         calculate: {
@@ -699,7 +706,7 @@ async _getContactAdditionCost() {
         }
       },
       default: "calculate"
-    }).render(true);
+    });
   });
 }
 }

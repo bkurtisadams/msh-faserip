@@ -1,3 +1,7 @@
+// karmaPool.js v2.3.0 - 2026-11-11
+// v2.3.0: The ten V1 dialogs here (Contribute, Use, Withdraw, Add Hero,
+//         Remove, the four GM tools and Dissolve) open as V2 dialogs through
+//         dialog-shim.js; <form> wrappers inside their content became <div>.
 // karmaPool.js v2.2.0 - 2026-10-01
 // v2.2.0: Optional rule "Locking Pool" (karmaPoolLocked): withdrawals refused,
 //         Use Pool Karma limited to die rolls, dissolving requires the
@@ -8,6 +12,7 @@
 // v2.0.0: Rewrite - fix double-deduct, consistent karma calc, add GM award to pool, clean UI
 import { computeKarmaTotals } from "./karma-rules.js";
 import { isKarmaPoolLocked } from "./karma-multipliers.js";
+import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 export class KarmaPoolSheet extends DocumentSheet {
   static get defaultOptions() {
@@ -97,10 +102,10 @@ export class KarmaPoolSheet extends DocumentSheet {
     event.preventDefault();
     const currentKarma = this._getActorKarma(game.actors.get(this.object.id));
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Contribute to Team Karma Pool",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>${this.object.name}'s Available Karma: <strong>${currentKarma}</strong></label>
           </div>
@@ -111,7 +116,7 @@ export class KarmaPoolSheet extends DocumentSheet {
           <p style="font-size:0.85em; color:#666; margin-top:6px;">
             Deducted from personal karma and added to the shared team pool.
           </p>
-        </form>
+        </div>
       `,
       buttons: {
         contribute: {
@@ -157,7 +162,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "contribute"
-    }).render(true);
+    });
   }
 
   _onUseFromPool(event) {
@@ -169,10 +174,10 @@ export class KarmaPoolSheet extends DocumentSheet {
       return;
     }
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Use Team Karma Pool",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Team Pool Available: <strong>${currentPool}</strong></label>
           </div>
@@ -189,7 +194,7 @@ export class KarmaPoolSheet extends DocumentSheet {
               ? "Locked pool: pool karma may only be used on die rolls."
               : "Pool karma can be used to manipulate die rolls or build things, but not for advancement."}
           </p>
-        </form>
+        </div>
       `,
       buttons: {
         use: {
@@ -210,7 +215,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "use"
-    }).render(true);
+    });
   }
 
   _onWithdrawFromPool(event) {
@@ -234,7 +239,7 @@ export class KarmaPoolSheet extends DocumentSheet {
     
     const equalShare = Math.floor(currentPool / memberCount);
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Withdraw from Team Pool",
       content: `
         <div style="margin-bottom:12px;">
@@ -302,7 +307,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "withdraw"
-    }).render(true);
+    });
   }
 
   _onAddMember(event) {
@@ -321,10 +326,10 @@ export class KarmaPoolSheet extends DocumentSheet {
     
     let options = availableActors.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Add Hero to Team Pool",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Select Hero:</label>
             <select name="character">
@@ -332,7 +337,7 @@ export class KarmaPoolSheet extends DocumentSheet {
               ${options}
             </select>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         add: {
@@ -357,7 +362,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "add"
-    }).render(true);
+    });
   }
 
   _onRemoveMember(event) {
@@ -369,7 +374,7 @@ export class KarmaPoolSheet extends DocumentSheet {
     const member = game.actors.get(memberId);
     if (!member) return;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Remove from Team Pool",
       content: `
         <p>Remove <strong>${member.name}</strong> from the team karma pool?</p>
@@ -394,7 +399,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "cancel"
-    }).render(true);
+    });
   }
 
   _onGMAdjustPool(event) {
@@ -403,10 +408,10 @@ export class KarmaPoolSheet extends DocumentSheet {
     
     const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "GM: Adjust Team Karma Pool",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Current Pool Total: <strong>${currentPool}</strong></label>
           </div>
@@ -418,7 +423,7 @@ export class KarmaPoolSheet extends DocumentSheet {
             <label>Reason (optional):</label>
             <input type="text" name="reason" placeholder="e.g., GM correction..." />
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         adjust: {
@@ -440,7 +445,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "adjust"
-    }).render(true);
+    });
   }
 
   _onGMAwardToPool(event) {
@@ -450,10 +455,10 @@ export class KarmaPoolSheet extends DocumentSheet {
     const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "GM: Award Karma to Pool",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Current Pool: <strong>${currentPool}</strong></label>
           </div>
@@ -468,7 +473,7 @@ export class KarmaPoolSheet extends DocumentSheet {
           <p style="font-size:0.85em; color:#666; margin-top:6px;">
             Current karma multiplier: x${multiplier}. Enter the final amount (after any multiplier/split you want to apply).
           </p>
-        </form>
+        </div>
       `,
       buttons: {
         award: {
@@ -489,7 +494,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "award"
-    }).render(true);
+    });
   }
 
   _onGMEditContribution(event) {
@@ -503,10 +508,10 @@ export class KarmaPoolSheet extends DocumentSheet {
     
     const currentContribution = member.system.karma?.poolContribution || 0;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: `GM: Edit ${memberName}'s Contribution`,
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Current Tracked Contribution: <strong>${currentContribution}</strong></label>
           </div>
@@ -517,7 +522,7 @@ export class KarmaPoolSheet extends DocumentSheet {
           <p style="font-size:0.85em; color:#666; margin-top:6px;">
             This only changes the tracked amount, not the actual pool total or personal karma.
           </p>
-        </form>
+        </div>
       `,
       buttons: {
         save: {
@@ -537,7 +542,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "save"
-    }).render(true);
+    });
   }
 
   _onResetAllContributions(event) {
@@ -547,7 +552,7 @@ export class KarmaPoolSheet extends DocumentSheet {
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     const teamMembers = game.actors.filter(a => teamMemberIds.includes(a.id));
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Reset All Contribution Tracking",
       content: `
         <p>Reset all pool contribution values to 0 for all ${teamMembers.length} team members?</p>
@@ -569,7 +574,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "cancel"
-    }).render(true);
+    });
   }
 
   async _onDeletePool(event) {
@@ -581,7 +586,7 @@ export class KarmaPoolSheet extends DocumentSheet {
     const teamMembers = game.actors.filter(a => teamMemberIds.includes(a.id));
     const refundPerMember = teamMembers.length > 0 ? Math.floor(currentPool / teamMembers.length) : 0;
     
-    const confirmed = await Dialog.confirm({
+    const confirmed = await showFaseripConfirm({
       title: "Dissolve Karma Pool",
       content: `
         <p>Dissolve the team karma pool and refund karma equally?</p>

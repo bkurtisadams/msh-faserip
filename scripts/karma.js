@@ -1,3 +1,9 @@
+// karma.js v2.4.0 - 2026-11-11
+// v2.4.0: The nine V1 dialogs here (Set Karma Multiplier, Clear All Karma
+//         Data, Add Karma, Spend Karma, the advancement sub-dialog, Import
+//         Karma History, Edit Karma Entry and the two delete confirmations)
+//         open as V2 dialogs through dialog-shim.js. A V2 dialog is itself a
+//         form, so the <form> wrappers inside their content became <div>.
 // karma.js v2.3.1 - 2026-10-04
 // v2.3.1: "R+I+P Bonus" history entries (Team Tracker house-rule bonus)
 //         get the R+I+P pill and the session-award styling.
@@ -92,6 +98,7 @@ import {
   ADVANCEMENT, rescueAward, foeDefeatAward
 } from "./lib/faserip-rules/faserip-karma.js";
 import { spendCost, advancementCost, SPEND_TYPE_KIND, TALENT_SOURCES } from "./karma-costs.js";
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
 // Crime classes in Summary Listing order; keys match the kernel CRIME_KARMA.
 export const CRIME_CLASSES = [
@@ -407,10 +414,10 @@ export class KarmaSheet extends DocumentSheet {
     event.preventDefault();
     const currentMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Set Karma Multiplier",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Karma Multiplier:</label>
             <input type="number" name="multiplier" value="${currentMultiplier}" min="1" max="10" step="0.5" />
@@ -418,7 +425,7 @@ export class KarmaSheet extends DocumentSheet {
           <p style="font-size:0.85em; color:#666; margin-top:6px;">
             Applied to base awards in the Add Karma dialog. Most GMs use 2x or 3x.
           </p>
-        </form>
+        </div>
       `,
       buttons: {
         save: {
@@ -433,12 +440,12 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "save"
-    }).render(true);
+    });
   }
 
   _onClearKarma(event) {
     event.preventDefault();
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Clear All Karma Data",
       content: `
         <div class="form-group">
@@ -466,7 +473,7 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "cancel"
-    }).render(true);
+    });
   }
 
   _onAddKarma(event) {
@@ -542,10 +549,10 @@ export class KarmaSheet extends DocumentSheet {
       </optgroup>
     `;
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Add Karma",
       content: `
-        <form class="karma-add-dialog">
+        <div class="karma-add-dialog">
           <div class="form-group">
             <label>Event Type:</label>
             <select name="eventType">${optionGroups}</select>
@@ -593,14 +600,14 @@ export class KarmaSheet extends DocumentSheet {
             <label>Description:</label>
             <textarea name="description"></textarea>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         add: {
           icon: '<i class="fas fa-check"></i>',
           label: "Add",
           callback: async (html) => {
-            const form = html.find("form")[0];
+            const form = (html.find("form")[0] ?? html.closest("form")[0]);
             const formData = new FormData(form);
             const eventType = formData.get("eventType");
             const amount = Number(formData.get("amount"));
@@ -760,17 +767,17 @@ export class KarmaSheet extends DocumentSheet {
         html.find('[name="foeRank"]').on('input', recalc);
         recalc();
       }
-    }).render(true);
+    });
   }
 
   _onSpendKarma(event) {
     event.preventDefault();
     const availableKarma = this._getCurrentKarma();
     
-    const dlg = new Dialog({
+    showFaseripButtonDialog({
       title: "Spend Karma",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Available Karma: ${availableKarma}</label>
           </div>
@@ -814,7 +821,7 @@ export class KarmaSheet extends DocumentSheet {
             <label>Description:</label>
             <textarea name="description" placeholder="Describe what you're spending karma on..."></textarea>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         spend: {
@@ -859,7 +866,7 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "spend",
-      render: (html) => {
+      render: (html, dlg) => {
         const $calc = html.find('.karma-spend-calc');
         const showRow = (cls) => { $calc.find('.ksc-row').hide(); if (cls) $calc.find(cls).css('display', 'flex'); };
         const PLACEHOLDER = {
@@ -913,7 +920,6 @@ export class KarmaSheet extends DocumentSheet {
         recalc();
       }
     });
-    dlg.render(true);
   }
 
   _onAbilityAdvancement() {
@@ -996,7 +1002,7 @@ export class KarmaSheet extends DocumentSheet {
     const S = "ka-adv";
     const popNote = kind === "popularity" ? `<div style="font-size:12px;color:#8b0000;margin-bottom:8px;">RAW: Popularity advancement requires a publicized act of charity within three weeks.</div>` : "";
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: `${info.title}: ${actor.name}`,
       content: `
         <div class="${S}-wrap" style="all:initial;font-family:inherit;font-size:13px;color:#333;line-height:1.4;min-width:480px;">
@@ -1192,7 +1198,7 @@ export class KarmaSheet extends DocumentSheet {
         html.find('[name="targetValue"]').val(targets[0].value + 1);
         updateCalc();
       }
-    }).render(true);
+    });
   }
 
   _getNewRank(value) {
@@ -1292,7 +1298,7 @@ export class KarmaSheet extends DocumentSheet {
       `;
     });
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Import Karma History",
       content: `
         <div>
@@ -1331,7 +1337,7 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "import"
-    }).render(true);
+    });
   }
 
   async _importKarmaData(data, mode) {
@@ -1427,10 +1433,10 @@ export class KarmaSheet extends DocumentSheet {
     const origAmount = event.amount;
     const origDescription = event.description;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Edit Karma Entry",
       content: `
-        <form>
+        <div>
           <div class="form-group">
             <label>Real Date:</label>
             <input type="text" name="realDate" value="${event.realDate || ''}" />
@@ -1451,14 +1457,14 @@ export class KarmaSheet extends DocumentSheet {
             <label>Description:</label>
             <textarea name="description">${event.description || ''}</textarea>
           </div>
-        </form>
+        </div>
       `,
       buttons: {
         save: {
           icon: '<i class="fas fa-save"></i>',
           label: "Save",
           callback: (html) => {
-            const form = html.find("form")[0];
+            const form = (html.find("form")[0] ?? html.closest("form")[0]);
             const formData = new FormData(form);
             
             // Find in UNSORTED original using ORIGINAL values
@@ -1490,7 +1496,7 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "save"
-    }).render(true);
+    });
   }
 
   _onDropKarmaRow(sourceIdx, targetIdx) {
@@ -1534,7 +1540,7 @@ export class KarmaSheet extends DocumentSheet {
     
     if (index < 0 || index >= history.length) return;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Confirm Deletion",
       content: `<p>Are you sure you want to delete this karma entry?</p>`,
       buttons: {
@@ -1549,7 +1555,7 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "cancel"
-    }).render(true);
+    });
   }
 
   _updateDeleteSelectedButton(html) {
@@ -1572,7 +1578,7 @@ export class KarmaSheet extends DocumentSheet {
     const indices = [];
     checkedBoxes.each((i, el) => { indices.push(Number(el.dataset.index)); });
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Confirm Deletion",
       content: `<p>Are you sure you want to delete ${count} karma ${count === 1 ? 'entry' : 'entries'}?</p>
                 <p style="color: #8b0000; font-weight: bold;">This cannot be undone.</p>`,
@@ -1596,7 +1602,7 @@ export class KarmaSheet extends DocumentSheet {
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
       default: "cancel"
-    }).render(true);
+    });
   }
 
   _addKarmaEvent(event) {
