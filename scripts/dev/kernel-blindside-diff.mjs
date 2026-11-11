@@ -1,4 +1,6 @@
-// scripts/dev/kernel-blindside-diff.mjs v1.1.0 - 2026-09-09
+// scripts/dev/kernel-blindside-diff.mjs v1.2.0 - 2026-11-10
+// v1.2.0: Energy and Force build their dialog in power-blast-action.js over
+//         attack-dialog-kit.js; those sources are read with the dialog file.
 // v1.1.0: +2CS to-hit anchor (attack-action 1.16.0) replaces the GAP line.
 // Proof for the Blindside Karma refusal and to-hit bonus. Run from the system root:
 //   node scripts/dev/kernel-blindside-diff.mjs
@@ -48,8 +50,12 @@ const DIALOGS = [
   "scripts/modules/actions/force-action.js",
   "scripts/modules/actions/charging-action.js",
 ];
+const SHARED = {
+  "scripts/modules/actions/energy-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
+  "scripts/modules/actions/force-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
+};
 for (const p of DIALOGS) {
-  const src = read(p);
+  const src = [p, ...(SHARED[p] ?? [])].map(read).join("\n");
   const name = p.split("/").pop().replace("-action.js", "");
   const declares = /id="blindside-attack"/.test(src) && /const blindside = html\.find\('#blindside-attack'\)/.test(src);
   const returns = /resolve\(\{\s*\n\s*blindside,/.test(src);

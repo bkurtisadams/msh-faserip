@@ -1,3 +1,10 @@
+// energy-action.js v3.10.0 - 2026-11-10
+// v3.10.0: Dialog flow moved to the shared PowerBlastAction base
+//          (power-blast-action.js) over attack-dialog-kit.js. This file keeps
+//          what is Energy-specific: candidate powers, damage-type inference,
+//          the Reduce / result-cap row, Magical override, Stun aim, the
+//          Nullify guard and the corrosive Force Field bypass. No behaviour
+//          change.
 // energy-action.js v3.9.0 - 2026-09-09
 // v3.9.0: Fixed-bug — stunt-mechanics.js's deviceAbility opts carried a
 //         `touch` flag (Shocking Touch et al.) that nothing read; the
@@ -94,35 +101,9 @@
 // v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 //         PwrHit toggle moved to checkbox, uses setAbilityRank().
-import { RangedAttackAction, powerRangePenalty, rangeLabel } from "./ranged-attack-action.js";
-import { 
-  setupKarmaControlHandlers, 
-  extractKarmaFromDialog,
-  getAvailableKarma,
-  getMinimumKarmaCommitment
-} from "../dice/dice-roller.js";
-
-import { 
-  attachAutoFillRange,
-  buildModeSelector,
-  effectsFor,
-  getAbilityInfo,
-  getBodyArmorValues,
-  getTargetData,
-  labelFor,
-  rankValue,
-  setupModeSelector,
-  applyCapabilitiesToDialog,
-  shiftRank,
-  derivePowerDamage
-} from "./action-utils.js";
-
-import { RANK_ABBR, POWER_RANGE } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
+import { PowerBlastAction } from "./power-blast-action.js";
+import { pinDialogWidth } from "./attack-dialog-kit.js";
 import { isAuraMaintained } from "./nullify.js";
-
-import { showFaseripDialog } from "./dialog-shim.js";
-
 
 function inferEnergyDamageType(item, fallback = "energy-generic") {
   const sys = item?.system || {};
@@ -160,710 +141,225 @@ function inferEnergyDamageType(item, fallback = "energy-generic") {
 
   return explicit || fallback;
 }
-export class EnergyAction extends RangedAttackAction {
-  async execute() {
-    const actor = this.actor;
-    const actionType = "energy";
-    const actionName = labelFor(actionType);
-    const effects = effectsFor(actionType);
-    const ability = getAbilityInfo(actor, this.abilityName || "agility");
 
-    // === Candidate powers ===
-    let energyItems = actor.items.filter((i) => {
-      if (i.type !== "power") return false;
-      const s = i.system || {};
-      if (s.isEnergyAttack === true) return true;
-      if (s.isForceAttack || s.isBluntAttack || s.isEdgedAttack || s.isShootingAttack || s.isMentalAttack) return false;
-      const cat = String(s.category || "").toLowerCase();
-      const typ = String(s.type || "").toLowerCase();
-      const catIsEnergy = cat === "energycontrol";
-      const typeLooksEnergy = /\b(energy|light|electric|plasma|beam|blast|fire|cold|darkforce|radiation|heat|lightning)\b/.test(typ);
-      return catIsEnergy || typeLooksEnergy;
-    });
+function isEnergyGeneration(item) {
+  const s = item?.system || {};
+  return String(item?.name || "").toLowerCase().includes('energy generation') ||
+    s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
+}
 
-    const energyEquipment = actor.items.filter((i) => {
-      if (i.type !== "equipment") return false;
-      const s = i.system || {};
-      const damageType = String(s.damageType || "").toUpperCase();
-      return damageType === "E" && s.category === "weapon";
-    });
-    energyItems = [...energyItems, ...energyEquipment];
+export class EnergyAction extends PowerBlastAction {
+  static BLAST = {
+    key: "energy",
+    flag: "Energy",
+    equipmentCode: "E",
+    armorQuery: "energy",
+    adhocName: "Energy Blast",
+    adhocDamage: 20,
+    touchZeroRange: true,
+    liveArmor: false,
+    pinWidthOnUpdate: false,
+    selectError: "Select an energy power or use ad-hoc.",
+    damageNote: "BA -20 vs Energy &bull; Kill: White = End Loss"
+  };
 
-    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
-    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
-    if (passedItem && (passedItem.type === "power" || passedItem.type === "equipment")) {
-      if (!energyItems.find(i => i.id === passedItem.id)) {
-        energyItems = [passedItem, ...energyItems];
-      }
-    }
+  _isCandidatePower(i) {
+    const s = i.system || {};
+    if (s.isEnergyAttack === true) return true;
+    if (s.isForceAttack || s.isBluntAttack || s.isEdgedAttack || s.isShootingAttack || s.isMentalAttack) return false;
+    const cat = String(s.category || "").toLowerCase();
+    const typ = String(s.type || "").toLowerCase();
+    const catIsEnergy = cat === "energycontrol";
+    const typeLooksEnergy = /\b(energy|light|electric|plasma|beam|blast|fire|cold|darkforce|radiation|heat|lightning)\b/.test(typ);
+    return catIsEnergy || typeLooksEnergy;
+  }
 
-    // === Restore prefs ===
-    const lsRememberKey = "msh.energy.remember";
-    const lsSkipKey = "msh.energy.skipDice";
-    const storedRemember = localStorage.getItem(lsRememberKey);
-    const shouldRemember = storedRemember === "1";
+  _armorValue(info) { return info?.energy ?? 0; }
 
-    const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyItemId") || "") : "");
-    let savedRange = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyRange") || 1) : 1;
+  _armorView(info, armorNote) {
+    const physical = info?.physical ?? 0;
+    const energy = info?.energy ?? 0;
+    return {
+      display: energy > 0
+        ? `BA: ${energy}${physical !== energy ? ` (${physical}-20)` : ''}${armorNote}`
+        : "",
+      hintHtml: physical > 0 && physical !== energy
+        ? `<span style="font-size:10px;color:#1565c0;">(BA -20 vs Energy)</span>`
+        : ''
+    };
+  }
 
-    let savedAdHoc = passedItem ? false : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHoc") || (!energyItems.length)) : (!energyItems.length));
-    let savedAdHocName = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHocName") || "Energy Blast") : "Energy Blast";
-    let savedAdHocDmg = Number(shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHocDamage") || 20) : 20);
-    let savedAdHocRank = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHocRank") || "Remarkable") : "Remarkable";
+  _recallExtras(recall, flag) {
+    return {
+      magical: recall(flag("Magical"), false),
+      reduce: recall(flag("ReduceDamage"), false),
+      reducedAmount: recall(flag("ReducedAmount"), 0),
+      resultCap: recall(flag("ResultCap"), "none")
+    };
+  }
 
-    const deviceAbility = this.opts?.deviceAbility;
-    if (deviceAbility) {
-      savedAdHoc = true;
-      savedAdHocName = `${deviceAbility.name}${passedItem ? ` (${passedItem.name})` : ""}`;
-      savedAdHocRank = deviceAbility.rank || "Remarkable";
-      savedAdHocDmg = CONFIG.FASERIP?.rankValues?.[deviceAbility.rank] || 20;
-      // Touch stunts (Shocking Touch, Energy Touch-style) resolve at 0
-      // areas regardless of what range was last remembered.
-      if (deviceAbility.touch) savedRange = 0;
-    }
-
-    const savedUsePowerToHit = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastEnergyUsePowerToHit")) === true) : false;
-    const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyShift") ?? 0) : 0;
-    const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false) : false;
-    const savedMagical = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyMagical") || false) : false;
-    const savedReduceDamage = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReduceDamage") || false) : false;
-    const savedReducedAmount = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0) : 0;
-    const savedResultCap = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyResultCap") || "none") : "none";
-    const savedAim = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAim") || "none") : "none";
-    const savedReason = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReason") || "") : "";
-    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
-
-    // === Target Info ===
-    const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
-    const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "energy") : null;
-    const physicalArmor = targetArmorInfo?.physical ?? 0;
-    const energyArmor = targetArmorInfo?.energy ?? 0;
-    const targetArmorSource = targetArmorInfo?.source ?? "";
-    const armorNote = targets.length > 1 ? " (1st)" : "";
-
-    const targetHealth = primaryTargetActor?.system?.health;
-    const targetHealthStr = targetHealth ? `${targetHealth.value}/${targetHealth.max}` : "";
-    const targetEffects = (primaryTargetActor?.effects?.filter(e => !e.disabled) ?? [])
-      .filter(e => {
-        const n = (e.name || e.label || '').toLowerCase();
-        return !n.includes('body armor') && !n.includes('force field');
-      });
-    const targetStatusStr = targetEffects.length > 0
-      ? targetEffects.map(e => e.name || e.label).join(", ") : "";
-
-    const armorDisplay = energyArmor > 0
-      ? `BA: ${energyArmor}${physicalArmor !== energyArmor ? ` (${physicalArmor}-20)` : ''}${armorNote}`
-      : "";
-
-    const initialPower = energyItems.find(i => i.id === savedItemId) || energyItems[0];
-    const initialPowerRank = savedAdHoc ? savedAdHocRank : (initialPower?.system?.rank ?? initialPower?.system?.powerRank ?? "Remarkable");
-    const initialDamage = savedAdHoc ? savedAdHocDmg : derivePowerDamage(initialPower?.system || {}, actor);
-    const initialAfterArmor = Math.max(0, initialDamage - energyArmor);
-    const initialDisplayRank = savedUsePowerToHit ? initialPowerRank : ability.rank;
-
-    const availableKarma = getAvailableKarma(actor);
-    const minKarma = getMinimumKarmaCommitment(actor);
-    const hasKarma = availableKarma > 0;
-
-    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
-
-    // Build CS row via shared utility (manual input + range + ? reference)
-    const initialRangePenalty = (() => {
-      const maxRange = this._getPowerRangeInAreas(initialPowerRank);
-      return (savedRange > maxRange && maxRange > 0) ? powerRangePenalty(initialPowerRank, savedRange) : 0;
-    })();
-    const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
-    const csRowHtml = buildCSRow({
-      savedCS: savedColumnShift,
-      savedReason,
-      abilityRank: initialDisplayRank,
-      rangePenalty: initialRangePenalty,
-      showRange: true,
-      autoMods
-    });
-
-    // Build power source <select> options
-    const powerSrcOptions = [];
-    for (const item of energyItems) {
-      const s = item.system || {};
-      const dmg = derivePowerDamage(s, actor);
-      const rank = s.rank ?? s.powerRank ?? "Remarkable";
-      const rankAbbr = RANK_ABBR[rank] || rank;
-      const sel = (!savedAdHoc && item.id === savedItemId) ? 'selected'
-        : (!savedAdHoc && !savedItemId && item === energyItems[0]) ? 'selected' : '';
-      powerSrcOptions.push(`<option value="power:${item.id}" ${sel}>${item.name} &mdash; ${rankAbbr} (${dmg})</option>`);
-    }
-    powerSrcOptions.push(`<option value="adhoc" ${savedAdHoc ? 'selected' : ''}>Ad-hoc&hellip;</option>`);
-
-    // ── Dialog HTML — v3 Compact Layout ──
-    const dialogHtml = `
-    <div class="frp-dlg">
-
-      <!-- Header -->
-      <div class="frp-header-v3">
-        <span class="h-actor" title="${actor.name}">${actor.name}</span>
-        <span class="h-paren">(</span>
-        <span class="h-stat">
-          <span class="h-stat-label">Base ${ability.name}:</span>
-          <span class="h-stat-rank">${abilityShort} ${ability.value}</span>
-        </span>
-        <span class="h-paren">)</span>
-        ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
-          : ''}
-      </div>
-
-      ${targetDisplay ? `
-      <div class="frp-target-compact">
-        ${targetHealthStr ? `<span class="t-hp">HP ${targetHealthStr}</span>` : ''}
-        ${armorDisplay ? `<span class="t-armor">${armorDisplay}</span>` : '<span class="t-armor" style="color:#999;">No armor</span>'}
-        ${physicalArmor > 0 && physicalArmor !== energyArmor ? `<span style="font-size:10px;color:#1565c0;">(BA -20 vs Energy)</span>` : ''}
-        ${targetStatusStr ? `<span class="t-status">${targetStatusStr}</span>` : ''}
-      </div>` : ''}
-
-      <!-- CS row (manual input + range + ? reference) -->
-      ${csRowHtml}
-
-      <!-- PwrHit toggle: use power rank instead of ability rank for to-hit -->
-      <div style="padding:0 10px 2px;font-size:11px;">
-        <label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="pwr-hit-toggle" ${savedUsePowerToHit ? 'checked' : ''}>
-          <span style="font-weight:600;color:#7b6b00;">PwrHit</span>
-          <span style="color:#999;">use power rank to hit</span>
-        </label>
-      </div>
-
-      <!-- Damage: power select + numbers inline -->
-      <div class="frp-box frp-dmg-box">
-        <div class="frp-dmg-inline">
-          <select class="frp-select" name="powerSource" id="power-source-select">
-            ${powerSrcOptions.join('')}
-          </select>
-          <span class="frp-dmg-num" id="dmg-val">${initialDamage}</span>
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-dmg-after" id="after-armor-display">${primaryTarget ? `${initialAfterArmor} after armor` : `${initialDamage} damage`}</span>
-        </div>
-        <div class="object-row" id="adhoc-row" style="display:${savedAdHoc ? 'block' : 'none'}">
-          <div class="obj-grid">
-            <label>Name:</label>
-            <input type="text" name="adhocName" value="${savedAdHocName}" placeholder="Energy Blast">
-            <label>Rank:</label>
-            <div class="obj-mat-row">
-              <input type="text" name="adhocRank" value="${savedAdHocRank}" placeholder="Remarkable" style="flex:1;">
-              <input type="number" name="adhocDamage" value="${savedAdHocDmg}" min="0" style="width:50px;">
-            </div>
-          </div>
-        </div>
-        <div style="font-size:10px;color:#999;margin-top:2px;">BA -20 vs Energy &bull; Kill: White = End Loss</div>
-      </div>
-
-      <!-- Range box (blue) -->
-      <div class="frp-box" style="padding:3px 8px;background:#e3f2fd;border-color:#90caf9;">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
-          <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
-          <input type="number" name="range" value="${savedRange}" min="0" class="frp-pull-input" style="width:36px;">
-          <span style="color:#777;">areas</span>
-          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${rangeLabel(this._getPowerRangeInAreas(initialPowerRank))}</span>)</span>
-          <span id="range-penalty-display" style="margin-left:auto;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#c62828;"></span>
-        </div>
-      </div>
-
-      <!-- Options: Reduce / Multi / Aim / Karma -->
-      <div class="frp-box frp-opts-box">
-        <div class="frp-opt-row${!savedReduceDamage ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label><input type="checkbox" id="reduce-damage-enabled" ${savedReduceDamage ? 'checked' : ''}> <span class="frp-opt-label orange">Reduce</span></label>
+  _reduceRowHtml(saved, initialDamage) {
+    return `
+        <div class="frp-opt-row${!saved.reduce ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label><input type="checkbox" id="reduce-damage-enabled" ${saved.reduce ? 'checked' : ''}> <span class="frp-opt-label orange">Reduce</span></label>
           <span style="font-size:11px;color:#777;">to</span>
-          <input type="number" class="frp-pull-input" name="reducedDamage" value="${savedReduceDamage && savedReducedAmount > 0 ? savedReducedAmount : initialDamage}" min="0" max="${initialDamage}" ${!savedReduceDamage ? 'disabled' : ''}>
+          <input type="number" class="frp-pull-input" name="reducedDamage" value="${saved.reduce && saved.reducedAmount > 0 ? saved.reducedAmount : initialDamage}" min="0" max="${initialDamage}" ${!saved.reduce ? 'disabled' : ''}>
           <span class="result-cap-controls" style="display:none;margin-left:4px;font-size:11px;">
-            <label><input type="radio" name="resultCap" value="none" ${savedResultCap === 'none' ? 'checked' : ''}> Any</label>
-            <label><input type="radio" name="resultCap" value="yellow" ${savedResultCap === 'yellow' ? 'checked' : ''}> Ylw</label>
-            <label><input type="radio" name="resultCap" value="green" ${savedResultCap === 'green' ? 'checked' : ''}> Grn</label>
+            <label><input type="radio" name="resultCap" value="none" ${saved.resultCap === 'none' ? 'checked' : ''}> Any</label>
+            <label><input type="radio" name="resultCap" value="yellow" ${saved.resultCap === 'yellow' ? 'checked' : ''}> Ylw</label>
+            <label><input type="radio" name="resultCap" value="green" ${saved.resultCap === 'green' ? 'checked' : ''}> Grn</label>
           </span>
           <span class="effect-note" style="font-size:10px;color:#888;margin-left:auto;">Effect &ne; reduced</span>
-        </div>
+        </div>`;
+  }
+
+  _multiRowHtml(saved) {
+    return `
         <div class="frp-opt-row" style="border-bottom:1px solid #e8e0d0;">
-          <label id="multi-lbl" style="${!savedMultiAdjacent ? 'opacity:0.55;' : ''}"><input type="checkbox" id="multi-enabled" ${savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
-          <span id="multi-hint" style="font-size:11px;color:#777;margin-left:8px;${!savedMultiAdjacent ? 'opacity:0.55;' : ''}">Adjacent targets (-4CS)</span>
-          <label id="magical-lbl" style="margin-left:auto;${!savedMagical ? 'opacity:0.55;' : ''}" title="Force this attack to count as magical vs a Resistance to Magical Attacks"><input type="checkbox" id="magical-enabled" ${savedMagical ? 'checked' : ''}> <span class="frp-opt-label" style="color:#7b1fa2;">Magical</span></label>
-        </div>
-        <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
-          <select name="aimMode" ${savedAim === 'none' ? 'disabled' : ''} style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;">
-            <option value="neutralize" ${savedAim === 'neutralize' ? 'selected' : ''}>Neutralize (disarm)</option>
-            <option value="stun" ${(savedAim === 'stun' || savedAim === 'none') ? 'selected' : ''}>Stun</option>
-          </select>
-          <span style="font-size:10px;color:#888;margin-left:auto;">Bullseye effect</span>
-        </div>
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
-          ${hasKarma ? `
-            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-        </div>
-        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
-          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
-          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
-        </div>
-      </div>
+          <label id="multi-lbl" style="${!saved.multiAdjacent ? 'opacity:0.55;' : ''}"><input type="checkbox" id="multi-enabled" ${saved.multiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
+          <span id="multi-hint" style="font-size:11px;color:#777;margin-left:8px;${!saved.multiAdjacent ? 'opacity:0.55;' : ''}">Adjacent targets (-4CS)</span>
+          <label id="magical-lbl" style="margin-left:auto;${!saved.magical ? 'opacity:0.55;' : ''}" title="Force this attack to count as magical vs a Resistance to Magical Attacks"><input type="checkbox" id="magical-enabled" ${saved.magical ? 'checked' : ''}> <span class="frp-opt-label" style="color:#7b1fa2;">Magical</span></label>
+        </div>`;
+  }
 
-      <!-- Effect preview grid -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w">${effects.white}</div>
-        <div class="frp-fx-cell g">${effects.green}</div>
-        <div class="frp-fx-cell y">${effects.yellow}</div>
-        <div class="frp-fx-cell r">${effects.red}</div>
-      </div>
+  _aimOptionsHtml(savedAim) {
+    return `<option value="neutralize" ${savedAim === 'neutralize' ? 'selected' : ''}>Neutralize (disarm)</option>
+            <option value="stun" ${(savedAim === 'stun' || savedAim === 'none') ? 'selected' : ''}>Stun</option>`;
+  }
 
-      <!-- Footer -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
-    </div>
-    `;
+  _readExtras($dlg, { item, useAdHoc, powerDamage }) {
+    const powerDamageType = item ? inferEnergyDamageType(item, "energy-generic") : "energy-generic";
+    const freeEffectReduction = item ? isEnergyGeneration(item) : false;
+    const magicalForced = !!$dlg('#magical-enabled').is(':checked');
+    const reduceDamageEnabled = !!$dlg('#reduce-damage-enabled').is(':checked');
+    const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
+    const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
+    return {
+      choice: {
+        useAdHoc,
+        powerDamageType,
+        isMagic: magicalForced || undefined,
+        reduceDamageEnabled, reducedDamage, resultCap, freeEffectReduction
+      },
+      flags: {
+        lastEnergyMagical: magicalForced,
+        lastEnergyReduceDamage: reduceDamageEnabled,
+        lastEnergyReducedAmount: reducedDamage,
+        lastEnergyResultCap: resultCap
+      }
+    };
+  }
 
-    const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  _updateSource(html, src) {
+    let energyGeneration = false, isCorrosive = false, isRotting = false;
+    if (src.item) {
+      const s = src.item.system || {};
+      const nameLower = src.item.name.toLowerCase();
+      energyGeneration = isEnergyGeneration(src.item);
+      const dtLower = String(inferEnergyDamageType(src.item, s.damageType || "")).toLowerCase();
+      isCorrosive = /corrosive|acid/.test(nameLower) || /corrosive|acid/.test(dtLower);
+      isRotting = /rotting|rot.touch|decay/.test(nameLower) || /rotting|decay/.test(dtLower);
+    }
 
-    const choice = await new Promise((resolve) => {
-      let _csState = null;
-      let _resolved = false;
-      showFaseripDialog({
-        title: actionName,
-        content: dialogHtml,
-        render: async (html, dlg) => {
-          setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
+    const $resultCapControls = html.find('.result-cap-controls');
+    const $effectNote = html.find('.effect-note');
+    if (energyGeneration) {
+      $resultCapControls.css('display', 'inline-flex');
+      $effectNote.text('Energy Gen: can reduce effect').css('color', '#2e7d32');
+    } else {
+      $resultCapControls.hide();
+      html.find('[name="resultCap"][value="none"]').prop('checked', true);
+      $effectNote.text('Effect \u2260 reduced').css('color', '#888');
+    }
 
-          // Hide Foundry's native button row
-          $dialog.find('.dialog-buttons').hide();
+    // Corrosive / Rotting damage cannot be reduced (DESIGN-material-strength.md §2).
+    const $reduceToggle = html.find('#reduce-damage-enabled');
+    const $reduceInput = html.find('[name="reducedDamage"]');
+    if (isCorrosive) {
+      $reduceToggle.prop('checked', false).prop('disabled', true);
+      $reduceInput.prop('disabled', true);
+      $effectNote.text('Corrosive: damage cannot be reduced').css('color', '#bf360c');
+    } else if (isRotting) {
+      $reduceToggle.prop('checked', false).prop('disabled', true);
+      $reduceInput.prop('disabled', true);
+      $effectNote.text('Rotting: damage cannot be reduced').css('color', '#5d4037');
+    } else {
+      $reduceToggle.prop('disabled', false);
+      $reduceInput.prop('disabled', !$reduceToggle.is(':checked'));
+    }
+  }
 
-          // Inject mode buttons into titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastEnergyMode");
+  _syncReduceMax(html, damage) {
+    const $reducedDamage = html.find('[name="reducedDamage"]');
+    const oldMax = Number($reducedDamage.attr('max')) || 0;
+    $reducedDamage.attr('max', damage);
+    if (oldMax !== damage) $reducedDamage.val(damage);
+  }
 
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-          // Lock width through the AppV2 position API. A CSS-only width is
-          // re-applied as position.width ('auto' by default) on the next
-          // setPosition AppV2 runs (e.g. on a form-input change), which then
-          // measures the long defensive-powers summary line and balloons the
-          // dialog. Pinning position.width keeps it fixed across re-measures.
-          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
-
-          // ── Wire CS panel from shared utility ──
-          const _getCurrentRangePenalty = () => {
-            const srcVal = html.find('#power-source-select').val() || "adhoc";
-            const isAdHoc = srcVal === "adhoc";
-            let currentRank = "Remarkable";
-            if (isAdHoc) {
-              currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
-            } else {
-              const itemId = srcVal.replace("power:", "");
-              const item = energyItems.find(i => i.id === itemId);
-              if (item) currentRank = String(item.system?.rank ?? item.system?.powerRank ?? "Remarkable");
-            }
-            const maxRange = this._getPowerRangeInAreas(currentRank);
-            const rangeVal = Number(html.find('[name="range"]').val() || 0);
-            if (rangeVal > maxRange && maxRange > 0) return powerRangePenalty(currentRank, rangeVal);
-            return 0;
-          };
-          _csState = wireCSPanel(html, {
-            abilityRank: initialDisplayRank,
-            getRangePenalty: _getCurrentRangePenalty,
-            onUpdate: () => {
-              if ($dialog.length) $dialog[0].style.height = 'auto';
-            }
-          });
-
-          // ── PwrHit toggle — switch base ability rank ──
-          html.find('#pwr-hit-toggle').on('change', function() {
-            const srcVal = html.find('#power-source-select').val() || "adhoc";
-            const isAdHoc = srcVal === "adhoc";
-            let currentRank = "Remarkable";
-            if (isAdHoc) {
-              currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
-            } else {
-              const itemId = srcVal.replace("power:", "");
-              const item = energyItems.find(i => i.id === itemId);
-              if (item) currentRank = String(item.system?.rank ?? item.system?.powerRank ?? "Remarkable");
-            }
-            _csState.setAbilityRank(this.checked ? currentRank : ability.rank);
-          });
-
-          // Auto-focus Roll button for keyboard Enter and focus ring
-          html.find('#frp-roll').focus();
-
-          // Intercept Enter key — trigger Roll instead of Foundry's native submit
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
-
-          // ── Roll button handler ──
-          html.find('#frp-roll').on('click', async () => {
-            const $dlg = (sel) => html.find(sel);
-
-            const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
-            const skipDice = $dlg("#msh-skip-dice").is(':checked');
-            setLS(lsRememberKey, rememberSettings ? "1" : "0");
-            setLS(lsSkipKey, skipDice ? "1" : "0");
-
-            const srcVal = $dlg('#power-source-select').val() || "adhoc";
-            const useAdHoc = srcVal === "adhoc";
-
-            let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
-            let powerDamageType = "energy-generic";
-            let freeEffectReduction = false;
-
-            if (useAdHoc) {
-              powerName = String($dlg('[name="adhocName"]').val() || "Energy Blast");
-              powerDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
-              powerRank = String($dlg('[name="adhocRank"]').val() || "Remarkable");
-              if (!Number.isFinite(powerDamage) || powerDamage < 0) {
-                ui.notifications.error("Enter a valid non-negative damage value.");
-                return;
-              }
-            } else {
-              const itemId = srcVal.replace("power:", "");
-              const item = energyItems.find(i => i.id === itemId);
-              if (!item) {
-                ui.notifications.error("Select an energy power or use ad-hoc.");
-                return;
-              }
-              powerId = itemId;
-              const s = item.system || {};
-              powerName = item.name;
-              powerDamage = derivePowerDamage(s, actor);   // shared, honors system.damageSource
-              powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
-              prettyRange = s.range === "rank"
-                ? (POWER_RANGE[powerRank] || "")
-                : String(s.calculatedRange || "");
-              powerDamageType = inferEnergyDamageType(item, "energy-generic");
-              const _nameLc = item.name.toLowerCase();
-              freeEffectReduction = _nameLc.includes('energy generation') ||
-                s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
-            }
-
-            const cs = _csState.get();
-            const shift = cs.totalShift;
-            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-
-            // RAW: FEATs forced by a Blindside or an unexpected attack may not
-            // be modified by Karma. Declared here, carried to the target's
-            // Slam/Stun/Kill check through the attack prefill.
-            const blindside = html.find('#blindside-attack').is(':checked');
-            const karma = karmaToSpend;
-            const usePowerToHit = !!html.find('#pwr-hit-toggle').is(':checked');
-            const range = Number($dlg('[name="range"]').val() || 1);
-            const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
-            const magicalForced = !!$dlg('#magical-enabled').is(':checked');
-            const reduceDamageEnabled = !!$dlg('#reduce-damage-enabled').is(':checked');
-            const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
-            const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
-            const aimEnabled = $dlg('#aim-enabled').is(':checked');
-            const aimMode = aimEnabled ? ($dlg('[name="aimMode"]').val() || "none") : "none";
-            const csNotes = cs.csNotes;
-
-            const flagUpdate = { csNotes };
-            if (rememberSettings) {
-              Object.assign(flagUpdate, {
-                lastEnergyAdHoc: useAdHoc,
-                lastEnergyUsePowerToHit: usePowerToHit,
-                lastEnergyShift: cs.manualCS,
-                cs_energy: cs.manualCS,
-                lastEnergyMultiAdjacent: multiAdjacent,
-                lastEnergyMagical: magicalForced,
-                lastEnergyAdHocName: powerName,
-                lastEnergyAdHocDamage: powerDamage,
-                lastEnergyAdHocRank: powerRank,
-                lastEnergyItemId: powerId || "",
-                lastEnergyRange: range,
-                lastEnergyReduceDamage: reduceDamageEnabled,
-                lastEnergyReducedAmount: reducedDamage,
-                lastEnergyResultCap: resultCap,
-                lastEnergyAim: aimMode,
-                lastEnergyReason: cs.reason
-              });
-            }
-            await actor.update({ "flags.msh-faserip": flagUpdate });
-
-            _resolved = true;
-            resolve({
-              blindside,
-              powerName, powerDamage, powerRank, powerId, prettyRange,
-              useAdHoc,
-              shift, karma, spendKarma, range, skipDice, usePowerToHit,
-              totalShift: shift,
-              manualCS: cs.manualCS,
-              rangePenalty: cs.rangePenalty,
-              powerDamageType, multiAdjacent,
-              isMagic: magicalForced || undefined,
-              reduceDamageEnabled, reducedDamage, resultCap, freeEffectReduction,
-              aimMode,
-              csNotes
-            });
-            dlg.close();
-          });
-
-          // ── Cancel button handler ──
-          html.find('#frp-cancel').on('click', () => {
-            _resolved = true;
-            resolve(null);
-            dlg.close();
-          });
-
-          // ── Main update function (damage + range display only — CS handled by csState) ──
-          const update = () => {
-            const srcVal = html.find('#power-source-select').val() || "adhoc";
-            const isAdHoc = srcVal === "adhoc";
-            html.find('#adhoc-row').css('display', isAdHoc ? 'block' : 'none');
-
-            let currentDamage = 0, currentRank = "Remarkable", isEnergyGeneration = false, isCorrosive = false, isRotting = false;
-            if (isAdHoc) {
-              currentDamage = Number(html.find('[name="adhocDamage"]').val()) || 0;
-              currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
-            } else {
-              const itemId = srcVal.replace("power:", "");
-              const item = energyItems.find(i => i.id === itemId);
-              if (item) {
-                const s = item.system || {};
-                currentDamage = derivePowerDamage(s, actor);
-                currentRank = String(s.rank ?? s.powerRank ?? "Remarkable");
-                const nameLower = item.name.toLowerCase();
-                isEnergyGeneration = nameLower.includes('energy generation') ||
-                  s.canReduceEffect === true || s.type?.toLowerCase() === 'energy generation';
-                const dtLower = String(inferEnergyDamageType(item, s.damageType || "")).toLowerCase();
-                isCorrosive = /corrosive|acid/.test(nameLower) || /corrosive|acid/.test(dtLower);
-                isRotting = /rotting|rot.touch|decay/.test(nameLower) || /rotting|decay/.test(dtLower);
-              }
-            }
-
-            // Energy Generation: show/hide result cap controls
-            const $resultCapControls = html.find('.result-cap-controls');
-            const $effectNote = html.find('.effect-note');
-            if (isEnergyGeneration) {
-              $resultCapControls.css('display', 'inline-flex');
-              $effectNote.text('Energy Gen: can reduce effect').css('color', '#2e7d32');
-            } else {
-              $resultCapControls.hide();
-              html.find('[name="resultCap"][value="none"]').prop('checked', true);
-              $effectNote.text('Effect ≠ reduced').css('color', '#888');
-            }
-
-            // Corrosive / Rotting: cannot reduce damage per rules. Lock
-            // reduce controls off. Rotting parallels corrosive per design
-            // (DESIGN-material-strength.md §2 Rotting Touch).
-            const $reduceToggle = html.find('#reduce-damage-enabled');
-            const $reduceInput  = html.find('[name="reducedDamage"]');
-            if (isCorrosive) {
-              $reduceToggle.prop('checked', false).prop('disabled', true);
-              $reduceInput.prop('disabled', true);
-              $effectNote.text('Corrosive: damage cannot be reduced').css('color', '#bf360c');
-            } else if (isRotting) {
-              $reduceToggle.prop('checked', false).prop('disabled', true);
-              $reduceInput.prop('disabled', true);
-              $effectNote.text('Rotting: damage cannot be reduced').css('color', '#5d4037');
-            } else {
-              $reduceToggle.prop('disabled', false);
-              $reduceInput.prop('disabled', !$reduceToggle.is(':checked'));
-            }
-
-            html.find('#dmg-val').text(currentDamage);
-
-            const afterArmorDmg = Math.max(0, currentDamage - energyArmor);
-            html.find('#after-armor-display').text(
-              primaryTarget ? `${afterArmorDmg} after armor` : `${currentDamage} damage`
-            );
-
-            // Update max range hint based on power rank
-            const powerMaxRange = this._getPowerRangeInAreas(currentRank);
-            html.find('#max-range-hint').text(rangeLabel(powerMaxRange));
-
-            // Range penalty — update CS panel and range info display
-            const rangeVal = Number(html.find('[name="range"]').val() || 0);
-            const $rangePenalty = html.find('#range-penalty-display');
-            if (rangeVal > powerMaxRange && powerMaxRange > 0) {
-              const penalty = powerRangePenalty(currentRank, rangeVal);
-              $rangePenalty.text(`${penalty}CS`).css('color', '#e65100');
-              _csState.setRange(penalty);
-            } else {
-              $rangePenalty.text('');
-              _csState.setRange(0);
-            }
-
-            // Update reduce damage max
-            const $reducedDamage = html.find('[name="reducedDamage"]');
-            const oldMax = Number($reducedDamage.attr('max')) || 0;
-            $reducedDamage.attr('max', currentDamage);
-            if (oldMax !== currentDamage) $reducedDamage.val(currentDamage);
-
-            // Update PwrHit base rank if checked
-            const usePwrHit = html.find('#pwr-hit-toggle').is(':checked');
-            _csState.setAbilityRank(usePwrHit ? currentRank : ability.rank);
-
-            if ($dialog.length) $dialog[0].style.height = 'auto';
-          };
-
-          // ── Event wiring ──
-          html.find('#power-source-select').on('change', update);
-          html.find('[name="adhocDamage"], [name="adhocRank"]').on('input change', update);
-          html.find('[name="range"]').on('input change', update);
-
-          // Reduce damage toggle
-          html.find('#reduce-damage-enabled').on('change', function() {
-            const $row = $(this).closest('.frp-opt-row');
-            const $reducedDamage = html.find('[name="reducedDamage"]');
-            $row.toggleClass('inactive', !this.checked);
-            if (this.checked) {
-              const currentMax = Number($reducedDamage.attr('max')) || 20;
-              $reducedDamage.val(currentMax).prop('disabled', false);
-              html.find('input[name="resultCap"]').prop('disabled', false);
-            } else {
-              $reducedDamage.val($reducedDamage.attr('max')).prop('disabled', true);
-              html.find('input[name="resultCap"]').prop('disabled', true);
-              html.find('input[name="resultCap"][value="none"]').prop('checked', true);
-            }
-          });
-
-          // Multi toggle
-          html.find('#multi-enabled').on('change', function() {
-            html.find('#multi-lbl, #multi-hint').css('opacity', this.checked ? '' : '0.55');
-            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
-          });
-
-          // Magical override toggle
-          html.find('#magical-enabled').on('change', function() {
-            html.find('#magical-lbl').css('opacity', this.checked ? '' : '0.55');
-            try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
-          });
-
-          // Aim tactic toggle
-          html.find('#aim-enabled').on('change', function() {
-            const $row = $(this).closest('.frp-opt-row');
-            $row.toggleClass('inactive', !this.checked);
-            $row.find('[name="aimMode"]').prop('disabled', !this.checked);
-          });
-
-          // Karma toggle
-          html.find('#spend-karma').on('change', function() {
-            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
-          });
-
-          applyCapabilitiesToDialog(html, "energy", { actor });
-          this._disposeAutoFill = attachAutoFillRange(html, actor, update);
-
-          html.find('#msh-skip-dice').on('change', function() {
-            setLS(lsSkipKey, this.checked ? "1" : "0");
-          });
-          html.find('#msh-remember-settings').on('change', function() {
-            setLS(lsRememberKey, this.checked ? "1" : "0");
-          });
-
-          update();
-        },
-        close: () => {
-          if (_csState) _csState.destroy();
-          if (this._disposeAutoFill) this._disposeAutoFill();
-          if (!_resolved) resolve(null);
-        }
-      });
+  _wireExtras(html, dlg) {
+    html.find('#reduce-damage-enabled').on('change', function() {
+      const $row = $(this).closest('.frp-opt-row');
+      const $reducedDamage = html.find('[name="reducedDamage"]');
+      $row.toggleClass('inactive', !this.checked);
+      if (this.checked) {
+        const currentMax = Number($reducedDamage.attr('max')) || 20;
+        $reducedDamage.val(currentMax).prop('disabled', false);
+        html.find('input[name="resultCap"]').prop('disabled', false);
+      } else {
+        $reducedDamage.val($reducedDamage.attr('max')).prop('disabled', true);
+        html.find('input[name="resultCap"]').prop('disabled', true);
+        html.find('input[name="resultCap"][value="none"]').prop('checked', true);
+      }
     });
 
-    if (!choice) return { rawActionCancelled: true };
+    html.find('#multi-enabled').on('change', function() {
+      html.find('#multi-lbl, #multi-hint').css('opacity', this.checked ? '' : '0.55');
+      pinDialogWidth(dlg);
+    });
 
-    // Nullify RAW guard
+    html.find('#magical-enabled').on('change', function() {
+      html.find('#magical-lbl').css('opacity', this.checked ? '' : '0.55');
+      pinDialogWidth(dlg);
+    });
+  }
+
+  // RAW: a character maintaining Nullification cannot use other inborn powers.
+  _afterDialog(choice, { items }) {
     try {
-      const maintaining = isAuraMaintained(actor);
+      const maintaining = isAuraMaintained(this.actor);
       if (maintaining && !choice.useAdHoc && choice.powerId) {
-        const thisItem = energyItems.find(i => i.id === choice.powerId);
+        const thisItem = items.find(i => i.id === choice.powerId);
         const isNullifyPower =
           (thisItem?.system?.damageType === 'nullification') ||
           (thisItem?.system?.primaryEffect === 'nullification') ||
           /nullif/i.test(thisItem?.name ?? '');
         const isInborn = (thisItem?.system?.source === 'natural');
         if (!isNullifyPower && isInborn) {
-          ui.notifications.warn(`${actor.name} is maintaining Nullification and cannot use other inborn powers right now.`);
-          return;
+          ui.notifications.warn(`${this.actor.name} is maintaining Nullification and cannot use other inborn powers right now.`);
+          return false;
         }
       }
     } catch (e) {
       console.warn('Nullify aura guard check failed:', e);
     }
+    return true;
+  }
 
-    // Handle adjacent multi
-    if (choice.multiAdjacent) {
-      choice.totalShift = (choice.totalShift || 0) - 4;
-      ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
-    }
-
-    // Mode already set by setupModeSelector during dialog render
-    const mode = this.opts.mode;
-
-    // Build shift breakdown — manual CS and range penalty itemized separately
-    const shiftBreakdown = {
-      manual: choice.manualCS || 0,
-      range: choice.rangePenalty || 0,
-      csNotes: choice.csNotes || ""
-    };
-    if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
-    choice.shiftBreakdown = shiftBreakdown;
-
-    const toHitAbility = choice.usePowerToHit
-      ? { name: "Power", rank: choice.powerRank, value: rankValue(choice.powerRank) || 30 }
-      : ability;
-
+  // Corrosive attacks bypass Force Fields (open reading, see
+  // DESIGN-material-strength.md rev 2 §3).
+  _attackParams(choice, powerItem) {
     const baseDamage = choice.reduceDamageEnabled ? choice.reducedDamage : choice.powerDamage;
-    const rawDamage = Number(baseDamage) || 0;
-    const powerItem = choice.powerId ? actor.items.get(choice.powerId) : null;
-    const targetCount = choice.multiAdjacent ? targets.length : 1;
-
-    // Corrosive attacks bypass Force Fields per RAW (pre-rev-1
-    // existing behavior — note this is the §3 open question in
-    // DESIGN-material-strength.md rev 2; the rules text "Corrosive
-    // attacks must hit the target, and as such have no effect on
-    // Force Fields and the like" can be read either as "FF blocks
-    // corrosive entirely" or "corrosive bypasses FF." Code currently
-    // implements the latter pending decision.
-    const _pwNameLc = String(powerItem?.name || choice.powerName || "").toLowerCase();
-    const _pwDtLc = String(powerItem?.system?.damageType || choice.powerDamageType || "").toLowerCase();
-    const _isCorrosive = /corrosive|acid/.test(_pwNameLc) || /corrosive|acid/.test(_pwDtLc);
-    const choiceForAttack = {
-      ...choice,
-      weapon: powerItem,
-      bypassForceField: !!choice.bypassForceField || _isCorrosive
+    const nameLc = String(powerItem?.name || choice.powerName || "").toLowerCase();
+    const dtLc = String(powerItem?.system?.damageType || choice.powerDamageType || "").toLowerCase();
+    const isCorrosive = /corrosive|acid/.test(nameLc) || /corrosive|acid/.test(dtLc);
+    return {
+      choice: {
+        ...choice,
+        weapon: powerItem,
+        bypassForceField: !!choice.bypassForceField || isCorrosive
+      },
+      rawDamage: Number(baseDamage) || 0,
+      damageType: choice.powerDamageType || "energy-generic"
     };
-
-    await this._executeSingleAttack({
-      choice: choiceForAttack,
-      actor,
-      ability: toHitAbility,
-      actionType, actionName, effects,
-      damageType: choice.powerDamageType || "energy-generic",
-      rawDamage,
-      damageNote: `Power: ${choice.powerName} (${choice.powerRank})`,
-      sourceName: choice.powerName || "Energy Blast",
-      attackForm: "energy",
-      breakingFeat: null,
-      targetCount,
-      attackNumber: 1,
-      totalAttacks: 1
-    });
-
-  } // end execute()
+  }
 }

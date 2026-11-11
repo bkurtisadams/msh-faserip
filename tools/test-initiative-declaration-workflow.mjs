@@ -1,4 +1,6 @@
-// tools/test-initiative-declaration-workflow.mjs v3.1.2 - 2026-09-09
+// tools/test-initiative-declaration-workflow.mjs v3.1.3 - 2026-11-10
+// v3.1.3: Energy and Force dialogs live in power-blast-action.js; its source
+//         is read with theirs.
 // v3.1.2: v14 tracker context hook name.
 // v3.1.1: characterType vocabulary is player / npc-villain / civilian.
 // v3.1.0: faserip-initiative.js 4.1.3 — side rule reads the sheet's
@@ -30,7 +32,8 @@ const attackFiles = [
   'blunt-attack-action.js','edged-attack-action.js','shooting-action.js','throwing-edged-action.js',
   'throwing-blunt-action.js','energy-action.js','force-action.js','mental-power-action.js','grenade-action.js',
   'grappling-action.js','grabbing-action.js','charging-action.js'
-].map(f => read(`scripts/modules/actions/${f}`));
+].map(f => read(`scripts/modules/actions/${f}`)
+  + (/^(energy|force)-action\.js$/.test(f) ? read('scripts/modules/actions/power-blast-action.js') : ''));
 
 let n = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); n++; };
