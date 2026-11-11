@@ -130,6 +130,47 @@ export async function showFaseripDialog({ title, content, render, close, width, 
 // flattened into the same kwargs object — V2 routes them to position{} and
 // top-level fields as needed.
 
+// V1 button icons were HTML ('<i class="fas fa-save"></i>'); DialogV2 wants
+// the class list ("fas fa-save"). Accept either.
+function _iconClasses(icon) {
+  if (typeof icon !== "string") return icon;
+  const m = icon.match(/<i[^>]*\sclass=(["'])(.*?)\1/i);
+  return m ? m[2] : icon;
+}
+
+// 2026-11-11: showFaseripConfirm / showFaseripPrompt replace V1
+// Dialog.confirm / Dialog.prompt. Confirm resolves true, false, or null when
+// dismissed. Prompt resolves with the callback's return value, or null when
+// dismissed; the callback receives the same ($html, dialog) pair as the
+// button dialog's callbacks.
+export async function showFaseripConfirm({ title, content } = {}) {
+  const { DialogV2 } = foundry.applications.api;
+  return DialogV2.confirm({
+    window: { title },
+    content,
+    classes: ["faserip-shim-dialog"],
+    rejectClose: false
+  });
+}
+
+export async function showFaseripPrompt({ title, content, label, callback } = {}) {
+  const { DialogV2 } = foundry.applications.api;
+  return DialogV2.prompt({
+    window: { title },
+    content,
+    classes: ["faserip-shim-dialog"],
+    rejectClose: false,
+    ok: {
+      ...(label ? { label } : {}),
+      callback: async (event, button, dialog) => {
+        const $html = $(dialog.element).find('.window-content').first();
+        try { return callback ? await callback($html, dialog) : true; }
+        catch (e) { console.error("FASERIP prompt callback error:", e); return null; }
+      }
+    }
+  });
+}
+
 export async function showFaseripButtonDialog({
   title, content, buttons = {}, default: defaultAction, render, close,
   id, width, height, classes
@@ -138,7 +179,7 @@ export async function showFaseripButtonDialog({
   const v2Buttons = Object.entries(buttons).map(([action, b]) => ({
     action,
     label: b.label,
-    icon: b.icon,
+    icon: _iconClasses(b.icon),
     default: action === defaultAction,
     callback: async (event, button, dialog) => {
       const $html = $(dialog.element).find('.window-content').first();

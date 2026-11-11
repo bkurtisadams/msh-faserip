@@ -1,3 +1,12 @@
+// actorSheet.js v2.19.0 - 2026-11-11
+// v2.19.0: The last 23 V1 dialog calls in this file are on DialogV2 through
+//          dialog-shim.js: 19 `new Dialog(...)` (16 by a straight swap to
+//          showFaseripButtonDialog; Recovery & Rest to the frame-only
+//          showFaseripDialog since it has no buttons; Headquarters
+//          Information and Buy with Resource Points with their post-render
+//          wiring moved into render) and 4 static calls (three
+//          Dialog.confirm, one Dialog.prompt). Closing the stunt Karma
+//          prompt still cancels the attempt.
 // actorSheet.js v2.18.0 - 2026-11-11
 // v2.18.0: FaseripActorSheet no longer extends Foundry's V1 ActorSheet. It is
 //          a plain class holding the character sheet's data preparation and
@@ -283,7 +292,7 @@ import {
   rankValueForStorage,
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
-import { showFaseripDialog, isDialogDetached } from "./modules/actions/dialog-shim.js";
+import { showFaseripDialog, showFaseripButtonDialog, showFaseripConfirm, showFaseripPrompt, isDialogDetached } from "./modules/actions/dialog-shim.js";
 import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHardware,
          successFeatCS, costExceedsReason, fundingResourceRank,
          kitbashKarma, kitbashRounds, repairHours, centerRepairAuto,
@@ -1463,7 +1472,7 @@ export class FaseripActorSheet {
       await actor.update({ "system.karma.history": history });
       return true;
     };
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Stabilize ${actor.name}`,
       content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p>
         <p style="font-size:.9em;color:#555;">Available Karma: <strong>${actor.availableKarma ?? 0}</strong></p>
@@ -1486,7 +1495,7 @@ export class FaseripActorSheet {
         cancel: { label: "Cancel", callback: () => {} }
       },
       default: "aid"
-    }).render(true);
+    });
   }
 
   /** Hardware tab quick-reference, opened from the "?" header link.
@@ -1799,7 +1808,7 @@ export class FaseripActorSheet {
   /** Hardware Slice 3: salvage a dead or failed device — back to design
    *  with the +1CS rebuild bonus on future rolls to duplicate it. */
   async _hwSalvage(item) {
-    const ok = await Dialog.confirm({
+    const ok = await showFaseripConfirm({
       title: "Salvage Device",
       content: `<p>Strip <b>${item.name}</b> for parts? The project returns to the drawing board with <b>+1CS on future success rolls</b> to duplicate the device. A new Resource FEAT is required (the GM may waive it if the salvaged materials suffice).</p>`
     });
@@ -2826,7 +2835,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       else if (healingCooldownRemaining) healingTitle += `\nOn cooldown: ${healingCooldownRemaining} min remaining`;
       else if (healingUnavailable) healingTitle += '\nTake damage first to start healing timer';
 
-      const dlg = new Dialog({
+      showFaseripDialog({
         title: `${actor.name} — Recovery & Rest`,
         content: `
           <div class="faserip-recovery-dialog" style="padding:8px;">
@@ -2846,8 +2855,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             </div>
             ${crisisHtml ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">${crisisHtml}</div>` : ''}
           </div>`,
-        buttons: {},
-        render: (html) => {
+        render: (html, dlg) => {
           html.find('.recovery-btn').click(async (ev) => {
             ev.preventDefault();
             const action = $(ev.currentTarget).data('action');
@@ -2895,9 +2903,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
               }
             }
           });
-        }
-      }, { width: 380 });
-      dlg.render(true);
+        },
+        width: 380
+      });
     });
 
 
@@ -3454,14 +3462,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const resistance = this.actor.system.resistances[index];
       if (!resistance) return;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Resistance Information",
         content: `
           <p><strong>Type:</strong> ${resistance.type}</p>
           <p><strong>Rank:</strong> ${resistance.rank} (${resistance.value})</p>
         `,
         buttons: { close: { label: "Close" } }
-      }).render(true);
+      });
     });
 
     // Resistance edit button
@@ -3534,7 +3542,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         </form>
       `;
       
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Edit Resistance",
         content: content,
         buttons: {
@@ -3573,7 +3581,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         },
         default: "save",
         width: 400
-      }).render(true);
+      });
     });
 
     // Delete Resistance
@@ -3730,7 +3738,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const itemId = li.data("itemId");
 
       // Confirm deletion
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Delete Power",
         content: "<p>Are you sure you want to delete this power?</p>",
         buttons: {
@@ -3748,7 +3756,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         default: "cancel"
-      }).render(true);
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3828,7 +3836,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     <div class="description">${item.system.description || 'No description available.'}</div>
   `;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Talent Information",
         content: content,
         buttons: {
@@ -3837,7 +3845,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         width: 400
-      }).render(true);
+      });
     });
 
     // Edit talent button
@@ -3859,7 +3867,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (!itemId) return;
 
       // Confirm deletion
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Delete Talent",
         content: "<p>Are you sure you want to delete this talent?</p>",
         buttons: {
@@ -3877,7 +3885,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         default: "cancel"
-      }).render(true);
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3966,7 +3974,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     </div>
   `;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Contact Information",
         content,
         buttons: {
@@ -3974,11 +3982,10 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             label: "Close"
           }
         },
-        default: "close"
-      }, {
+        default: "close",
         width: 400,
         classes: ["faserip", "contact-information-dialog"]
-      }).render(true);
+      });
     });
 
     // Edit contact button
@@ -4000,7 +4007,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (!itemId) return;
 
       // Confirm deletion
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Delete Contact",
         content: "<p>Are you sure you want to delete this contact?</p>",
         buttons: {
@@ -4018,7 +4025,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         default: "cancel"
-      }).render(true);
+      });
     });
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Roll Contact button
@@ -4124,7 +4131,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
     html.find('.hw-project .hw-delete').click(async ev => {
       const item = hwItem(ev); if (!item) return;
-      const ok = await Dialog.confirm({
+      const ok = await showFaseripConfirm({
         title: "Delete Invention",
         content: `<p>Delete <b>${item.name}</b>? This removes the equipment item entirely.</p>`
       });
@@ -4296,7 +4303,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         <div class="notes">${item.system.notes ? `<strong>Notes:</strong> ${item.system.notes}` : ''}</div>
       `;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Equipment Information",
         content: content,
         buttons: {
@@ -4305,7 +4312,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         width: 400
-      }).render(true);
+      });
     });
 
     // ── Equipment effect toggle: inject power button for items with effects ──
@@ -4380,7 +4387,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (!itemId) return;
     
       // Confirm deletion
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Delete Equipment",
         content: "<p>Are you sure you want to delete this equipment?</p>",
         buttons: {
@@ -4398,7 +4405,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         default: "cancel"
-      }).render(true);
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4548,12 +4555,12 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         ${item.system.description ? `<div class="description">${item.system.description}</div>` : ''}
       `;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Vehicle Information",
         content,
         buttons: { close: { label: "Close" } },
         width: 400
-      }).render(true);
+      });
     });
 
     // Make ONLY the vehicle name text draggable
@@ -4586,7 +4593,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
       if (!itemId) return;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Delete Vehicle",
         content: "<p>Are you sure you want to delete this vehicle?</p>",
         buttons: {
@@ -4604,7 +4611,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         },
         default: "cancel"
-      }).render(true);
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4683,7 +4690,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }).filter(Boolean).join('');
 
       const hasCustomImg = item.img && !item.img.includes("mystery-man") && !item.img.includes("default");
-      new Dialog({
+      showFaseripButtonDialog({
         title: item.name,
         content: `
           ${hasCustomImg ? `<img src="${item.img}" style="width:100%;border-radius:4px;margin-bottom:8px;" />` : ''}
@@ -4723,7 +4730,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             FaseripHeadquartersSheet.rollHQResourceFEAT(item.name, costRank, costType);
           });
         }
-      }).render(true);
+      });
     });
 
     // Headquarters info button (clickable image)
@@ -4771,7 +4778,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         </div>
       `;
 
-      const dlg = new Dialog({
+      showFaseripButtonDialog({
         title: "Headquarters Information",
         content,
         buttons: { close: { label: "Close" } },
@@ -4794,7 +4801,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           });
         }
       });
-      dlg.render(true);
     });
 
     // Headquarters - draggable and sortable
@@ -4895,7 +4901,7 @@ html.find('.headquarters-row').each((i, row) => {
       if (!itemId) return;
 
       // Confirm deletion
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Delete Headquarters",
         content: "<p>Are you sure you want to delete this headquarters?</p>",
         buttons: {
@@ -4913,7 +4919,7 @@ html.find('.headquarters-row').each((i, row) => {
           }
         },
         default: "cancel"
-      }).render(true);
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5513,7 +5519,7 @@ html.find('.headquarters-row').each((i, row) => {
       <p>Characters may purchase something up to one rank higher than their Resource rank through a bank loan. The character then must make monthly Resource FEATs of two ranks less for as many months as the rank number of the item.</p>
     `;
   
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Resources in FASERIP",
       content,
       buttons: {
@@ -5529,7 +5535,7 @@ html.find('.headquarters-row').each((i, row) => {
       },
       default: "close",
       classes: ["resources-dialog"]
-    }).render(true);
+    });
   }
 
   // Resource FEAT Roll (standard mode, no RP)
@@ -5748,7 +5754,7 @@ html.find('.headquarters-row').each((i, row) => {
       const id = $(ev.currentTarget).closest(".frp-loan-row").data("loan-id");
       const loan = this._getLoans().find(l => l.id === id);
       if (!loan) return;
-      const ok = await Dialog.confirm({ title: "Repossess", content: `<p>The bank takes back <b>${loan.desc}</b>. Remove the loan?</p>` });
+      const ok = await showFaseripConfirm({ title: "Repossess", content: `<p>The bank takes back <b>${loan.desc}</b>. Remove the loan?</p>` });
       if (!ok) return;
       await this._setLoans(this._getLoans().filter(l => l.id !== id));
       await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: `<div style="padding:6px 10px;border:1px solid #c0c0c0;background:#f5f5f0;"><b style="color:#8b0000;">Repossessed:</b> ${loan.desc} (${loan.itemRank}) \u2014 the bank reclaims it.</div>` });
@@ -5991,7 +5997,7 @@ html.find('.headquarters-row').each((i, row) => {
       </div>
     `;
 
-    const dlg = new Dialog({
+    showFaseripButtonDialog({
       title: `Buy with Resource Points: ${this.actor.name}`,
       content,
       buttons: {
@@ -6026,27 +6032,25 @@ html.find('.headquarters-row').each((i, row) => {
         },
         cancel: { label: "Cancel" }
       },
-      default: "buy"
-    }, { width: 400 });
-
-    dlg.render(true);
-
-    // Wire up Quick Pick dropdown after render
-    setTimeout(() => {
-      const el = document.querySelector('.dialog #rp-price-list');
-      if (!el) return;
-      el.addEventListener('change', (ev) => {
-        const selected = ev.target.selectedOptions[0];
-        if (!selected || !selected.value) return;
-        const cost = parseInt(selected.dataset.cost) || 0;
-        const name = selected.value;
-        const form = el.closest('.dialog-content') || el.closest('form') || el.parentElement;
-        const descInput = form.querySelector('#rp-buy-desc');
-        const costInput = form.querySelector('#rp-buy-cost');
-        if (descInput) descInput.value = name;
-        if (costInput) costInput.value = cost;
-      });
-    }, 200);
+      default: "buy",
+      width: 400,
+      // Quick Pick dropdown fills in the description and cost
+      render: (html) => {
+        const el = html[0]?.querySelector('#rp-price-list');
+        if (!el) return;
+        el.addEventListener('change', (ev) => {
+          const selected = ev.target.selectedOptions[0];
+          if (!selected || !selected.value) return;
+          const cost = parseInt(selected.dataset.cost) || 0;
+          const name = selected.value;
+          const form = el.closest('.dialog-content') || el.closest('form') || el.parentElement;
+          const descInput = form.querySelector('#rp-buy-desc');
+          const costInput = form.querySelector('#rp-buy-cost');
+          if (descInput) descInput.value = name;
+          if (costInput) costInput.value = cost;
+        });
+      }
+    });
   }
 
   // _onPopularityRoll method
@@ -6294,7 +6298,7 @@ _rollVehicleControl(vehicle) {
     return;
   }
 
-  new Dialog({
+  showFaseripButtonDialog({
     title: `Vehicle Control FEAT: ${vehicle.name}`,
     content: `
       <div style="margin-bottom:8px;">
@@ -6605,7 +6609,7 @@ _rollVehicleControl(vehicle) {
       },
       cancel: { label: "Cancel" }
     }
-  }).render(true);
+  });
 }
 
   async _rollStandaloneStunt(stunt, stuntIndex) {
@@ -6697,7 +6701,7 @@ _rollVehicleControl(vehicle) {
     console.log("Max additional karma available:", maxAdditionalKarma);
     
     // Prompt for optional Karma bonus
-    const karmaInput = await Dialog.prompt({
+    const karmaInput = await showFaseripPrompt({
       title: "Add Karma Bonus to Roll?",
       label: "Optional Karma bonus (in addition to 100 Karma base cost):",
       callback: html => parseInt(html.find("input").val() || "0"),
@@ -6709,6 +6713,8 @@ _rollVehicleControl(vehicle) {
         <input type="number" min="0" max="${maxAdditionalKarma}" value="0" style="width:100%"/>
       `
     });
+    // Closing the prompt cancels the stunt attempt (the V1 prompt rejected here).
+    if (karmaInput === null) return;
     
     const karmaBonus = Math.min(maxAdditionalKarma, Number.isNaN(karmaInput) ? 0 : karmaInput);
     console.log("Karma bonus:", karmaBonus);

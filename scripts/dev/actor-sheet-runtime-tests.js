@@ -1,3 +1,8 @@
+// scripts/dev/actor-sheet-runtime-tests.js v1.6.0 - 2026-11-11
+// v1.6.0: Sheet dialogs. Opens the Delete Power confirmation (cancel, then
+//         delete), Talent Information, Equipment Information and Recovery &
+//         Rest from the sheet's own controls, and checks each is a V2 dialog
+//         and that no V1 window opens.
 // scripts/dev/actor-sheet-runtime-tests.js v1.5.0 - 2026-11-11
 // v1.5.0: Checks that neither legacy sheet class extends Foundry's V1
 //         framework, that opening a sheet logs no V1 deprecation warning,
@@ -268,6 +273,86 @@ async function historyEditorTest(recorder, sheet, actor) {
   const shown = block()?.textContent ?? "";
   recorder.assert(shown.includes(marker), "History editor: the sheet shows the saved text afterwards", { shown: shown.slice(0, 120) });
   recorder.assert(!block()?.querySelector('[contenteditable="true"]'), "History editor: the editor closes after saving");
+}
+
+const v2Dialogs = () => Array.from(foundry.applications.instances?.values?.() ?? [])
+  .filter(a => a?.element?.tagName === "DIALOG" || a?.options?.classes?.includes?.("faserip-shim-dialog") || a?.constructor?.name === "DialogV2");
+
+async function openDialogFrom(trigger) {
+  const before = new Set(v2Dialogs());
+  const v1Before = Object.keys(ui.windows ?? {}).length;
+  trigger.click();
+  const dialog = await waitFor(() => v2Dialogs().find(a => !before.has(a) && a.rendered), { timeout: 3000 });
+  await sleep(150);
+  return { dialog: dialog || null, v1Opened: Object.keys(ui.windows ?? {}).length - v1Before };
+}
+
+async function closeDialog(dialog) {
+  try { await dialog?.close?.(); } catch (_) { /* noop */ }
+  await waitFor(() => !dialog?.rendered, { timeout: 2000 });
+  await sleep(150);
+}
+
+async function dialogTests(recorder, sheet, actor) {
+  const root = () => content(sheet);
+  const title = (d) => d?.options?.window?.title ?? d?.title ?? "";
+  let v1Total = 0;
+
+  // Delete Power: cancel keeps the item, delete removes it.
+  const victim = actor.items.getName("Runtime Armor");
+  const delBtn = () => root()?.querySelector(`.powers-table [data-item-id="${victim?.id}"] .item-delete`)
+    ?? root()?.querySelector(`[data-item-id="${victim?.id}"] .item-delete`);
+  if (!victim || !delBtn()) recorder.skip("Dialogs: Delete Power", { reason: "no delete control for the test power" });
+  else {
+    let r = await openDialogFrom(delBtn()); v1Total += r.v1Opened;
+    recorder.assert(!!r.dialog && /Delete Power/i.test(title(r.dialog)), "Dialogs: the power delete control opens a V2 Delete Power dialog", { title: title(r.dialog), v1Opened: r.v1Opened });
+    if (r.dialog) {
+      const cancel = r.dialog.element.querySelector('[data-action="cancel"]');
+      recorder.assert(!!cancel && !!r.dialog.element.querySelector('[data-action="delete"]'), "Dialogs: Delete Power offers Cancel and Delete",
+        { actions: Array.from(r.dialog.element.querySelectorAll("[data-action]")).map(b => b.dataset.action) });
+      cancel?.click();
+      await waitFor(() => !r.dialog.rendered, { timeout: 2000 });
+      await sleep(300);
+      recorder.assert(!!actor.items.get(victim.id), "Dialogs: Cancel leaves the power in place");
+      if (!cancel) await closeDialog(r.dialog);
+
+      r = await openDialogFrom(delBtn()); v1Total += r.v1Opened;
+      r.dialog?.element.querySelector('[data-action="delete"]')?.click();
+      const gone = await waitFor(() => !actor.items.get(victim.id), { timeout: 3000 });
+      await sleep(300);
+      recorder.assert(!!gone, "Dialogs: Delete removes the power");
+      if (r.dialog?.rendered) await closeDialog(r.dialog);
+    }
+  }
+
+  // Information dialogs.
+  for (const [label, selector, expect] of [["Talent Information", ".talent-info", /Talent Information/i], ["Equipment Information", ".equipment-info", /Equipment Information/i]]) {
+    const trigger = root()?.querySelector(selector);
+    if (!trigger) { recorder.skip(`Dialogs: ${label}`, { reason: `no ${selector} control` }); continue; }
+    const r = await openDialogFrom(trigger); v1Total += r.v1Opened;
+    recorder.assert(!!r.dialog && expect.test(title(r.dialog)), `Dialogs: ${label} opens as a V2 dialog`, { title: title(r.dialog), v1Opened: r.v1Opened });
+    if (r.dialog) {
+      const close = r.dialog.element.querySelector('[data-action="close"]');
+      close?.click();
+      const closed = await waitFor(() => !r.dialog.rendered, { timeout: 2000 });
+      recorder.assert(!!close && !!closed, `Dialogs: ${label} closes from its Close button`);
+      if (!closed) await closeDialog(r.dialog);
+    }
+  }
+
+  // Recovery & Rest: frame-only dialog driven by its own buttons.
+  const rest = root()?.querySelector(".health-recovery-link");
+  if (!rest) recorder.skip("Dialogs: Recovery & Rest", { reason: "no .health-recovery-link control" });
+  else {
+    const r = await openDialogFrom(rest); v1Total += r.v1Opened;
+    recorder.assert(!!r.dialog && /Recovery & Rest/i.test(title(r.dialog)), "Dialogs: Recovery & Rest opens as a V2 dialog", { title: title(r.dialog), v1Opened: r.v1Opened });
+    if (r.dialog) {
+      recorder.assert(!!r.dialog.element.querySelector(".faserip-recovery-dialog .recovery-btn"), "Dialogs: Recovery & Rest shows its recovery buttons");
+      await closeDialog(r.dialog);
+    }
+  }
+
+  recorder.assert(v1Total === 0, "Dialogs: no V1 window opened for any of them", { v1Opened: v1Total });
 }
 
 async function dropTest(recorder, sheet, actor, donor) {
@@ -544,6 +629,7 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
       try { await bioTest(recorder, sheet, actor); } catch (e) { recorder.fail("Bio panel: test ran", { message: e?.message }); }
       try { await submitTest(recorder, sheet, actor); } catch (e) { recorder.fail("Submit: test ran", { message: e?.message }); }
       try { await dropTest(recorder, sheet, actor, legacy); } catch (e) { recorder.fail("Drop: test ran", { message: e?.message }); }
+      try { await dialogTests(recorder, sheet, actor); } catch (e) { recorder.fail("Dialogs: test ran", { message: e?.message }); }
 
       // Close and reopen
       await closeSheet(sheet);
