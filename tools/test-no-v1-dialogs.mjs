@@ -1,3 +1,7 @@
+// tools/test-no-v1-dialogs.mjs v1.2.0 - 2026-11-11
+// v1.2.0: V1 dialog calls are now allowed only in the three files whose
+//         windows are still to be ported (Team sheet, GM Tools, Encounter
+//         Editor).
 // tools/test-no-v1-dialogs.mjs v1.1.0 - 2026-11-11
 // v1.1.0: The three Karma files are guarded for V1 dialog calls. Their sheet
 //         classes still extend the V1 DocumentSheet, so only dialogs are checked.
@@ -38,6 +42,13 @@ function walk(dir, out = []) {
   }
   return out;
 }
+const PENDING = ['scripts/teamSheet.js', 'scripts/gm-tools.js', 'scripts/apps/encounter-editor.js'];
+for (const file of walk('scripts')) {
+  if (PENDING.includes(file)) continue;
+  const src = stripComments(fs.readFileSync(path.join(root, file), 'utf8'));
+  assert.equal((src.match(V1_DIALOG) ?? []).length, 0, `${file} must not use V1 dialogs`);
+}
+
 const remaining = walk('scripts').map(f => [f, count(f)]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
 const total = remaining.reduce((n, [, c]) => n + c, 0);
 console.log(`V1 dialog/window uses still in other files: ${total} in ${remaining.length} files`);

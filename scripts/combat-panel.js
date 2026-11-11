@@ -1,4 +1,5 @@
-// combat-panel.js v1.7.3 - 2026-09-04
+// combat-panel.js v1.8.0 - 2026-11-11
+// v1.8.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.7.3: Strip side comes from FaseripInitiative._getCombatantSide (override ??
 //         automatic rule), not the cached flag / raw disposition.
 // combat-panel.js v1.7.2 - 2026-09-03
@@ -24,6 +25,7 @@
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
 import { FaseripInitiative } from "./faserip-initiative.js";
+import { showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -407,7 +409,7 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
     el.querySelector(".fcp-end-combat")?.addEventListener("click", () => {
       const combat = game.combat;
       if (!combat) return;
-      Dialog.confirm({
+      showFaseripConfirm({
         title: "End Combat",
         content: "<p>End this combat encounter and clear the tracker?</p>",
         yes: () => combat.endCombat(),

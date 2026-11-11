@@ -1,4 +1,5 @@
-// itemSheet.js v2.1.2 - 2026-08-01
+// itemSheet.js v2.2.0 - 2026-11-11
+// v2.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.1.2: carrierToxinOptions feeds the Target Save panel's Poisoned toxin
 //         dropdown; carrierToxinRanks removed with the Venomous block.
 // itemSheet.js v2.1.1 - 2026-08-01
@@ -35,6 +36,7 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
+import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -599,7 +601,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
     // Delete button
     html.find('.delete-power').click(async () => {
-      const confirmed = await Dialog.confirm({
+      const confirmed = await showFaseripConfirm({
         title: "Delete Power",
         content: `<p>Are you sure you want to delete ${this.item.name}?</p>`
       });
@@ -637,10 +639,10 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       const suggestedRank = ranks[suggestedRankIndex];
       const suggestedValue = game.msh.getRankValue(suggestedRank);
       
-      new Dialog({
+      showFaseripButtonDialog({
         title: `Create Stunt for ${power.name}`,
         content: `
-          <form>
+          <div>
             <div class="form-group">
               <label>Stunt Name:</label>
               <input type="text" name="name" placeholder="e.g., Enhanced ${power.name}" style="width: 100%;" />
@@ -663,7 +665,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             <p style="margin-top: 10px; padding: 8px; background: #fff3e0; border: 1px solid #ff9800; border-radius: 3px; font-size: 0.9em;">
               <strong>Note:</strong> First use requires a Red FEAT and costs 100 Karma. This stunt will appear in the actor's Stunts tab.
             </p>
-          </form>
+          </div>
         `,
         buttons: {
           create: {
@@ -716,7 +718,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             html.find('[name="value"]').val(value);
           });
         }
-      }).render(true);
+      });
     });
 
     // ANCHOR: vehicle-item-create-actor

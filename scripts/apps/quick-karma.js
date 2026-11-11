@@ -1,4 +1,5 @@
-// scripts/apps/quick-karma.js v1.0.0 - 2026-10-01
+// scripts/apps/quick-karma.js v1.1.0 - 2026-11-11
+// v1.1.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.0.0: Karma UI slice 3 — immediate awards from the tokens. GM-only
 //         Karma button in the token HUD and a K keybinding open one dialog
 //         for every selected token (the right-clicked token alone when it is
@@ -20,6 +21,7 @@
 import { CRIME_KARMA, rescueAward, foeDefeatAward, propertyDestructionLoss, DEFEAT_LOSS, poolAbsorbLoss } from "../lib/faserip-rules/faserip-karma.js";
 import { getCategoryMultiplier } from "../karma-multipliers.js";
 import { computeKarmaTotals } from "../karma-rules.js";
+import { showFaseripButtonDialog } from "../modules/actions/dialog-shim.js";
 
 const SCOPE = "msh-faserip";
 
@@ -185,7 +187,7 @@ export async function openQuickKarma(tokens = canvas?.tokens?.controlled || []) 
     root.querySelector(".qk-preview").innerHTML = previewText(compute(f, f.heroIds.length, fr));
   };
 
-  new Dialog({
+  showFaseripButtonDialog({
     title: "Award Karma",
     content,
     buttons: {
@@ -208,8 +210,9 @@ export async function openQuickKarma(tokens = canvas?.tokens?.controlled || []) 
       root.addEventListener("change", () => recalc(root));
       root.addEventListener("input", () => recalc(root));
       recalc(root);
-    }
-  }, { width: 460, classes: ["dialog", "faserip-quick-karma-dialog"] }).render(true);
+    },
+    width: 460, classes: ["dialog", "faserip-quick-karma-dialog"]
+  });
 }
 
 async function applyAward(heroes, t) {

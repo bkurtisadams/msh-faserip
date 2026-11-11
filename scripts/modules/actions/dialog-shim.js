@@ -143,14 +143,21 @@ function _iconClasses(icon) {
 // dismissed. Prompt resolves with the callback's return value, or null when
 // dismissed; the callback receives the same ($html, dialog) pair as the
 // button dialog's callbacks.
-export async function showFaseripConfirm({ title, content } = {}) {
+// V1's yes / no callbacks and defaultYes are honoured: the promise resolves
+// with the chosen callback's return value when one is given.
+export async function showFaseripConfirm({ title, content, yes, no, defaultYes = true } = {}) {
   const { DialogV2 } = foundry.applications.api;
-  return DialogV2.confirm({
+  const answer = await DialogV2.confirm({
     window: { title },
     content,
     classes: ["faserip-shim-dialog"],
-    rejectClose: false
+    rejectClose: false,
+    yes: { default: !!defaultYes },
+    no: { default: !defaultYes }
   });
+  if (answer === true) return yes ? await yes() : true;
+  if (answer === false) return no ? await no() : false;
+  return null;
 }
 
 export async function showFaseripPrompt({ title, content, label, callback } = {}) {
@@ -173,7 +180,7 @@ export async function showFaseripPrompt({ title, content, label, callback } = {}
 
 export async function showFaseripButtonDialog({
   title, content, buttons = {}, default: defaultAction, render, close,
-  id, width, height, classes
+  id, width, height, classes, resizable
 } = {}) {
   const { DialogV2 } = foundry.applications.api;
   const v2Buttons = Object.entries(buttons).map(([action, b]) => ({
@@ -188,7 +195,7 @@ export async function showFaseripButtonDialog({
     }
   }));
   const cfg = {
-    window: { title },
+    window: { title, ...(resizable ? { resizable: true } : {}) },
     content,
     buttons: v2Buttons,
     default: defaultAction,
@@ -206,6 +213,7 @@ export async function showFaseripButtonDialog({
   };
   if (id) cfg.id = id;
   cfg.classes = ["faserip-shim-dialog", ...(Array.isArray(classes) ? classes : [])];
-  if (width || height) cfg.position = { ...(width ? { width } : {}), ...(height ? { height } : {}) };
+  const size = { ...(Number.isFinite(width) ? { width } : {}), ...(Number.isFinite(height) ? { height } : {}) };
+  if (Object.keys(size).length) cfg.position = size;
   return DialogV2.wait(cfg);
 }

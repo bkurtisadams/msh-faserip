@@ -1,4 +1,5 @@
-// action-utils.js v1.14.3 - 2026-11-11
+// action-utils.js v1.15.0 - 2026-11-11
+// v1.15.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.14.3: getBodyArmorValues skips armor equipment marked broken.
 // action-utils.js v1.14.2 - 2026-11-10
 // v1.14.2: getRollMode() moved to ../dice/roll-mode.js (re-exported here); the
@@ -204,6 +205,7 @@ import { bluntDamage as kernelBluntDamage, meleeWeaponDamage as kernelMeleeWeapo
 import { rankDistance as kernelRankDistance, rankForNumber as kernelRankForNumber } from "../../lib/faserip-rules/faserip-kernel.js";
 import { resolveAttack as kernelResolveAttack } from "../../lib/faserip-rules/faserip-effects.js";
 import { kernelKeyFor, labelForToken } from "../../kernel/adapter.js";
+import { showFaseripConfirm } from "./dialog-shim.js";
 
 // Kernel bridge for actions that roll their own Universal Table result.
 // shifts: [{ cs, reason }] — dropped when the rank is Class 1000+ (unshiftable).
@@ -3012,7 +3014,7 @@ export function buildPreviewHtml({
  * @returns {Promise<boolean>}
  */
 export async function confirmPreview({ title = "Preview", contentHtml }) {
-  return await Dialog.confirm({
+  return await showFaseripConfirm({
     title,
     content: contentHtml,
     yes: () => true,

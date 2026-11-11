@@ -1,4 +1,5 @@
 // File: systems/msh-faserip/scripts/modules/dice/dice-roller.js
+// 2026-11-11: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // 2026-11-10: Roll visibility read via getRollMode() (core.messageMode on
 // v14; core.rollMode is deprecated and removed in v16).
 // 2026-10-01: Optional rule "Spend Karma in Increments of 5"
@@ -30,6 +31,7 @@
 // dlg.setPosition in render, and re-assert it inside the countdown tick.
 import { runAsGM } from '../../gm-utils.js';
 import { getRollMode } from './roll-mode.js';
+import { showFaseripButtonDialog } from "../actions/dialog-shim.js";
 
 // Inline debug helper to avoid import issues
 function debugLog(...args) {
@@ -410,7 +412,7 @@ export async function showKarmaDecisionDialog(actor, rollResult, rank, sourceNam
   `;
   
   return new Promise((resolve) => {
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Karma Decision: ${sourceName}`,
       content: `
         <div style="background: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px;">
@@ -473,7 +475,7 @@ export async function showKarmaDecisionDialog(actor, rollResult, rank, sourceNam
           }
         });
       }
-    }).render(true);
+    });
   });
 }
 

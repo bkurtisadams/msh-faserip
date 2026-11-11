@@ -1,4 +1,5 @@
-// headquartersSheet.js v3.2.0 - 2026-09-05
+// headquartersSheet.js v3.3.0 - 2026-11-11
+// v3.3.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v3.2.0: HQ Resource FEATs (purchase, rent, loan payment) share the hero's
 //         weekly resourceFeat ledger with the actor sheet (setting-gated by
 //         enforceResourceLockout; GM proceeds with a notice). A missed loan
@@ -40,6 +41,7 @@ import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { RANKS_ORDERED as RANKS } from './rules/rules-reference.js';
 import { purchaseColor, bankLoan as kernelBankLoan, resourceFeatAvailable, purchaseBlockedByFailure } from './lib/faserip-rules/faserip-resources.js';
 import { kernelKeyFor, foundryNameFor } from './kernel/adapter.js';
+import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -436,7 +438,7 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
           ui.notifications.error("Invalid HQ JSON — missing system data");
           return;
         }
-        const confirmed = await Dialog.confirm({
+        const confirmed = await showFaseripConfirm({
           title: "Import HQ Data",
           content: `<p>Import <strong>${data.name || 'HQ'}</strong> data? This will overwrite current HQ configuration.</p>`
         });
@@ -564,9 +566,9 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
     const costIdx = RANKS.indexOf(costRank);
     const showBankLoan = !isPayment && !isLoan;
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Resource FEAT: ${costType}`,
-      content: `<form style="font-size:12px;">
+      content: `<div style="font-size:12px;">
         <div class="form-group"><label>Character:</label>
           <select name="heroId" style="width:100%">${heroOpts}</select></div>
         <div class="form-group"><label>Cost Rank:</label>
@@ -575,7 +577,7 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
         <div class="form-group"><label>Description:</label>
           <input type="text" name="desc" value="${desc}" style="width:100%" /></div>
         ${showBankLoan ? '<div class="form-group"><label><input type="checkbox" name="bankLoan" /> Bank Loan (+1 rank purchase)</label></div>' : ''}
-      </form>`,
+      </div>`,
       buttons: {
         roll: {
           icon: '<i class="fas fa-dice-d20"></i>',
@@ -765,6 +767,6 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
         cancel: { label: "Cancel" }
       },
       default: "roll"
-    }).render(true);
+    });
   }
 }

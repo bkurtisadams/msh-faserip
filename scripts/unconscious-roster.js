@@ -1,4 +1,5 @@
-// scripts/unconscious-roster.js v1.1.0 - 2026-08-20
+// scripts/unconscious-roster.js v1.2.0 - 2026-11-11
+// v1.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.1.0: Show KO timers, Dying Endurance state/next tick, and GM Aid action.
 // scripts/unconscious-roster.js v1.0.0 - 2026-04-24
 // GM dialog: list all KO'd/dying actors grouped by scene.
@@ -8,6 +9,7 @@
 // down and on which scene, without console commands or macro bookkeeping.
 
 import { getRemaining } from "./modules/effects/effect-engine.js";
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
 const SCOPE = "msh-faserip";
 
@@ -299,39 +301,44 @@ export function openUnconsciousRoster() {
 
   let includeDead = false;
 
-  const dlg = new Dialog({
+  let dialog = null;
+  let hookIds = [];
+
+  // Auto-refresh on relevant hooks while the dialog is open
+  const refresh = () => {
+    if (!dialog?.rendered) return;
+    const $el = $(dialog.element);
+    $el.find(".faserip-unconscious-roster").parent().html(buildDialogHTML({ includeDead }));
+    attachHandlers($el, dialog, () => includeDead, (v) => { includeDead = v; });
+  };
+
+  showFaseripButtonDialog({
     title: "Unconscious Roster",
     content: buildDialogHTML({ includeDead }),
     buttons: {
       close: { label: "Close", callback: () => {} }
     },
     default: "close",
-    render: (html) => attachHandlers(html, dlg, () => includeDead, (v) => { includeDead = v; })
-  }, { width: 480, height: "auto", resizable: true, classes: ["msh", "faserip-unconscious-roster-dialog"] });
-
-  dlg.render(true);
-
-  // Auto-refresh on relevant hooks while dialog is open
-  const refresh = () => {
-    if (!dlg.rendered) return;
-    const el = dlg.element.find(".faserip-unconscious-roster").parent();
-    el.html(buildDialogHTML({ includeDead }));
-    attachHandlers(dlg.element, dlg, () => includeDead, (v) => { includeDead = v; });
-  };
-  const hookIds = [
-    Hooks.on("updateActor",        refresh),
-    Hooks.on("createActiveEffect", refresh),
-    Hooks.on("deleteActiveEffect", refresh),
-    Hooks.on("canvasReady",        refresh)
-  ];
-  const origClose = dlg.close.bind(dlg);
-  dlg.close = (opts) => {
-    Hooks.off("updateActor",        hookIds[0]);
-    Hooks.off("createActiveEffect", hookIds[1]);
-    Hooks.off("deleteActiveEffect", hookIds[2]);
-    Hooks.off("canvasReady",        hookIds[3]);
-    return origClose(opts);
-  };
+    width: 480,
+    resizable: true,
+    classes: ["msh", "faserip-unconscious-roster-dialog"],
+    render: (html, dlg) => {
+      dialog = dlg;
+      attachHandlers(html, dlg, () => includeDead, (v) => { includeDead = v; });
+      if (!hookIds.length) {
+        hookIds = [
+          ["updateActor",        Hooks.on("updateActor",        refresh)],
+          ["createActiveEffect", Hooks.on("createActiveEffect", refresh)],
+          ["deleteActiveEffect", Hooks.on("deleteActiveEffect", refresh)],
+          ["canvasReady",        Hooks.on("canvasReady",        refresh)]
+        ];
+      }
+    },
+    close: () => {
+      for (const [name, id] of hookIds) Hooks.off(name, id);
+      hookIds = [];
+    }
+  });
 }
 
 function attachHandlers(html, dlg, getIncludeDead, setIncludeDead) {

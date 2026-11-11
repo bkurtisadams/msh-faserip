@@ -1,4 +1,5 @@
-// equipment.js v2.3.0 - 2026-08-02
+// equipment.js v2.4.0 - 2026-11-11
+// v2.4.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.3.0: v14 crash fixes + dead code removal. Bare duplicate() → foundry.utils.duplicate
 //         (global removed in v14; add/remove-granted-power and remove-custom-ability threw
 //         ReferenceError). _rollPowerItem: global Ray → Math.hypot distance (Ray global
@@ -26,6 +27,7 @@
 // v1.4.0: Rewrite effects to use standard changes[] — system.* for mechanics, faserip.token.* for visuals
 // v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -1147,7 +1149,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     ${dialogPowerRangeInfo} <!-- NEW INFO DISPLAY -->
     `;
 
-    return new Dialog({
+    return showFaseripButtonDialog({
       title: `Power Item Roll: ${item.name}`,
       content: dialogContent,
       buttons: {
@@ -1330,7 +1332,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         cancel: { label: "Cancel" }
       },
       default: "roll"
-    }).render(true);
+    });
   }
 
   // ── Device Functions helpers ──
@@ -1435,7 +1437,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
 
     let selectedType = "attack";
 
-    const d = new Dialog({
+    showFaseripButtonDialog({
       title: "Add Device Function",
       content: html,
       buttons: {
@@ -1456,9 +1458,9 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
           $(this).addClass('selected');
           selectedType = this.dataset.type;
         });
-      }
-    }, { width: 380 });
-    d.render(true);
+      },
+      width: 380
+    });
   }
 
   async _addDeviceFunction(type) {
@@ -1549,7 +1551,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     const content = `<form class="df-edit-form">${fieldsHtml}</form>`;
     const sheet = this;
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Edit: ${fn.name || "Device Function"}`,
       content,
       buttons: {
@@ -1589,8 +1591,9 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         },
         cancel: { label: "Cancel" }
       },
-      default: "save"
-    }, { width: 400 }).render(true);
+      default: "save",
+      width: 400
+    });
   }
 
   // Create or update the Active Effect that backs a passive buff function
@@ -1676,7 +1679,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       return `<option value="${fn._idx}">${label}</option>`;
     }).join("");
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: `${item.name}: Choose Function`,
       content: `<div style="margin-bottom:10px;">
         <label>Function:</label>
@@ -1694,7 +1697,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         cancel: { label: "Cancel" }
       },
       default: "roll"
-    }).render(true);
+    });
   }
 
   // Roll a custom ability (legacy)
@@ -1721,7 +1724,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         </select>
       </div>`;
 
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Choose Custom Ability",
         content: choiceDialog,
         buttons: {
@@ -1735,7 +1738,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
           cancel: { label: "Cancel" }
         },
         default: "roll"
-      }).render(true);
+      });
 
       return;
     }
@@ -1788,7 +1791,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
     </div>`;
 
-    return new Dialog({
+    return showFaseripButtonDialog({
       title: `Custom Ability Roll: ${ability.name}`,
       content: dialogContent,
       buttons: {
@@ -1956,6 +1959,6 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         cancel: { label: "Cancel" }
       },
       default: "roll"
-    }).render(true);
+    });
   }
 }

@@ -1,5 +1,7 @@
 // item.js
+// 2026-11-11: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
 export class FaseripItem extends Item {
   prepareData() {
@@ -219,7 +221,7 @@ async _rollPower() {
     </div>
   </div>`;
 
-  new Dialog({
+  showFaseripButtonDialog({
     title: `Power Roll: ${this.name} (${rank})`,
     content: dialogContent,
     buttons: {
@@ -322,7 +324,7 @@ async _rollPower() {
       cancel: { label: "Cancel" }
     },
     default: "roll"
-  }).render(true);
+  });
 }
 
 }

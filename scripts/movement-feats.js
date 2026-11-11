@@ -1,4 +1,5 @@
-// movement-feats.js v1.9.1 - 2026-11-10
+// movement-feats.js v1.10.0 - 2026-11-11
+// v1.10.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.9.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
 // v1.9.0: Slice 7a — movement FEATs onto the faserip-rules kernel. Colours via
@@ -39,6 +40,7 @@ import {
 } from './lib/faserip-rules/faserip-movement.js';
 import { kernelKeyFor } from './kernel/adapter.js';
 import { getRollMode } from './modules/dice/roll-mode.js';
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
 // Exhaustion immunity: kernel rule (Unearthly+ Endurance)
 const isExhaustionImmuneRank = (rankName) => exhaustionExempt({ enduranceNumber: rankValue(rankName) });
@@ -258,7 +260,7 @@ export class MovementFeats {
     // Store reference for callbacks
     const self = this;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Leap FEAT: ${this.actor.name}`,
       content: dialogContent,
       buttons: {
@@ -303,7 +305,7 @@ export class MovementFeats {
           html.find('#leap-distance-table').html(buildDistanceTable(newLeapData));
         });
       }
-    }).render(true);
+    });
   }
   
   /**
@@ -558,7 +560,7 @@ export class MovementFeats {
       </div>
     `;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Fly FEAT: ${this.actor.name}`,
       content: dialogContent,
       buttons: {
@@ -603,7 +605,7 @@ export class MovementFeats {
           html.find('[name="flyCurrentSpeed"]').val(speed);
         });
       }
-    }).render(true);
+    });
   }
   
   /**
@@ -941,7 +943,7 @@ export class MovementFeats {
       </div>
     `;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Run FEAT: ${this.actor.name}`,
       content: dialogContent,
       buttons: {
@@ -1031,7 +1033,7 @@ export class MovementFeats {
           }
         });
       }
-    }).render(true);
+    });
   }
   
   /**
@@ -1393,7 +1395,7 @@ export class MovementFeats {
       </div>
     `;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Swim FEAT: ${this.actor.name}`,
       content: dialogContent,
       buttons: {
@@ -1469,7 +1471,7 @@ export class MovementFeats {
           html.find('.swim-speed-btn').eq(1).data('speed', newCruising);
         });
       }
-    }).render(true);
+    });
   }
   
   /**
@@ -1803,7 +1805,7 @@ export class MovementFeats {
       </div>
     `;
     
-    new Dialog({
+    showFaseripButtonDialog({
       title: `Teleport FEAT: ${this.actor.name}`,
       content: dialogContent,
       buttons: {
@@ -1866,7 +1868,7 @@ export class MovementFeats {
           html.find('#teleport-power-display').html(`Power: ${teleportAbbrev}(${teleportInfo.value}) End: ${endAbbrev}(${enduranceValue})`);
         });
       }
-    }).render(true);
+    });
   }
   
   /**

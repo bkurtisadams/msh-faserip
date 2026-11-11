@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js v2.4.0 - 2026-09-09
+// scripts/modules/actions/defense-action.js v2.5.0 - 2026-11-11
+// v2.5.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.4.0: Fixed-bug — all four defense Active Effects (Blocking,
 //         Dodging, Evading/Evasion Failed, Evasion Bonus) used the field
 //         name "icon" instead of "img" in their ActiveEffect data.
@@ -84,7 +85,7 @@ import {
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
-import { showFaseripDialog } from "./dialog-shim.js";
+import { showFaseripDialog, showFaseripConfirm } from "./dialog-shim.js";
 /**
  * Handles: "dodging" | "evading" | "blocking" | "catching"
  * Expect dispatcher to pass { actionType, abilityName, opts }
@@ -319,7 +320,7 @@ export class DefenseAction extends BaseAction {
             "shooting-arrow":  "an arrow",
             "throwing-other":  "a thrown projectile"
           };
-          const proceed = await Dialog.confirm({
+          const proceed = await showFaseripConfirm({
             title: "Catching Prerequisite Not Met",
             content: `
               <div style="padding:6px 0;font-size:13px;">

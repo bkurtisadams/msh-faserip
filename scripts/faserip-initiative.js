@@ -1,4 +1,5 @@
-// faserip-initiative.js v4.1.6 - 2026-10-01
+// faserip-initiative.js v4.2.0 - 2026-11-11
+// v4.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v4.1.6: Fixed-bug — duplicate round numbers on fast round advances. Foundry
 //         fires combatRound before the round update is saved, so the
 //         auto-reroll could read the previous round and post "Round N —
@@ -165,6 +166,7 @@ import {
   resolveSideInitiative, sideInitiativeModifier, talentInitiativeBonus
 } from "./lib/faserip-rules/faserip-initiative.js";
 import { authorizeRawMovement, canChangeAction, getPreActionRequirement, isCombatantReady, isDefenseRequirement, normalizeRawPhase, readinessSummary } from "./rules/raw-combat-state.js";
+import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
 export class FaseripInitiative {
   static initialized = false;
@@ -1703,7 +1705,7 @@ export class FaseripInitiative {
   static async _postJudgeEvent(combat) {
     if (!game.user.isGM) return;
     const text = await new Promise(resolve => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `Judge Event — Round ${combat.round}`,
         content: `<div class="faserip-declare-dialog"><label class="faserip-declare-field"><span>Event</span><textarea name="event" rows="3" placeholder="The gantry gives way... the bomb detonates... reinforcements arrive..."></textarea></label></div>`,
         buttons: {
@@ -1712,7 +1714,7 @@ export class FaseripInitiative {
         },
         default: "post",
         render: html => html.find('[name="event"]').focus()
-      }).render(true);
+      });
     });
     if (!text) return;
     await ChatMessage.create({
@@ -1929,7 +1931,7 @@ export class FaseripInitiative {
     const q = current.qualifiers || {};
 
     const choice = await new Promise(resolve => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: `${isChange ? "New Action" : "Declare Action"}: ${actor.name}`,
         content: `
           <div class="faserip-declare-dialog">
@@ -2006,7 +2008,7 @@ export class FaseripInitiative {
           });
           update();
         }
-      }).render(true);
+      });
     });
     if (!choice) return null;
 
@@ -2055,7 +2057,7 @@ export class FaseripInitiative {
     }).join("");
 
     const choice = await new Promise(resolve => {
-      new Dialog({
+      showFaseripButtonDialog({
         title: "Private NPC Plans",
         content: `<div class="faserip-npc-plan-dialog">
           <p class="hint">Select NPCs, then assign one intended action to them. Players only see that an NPC has declared, not the details.</p>
@@ -2094,7 +2096,7 @@ export class FaseripInitiative {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "apply"
-      }).render(true);
+      });
     });
     if (!choice?.ids?.length) return;
 

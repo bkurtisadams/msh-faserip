@@ -1,3 +1,7 @@
+// scripts/dev/actor-sheet-runtime-tests.js v1.7.0 - 2026-11-11
+// v1.7.0: Movement FEAT dialogs (Run, Leap, Swim, Fly, Teleport) opened from
+//         the sheet's movement labels: each that opens must be a V2 dialog
+//         and close from Cancel, with no V1 window.
 // scripts/dev/actor-sheet-runtime-tests.js v1.6.0 - 2026-11-11
 // v1.6.0: Sheet dialogs. Opens the Delete Power confirmation (cancel, then
 //         delete), Talent Information, Equipment Information and Recovery &
@@ -355,6 +359,28 @@ async function dialogTests(recorder, sheet, actor) {
   recorder.assert(v1Total === 0, "Dialogs: no V1 window opened for any of them", { v1Opened: v1Total });
 }
 
+async function movementDialogTests(recorder, sheet) {
+  const root = () => content(sheet);
+  const title = (d) => d?.options?.window?.title ?? d?.title ?? "";
+  const opened = [];
+  let v1Total = 0;
+  for (const [mode, expect] of [["run", /Run FEAT/i], ["leap", /Leap FEAT/i], ["swim", /Swim FEAT/i], ["fly", /Fly FEAT/i], ["teleport", /Teleport FEAT/i]]) {
+    const label = root()?.querySelector(`.movement-label[data-movement="${mode}"]`);
+    if (!label) { recorder.skip(`Movement: ${mode} dialog`, { reason: "no movement label on the sheet" }); continue; }
+    const r = await openDialogFrom(label); v1Total += r.v1Opened;
+    if (!r.dialog) { recorder.skip(`Movement: ${mode} dialog`, { reason: "no dialog opened (the test hero may lack this movement)", v1Opened: r.v1Opened }); continue; }
+    opened.push(mode);
+    recorder.assert(expect.test(title(r.dialog)), `Movement: the ${mode} label opens a V2 ${mode} FEAT dialog`, { title: title(r.dialog) });
+    const cancel = r.dialog.element.querySelector('[data-action="cancel"]');
+    cancel?.click();
+    const closed = await waitFor(() => !r.dialog.rendered, { timeout: 2000 });
+    recorder.assert(!!cancel && !!closed, `Movement: the ${mode} FEAT dialog closes from Cancel`);
+    if (!closed) await closeDialog(r.dialog);
+  }
+  recorder.assert(opened.includes("run") && opened.includes("leap"), "Movement: Run and Leap dialogs both opened", { opened });
+  recorder.assert(v1Total === 0, "Movement: no V1 window opened for any of them", { v1Opened: v1Total });
+}
+
 async function dropTest(recorder, sheet, actor, donor) {
   const gift = donor.items.getName("Runtime Gift");
   const root = content(sheet);
@@ -630,6 +656,7 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
       try { await submitTest(recorder, sheet, actor); } catch (e) { recorder.fail("Submit: test ran", { message: e?.message }); }
       try { await dropTest(recorder, sheet, actor, legacy); } catch (e) { recorder.fail("Drop: test ran", { message: e?.message }); }
       try { await dialogTests(recorder, sheet, actor); } catch (e) { recorder.fail("Dialogs: test ran", { message: e?.message }); }
+      try { await movementDialogTests(recorder, sheet); } catch (e) { recorder.fail("Movement: test ran", { message: e?.message }); }
 
       // Close and reopen
       await closeSheet(sheet);
