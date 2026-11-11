@@ -1,3 +1,6 @@
+// grabbing-action.js v2.2.0 - 2026-11-11
+// v2.2.0: Dialog scaffolding (Karma row, effect grid, footer, titlebar and
+//         width setup, Enter-to-roll) now comes from attack-dialog-kit.js.
 // grabbing-action.js v2.1.0 - 2026-09-09
 // v2.1.0: Fix dialog ballooning to full width on checkbox/select
 //         toggle — same bug and fix as energy-action.js v3.4.2,
@@ -42,9 +45,7 @@ import {
   bannerColors,
   showDiceAnimation,
   getTargetData,
-  applyCapabilitiesToDialog,
-  buildModeSelector,
-  setupModeSelector
+  applyCapabilitiesToDialog
 } from "./action-utils.js";
 import {
   setupKarmaControlHandlers,
@@ -58,6 +59,7 @@ import { compareRankNames } from "../../kernel/adapter.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import { karmaRowHtml, fxGridHtml, footerHtml, mountDialogFrame, wireRollKeys } from "./attack-dialog-kit.js";
 /**
  * Grabbing (Wrestling) — STR vs UT → Miss / Take / Grab / Break
  * - Miss: no possession; loose items may scatter up to 1 area (GM decides).
@@ -217,7 +219,6 @@ export class GrabbingAction extends AttackAction {
     // Karma data
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
-    const hasKarma = availableKarma > 0;
 
     const abilityShort = RANK_ABBR[strength.rank] || strength.rank;
     const { targetDisplay } = getTargetData();
@@ -266,33 +267,17 @@ export class GrabbingAction extends AttackAction {
 
       <!-- Options: Karma -->
       <div class="frp-box frp-opts-box">
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
-          ${hasKarma ? `
-            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-        </div>
+        ${karmaRowHtml({ availableKarma, minKarma })}
       </div>
 
       <!-- Effect preview grid -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w" title="No possession; item may scatter 1 area">Miss</div>
-        <div class="frp-fx-cell g" title="Take item only if STR ≥ comparator">Take</div>
-        <div class="frp-fx-cell y" title="Gain possession regardless of STR">Grab</div>
-        <div class="frp-fx-cell r" title="Gain item + Breaking FEAT vs item material">Break</div>
-      </div>
+      ${fxGridHtml(
+        { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+        { white: "No possession; item may scatter 1 area", green: "Take item only if STR \u2265 comparator", yellow: "Gain possession regardless of STR", red: "Gain item + Breaking FEAT vs item material" }
+      )}
 
       <!-- Footer -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
+      ${footerHtml({ remember: savedRemember, skipDice: savedSkipDice })}
     </div>
     `;
 
@@ -304,24 +289,7 @@ export class GrabbingAction extends AttackAction {
         content: html,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
-          $dialog.find('.dialog-buttons').hide();
-
-          // Inject mode buttons into titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastGrabbingMode");
-
-          // Set dialog width
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastGrabbingMode" });
           // Re-pin on any form-input change, whichever internal handler
           // reacts to it — AppV2 re-measures to 'auto' width otherwise.
           html.on('change input', 'input, select', () => {
@@ -339,16 +307,7 @@ export class GrabbingAction extends AttackAction {
           applyCapabilitiesToDialog(html, "grabbing", { actor });
 
           // Auto-focus Roll button
-          html.find('#frp-roll').focus();
-
-          // Intercept Enter key
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
+          wireRollKeys(html, $dialog);
 
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {

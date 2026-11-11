@@ -1,3 +1,6 @@
+// grappling-action.js v3.6.0 - 2026-11-11
+// v3.6.0: Dialog scaffolding (header, Karma row, effect grid, footer, titlebar
+//         and width setup, Enter-to-roll) now comes from attack-dialog-kit.js.
 // grappling-action.js v3.5.0 - 2026-09-09
 // v3.5.0: Fix dialog ballooning to full width on checkbox/select
 //         toggle — same bug and fix as energy-action.js v3.4.2,
@@ -56,8 +59,6 @@ import {
   effectsFor,
   applyCapabilitiesToDialog,
   showDiceAnimation,
-  buildModeSelector,
-  setupModeSelector,
   getTargetData,
   getBodyArmorValues,
   resolveKernelAttack
@@ -70,6 +71,10 @@ import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import {
+  saveDialogFlags, headerHtml, karmaRowHtml, fxGridHtml, footerHtml,
+  mountDialogFrame, wireRollKeys, wireRowToggle
+} from "./attack-dialog-kit.js";
 export class GrapplingAction extends AttackAction {
   constructor(args) {
     super(args);
@@ -143,7 +148,7 @@ export class GrapplingAction extends AttackAction {
       flagUpdate.lastGrappleShift = choice.manualCS;
       flagUpdate.lastGrappleReason = choice.reason || "";
     }
-    await actor.update({ "flags.msh-faserip": flagUpdate });
+    await saveDialogFlags(actor, flagUpdate);
 
     // Build shift breakdown for hover text
     const shiftBreakdown = {
@@ -342,7 +347,6 @@ export class GrapplingAction extends AttackAction {
     // ── Karma ──
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
-    const hasKarma = availableKarma > 0;
 
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
@@ -359,18 +363,7 @@ export class GrapplingAction extends AttackAction {
     <div class="frp-dlg">
 
       <!-- Header: Actor (Base Strength / Rank Value) attacks Target -->
-      <div class="frp-header-v3">
-        <span class="h-actor" title="${actor.name}">${actor.name}</span>
-        <span class="h-paren">(</span>
-        <span class="h-stat">
-          <span class="h-stat-label">${abilityLabel}:</span>
-          <span class="h-stat-rank">${strengthAbbr} ${strength.value}</span>
-        </span>
-        <span class="h-paren">)</span>
-        ${targetDisplay
-          ? `<span class="h-verb">grapples</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
-          : ''}
-      </div>
+      ${headerHtml({ actor, ability: strength, targetDisplay, verb: "grapples", statLabel: `${abilityLabel}:`, statText: `${strengthAbbr} ${strength.value}` })}
 
       <!-- Target compact line -->
       ${primaryTarget ? `
@@ -402,33 +395,19 @@ export class GrapplingAction extends AttackAction {
 
       <!-- Options: Karma -->
       <div class="frp-box frp-opts-box">
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
-          ${hasKarma ? `
-            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-        </div>
+        ${karmaRowHtml({ availableKarma, minKarma })}
       </div>
 
       <!-- Effect preview grid -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w">Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">no other atk</span></div>
-        <div class="frp-fx-cell g">Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">no other atk</span></div>
-        <div class="frp-fx-cell y">Partial<br><span style="font-size:9px;font-weight:400;opacity:0.7;">-2CS, no move</span></div>
-        <div class="frp-fx-cell r">Full Hold<br><span style="font-size:9px;font-weight:400;opacity:0.7;">restrained</span></div>
-      </div>
+      ${fxGridHtml({
+        white: `Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">no other atk</span>`,
+        green: `Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">no other atk</span>`,
+        yellow: `Partial<br><span style="font-size:9px;font-weight:400;opacity:0.7;">-2CS, no move</span>`,
+        red: `Full Hold<br><span style="font-size:9px;font-weight:400;opacity:0.7;">restrained</span>`
+      })}
 
       <!-- Footer: checkboxes + buttons on one row -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
+      ${footerHtml({ remember: savedRemember, skipDice: savedSkipDice, ids: false })}
 
     </div>
     `;
@@ -441,26 +420,7 @@ export class GrapplingAction extends AttackAction {
         content: dialogHtml,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
-
-          // Hide Foundry's native button row
-          $dialog.find('.dialog-buttons').hide();
-
-          // Inject mode buttons into the titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastGrapplingMode");
-
-          // Set dialog width
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastGrapplingMode" });
           // Re-pin on any form-input change, whichever internal handler
           // reacts to it — AppV2 re-measures to 'auto' width otherwise.
           html.on('change input', 'input, select', () => {
@@ -476,16 +436,7 @@ export class GrapplingAction extends AttackAction {
           });
 
           // Auto-focus Roll button for keyboard Enter and focus ring
-          html.find('#frp-roll').focus();
-
-          // Intercept Enter key — trigger Roll instead of Foundry's native submit
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
+          wireRollKeys(html, $dialog);
 
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
@@ -524,9 +475,7 @@ export class GrapplingAction extends AttackAction {
           });
 
           // Karma toggle — inactive styling
-          html.find('#spend-karma').on('change', function() {
-            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
-          });
+          wireRowToggle(html, '#spend-karma');
 
           applyCapabilitiesToDialog(html, "grappling", { actor });
         },

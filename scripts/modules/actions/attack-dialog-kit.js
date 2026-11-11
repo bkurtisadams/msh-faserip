@@ -1,3 +1,6 @@
+// scripts/modules/actions/attack-dialog-kit.js v1.3.0 - 2026-11-11
+// v1.3.0: headerHtml verb / statLabel / statText; footerHtml ids option;
+//         fxGridHtml hover tips (grapple-family dialogs).
 // scripts/modules/actions/attack-dialog-kit.js v1.2.0 - 2026-11-11
 // v1.2.0: paidEffectRowHtml / wirePaidEffectToggle (the Karma-paid Effect cap
 //         shared by the edged melee and thrown edged dialogs).
@@ -54,20 +57,21 @@ export function targetSummary(targetActor) {
   return { healthStr, statusStr };
 }
 
-export function headerHtml({ actor, ability, targetDisplay, titles = true }) {
-  const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
+export function headerHtml({ actor, ability, targetDisplay, titles = true, verb = "attacks", statLabel = null, statText = null }) {
+  const label = statLabel ?? `Base ${ability.name}:`;
+  const stat = statText ?? `${RANK_ABBR[ability.rank] || ability.rank} ${ability.value}`;
   const tip = (text) => titles ? ` title="${text}"` : '';
   return `
       <div class="frp-header-v3">
         <span class="h-actor"${tip(actor.name)}>${actor.name}</span>
         <span class="h-paren">(</span>
         <span class="h-stat">
-          <span class="h-stat-label">Base ${ability.name}:</span>
-          <span class="h-stat-rank">${abilityShort} ${ability.value}</span>
+          <span class="h-stat-label">${label}</span>
+          <span class="h-stat-rank">${stat}</span>
         </span>
         <span class="h-paren">)</span>
         ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target"${tip(targetDisplay)}>${targetDisplay}</span>`
+          ? `<span class="h-verb">${verb}</span><span class="h-target"${tip(targetDisplay)}>${targetDisplay}</span>`
           : ''}
       </div>`;
 }
@@ -170,17 +174,19 @@ export function wirePaidEffectToggle(html) {
   });
 }
 
-export function fxGridHtml(effects) {
+export function fxGridHtml(effects, tips = {}) {
+  const tip = (color) => tips[color] ? ` title="${tips[color]}"` : '';
   return `
       <div class="frp-fx-grid">
-        <div class="frp-fx-cell w">${effects.white}</div>
-        <div class="frp-fx-cell g">${effects.green}</div>
-        <div class="frp-fx-cell y">${effects.yellow}</div>
-        <div class="frp-fx-cell r">${effects.red}</div>
+        <div class="frp-fx-cell w"${tip("white")}>${effects.white}</div>
+        <div class="frp-fx-cell g"${tip("green")}>${effects.green}</div>
+        <div class="frp-fx-cell y"${tip("yellow")}>${effects.yellow}</div>
+        <div class="frp-fx-cell r"${tip("red")}>${effects.red}</div>
       </div>`;
 }
 
-export function footerHtml({ remember, skipDice }) {
+export function footerHtml({ remember, skipDice, ids = true }) {
+  const id = (value) => ids ? ` id="${value}"` : '';
   return `
       <div class="frp-foot">
         <div class="frp-foot-btns">
@@ -188,8 +194,8 @@ export function footerHtml({ remember, skipDice }) {
           <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
         </div>
         <div class="frp-foot-checks">
-          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${remember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${skipDice ? 'checked' : ''}> Skip dice</label>
+          <label><input type="checkbox"${id("msh-remember-settings")} name="remember" ${remember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox"${id("msh-skip-dice")} name="skipDice" ${skipDice ? 'checked' : ''}> Skip dice</label>
         </div>
       </div>`;
 }

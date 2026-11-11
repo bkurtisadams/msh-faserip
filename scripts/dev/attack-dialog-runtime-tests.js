@@ -1,3 +1,8 @@
+// scripts/dev/attack-dialog-runtime-tests.js v1.3.0 - 2026-11-11
+// v1.3.0: Grappling, Grabbing and Escaping. These resolve themselves (roll,
+//         card, hold effects), so they run for real against the throwaway
+//         actors with Skip dice ticked; their result cards are captured
+//         instead of posted.
 // scripts/dev/attack-dialog-runtime-tests.js v1.2.0 - 2026-11-11
 // v1.2.0: Blunt and Edged melee dialogs; broken armor no longer protects;
 //         thrown dropdown shows computed damage.
@@ -24,6 +29,9 @@ import { ThrowingEdgedAction } from "../modules/actions/throwing-edged-action.js
 import { ThrowingBluntAction } from "../modules/actions/throwing-blunt-action.js";
 import { BluntAttackAction } from "../modules/actions/blunt-attack-action.js";
 import { EdgedAttackAction } from "../modules/actions/edged-attack-action.js";
+import { GrapplingAction } from "../modules/actions/grappling-action.js";
+import { GrabbingAction } from "../modules/actions/grabbing-action.js";
+import { EscapingAction } from "../modules/actions/escaping-action.js";
 import { getBodyArmorValues } from "../modules/actions/action-utils.js";
 import { getAvailableKarma } from "../modules/dice/dice-roller.js";
 
@@ -126,13 +134,13 @@ const openDialogEl = () => document.querySelector(".frp-dlg");
 // Opens one real dialog, hands a driver the live DOM, and returns what the
 // dialog resolved with. The attack hand-off, notifications and actor writes
 // are captured for the driver's assertions.
-async function withDialog(recorder, label, ActionClass, { actor, actionType, abilityName = "agility", opts = {} }, drive) {
+async function withDialog(recorder, label, ActionClass, { actor, actionType, abilityName = "agility", opts = {}, captureChat = false }, drive) {
   if (openDialogEl()) {
     recorder.fail(`${label}: no other attack dialog is open`);
     return null;
   }
   const action = new ActionClass({ actor, actionType, abilityName, opts: { ...opts } });
-  const ctx = { exec: null, notes: [], writes: 0, ret: undefined, error: null, settled: false };
+  const ctx = { exec: null, notes: [], chat: [], writes: 0, ret: undefined, error: null, settled: false };
   action._executeSingleAttack = async (args) => { ctx.exec = args; };
 
   const original = {};
@@ -141,6 +149,10 @@ async function withDialog(recorder, label, ActionClass, { actor, actionType, abi
     ui.notifications[level] = (message) => { ctx.notes.push({ level, message: String(message) }); };
   }
   const hookId = Hooks.on("updateActor", (doc) => { if (doc.id === actor.id) ctx.writes++; });
+  const chatClass = globalThis.ChatMessage;
+  const hadOwnCreate = Object.prototype.hasOwnProperty.call(chatClass, "create");
+  const originalCreate = chatClass.create;
+  if (captureChat) chatClass.create = async (data) => { ctx.chat.push(String(data?.content ?? "")); return {}; };
 
   const done = action.execute().then(
     (ret) => { ctx.ret = ret; ctx.settled = true; },
@@ -180,6 +192,10 @@ async function withDialog(recorder, label, ActionClass, { actor, actionType, abi
     }
     await waitFor(() => !openDialogEl(), { timeout: 2000 });
     Hooks.off("updateActor", hookId);
+    if (captureChat) {
+      if (hadOwnCreate) chatClass.create = originalCreate;
+      else delete chatClass.create;
+    }
     for (const level of ["info", "warn", "error"]) ui.notifications[level] = original[level];
   }
   return ctx;
@@ -472,6 +488,34 @@ async function meleeTests(recorder, { attacker, targetA, targetB }) {
   recorder.equal(getBodyArmorValues(targetB.actor, "physical-edged")?.applicable, 0, "Armor: an armor item marked broken gives no protection");
 }
 
+async function grappleFamilyTests(recorder, { attacker, targetA }) {
+  const actor = attacker.actor;
+  await setTargets([targetA.token]);
+  const cases = [
+    ["Grappling", GrapplingAction, "grappling", "GRAPPLING"],
+    ["Grabbing", GrabbingAction, "grabbing", "GRABBING"],
+    ["Escaping", EscapingAction, "escaping", "ESCAPE"]
+  ];
+  for (const [label, ActionClass, actionType, cardLabel] of cases) {
+    await withDialog(recorder, label, ActionClass, { actor, actionType, abilityName: "strength", captureChat: true }, async (d) => {
+      const { $html } = d;
+      recorder.equal(d.width(), DIALOG_WIDTH, `${label}: dialog opens at its pinned width`);
+      recorder.assert($html.find(".frp-karma-pool").text().includes("avail"), `${label}: Karma row shows the pool`, { text: $html.find(".frp-karma-pool").text() });
+      recorder.equal($html.find(".frp-fx-cell").length, 4, `${label}: effect grid has four cells`);
+      recorder.assert($html.find('[name="remember"]').length === 1 && $html.find('[name="skipDice"]').length === 1, `${label}: footer has Remember and Skip dice`);
+      $html.find('[name="remember"]').prop("checked", true).trigger("change");
+      $html.find('[name="skipDice"]').prop("checked", true).trigger("change");
+      recorder.equal(d.width(), DIALOG_WIDTH, `${label}: width holds after toggling options`);
+      const e = $.Event("keydown"); e.key = "Enter";
+      $html.closest(".dialog").trigger(e);
+      await waitFor(() => d.settled, { timeout: 8000 });
+      recorder.assert(d.settled && !d.error, `${label}: Enter rolls and the action resolves`, { error: d.error?.message, notes: d.notes });
+      recorder.assert(d.chat.some(c => c.includes(cardLabel)), `${label}: a result card is produced`, { cards: d.chat.length });
+    });
+  }
+  recorder.equal(actor.getFlag(SYSTEM_ID, "lastGrappleRemember"), true, "Grappling: Remember was saved");
+}
+
 async function cleanupState(state, keepArtifacts) {
   try { await setTargets(state.previousTargets ?? []); } catch (_) { /* noop */ }
   for (const [key, value] of Object.entries(state.prefs)) {
@@ -538,6 +582,7 @@ export async function runAttackDialogRuntimeTests({ keepArtifacts = false, postC
       await thrownEdgedTests(recorder, fixtures);
       await thrownBluntTests(recorder, fixtures);
       await meleeTests(recorder, fixtures);
+      await grappleFamilyTests(recorder, fixtures);
     }
   } catch (error) {
     recorder.fail("Attack dialog suite completed without an uncaught exception", { message: error?.message ?? String(error), stack: error?.stack });

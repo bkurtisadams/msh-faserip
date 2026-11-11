@@ -1,3 +1,8 @@
+// scripts/modules/actions/escaping-action.js v3.3.0 - 2026-11-11
+// v3.3.0: Dialog scaffolding (Karma row, effect grid, footer, titlebar and
+//         width setup, Enter-to-roll) now comes from attack-dialog-kit.js.
+//         The width is pinned through the position API like the other
+//         attack dialogs.
 // scripts/modules/actions/escaping-action.js v3.2.0 - 2026-09-02
 // v3.2.0: Kernel slice 5f. Result via resolveKernelAttack on the Es column
 //         with itemized shifts; hold removal, Escaped/Reversed effects and
@@ -36,9 +41,7 @@ import {
   labelFor, 
   effectsFor,
   applyCapabilitiesToDialog,
-  showDiceAnimation,
-  buildModeSelector,
-  setupModeSelector
+  showDiceAnimation
 } from "./action-utils.js";
 import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment, setupKarmaControlHandlers } from "../dice/dice-roller.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
@@ -46,6 +49,7 @@ import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/ef
 import { applyEscaped, applyReversed } from "../effects/effect-engine.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import { saveDialogFlags, karmaRowHtml, fxGridHtml, footerHtml, mountDialogFrame, wireRollKeys } from "./attack-dialog-kit.js";
 /**
  * Remove grappled/held effects from an actor
  * @param {Actor} actor 
@@ -250,7 +254,6 @@ export class EscapingAction extends AttackAction {
     // Karma data
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
-    const hasKarma = availableKarma > 0;
     const savedShiftVal = Number(this.opts?.shift ?? savedShift);
 
     // CS row from shared utility
@@ -301,33 +304,17 @@ export class EscapingAction extends AttackAction {
 
       <!-- Karma -->
       <div class="frp-box frp-opts-box">
-        <div class="frp-opt-row${hasKarma ? ' inactive' : ' inactive'}">
-          ${hasKarma ? `
-            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-        </div>
+        ${karmaRowHtml({ availableKarma, minKarma })}
       </div>
 
       <!-- Effect preview -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w" title="White: still held; no actions this turn.">Miss</div>
-        <div class="frp-fx-cell g" title="Green: still held; no actions this turn.">Miss</div>
-        <div class="frp-fx-cell y" title="Yellow: free; half move; no other actions.">Escape</div>
-        <div class="frp-fx-cell r" title="Red: free + grapple back or act at -2CS.">Reverse</div>
-      </div>
+      ${fxGridHtml(
+        { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+        { white: "White: still held; no actions this turn.", green: "Green: still held; no actions this turn.", yellow: "Yellow: free; half move; no other actions.", red: "Red: free + grapple back or act at -2CS." }
+      )}
 
       <!-- Footer -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
+      ${footerHtml({ remember: savedRemember, skipDice: savedSkipDice, ids: false })}
     </div>
     `;
 
@@ -339,23 +326,7 @@ export class EscapingAction extends AttackAction {
         content: dialogHtml,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
-
-          $dialog.find('.dialog-buttons').hide();
-
-          // Mode selector in titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastEscapingMode");
-
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastEscapingMode" });
 
           // Wire CS panel
           _csState = wireCSPanel(html, {
@@ -366,16 +337,7 @@ export class EscapingAction extends AttackAction {
           });
 
           // Auto-focus Roll button
-          html.find('#frp-roll').focus();
-
-          // Enter key -> Roll
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
+          wireRollKeys(html, $dialog);
 
           // Roll button
           html.find('#frp-roll').on('click', async () => {
@@ -402,7 +364,7 @@ export class EscapingAction extends AttackAction {
             
             // Persist settings if requested — single document update
             if (result.remember) {
-              await actor.update({ "flags.msh-faserip": { lastEscapeShift: result.shift, lastEscapeCsNotes: result.csNotes || "" } });
+              await saveDialogFlags(actor, { lastEscapeShift: result.shift, lastEscapeCsNotes: result.csNotes || "" });
             }
             
             dlg.close();
