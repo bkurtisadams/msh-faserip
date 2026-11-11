@@ -1,4 +1,7 @@
-﻿// init.js v1.20.0 - 2026-11-11
+﻿// init.js v1.21.0 - 2026-11-11
+// v1.21.0: Vehicle actors use MSHVehicleActorSheetV2 (the V2 shell); the V1
+//          vehicle sheet is no longer registered.
+// init.js v1.20.0 - 2026-11-11
 // v1.20.0: The V2 character sheet is registered unconditionally as the only
 //          sheet for hero / villain / npc. The V1 sheet is no longer
 //          registered (its template had no form element, so field edits and
@@ -211,7 +214,7 @@ import { debugLog } from './modules/actions/action-utils.js';
 import { ActionDispatcher } from './modules/actions/action-dispatcher.js';
 import { ManualModeDialog } from './modules/actions/manual-mode-dialog.js';
 import * as Effects from "./modules/effects/effect-engine.js";
-import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
+import { MSHVehicleActorSheetV2 } from "./vehicle-actor-sheet.js";
 import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
 import { countElapsedTurns, TURN_SECONDS } from "./modules/recovery-timing.js";
@@ -1040,11 +1043,16 @@ Hooks.once("init", async () => {
     default: "summary"
   });
 
-  foundry.documents.collections.Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
-    types: ["vehicle"],
-    makeDefault: true,
-    label: "Vehicle Sheet"
-  });
+  foundry.applications.apps.DocumentSheetConfig.registerSheet(
+    Actor,
+    "msh-faserip",
+    MSHVehicleActorSheetV2,
+    {
+      types: ["vehicle"],
+      label: "Vehicle Sheet",
+      makeDefault: true
+    }
+  );
   // preCreateActiveEffect: duplicate-status guard + icon→img remap.
   // (Legacy v13 rounds→seconds conversion removed for v14 — see note below.)
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {

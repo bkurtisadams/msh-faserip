@@ -1,3 +1,23 @@
+// scripts/actor-sheet-v2.js v1.5.0 - 2026-11-11
+// v1.5.0: Three things a subclass can now set, so the vehicle sheet can use
+//         this shell: the tab selectors (TABS_SHIM), the full-size window
+//         (NORMAL_SIZE) and the legacy class the adapter wraps
+//         (_createLegacySheet). No behaviour change for character sheets.
+// scripts/actor-sheet-v2.js v1.4.0 - 2026-11-11
+// v1.4.0: The History field uses Foundry's V2 rich-text element
+//         (<prose-mirror>, toggled) instead of the V1 {{editor}} helper. It
+//         is a form field, so Save goes through this sheet's normal submit.
+//         That removes the last use of the V1 base's editor machinery: the
+//         legacy editor activation and the adapter's editor-save shim are
+//         gone. A sheet that is not editable shows the enriched text with
+//         no editor.
+// scripts/actor-sheet-v2.js v1.3.0 - 2026-11-11
+// v1.3.0: The adapter marks itself (_isV2Adapter) so the legacy class skips
+//         the V1 base listeners, which had been running against this sheet's
+//         form on every render (a second form-submit handler, a second
+//         editor activation, a second portrait binding). The one thing they
+//         did that nothing else covered, disabling the controls of a sheet
+//         that is not editable, is now done here.
 // scripts/actor-sheet-v2.js v1.2.1 - 2026-11-11
 // v1.2.1: This is now the only registered character sheet (init.js v1.20.0);
 //         the opt-in setting is gone. No code change.
@@ -59,13 +79,24 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /*  v1 adapter                                  */
   /* -------------------------------------------- */
 
+  /** Where the tab strip and its panels live, and which tab opens first. */
+  static TABS_SHIM = { nav: ".sheet-tabs-navigation", content: ".sheet-tab-content", initial: "powers" };
+
+  /** The window size the legacy compact-mode toggle restores. */
+  static NORMAL_SIZE = { width: 720, height: 840 };
+
   #v1 = null;
-  _activeTab = "powers";
+  _activeTab = this.constructor.TABS_SHIM.initial;
+
+  /** The legacy sheet class whose data preparation and listeners this shell borrows. */
+  _createLegacySheet() {
+    return new FaseripActorSheet(this.actor, { editable: this.isEditable });
+  }
 
   /** Lazy, non-rendering v1 sheet used purely as a data + listener adapter. */
   _v1() {
     if (!this.#v1) {
-      this.#v1 = new FaseripActorSheet(this.actor, { editable: this.isEditable });
+      this.#v1 = this._createLegacySheet();
     }
     return this.#v1;
   }
@@ -79,6 +110,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     return new Proxy(v1, {
       get(target, prop) {
         switch (prop) {
+          case "_isV2Adapter": return true;
           case "actor":      return v2.actor;
           case "object":     return v2.actor;
           case "document":   return v2.actor;
@@ -88,7 +120,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
           case "isEditable": return v2.isEditable;
           case "rendered":   return v2.rendered;
           case "position":         return v2.position;
-          case "_normalSheetSize": return { width: 720, height: 840 };
+          case "_normalSheetSize": return { ...v2.constructor.NORMAL_SIZE };
           case "setPosition":      return (...a) => v2.setPosition?.(...a);
           case "render":     return (...a) => {
             // v1 callers use render(force, options); v2 expects (options, _options).
@@ -101,48 +133,6 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
           case "submit":     return (...a) => v2.submit?.(...a);
           case "close":      return (...a) => v2.close(...a);
 
-          // V2-native saveEditor. v1's editor save callback (bound by
-          // _activateEditor) calls this.saveEditor(name); v14's appv1 shim
-          // routes that through submit() → _onSubmit chain that depends on
-          // a rendered v1 instance, which we never have. Intercept here:
-          // commit the active editor's content via its own save(), pull the
-          // resulting HTML from the editor instance (or the form field it
-          // wrote to), and update the live actor directly. Then tear the
-          // editor down and re-render to restore the static view.
-          case "saveEditor": return async (name, opts = {}) => {
-            const ed = v1.editors?.[name];
-            if (!ed) return;
-
-            // ed.active is a boolean editing-state flag in v14's appv1 shim,
-            // not the editor instance. The ProseMirrorEditor lives at
-            // ed.instance, with .editor / .mce as fallbacks for older shims
-            // and tinymce respectively.
-            const editor = ed.instance ?? ed.editor ?? ed.mce ?? null;
-
-            try { await editor?.save?.(); } catch (_) {}
-
-            // Pull the new content from whichever source the active editor
-            // surfaces; the form field and serializeString cover ProseMirror,
-            // dom/innerHTML covers tinymce or fallback shapes, and
-            // contentDivHTML is the last-resort writeback target.
-            const content =
-                 v2.element.querySelector(`[name="${name}"]`)?.value
-              ?? editor?.serializeString?.()
-              ?? editor?.serializeHTMLString?.()
-              ?? editor?.view?.dom?.innerHTML
-              ?? editor?.dom?.innerHTML
-              ?? (typeof editor?.value === "string" ? editor.value : undefined)
-              ?? v2.element.querySelector(`[data-edit="${name}"]`)?.innerHTML
-              ?? null;
-
-            if (content !== null && content !== undefined) {
-              await v2.actor.update({ [name]: content });
-            }
-
-            try { editor?.destroy?.(); } catch (_) {}
-            v1.editors[name] = null;
-            await v2.render({ force: true });
-          };
           default:           return Reflect.get(target, prop, target);
         }
       }
@@ -182,7 +172,35 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     // to assign to read-only Collection getters (actor.items, etc.).
     // v1 keys (actor, system, items, flags, ...) intentionally win over
     // v2 base keys; the legacy template expects the v1 shape.
-    return Object.assign(base, legacy);
+    const context = Object.assign(base, legacy);
+    context.historyEditor = await this._historyEditorHtml();
+    return context;
+  }
+
+  /** Markup for the History field in the Bio panel: a toggled <prose-mirror>
+   *  form element when the sheet is editable, the enriched text otherwise. */
+  async _historyEditorHtml() {
+    const raw = String(this.actor.system?.history ?? "");
+    const TE = foundry.applications.ux.TextEditor?.implementation ?? globalThis.TextEditor;
+    let enriched = raw;
+    try {
+      enriched = await TE.enrichHTML(raw, { relativeTo: this.actor, secrets: this.actor.isOwner, documents: true });
+    } catch (err) {
+      console.warn("FaseripActorSheetV2 | could not enrich History", err);
+    }
+    if (!this.isEditable) return `<div class="editor-content msh-history-readonly">${enriched}</div>`;
+
+    const editor = foundry.applications.elements.HTMLProseMirrorElement.create({
+      name: "system.history",
+      value: raw,
+      enriched,
+      toggled: true,
+      collaborate: false,
+      documentUUID: this.actor.uuid,
+      height: 200
+    });
+    editor.classList.add("msh-history-editor");
+    return editor.outerHTML;
   }
 
   /** @override */
@@ -226,10 +244,18 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     // this.element. The utility guards against double-binding.
     initSheetZoom(this);
 
-    // Wire {{editor}} helper outputs (pencil-edit + save). ApplicationV2
-    // doesn't auto-activate v1-style editor blocks, so we delegate to
-    // v1's _activateEditor on each render.
-    this._activateLegacyEditors();
+    if (!this.isEditable) this._lockContent();
+  }
+
+  /** Disable every control in the sheet body. The window header (close,
+   *  controls menu) stays live. Mirrors what the V1 base did for a sheet
+   *  that is not editable. */
+  _lockContent() {
+    const body = this.element?.querySelector(".window-content");
+    if (!body) return;
+    for (const el of body.querySelectorAll("input, select, textarea, button")) {
+      el.setAttribute("disabled", "");
+    }
   }
 
 /* -------------------------------------------- */
@@ -344,28 +370,6 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     return picker.render(true);
   }
 
-  /** Activate v1-style {{editor}} helper outputs ({.editor-content[data-edit]})
-   *  on the v2 sheet. v1's FormApplication._render wires the pencil-edit
-   *  button and the eventual save → _onSubmit → _updateObject → actor.update
-   *  chain. ApplicationV2 doesn't run that path, so we delegate to v1's
-   *  _activateEditor through the proxy on each render. */
-  _activateLegacyEditors() {
-    if (!this.isEditable) return;
-    const v1 = this._v1();
-    if (typeof v1._activateEditor !== "function") return;
-    const divs = this.element.querySelectorAll(".editor-content[data-edit]");
-    for (const div of divs) {
-      try {
-        v1._activateEditor.call(this._adapterThis(v1), div);
-      } catch (err) {
-        console.warn(
-          "FaseripActorSheetV2 | _activateEditor failed for",
-          div.dataset.edit, err
-        );
-      }
-    }
-  }
-
   /**
    * V2-native drop. The v1 base ActorSheet._onDrop chain depends on the
    * legacy global TextEditor and a fully-rendered v1 instance, neither of
@@ -456,8 +460,9 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     const root = html[0];
     if (!root) return;
 
-    const nav = root.querySelector(".sheet-tabs-navigation");
-    const content = root.querySelector(".sheet-tab-content");
+    const shim = this.constructor.TABS_SHIM;
+    const nav = root.querySelector(shim.nav);
+    const content = root.querySelector(shim.content);
     if (!nav || !content) return;
 
     const items = nav.querySelectorAll(".item[data-tab]");

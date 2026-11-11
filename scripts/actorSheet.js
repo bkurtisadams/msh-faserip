@@ -1,3 +1,8 @@
+// actorSheet.js v2.16.0 - 2026-11-11
+// v2.16.0: Two steps toward leaving the V1 framework. getData() builds its
+//          base context itself (_baseSheetContext) instead of calling the V1
+//          ActorSheet's getData. activateListeners() skips the V1 base
+//          listeners when it runs under the V2 sheet's adapter.
 // actorSheet.js v2.15.0 - 2026-11-11
 // v2.15.0: Form-submit normalisation (rank / number coherence, Resources
 //          sync, the guard against saving effect-shifted display values)
@@ -448,8 +453,33 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   }
 
   /** @override */
+  /**
+   * The base template context the V1 ActorSheet used to supply. Built here
+   * so this class no longer depends on the V1 framework for its data.
+   */
+  _baseSheetContext() {
+    const actor = this.actor;
+    const data = actor.toObject(false);
+    const items = data.items ?? [];
+    items.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    const editable = !!this.isEditable;
+    return {
+      cssClass: editable ? "editable" : "locked",
+      editable,
+      document: actor,
+      data,
+      limited: actor.limited,
+      options: this.options,
+      owner: actor.isOwner,
+      title: this.title,
+      actor,
+      items,
+      effects: data.effects
+    };
+  }
+
   getData() {
-    const context = super.getData();
+    const context = this._baseSheetContext();
     const actorData = this.actor.toObject(false);
 
     context.system = actorData.system;
@@ -2437,7 +2467,11 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   }
 
   activateListeners(html) {
-    super.activateListeners(html);
+    // Under the V2 sheet's adapter the V1 base listeners are not wanted: the
+    // V2 sheet owns form submission, tabs, editors, the portrait click and
+    // the read-only lock. A true V1 subclass (the vehicle sheet) still needs
+    // them.
+    if (!this._isV2Adapter) super.activateListeners(html);
     this._restoreSheetFocus(html);
     this._bindCoreStatTabbing(html);
 

@@ -460,3 +460,10 @@
   padding: 6px 8px;
   border-top: 1px solid #c0a070;
 }
+
+/* V2 vehicle window (v3.3.0): the template root carries .faserip-sheet, so
+   the window itself only needs to scroll and drop its default padding. */
+.faserip-vehicle-window .window-content {
+  padding: 0;
+  overflow: auto;
+}

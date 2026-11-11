@@ -1,3 +1,8 @@
+// scripts/vehicle-actor-sheet.js v3.3.0 - 2026-11-11
+// v3.3.0: MSHVehicleActorSheetV2, the registered vehicle sheet. It is the same
+//         V2 shell the character sheet uses, pointed at the vehicle template
+//         and at MSHVehicleActorSheet for data and listeners. The V1 class
+//         below is no longer registered as a sheet.
 // scripts/vehicle-actor-sheet.js v3.2.0 - 2026-09-26
 // v3.2.0: Art Facing select (flags.msh-faserip.artFacing) drives headlight/vision cone offset
 // v3.1.0: Unlinked tokens as crew — "Selected" buttons add controlled canvas tokens by
@@ -9,6 +14,7 @@
 // v1.0.0: Initial vehicle actor sheet
 
 import { FaseripActorSheet } from "./actorSheet.js";
+import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 import {
   RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
   stepRank, rankValue as rankVal
@@ -263,5 +269,44 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
     if (slot !== "driver" && slot !== "passenger") return false;
     await this._addCrew(slot, doc);
     return doc;
+  }
+}
+
+export class MSHVehicleActorSheetV2 extends FaseripActorSheetV2 {
+  /** @override */
+  static DEFAULT_OPTIONS = {
+    classes: ["vehicle", "faserip-vehicle-window"],
+    position: { width: 620, height: 580 }
+  };
+
+  /** @override */
+  static PARTS = {
+    sheet: {
+      template: "systems/msh-faserip/templates/actor/vehicle-actor-sheet.html",
+      scrollable: [".sheet-body"]
+    }
+  };
+
+  static TABS_SHIM = { nav: ".sheet-tabs", content: ".sheet-body", initial: "crew" };
+  static NORMAL_SIZE = { width: 620, height: 580 };
+
+  // The character sheet's form.faserip-sheet rules style the window itself.
+  // The vehicle sheet keeps its own look: the class goes on the template's
+  // root element instead, where only the descendant rules apply.
+  /** @override */
+  _initializeApplicationOptions(options) {
+    const applicationOptions = super._initializeApplicationOptions(options);
+    applicationOptions.classes = (applicationOptions.classes ?? []).filter(c => c !== "faserip-sheet");
+    return applicationOptions;
+  }
+
+  /** @override */
+  _createLegacySheet() {
+    return new MSHVehicleActorSheet(this.actor, { editable: this.isEditable });
+  }
+
+  /** @override */
+  async _historyEditorHtml() {
+    return "";
   }
 }

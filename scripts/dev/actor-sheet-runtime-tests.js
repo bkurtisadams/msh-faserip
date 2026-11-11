@@ -1,3 +1,16 @@
+// scripts/dev/actor-sheet-runtime-tests.js v1.3.0 - 2026-11-11
+// v1.3.0: Vehicle sheet: quick damage button, dropping an actor on the
+//         Driver slot and removing them again, and (on the V2 shell) that
+//         the window does not pick up the character sheet's window styling.
+// scripts/dev/actor-sheet-runtime-tests.js v1.2.0 - 2026-11-11
+// v1.2.0: The History editor steps work with both the old V1 editor block
+//         and the V2 <prose-mirror> element, report which one is on the
+//         sheet, and check that saving makes exactly one actor update.
+// scripts/dev/actor-sheet-runtime-tests.js v1.1.1 - 2026-11-11
+// v1.1.1: The History editor lives in the Bio panel, which is closed by
+//         default, so the first run skipped it. The suite now opens Bio,
+//         edits a Bio field, runs the editor steps and closes Bio again.
+//         Adds an explicit form submit (the Enter-key path) saving once.
 // scripts/dev/actor-sheet-runtime-tests.js v1.1.0 - 2026-11-11
 // v1.1.0: Covers what the next port steps touch, so there is a baseline
 //         before they change: one actor update per edit, the portrait file
@@ -155,18 +168,66 @@ async function portraitTest(recorder, sheet) {
   await sleep(200);
 }
 
+async function bioTest(recorder, sheet, actor) {
+  const toggle = () => content(sheet)?.querySelector(".biography-toggle");
+  if (!toggle()) return recorder.skip("Bio panel", { reason: "no .biography-toggle on the sheet" });
+  const isOpen = () => !!content(sheet)?.querySelector(".msh-bio");
+  if (!isOpen()) { toggle().click(); await waitFor(isOpen, { timeout: 3000 }); await sleep(300); }
+  recorder.assert(isOpen(), "Bio panel: the Bio button opens the panel");
+  if (!isOpen()) return;
+
+  const field = content(sheet).querySelector('[name="system.race"]');
+  if (!field) recorder.skip("Bio panel: field edit", { reason: "no system.race control" });
+  else {
+    const value = `Runtime${Date.now()}`;
+    field.value = value;
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+    const saved = await waitFor(() => actor.system.race === value, { timeout: 2500 });
+    await sleep(300);
+    recorder.assert(!!saved, "Bio panel: a Bio field edit saves", { race: actor.system.race });
+    recorder.assert(isOpen(), "Bio panel: the panel stays open through the re-render");
+  }
+
+  await historyEditorTest(recorder, sheet, actor);
+
+  if (isOpen()) { toggle()?.click(); await waitFor(() => !isOpen(), { timeout: 3000 }); await sleep(200); }
+  recorder.assert(!isOpen(), "Bio panel: the Bio button closes the panel");
+}
+
+async function submitTest(recorder, sheet, actor) {
+  const form = sheet.element?.tagName === "FORM" ? sheet.element : sheet.element?.querySelector("form");
+  const name = content(sheet)?.querySelector('[name="name"]');
+  if (!form || !name || typeof form.requestSubmit !== "function") return recorder.skip("Submit: explicit form submit", { reason: "no form or name control" });
+  const value = `${TEST_PREFIX} Submitted`;
+  let updates = 0;
+  const hookId = Hooks.on("updateActor", (doc) => { if (doc.id === actor.id) updates++; });
+  try {
+    name.value = value;
+    form.requestSubmit();
+    const saved = await waitFor(() => actor.name === value, { timeout: 2500 });
+    await sleep(500);
+    recorder.assert(!!saved, "Submit: an explicit form submit saves", { name: actor.name });
+    recorder.assert(updates === 1, "Submit: an explicit form submit makes exactly one actor update", { updates });
+    recorder.assert(sheet.rendered, "Submit: the sheet stays open after a submit");
+  } finally {
+    Hooks.off("updateActor", hookId);
+  }
+}
+
 async function historyEditorTest(recorder, sheet, actor) {
   const marker = `RuntimeHistory${Date.now()}`;
-  const block = () => content(sheet)?.querySelector('.editor-content[data-edit="system.history"]')?.closest(".editor")
-    ?? content(sheet)?.querySelector('[data-edit="system.history"]')?.parentElement ?? null;
-  if (!block()) return recorder.skip("History editor", { reason: "no editor block for system.history on the sheet" });
-  recorder.pass("History editor: the editor block is on the sheet");
+  const block = () => content(sheet)?.querySelector('prose-mirror[name="system.history"]')
+    ?? content(sheet)?.querySelector('.editor-content[data-edit="system.history"]')?.closest(".editor")
+    ?? null;
+  if (!block()) return recorder.skip("History editor", { reason: "no editor for system.history on the sheet" });
+  const kind = block().tagName === "PROSE-MIRROR" ? "V2 prose-mirror element" : "V1 editor block";
+  recorder.pass(`History editor: the editor is on the sheet (${kind})`);
 
-  const pencil = block().querySelector(".editor-edit");
-  recorder.assert(!!pencil, "History editor: the edit button is present");
+  const pencil = block().querySelector(".editor-edit, button.toggle, button");
+  recorder.assert(!!pencil, "History editor: the edit button is present", { html: block().outerHTML.slice(0, 300) });
   if (!pencil) return;
   pencil.click();
-  const surface = await waitFor(() => block()?.querySelector('.ProseMirror[contenteditable="true"], [contenteditable="true"]'), { timeout: 4000 });
+  const surface = await waitFor(() => block()?.querySelector('[contenteditable="true"]'), { timeout: 4000 });
   recorder.assert(!!surface, "History editor: clicking edit opens an editing surface", { html: block()?.innerHTML?.slice(0, 300) });
   if (!surface) return;
 
@@ -182,12 +243,20 @@ async function historyEditorTest(recorder, sheet, actor) {
   const save = block().querySelector('[data-action="save"]') ?? content(sheet).querySelector('.editor-menu [data-action="save"], menu [data-action="save"]');
   recorder.assert(!!save, "History editor: the save button is present", { buttons: Array.from(block().querySelectorAll("button,[data-action]")).map(b => b.dataset?.action ?? b.className).slice(0, 12) });
   if (!save) return;
-  save.click();
-  const saved = await waitFor(() => String(actor.system.history ?? "").includes(marker), { timeout: 4000 });
-  recorder.assert(!!saved, "History editor: saving writes the text to the actor", { history: String(actor.system.history ?? "").slice(0, 120) });
-  await sleep(400);
-  const shown = content(sheet)?.querySelector('.editor-content[data-edit="system.history"]')?.textContent ?? "";
+  let updates = 0;
+  const hookId = Hooks.on("updateActor", (doc) => { if (doc.id === actor.id) updates++; });
+  try {
+    save.click();
+    const saved = await waitFor(() => String(actor.system.history ?? "").includes(marker), { timeout: 4000 });
+    recorder.assert(!!saved, "History editor: saving writes the text to the actor", { history: String(actor.system.history ?? "").slice(0, 120) });
+    await sleep(600);
+    recorder.assert(updates === 1, "History editor: saving makes exactly one actor update", { updates });
+  } finally {
+    Hooks.off("updateActor", hookId);
+  }
+  const shown = block()?.textContent ?? "";
   recorder.assert(shown.includes(marker), "History editor: the sheet shows the saved text afterwards", { shown: shown.slice(0, 120) });
+  recorder.assert(!block()?.querySelector('[contenteditable="true"]'), "History editor: the editor closes after saving");
 }
 
 async function dropTest(recorder, sheet, actor, donor) {
@@ -216,15 +285,16 @@ async function readOnlyTest(recorder, actor) {
     const controls = Array.from(content(sheet).querySelectorAll("input[name], select[name], textarea[name]")).filter(el => el.type !== "hidden");
     const live = controls.filter(el => !el.disabled && !el.readOnly);
     recorder.assert(live.length === 0, `Read-only: all ${controls.length} named controls are disabled`, { stillEditable: live.slice(0, 12).map(el => el.name), count: live.length });
+    const editorEl = content(sheet).querySelector('prose-mirror[name="system.history"]');
     const pencil = content(sheet).querySelector('.editor-content[data-edit="system.history"]')?.closest(".editor")?.querySelector(".editor-edit");
     const pencilShown = !!pencil && getComputedStyle(pencil).display !== "none";
-    recorder.assert(!pencilShown, "Read-only: the History edit button is not offered");
+    recorder.assert(!pencilShown && !editorEl, "Read-only: no History editor is offered");
   } finally {
     await closeSheet(sheet);
   }
 }
 
-async function vehicleTest(recorder, vehicle) {
+async function vehicleTest(recorder, vehicle, crewActor) {
   const sheet = vehicle.sheet;
   const isV1 = !!foundry.appv1?.sheets?.ActorSheet && sheet instanceof foundry.appv1.sheets.ActorSheet;
   recorder.pass(`Vehicle: sheet class is ${sheet?.constructor?.name} (${isV1 ? "V1 framework" : "V2 framework"})`);
@@ -248,6 +318,42 @@ async function vehicleTest(recorder, vehicle) {
     if (!panel?.classList.contains("active")) stuck.push(tab);
   }
   recorder.assert(stuck.length === 0, "Vehicle: every tab switches", { stuck });
+  if (!isV1) recorder.assert(!root().classList.contains("faserip-sheet") && !!root().querySelector(".vehicle-sheet.faserip-sheet"),
+    "Vehicle: the window keeps its own look (character window class is on the content, not the window)", { windowClasses: root().className });
+
+  const dmg = root().querySelector(".vehicle-damage-quick");
+  if (!dmg) recorder.skip("Vehicle: quick damage button", { reason: "no .vehicle-damage-quick button" });
+  else {
+    const before = Number(vehicle.system.bodyHP) || 0;
+    const amt = Number(dmg.dataset.amt || 0);
+    dmg.click();
+    const done = await waitFor(() => Number(vehicle.system.bodyHP) === Math.max(0, before - amt), { timeout: 2500 });
+    await sleep(300);
+    recorder.assert(!!done, `Vehicle: the quick damage button takes ${amt} off Body`, { before, after: vehicle.system.bodyHP });
+  }
+
+  const zone = root().querySelector('.crew-drop-zone[data-slot="driver"]');
+  if (!zone || !crewActor) recorder.skip("Vehicle: driver drop", { reason: "no driver drop zone or crew actor" });
+  else {
+    let dt = null;
+    try { dt = new DataTransfer(); dt.setData("text/plain", JSON.stringify({ type: "Actor", uuid: crewActor.uuid })); } catch (_) { dt = null; }
+    if (!dt) recorder.skip("Vehicle: driver drop", { reason: "cannot build a DataTransfer" });
+    else {
+      zone.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const seated = await waitFor(() => vehicle.system.driverUuid === crewActor.uuid, { timeout: 3000 });
+      await sleep(400);
+      recorder.assert(!!seated, "Vehicle: dropping an actor on the Driver slot makes them the driver", { driverUuid: vehicle.system.driverUuid });
+      const shownName = root().querySelector('.crew-link')?.textContent?.trim() ?? "";
+      recorder.assert(!seated || shownName.length > 0, "Vehicle: the driver is listed on the Crew tab", { shownName });
+      const remove = root().querySelector('.crew-remove[data-slot="driver"]');
+      if (remove) {
+        remove.click();
+        const cleared = await waitFor(() => !vehicle.system.driverUuid, { timeout: 2500 });
+        await sleep(300);
+        recorder.assert(!!cleared, "Vehicle: the remove button clears the driver", { driverUuid: vehicle.system.driverUuid });
+      } else if (seated) recorder.fail("Vehicle: the remove button clears the driver", { reason: "no .crew-remove[data-slot=driver] after seating" });
+    }
+  }
 
   const newName = `${TEST_PREFIX} Vehicle Renamed`;
   const el = root().querySelector('[name="name"]');
@@ -374,7 +480,8 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
       await actor.update(foundry.utils.deepClone(BASELINE));
       await sleep(300);
       try { await portraitTest(recorder, sheet); } catch (e) { recorder.fail("Portrait: test ran", { message: e?.message }); }
-      try { await historyEditorTest(recorder, sheet, actor); } catch (e) { recorder.fail("History editor: test ran", { message: e?.message }); }
+      try { await bioTest(recorder, sheet, actor); } catch (e) { recorder.fail("Bio panel: test ran", { message: e?.message }); }
+      try { await submitTest(recorder, sheet, actor); } catch (e) { recorder.fail("Submit: test ran", { message: e?.message }); }
       try { await dropTest(recorder, sheet, actor, legacy); } catch (e) { recorder.fail("Drop: test ran", { message: e?.message }); }
 
       // Close and reopen
@@ -391,10 +498,10 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
     }
 
     try {
-      const vehicle = await ActorClass.create({ name: `${TEST_PREFIX} Vehicle ${Date.now()}`, type: "vehicle" });
+      const vehicle = await ActorClass.create({ name: `${TEST_PREFIX} Vehicle ${Date.now()}`, type: "vehicle", system: { bodyHP: 20, bodyHPMax: 20, seatingCapacity: 5 } });
       if (!vehicle) throw new Error("Could not create the vehicle test actor.");
       actors.push(vehicle);
-      await vehicleTest(recorder, vehicle);
+      await vehicleTest(recorder, vehicle, actors[0]);
     } catch (e) { recorder.fail("Vehicle: test ran", { message: e?.message ?? String(e) }); }
   } catch (error) {
     recorder.fail("Character sheet suite completed without an uncaught exception", { message: error?.message ?? String(error), stack: error?.stack });
