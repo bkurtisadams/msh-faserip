@@ -1,3 +1,9 @@
+// karma-sheet-v2.js v1.2.0 - 2026-11-11
+// v1.2.0: KarmaSheet and KarmaPoolSheet are now plain classes, so this file
+//         holds both Karma windows: KarmaSheetV2 and the new
+//         KarmaPoolSheetV2. Which legacy class a window wraps is set by
+//         _createLegacy(). A window that is not editable disables its own
+//         controls (the V1 base listeners used to).
 // karma-sheet-v2.js v1.1.0
 // FASERIP KarmaSheetV2 — DocumentSheetV2 wrap around the v1 KarmaSheet.
 // Mirrors FaseripActorSheetV2: a lazy, non-rendering v1 sheet acts as a
@@ -7,6 +13,7 @@
 // (Resource Income, etc.) which never renders.
 
 import { KarmaSheet } from "./karma.js";
+import { KarmaPoolSheet } from "./karmaPool.js";
 
 const { HandlebarsApplicationMixin, DocumentSheetV2 } = foundry.applications.api;
 
@@ -50,9 +57,14 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
 
   _v1() {
     if (!this.#v1) {
-      this.#v1 = new KarmaSheet(this.document, { editable: this.isEditable });
+      this.#v1 = this._createLegacy();
     }
     return this.#v1;
+  }
+
+  /** The legacy class whose data preparation and listeners this window borrows. */
+  _createLegacy() {
+    return new KarmaSheet(this.document, { editable: this.isEditable });
   }
 
   /** Proxy the v1 instance so its methods see v2's actor / element / render
@@ -137,6 +149,11 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
     } catch (err) {
       console.error("KarmaSheetV2 | v1 activateListeners shim failed", err);
     }
+
+    if (!this.isEditable) {
+      const body = this.element?.querySelector(".window-content");
+      for (const el of body?.querySelectorAll("input, select, textarea, button") ?? []) el.setAttribute("disabled", "");
+    }
   }
 
   /** @override */
@@ -153,5 +170,39 @@ export class KarmaSheetV2 extends HandlebarsApplicationMixin(DocumentSheetV2) {
    *  absent on the karma sheet despite being a real v2 application. */
   _canDetach() {
     return true;
+  }
+}
+
+export class KarmaPoolSheetV2 extends KarmaSheetV2 {
+
+  /** @override */
+  static DEFAULT_OPTIONS = {
+    classes: ["karma-pool"],
+    position: { width: 520, height: 520 }
+  };
+
+  /** @override */
+  static PARTS = {
+    body: {
+      template: "systems/msh-faserip/templates/karma-pool-sheet.html"
+    }
+  };
+
+  // The pool window is not a Karma History window; drop the inherited class.
+  /** @override */
+  _initializeApplicationOptions(options) {
+    const applicationOptions = super._initializeApplicationOptions(options);
+    applicationOptions.classes = (applicationOptions.classes ?? []).filter(c => c !== "karma");
+    return applicationOptions;
+  }
+
+  /** @override */
+  get title() {
+    return "Team Karma Pool";
+  }
+
+  /** @override */
+  _createLegacy() {
+    return new KarmaPoolSheet(this.document, { editable: this.isEditable });
   }
 }

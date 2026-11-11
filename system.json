@@ -2,7 +2,7 @@
   "id": "msh-faserip",
   "title": "Marvel Super Heroes (FASERIP)",
   "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v14.",
-  "version": "2.25.44",
+  "version": "2.25.45",
   "compatibility": {
     "minimum": "14",
     "verified": "14.360"
@@ -36,7 +36,6 @@
     "scripts/macros.js",
     "scripts/gm-utils.js",
     "scripts/karma.js",
-    "scripts/karmaAdvancement.js",
     "scripts/karmaPool.js",
     "scripts/karma-rules.js",
     "scripts/karma-multipliers.js",

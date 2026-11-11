@@ -1,3 +1,7 @@
+// karmaPool.js v2.4.0 - 2026-11-11
+// v2.4.0: KarmaPoolSheet no longer extends Foundry's V1 DocumentSheet. It is
+//         a plain class used by KarmaPoolSheetV2 (karma-sheet-v2.js), which
+//         is the window.
 // karmaPool.js v2.3.0 - 2026-11-11
 // v2.3.0: The ten V1 dialogs here (Contribute, Use, Withdraw, Add Hero,
 //         Remove, the four GM tools and Dissolve) open as V2 dialogs through
@@ -14,17 +18,19 @@ import { computeKarmaTotals } from "./karma-rules.js";
 import { isKarmaPoolLocked } from "./karma-multipliers.js";
 import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
-export class KarmaPoolSheet extends DocumentSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "karma-pool"],
-      template: "systems/msh-faserip/templates/karma-pool-sheet.html",
-      width: 520,
-      height: 520,
-      resizable: true,
-      closeOnSubmit: false,
-      submitOnChange: false
-    });
+export class KarmaPoolSheet {
+  /**
+   * @param {Actor} object   The hero the pool is being viewed for.
+   * @param {object} [options]
+   */
+  constructor(object, options = {}) {
+    this.object = object;
+    this.options = options;
+  }
+
+  /** No window of its own; KarmaPoolSheetV2 supplies one. */
+  render() {
+    return this;
   }
 
   get title() {
@@ -32,7 +38,7 @@ export class KarmaPoolSheet extends DocumentSheet {
   }
 
   getData() {
-    const context = super.getData();
+    const context = { document: this.object, actor: this.object };
     const freshActor = game.actors.get(this.object.id);
     const actorData = freshActor.toObject(false);
     
@@ -83,7 +89,6 @@ export class KarmaPoolSheet extends DocumentSheet {
   }
 
   activateListeners(html) {
-    super.activateListeners(html);
     
     html.find('.contribute-to-pool').click(ev => this._onContributeToPool(ev));
     html.find('.use-from-pool').click(ev => this._onUseFromPool(ev));

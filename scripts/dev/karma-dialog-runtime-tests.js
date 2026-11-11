@@ -1,4 +1,9 @@
-// scripts/dev/karma-dialog-runtime-tests.js v1.0.0 - 2026-11-11
+// scripts/dev/karma-dialog-runtime-tests.js v1.1.0 - 2026-11-11
+// v1.1.0: The Karma window classes left the V1 framework. Checks that, that
+//         a bare KarmaSheet can still record an event with no window open
+//         (the Resource income and stunt path), and that the Team Karma Pool
+//         window opens on V2 and its Contribute dialog opens and cancels.
+//         The pool total is never changed.
 // Foundry VTT runtime suite for the Karma dialogs. On a throwaway hero it
 // opens the Karma History window and drives its dialogs from the window's
 // own controls: Add Karma (adds an entry), Spend Karma (adds a negative
@@ -10,7 +15,9 @@
 // they write world settings.
 // Launch via macros/run-karma-dialog-runtime-tests.js as a GM.
 
-import { KarmaSheetV2 } from "../karma-sheet-v2.js";
+import { KarmaSheetV2, KarmaPoolSheetV2 } from "../karma-sheet-v2.js";
+import { KarmaSheet } from "../karma.js";
+import { KarmaPoolSheet } from "../karmaPool.js";
 
 const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Karma Runtime";
@@ -125,6 +132,23 @@ export async function runKarmaDialogRuntimeTests({ keepArtifacts = false, postCh
     });
     if (!actor) throw new Error("Could not create the test actor.");
 
+    // Framework
+    const v1Bases = [foundry.appv1?.api?.Application, foundry.appv1?.api?.DocumentSheet].filter(Boolean);
+    const onV1 = (cls) => v1Bases.some(base => cls.prototype instanceof base);
+    recorder.assert(!onV1(KarmaSheet) && !onV1(KarmaPoolSheet), "Framework: the Karma classes no longer extend the V1 framework",
+      { karma: Object.getPrototypeOf(KarmaSheet)?.name || "(none)", pool: Object.getPrototypeOf(KarmaPoolSheet)?.name || "(none)" });
+
+    // A bare KarmaSheet records an event with no window open.
+    {
+      const before = history(actor).length;
+      const v1Before = Object.keys(ui.windows ?? {}).length;
+      new KarmaSheet(actor)._addKarmaEvent({ realDate: new Date().toLocaleDateString(), gameDate: "", amount: 5, type: "Custom", description: "Runtime bare" });
+      const added = await waitFor(() => history(actor).length === before + 1, { timeout: 3000 });
+      recorder.assert(!!added && history(actor).at(-1)?.description === "Runtime bare", "Bare KarmaSheet: records an event without a window", { last: history(actor).at(-1) });
+      recorder.assert(Object.keys(ui.windows ?? {}).length === v1Before, "Bare KarmaSheet: opens no window");
+      await sleep(300);
+    }
+
     sheet = new KarmaSheetV2(actor);
     await sheet.render(true);
     const opened = await waitFor(() => sheet.rendered && sheet.element?.querySelector?.(".add-karma"));
@@ -216,13 +240,39 @@ export async function runKarmaDialogRuntimeTests({ keepArtifacts = false, postCh
       await closeDialog(d);
     }
 
+    // Team Karma Pool window
+    {
+      const v1Before = Object.keys(ui.windows ?? {}).length;
+      const poolTotal = game.settings.get(SYSTEM_ID, "teamKarmaPoolTotal");
+      const pool = new KarmaPoolSheetV2(actor);
+      stray.push(pool);
+      await pool.render(true);
+      const poolOpen = await waitFor(() => pool.rendered && pool.element?.querySelector?.(".karma-pool-sheet"));
+      await sleep(300);
+      recorder.assert(!!poolOpen && pool.title === "Team Karma Pool", "Pool window: opens on V2 with its own title", { title: pool.title });
+      recorder.assert(!!poolOpen && !pool.element.classList.contains("karma") && pool.element.classList.contains("karma-pool"), "Pool window: carries its own window class, not the Karma History one",
+        { classes: pool.element?.className });
+      v1Total += Object.keys(ui.windows ?? {}).length - v1Before;
+      const trigger = pool.element?.querySelector(".contribute-to-pool");
+      if (!trigger) recorder.skip("Pool window: Contribute dialog", { reason: "no .contribute-to-pool control (the test hero may not be a pool member)" });
+      else {
+        const r = await openDialogFrom(trigger);
+        v1Total += r.v1Opened;
+        recorder.assert(!!r.dialog && /Contribute to Team Karma Pool/i.test(titleOf(r.dialog)), "Pool window: Contribute opens as a V2 dialog", { title: titleOf(r.dialog) });
+        if (r.dialog) { stray.push(r.dialog); await press(r.dialog, "cancel"); await closeDialog(r.dialog); }
+      }
+      recorder.assert(game.settings.get(SYSTEM_ID, "teamKarmaPoolTotal") === poolTotal, "Pool window: the pool total is unchanged by the test", { poolTotal });
+      try { await pool.close(); } catch (_) { /* noop */ }
+      await sleep(200);
+    }
+
     recorder.assert(v1Total === 0, "No V1 window opened for any Karma dialog", { v1Opened: v1Total });
     recorder.assert(nested.length === 0, "No Karma dialog carries a form inside its content", { nested });
   } catch (error) {
     recorder.fail("Karma dialog suite completed without an uncaught exception", { message: error?.message ?? String(error), stack: error?.stack });
     console.error("[FASERIP TEST] Karma dialog suite aborted", error);
   } finally {
-    for (const dlg of stray) await closeDialog(dlg);
+    for (const dlg of stray) { try { await closeDialog(dlg); } catch (_) { /* noop */ } }
     if (sheet) { try { await sheet.close(); } catch (_) { /* noop */ } }
     if (actor && !keepArtifacts) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
     console.table(recorder.results.map(({ status, name }) => ({ status, name })));

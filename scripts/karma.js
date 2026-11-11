@@ -1,3 +1,8 @@
+// karma.js v2.5.0 - 2026-11-11
+// v2.5.0: KarmaSheet no longer extends Foundry's V1 DocumentSheet. It is a
+//         plain class holding the Karma window's data preparation, listeners
+//         and Karma-event helpers; KarmaSheetV2 is the window. The pool
+//         button opens KarmaPoolSheetV2.
 // karma.js v2.4.0 - 2026-11-11
 // v2.4.0: The nine V1 dialogs here (Set Karma Multiplier, Clear All Karma
 //         Data, Add Karma, Spend Karma, the advancement sub-dialog, Import
@@ -147,7 +152,23 @@ export function buildCrimeOptionGroups(amounts) {
   return { stop, arrest, commit, permit };
 }
 
-export class KarmaSheet extends DocumentSheet {
+export class KarmaSheet {
+  /**
+   * @param {Actor} object   The actor whose Karma this manages.
+   * @param {object} [options]
+   */
+  constructor(object, options = {}) {
+    this.object = object;
+    this.options = options;
+  }
+
+  /** This class has no window of its own; KarmaSheetV2 supplies one and
+   *  routes render to itself. Code that builds a bare KarmaSheet to record a
+   *  Karma event (Resource income, stunts) gets a no-op here. */
+  render() {
+    return this;
+  }
+
   sortNewestFirst = true;
   searchFilter = "";
 
@@ -189,25 +210,12 @@ export class KarmaSheet extends DocumentSheet {
     return map[type] || type.toUpperCase();
   }
 
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "karma"],
-      template: "systems/msh-faserip/templates/karma-sheet.html",
-      width: 720,
-      height: 520,
-      resizable: true,
-      closeOnSubmit: false,
-      submitOnChange: false,
-      tabs: []
-    });
-  }
-
   get title() {
     return `Karma History: ${this.object.name}`;
   }
 
   getData() {
-    const context = super.getData();
+    const context = { document: this.object, actor: this.object };
     const actorData = this.object.toObject(false);
     
     context.system = actorData.system;
@@ -297,7 +305,6 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   activateListeners(html) {
-    super.activateListeners(html);
     
     html.find('.add-karma').click(ev => this._onAddKarma(ev));
     html.find('.spend-karma').click(ev => this._onSpendKarma(ev));
@@ -396,9 +403,8 @@ export class KarmaSheet extends DocumentSheet {
     });
 
     html.find('.open-pool').click(ev => {
-      import('./karmaPool.js').then(module => {
-        const poolSheet = new module.KarmaPoolSheet(this.object);
-        poolSheet.render(true);
+      import('./karma-sheet-v2.js').then(module => {
+        new module.KarmaPoolSheetV2(this.object).render(true);
       });
     });
 

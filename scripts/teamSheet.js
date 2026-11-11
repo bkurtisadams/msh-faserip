@@ -1,4 +1,8 @@
-// teamSheet.js v4.20.2 - 2026-10-04
+// teamSheet.js v4.21.0 - 2026-11-11
+// v4.21.0: The 14 V1 dialogs here open as V2 dialogs through dialog-shim.js.
+//          The Karma History and Team Karma Pool buttons open the V2 windows
+//          (KarmaSheetV2, KarmaPoolSheetV2). The Team Tracker window itself
+//          is still a V1 Application.
 // v4.20.2: Old "Daily Roll" entries with a negative amount (karma spent on a
 //          FEAT roll, from the daily-bonus era) count as spending and stay
 //          off the Ledger; they remain on each hero's Karma History.
@@ -237,6 +241,7 @@ import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmou
 import { EncounterEditor } from "./apps/encounter-editor.js";
 import { postBattleReport, openBattleReportEditor, registerBattleReportHooks } from "./apps/battle-report.js";
 import { foeDefeatAward, poolAbsorbLoss } from "./lib/faserip-rules/faserip-karma.js";
+import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 export class TeamSheet extends Application {
 
@@ -876,7 +881,7 @@ export class TeamSheet extends Application {
     }
     if (!byActor.size) return;
     const count = [...byActor.values()].reduce((n, a) => n + a.length, 0);
-    if (!await Dialog.confirm({
+    if (!await showFaseripConfirm({
       title: "Undo Karma",
       content: `<p>Remove ${count} karma entr${count === 1 ? "y" : "ies"} from ${byActor.size} hero${byActor.size === 1 ? "" : "es"}?</p>`
     })) return;
@@ -1079,13 +1084,13 @@ export class TeamSheet extends Application {
     });
     html.find('.open-karma-sheet').click(ev => {
       const h = game.actors.get(ev.currentTarget.dataset.heroId);
-      if (h) import('./karma.js').then(m => new m.KarmaSheet(h).render(true));
+      if (h) import('./karma-sheet-v2.js').then(m => new m.KarmaSheetV2(h).render(true));
     });
     html.find('.open-pool-manager').click(() => {
-      import('./karmaPool.js').then(m => {
+      import('./karma-sheet-v2.js').then(m => {
         const a = game.actors.find(a => game.user.character?.id === a.id) ||
                   game.actors.find(a => a.type === "hero" && a.hasPlayerOwner);
-        if (a) new m.KarmaPoolSheet(a).render(true);
+        if (a) new m.KarmaPoolSheetV2(a).render(true);
       });
     });
 
@@ -1291,7 +1296,7 @@ export class TeamSheet extends Application {
     event.stopPropagation();
     const heroId = event.currentTarget.dataset.heroId;
     const hero = game.actors.get(heroId);
-    if (!await Dialog.confirm({ title: "Remove", content: `<p>Remove <strong>${hero?.name}</strong>?</p>` })) return;
+    if (!await showFaseripConfirm({ title: "Remove", content: `<p>Remove <strong>${hero?.name}</strong>?</p>` })) return;
     const tm = game.settings.get("msh-faserip", "teamMembers") || [];
     const i = tm.indexOf(heroId);
     if (i > -1) {
@@ -1783,7 +1788,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
     let parsedEnc = null;
 
-    const dlg = new Dialog({
+    showFaseripButtonDialog({
       title: "Import Encounter from Text",
       content,
       buttons: {
@@ -1818,10 +1823,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           parsedEnc = encounter;
           html.find(".enc-import-preview").html(this._renderImportPreview(encounter, warnings));
         });
-      }
-    }, { width: 760, height: 560, resizable: true });
-
-    dlg.render(true);
+      },
+      width: 760, height: 560, resizable: true
+    });
   }
 
   // ===== ADD / DELETE =====
@@ -1905,9 +1909,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       });
     };
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Add Encounter",
-      content: `<form>
+      content: `<div>
         <!-- Name -->
         <div class="form-group">
           <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;">Name</label>
@@ -2000,7 +2004,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
           </div>
         </details>
-      </form>`,
+      </div>`,
       buttons: {
         add: { icon: '<i class="fas fa-plus"></i>', label: "Create",
           callback: async (html) => {
@@ -2082,7 +2086,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           renderBonusList(html);
         });
       }
-    }).render(true);
+    });
   }
 
   _onAddFoeToEncounter(ev) {
@@ -2103,9 +2107,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       `<option value="${r.value}" data-label="${r.rank}">${r.rank} (${r.value})</option>`
     ).join('');
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Add Foe to Encounter",
-      content: `<form>
+      content: `<div>
         <div class="form-group"><label>Pick from actors:</label>
           <select name="actorId" style="width:100%"><option value="">— Manual entry —</option>${hostileOpts}</select></div>
         <hr/>
@@ -2113,7 +2117,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           <input type="text" name="name" placeholder="e.g., Rhino" /></div>
         <div class="form-group"><label>Highest Rank:</label>
           <select name="rank" style="width:100%">${rankOpts}</select></div>
-      </form>`,
+      </div>`,
       buttons: {
         add: { icon: '<i class="fas fa-skull"></i>', label: "Add",
           callback: async (html) => {
@@ -2150,7 +2154,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           }
         });
       }
-    }).render(true);
+    });
   }
 
   async _addEncounter(villains, presentHeroIds) {
@@ -2178,7 +2182,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
     if (!encounters[encIdx]?.villains?.[foeIdx]) return;
     const name = encounters[encIdx].villains[foeIdx].name;
-    if (!await Dialog.confirm({ title: "Remove Foe", content: `<p>Remove <strong>${name}</strong>?</p>` })) return;
+    if (!await showFaseripConfirm({ title: "Remove Foe", content: `<p>Remove <strong>${name}</strong>?</p>` })) return;
     encounters[encIdx].villains.splice(foeIdx, 1);
     if (!encounters[encIdx].villains.length) {
       encounters.splice(encIdx, 1);
@@ -2210,7 +2214,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     if (!encounters[idx]) return;
     const entry = encounters[idx];
     const names = entry.type === "event" ? (entry.name || "Event") : (entry.villains || []).map(v => v.name).join(', ') || 'Unknown';
-    if (!await Dialog.confirm({ title: "Delete Encounter", content: `<p>Delete ${entry.type === "event" ? "event" : "encounter"} (${names})?</p>` })) return;
+    if (!await showFaseripConfirm({ title: "Delete Encounter", content: `<p>Delete ${entry.type === "event" ? "event" : "encounter"} (${names})?</p>` })) return;
     encounters.splice(idx, 1);
     this._rebuildExpandedSet(idx);
     if (entry.id) this._inlineEncSections.delete(entry.id);
@@ -2256,7 +2260,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       pendingWarning,
       `<p>Apply to <strong>${heroes.length}</strong> hero${heroes.length === 1 ? '' : 'es'}?</p>`
     ].join('');
-    if (!await Dialog.confirm({
+    if (!await showFaseripConfirm({
       title: `Award — ${encLabel}`,
       content: confirmBody
     })) return;
@@ -2419,7 +2423,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const poolPendingWarning = poolPending.length
       ? `<p style="color:#c00;"><strong>⚠ Skipping ${poolPending.length} bonus${poolPending.length === 1 ? '' : 'es'} — needs hero assignment:</strong> ${poolPending.map(p => `${p.label || 'Award'} ${p.amount > 0 ? '+' : ''}${p.amount}`).join('; ')}</p>`
       : '';
-    if (!await Dialog.confirm({
+    if (!await showFaseripConfirm({
       title: `Award to Pool — ${encLabel}`,
       content: `<p>Add <strong>${poolDelta}</strong> karma to team pool?</p>${
         lossEach ? `<p>Losses: <strong>-${lossEach}</strong> to each of ${heroCount} hero${heroCount === 1 ? '' : 'es'}, from their own karma first, then the pool.</p>` : ''
@@ -2484,7 +2488,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     if (!enc || !enc.awarded) return;
 
     const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
-    if (!await Dialog.confirm({
+    if (!await showFaseripConfirm({
       title: `Undo Award — ${encLabel}`,
       content: `<p>Remove karma history entries for this encounter from all participating heroes?</p>`
     })) return;
@@ -2662,9 +2666,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       </tr>`;
     }).join("");
 
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Session Bonus (R+I+P)",
-      content: `<form>
+      content: `<div>
         <div style="margin-bottom:8px;">
           <label style="font-weight:600;">Session name:</label>
           <input type="text" name="reason" value="" placeholder="Optional, e.g. Session 12" style="width:100%;margin-top:2px;" />
@@ -2680,7 +2684,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-      </form>`,
+      </div>`,
       buttons: {
         award: { icon: '<i class="fas fa-star"></i>', label: "Award",
           callback: async (html) => {
@@ -2702,8 +2706,9 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         },
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       },
-      default: "award"
-    }, { width: 420 }).render(true);
+      default: "award",
+      width: 420
+    });
   }
 
   async _addHeroKarmaEvent(hero, { amount, type, description, gameDate, realDate, encounterId }) {
@@ -2785,7 +2790,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const actor = await TeamSheet.getTeamHQActor();
     const item = actor.items.get(itemId);
     if (!item) return;
-    if (!await Dialog.confirm({
+    if (!await showFaseripConfirm({
       title: "Delete Headquarters",
       content: `<p>Delete <strong>${item.name}</strong>?</p>`
     })) return;
@@ -2883,7 +2888,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     }).filter(Boolean).join('');
 
     const hasCustomImg = item.img && !item.img.includes("mystery-man") && !item.img.includes("default");
-    new Dialog({
+    showFaseripButtonDialog({
       title: item.name,
       content: `
         ${hasCustomImg ? `<img src="${item.img}" style="width:100%;border-radius:4px;margin-bottom:8px;" />` : ''}
@@ -2903,7 +2908,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       `,
       buttons: { close: { label: "Close" } },
       width: 500
-    }).render(true);
+    });
   }
 
   // ===== RANK =====
@@ -3048,16 +3053,16 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       ct = game.msh.getCampaignDateTime();
       startDate = game.settings.get("msh-faserip", "campaignStartDate");
     } catch { ui.notifications.warn("Campaign time not available."); return; }
-    new Dialog({
+    showFaseripButtonDialog({
       title: "Time Settings",
-      content: `<form>
+      content: `<div>
         <div class="form-group"><label>Campaign Start</label>
           <input type="datetime-local" name="startDateTime" value="${startDate.slice(0, 16)}" style="width:100%;padding:5px;"></div>
         <div class="form-group"><label>Current Time</label>
           <input type="datetime-local" name="currentDateTime" value="${ct.date.toISOString().slice(0, 16)}" style="width:100%;padding:5px;">
           <p class="notes">Elapsed: ${Math.floor(ct.elapsedSeconds / 86400)}d ${Math.floor((ct.elapsedSeconds % 86400) / 3600)}h</p></div>
         <div class="form-group"><label><input type="checkbox" name="combatSync" ${game.settings.get("msh-faserip", "combatSyncEnabled") ? "checked" : ""}> Auto-sync combat (6s/round)</label></div>
-      </form>`,
+      </div>`,
       buttons: {
         save: { icon: '<i class="fas fa-save"></i>', label: "Save",
           callback: async (html) => {
@@ -3085,7 +3090,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         },
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
       }, default: "save"
-    }).render(true);
+    });
   }
 
 } // end TeamSheet

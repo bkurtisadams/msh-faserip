@@ -1,3 +1,7 @@
+// gm-tools.js v1.5.0 - 2026-11-11
+// v1.5.0: The 9 V1 confirmations here open as V2 dialogs through
+//         dialog-shim.js. The GM Tools window itself is still a V1
+//         Application.
 // gm-tools.js v1.4.4 - 2026-09-03
 // v1.4.4: Advance Time "round" uses TURN_SECONDS (turnSeconds setting retired).
 // gm-tools.js v1.4.3 - 2026-08-01
@@ -41,6 +45,7 @@ import { safeActorDeleteEffects } from "./gm-utils.js";
 import { RANKS_ORDERED, rankValue, shiftRank } from "./rules/rules-reference.js";
 import { loseOneEnduranceRank, restoreOneEnduranceRank } from "./modules/effects/ongoing-engine.js";
 import { TURN_SECONDS } from "./modules/recovery-timing.js";
+import { showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
@@ -438,7 +443,7 @@ export class GMToolsApp extends Application {
     const actor = game.actors.get(actorId);
     if (!actor) { ui.notifications.warn("Actor not found"); return; }
 
-    const confirm = await Dialog.confirm({
+    const confirm = await showFaseripConfirm({
       title: `Restore ${snap.name}?`,
       content: `<p>This will overwrite <strong>${actor.name}</strong> with the backup from ${new Date(snap.timestamp).toLocaleString()}.</p><p>Current items, effects, and system data will be replaced.</p>`
     });
@@ -455,7 +460,7 @@ export class GMToolsApp extends Application {
     const snap = backups[backupId];
     if (!snap) { ui.notifications.warn("Backup not found"); return; }
 
-    const confirm = await Dialog.confirm({
+    const confirm = await showFaseripConfirm({
       title: `Restore deleted character: ${snap.name}?`,
       content: `<p>This will create a new actor <strong>${snap.name}</strong> from the backup made ${new Date(snap.timestamp).toLocaleString()}.</p>`
     });
@@ -549,7 +554,7 @@ export class GMToolsApp extends Application {
     const snap = backups[backupId];
     if (!snap) return;
 
-    const confirm = await Dialog.confirm({
+    const confirm = await showFaseripConfirm({
       title: "Delete Backup?",
       content: `<p>Permanently delete the backup for <strong>${snap.name}</strong>?</p>`
     });
@@ -640,7 +645,7 @@ export class GMToolsApp extends Application {
     const actorImg = snap._originalImg || (snap.img?.startsWith("data:") ? "icons/svg/mystery-man.svg" : snap.img) || "icons/svg/mystery-man.svg";
 
     if (existing) {
-      const choice = await Dialog.confirm({
+      const choice = await showFaseripConfirm({
         title: `Import: ${snap.name}`,
         content: `<p>An actor named <strong>${snap.name}</strong> already exists. Overwrite with the imported backup from ${new Date(snap.timestamp).toLocaleString()}?</p><p>Click "No" to create a new actor instead.</p>`
       });
@@ -673,7 +678,7 @@ export class GMToolsApp extends Application {
   }
 
   async _importBulkSnapshots(snapshots) {
-    const confirm = await Dialog.confirm({
+    const confirm = await showFaseripConfirm({
       title: "Bulk Import",
       content: `<p>Import ${snapshots.length} character backup(s)?</p><p>Existing actors with matching names will be overwritten.</p>`
     });
@@ -1005,14 +1010,14 @@ export class GMToolsApp extends Application {
     if (!actor) return ui.notifications.warn("Select an attacker token first.");
     const target = this._targetActor();
     if (!target) {
-      const proceed = await Dialog.confirm({
+      const proceed = await showFaseripConfirm({
         title: "No Target",
         content: "<p>No targeted token. Attack actions will likely warn or no-op. Continue anyway?</p>"
       });
       if (!proceed) return;
     }
     if (this._testMode !== "full") {
-      const proceed = await Dialog.confirm({
+      const proceed = await showFaseripConfirm({
         title: "Mode is not Full",
         content: "<p>Manual/Semi modes open dialogs that block the runner. Switch to Full or continue and click through?</p>"
       });
@@ -1148,7 +1153,7 @@ export class GMToolsApp extends Application {
     }
     const targetScene = canvas?.scene;
     if (!targetScene) return ui.notifications.warn("No active scene to bring to");
-    const confirm = await Dialog.confirm({
+    const confirm = await showFaseripConfirm({
       title: "Cross-scene move",
       content: `<p>Token <strong>${sourceToken.name}</strong> is on <em>${sourceScene.name}</em>. Move it to <em>${targetScene.name}</em>? Token data is duplicated then the original is deleted (unlinked actor delta is preserved).</p>`
     });
@@ -1191,7 +1196,7 @@ export class GMToolsApp extends Application {
     const scene = game.scenes.get(sceneId);
     const tok = scene?.tokens.get(tokenId);
     if (!tok) return;
-    const confirm = await Dialog.confirm({
+    const confirm = await showFaseripConfirm({
       title: "Delete token?",
       content: `<p>Delete <strong>${tok.name}</strong> from <em>${scene.name}</em>? The actor itself is not affected.</p>`
     });
