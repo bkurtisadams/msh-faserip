@@ -1,3 +1,5 @@
+// scripts/dev/attack-dialog-runtime-tests.js v1.4.0 - 2026-11-11
+// v1.4.0: Charging and Shooting dialogs.
 // scripts/dev/attack-dialog-runtime-tests.js v1.3.0 - 2026-11-11
 // v1.3.0: Grappling, Grabbing and Escaping. These resolve themselves (roll,
 //         card, hold effects), so they run for real against the throwaway
@@ -32,6 +34,8 @@ import { EdgedAttackAction } from "../modules/actions/edged-attack-action.js";
 import { GrapplingAction } from "../modules/actions/grappling-action.js";
 import { GrabbingAction } from "../modules/actions/grabbing-action.js";
 import { EscapingAction } from "../modules/actions/escaping-action.js";
+import { ChargingAction } from "../modules/actions/charging-action.js";
+import { ShootingAction } from "../modules/actions/shooting-action.js";
 import { getBodyArmorValues } from "../modules/actions/action-utils.js";
 import { getAvailableKarma } from "../modules/dice/dice-roller.js";
 
@@ -39,7 +43,7 @@ const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Attack Dialog Runtime";
 const DEFAULT_TIMEOUT = 6000;
 const DIALOG_WIDTH = 360;
-const PREF_KEYS = ["energy", "force", "te", "tb", "ba", "ea"].flatMap(k => [`msh.${k}.remember`, `msh.${k}.skipDice`]);
+const PREF_KEYS = ["energy", "force", "te", "tb", "ba", "ea", "charging", "shooting"].flatMap(k => [`msh.${k}.remember`, `msh.${k}.skipDice`]);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -86,7 +90,8 @@ const ATTACKER_ITEMS = [
   weapon("Test Club", { damageType: "BA", damage: "10", materialStrength: "Good" }),
   weapon("Test Mace", { damageType: "BA", damage: "15", materialStrength: "Good" }),
   weapon("Test Rock", { damageType: "TB", damage: "0", materialStrength: "Typical" }),
-  weapon("Test Girder", { damageType: "TB", damage: "0", materialStrength: "Remarkable" })
+  weapon("Test Girder", { damageType: "TB", damage: "0", materialStrength: "Remarkable" }),
+  { name: "Test Pistol", type: "equipment", system: { category: "weapon", weaponType: "shooting", damageType: "S", damage: "10", range: "5", shots: "6", shotsRemaining: 6, rate: "1", materialStrength: "Good" } }
 ];
 
 async function createCombatant(state, name, { x, y, disposition, system = {}, items = [] }) {
@@ -488,6 +493,59 @@ async function meleeTests(recorder, { attacker, targetA, targetB }) {
   recorder.equal(getBodyArmorValues(targetB.actor, "physical-edged")?.applicable, 0, "Armor: an armor item marked broken gives no protection");
 }
 
+async function chargingAndShootingTests(recorder, { attacker, targetA }) {
+  const actor = attacker.actor;
+  await setTargets([targetA.token]);
+  const karma = getAvailableKarma(actor);
+
+  await withDialog(recorder, "Charging", ChargingAction, { actor, actionType: "charging", abilityName: "endurance" }, async (d) => {
+    const { $html } = d;
+    recorder.equal(d.width(), DIALOG_WIDTH, "Charging: dialog opens at its pinned width");
+    recorder.assert($html.find(".h-stat-label").text() === "Base Endurance" && $html.find(".h-verb").text() === "charges", "Charging: header reads Base Endurance ... charges",
+      { label: $html.find(".h-stat-label").text(), verb: $html.find(".h-verb").text() });
+    recorder.equal($html.find(".frp-fx-cell").length, 4, "Charging: effect grid has four cells");
+    setChk($html, "#msh-remember-settings", true);
+    setChk($html, "#blindside-attack", true);
+    recorder.equal(d.width(), DIALOG_WIDTH, "Charging: width holds after toggling options");
+    const r = await d.roll();
+    recorder.assert(r.rolled && d.exec?.attackForm === "charging" && d.exec?.damageType === "physical-charging" && d.exec?.choice?.blindside === true,
+      "Charging: the charge and Blindside reach the attack", { attackForm: d.exec?.attackForm, damageType: d.exec?.damageType, blindside: d.exec?.choice?.blindside, notes: d.notes });
+    recorder.equal(r.writes, 1, "Charging: Remember flags saved in one actor update");
+  });
+
+  const pistolId = actor.items.getName("Test Pistol").id;
+  await withDialog(recorder, "Shooting", ShootingAction, { actor, actionType: "shooting", abilityName: "agility" }, async (d) => {
+    const { $html } = d;
+    recorder.equal(d.width(), DIALOG_WIDTH, "Shooting: dialog opens at its pinned width");
+    recorder.equal($html.find(".h-stat-label").text(), "Base Agility:", "Shooting: header reads Base Agility");
+    setVal($html, "#damage-source-select", optionValue($html, "#damage-source-select", "Test Pistol"));
+    recorder.equal($html.find("#dmg-val").text(), "10", "Shooting: pistol damage");
+    recorder.equal($html.find(".frp-fx-cell.y").text(), "Bullseye", "Shooting: effect grid names yellow Bullseye");
+    recorder.equal($html.find('[name="resultCap"] option[value="yellow"]').text(), "Cap at Bullseye", "Shooting: yellow result cap is labelled Bullseye");
+    setChk($html, "#msh-remember-settings", true);
+    setChk($html, "#aim-enabled", true);
+    recorder.assert(!$html.find('[name="aimMode"]').prop("disabled"), "Shooting: ticking Aim enables the aim mode");
+    setVal($html, '[name="aimMode"]', "neutralize");
+    if (karma >= 50) {
+      setChk($html, "#pull-effect-enabled", true);
+      recorder.assert(!$html.find('[name="resultCap"]').prop("disabled"), "Shooting: ticking the paid cap enables its select");
+      setVal($html, '[name="resultCap"]', "green");
+    }
+    setVal($html, '[name="range"]', 1);
+    recorder.equal(d.width(), DIALOG_WIDTH, "Shooting: width holds after toggling options");
+    const r = await d.roll();
+    const c = d.exec?.choice ?? {};
+    recorder.assert(r.rolled && d.exec?.attackForm === "shooting" && d.exec?.rawDamage === 10 && c.aimMode === "neutralize" && (karma < 50 || c.resultCap === "green"),
+      "Shooting: weapon damage, Aim and paid cap reach the attack", { attackForm: d.exec?.attackForm, rawDamage: d.exec?.rawDamage, aimMode: c.aimMode, resultCap: c.resultCap, notes: d.notes });
+    recorder.equal(r.writes, 1, "Shooting: Remember flags saved in one actor update");
+  });
+  await withDialog(recorder, "Shooting reopen", ShootingAction, { actor, actionType: "shooting", abilityName: "agility" }, async (d) => {
+    const { $html } = d;
+    recorder.assert($html.find("#msh-remember-settings").prop("checked") && $html.find("#aim-enabled").prop("checked") && $html.find('[name="aimMode"]').val() === "neutralize",
+      "Shooting reopen: Remember and Aim restored", { aim: $html.find("#aim-enabled").prop("checked"), mode: $html.find('[name="aimMode"]').val() });
+  });
+}
+
 async function grappleFamilyTests(recorder, { attacker, targetA }) {
   const actor = attacker.actor;
   await setTargets([targetA.token]);
@@ -582,6 +640,7 @@ export async function runAttackDialogRuntimeTests({ keepArtifacts = false, postC
       await thrownEdgedTests(recorder, fixtures);
       await thrownBluntTests(recorder, fixtures);
       await meleeTests(recorder, fixtures);
+      await chargingAndShootingTests(recorder, fixtures);
       await grappleFamilyTests(recorder, fixtures);
     }
   } catch (error) {

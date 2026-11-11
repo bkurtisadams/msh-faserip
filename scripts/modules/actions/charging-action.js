@@ -1,3 +1,7 @@
+// charging-action.js v3.4.0 - 2026-11-11
+// v3.4.0: Dialog scaffolding (header, Karma and Blindside rows, effect grid,
+//         footer, titlebar and width setup, Enter-to-roll) now comes from
+//         attack-dialog-kit.js.
 // charging-action.js v3.3.0 - 2026-09-09
 // v3.3.0: Fix dialog ballooning to full width on checkbox/select
 //         toggle — same bug and fix as energy-action.js v3.4.2,
@@ -92,8 +96,6 @@ import {
   showDiceAnimation,
   getTargetData,
   getBodyArmorValues,
-  buildModeSelector,
-  setupModeSelector,
   applyDamageToTargets,
   resolveKernelAttack
 } from "./action-utils.js";
@@ -101,6 +103,10 @@ import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { chargeDamageParts, chargeToHitShift, resolveChargeImpact } from "../../lib/faserip-rules/faserip-damage.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import {
+  saveDialogFlags, headerHtml, karmaRowHtml, blindsideRowHtml, fxGridHtml, footerHtml,
+  mountDialogFrame, wireRollKeys, wireRowToggle
+} from "./attack-dialog-kit.js";
 import { detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
 /**
  * ChargingAction - Endurance-based attack combining movement and combat
@@ -214,7 +220,6 @@ export class ChargingAction extends AttackAction {
   ).join('');
 
   const availableKarma = getAvailableKarma(actor);
-  const hasKarma = availableKarma > 0;
   const minKarma = 10;
 
   const initialBaseRankValue = Math.max(endurance.value, bodyArmorValue);
@@ -246,18 +251,7 @@ export class ChargingAction extends AttackAction {
   <div class="frp-dlg">
 
     <!-- Header: Actor (Base Endurance / Rank Value) charges Target -->
-    <div class="frp-header-v3">
-      <span class="h-actor" title="${actor.name}">${actor.name}</span>
-      <span class="h-paren">(</span>
-      <span class="h-stat">
-        <span class="h-stat-label">Base Endurance</span>
-        <span class="h-stat-rank">${enduranceAbbr} ${endurance.value}</span>
-      </span>
-      <span class="h-paren">)</span>
-      ${targetDisplay
-        ? `<span class="h-verb">charges</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
-        : ''}
-    </div>
+    ${headerHtml({ actor, ability: endurance, targetDisplay, verb: "charges", statLabel: "Base Endurance", statText: `${enduranceAbbr} ${endurance.value}` })}
 
     <!-- Target compact line -->
     ${primaryTarget ? `
@@ -364,37 +358,20 @@ export class ChargingAction extends AttackAction {
           <option value="green">Hit</option>
         </select>
       </div>
-      <div class="frp-opt-row${!hasKarma ? ' inactive' : ' inactive'}">
-        ${hasKarma ? `
-          <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-          <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-        ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-      </div>
-      <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
-        <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
-        <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
-      </div>
+      ${karmaRowHtml({ availableKarma, minKarma })}
+      ${blindsideRowHtml()}
     </div>
 
     <!-- Effect preview grid -->
-    <div class="frp-fx-grid">
-      <div class="frp-fx-cell w">Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">continue &frac12; spd</span></div>
-      <div class="frp-fx-cell g">Hit<br><span style="font-size:9px;font-weight:400;opacity:0.7;">damage only</span></div>
-      <div class="frp-fx-cell y">Slam<br><span style="font-size:9px;font-weight:400;opacity:0.7;">knockback</span></div>
-      <div class="frp-fx-cell r">Stun<br><span style="font-size:9px;font-weight:400;opacity:0.7;">unconscious</span></div>
-    </div>
+    ${fxGridHtml({
+      white: `Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">continue &frac12; spd</span>`,
+      green: `Hit<br><span style="font-size:9px;font-weight:400;opacity:0.7;">damage only</span>`,
+      yellow: `Slam<br><span style="font-size:9px;font-weight:400;opacity:0.7;">knockback</span>`,
+      red: `Stun<br><span style="font-size:9px;font-weight:400;opacity:0.7;">unconscious</span>`
+    })}
 
     <!-- Footer -->
-    <div class="frp-foot">
-      <div class="frp-foot-btns">
-        <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-        <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-      </div>
-      <div class="frp-foot-checks">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-      </div>
-    </div>
+    ${footerHtml({ remember: shouldRemember, skipDice: savedSkipDice })}
 
   </div>
   `;
@@ -406,26 +383,7 @@ export class ChargingAction extends AttackAction {
       content: dialogHtml,
       render: async (html, dlg) => {
         setupKarmaControlHandlers(html);
-        const $dialog = html.closest('.dialog');
-
-        // Hide Foundry's native button row
-        $dialog.find('.dialog-buttons').hide();
-
-        // Inject mode buttons into titlebar
-        const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-        if ($titlebar.length) {
-          const modeHtml = buildModeSelector({ mode: "semi" });
-          const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-          $titlebar.after($modeWrap);
-        }
-        await setupModeSelector(actor, $dialog, this.opts || {}, "lastChargingMode");
-
-        // Set dialog width
-        if ($dialog.length) {
-          $dialog.css('width', '360px');
-          $dialog[0].style.height = 'auto';
-        }
-        try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+        const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastChargingMode" });
         // Re-pin on any form-input change, whichever internal handler
         // reacts to it — AppV2 re-measures to 'auto' width otherwise.
         html.on('change input', 'input, select', () => {
@@ -433,16 +391,7 @@ export class ChargingAction extends AttackAction {
         });
 
         // Auto-focus Roll button for keyboard Enter and focus ring
-        html.find('#frp-roll').focus();
-
-        // Intercept Enter key
-        $dialog.on('keydown', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            html.find('#frp-roll').trigger('click');
-          }
-        });
+        wireRollKeys(html, $dialog);
 
         // ── Roll button handler ──
         html.find('#frp-roll').on('click', async () => {
@@ -505,7 +454,7 @@ export class ChargingAction extends AttackAction {
               flagUpdate.lastChargingObjectMaterial = objectMaterial;
               flagUpdate.lastChargingObjectDesc = objectDesc;
             }
-            await actor.update({ "flags.msh-faserip": flagUpdate });
+            await saveDialogFlags(actor, flagUpdate);
           }
 
           const movementBonus = chargeToHitShift(areas) ?? 0;
@@ -697,9 +646,7 @@ export class ChargingAction extends AttackAction {
         });
 
         // Karma toggle
-        html.find('#spend-karma').on('change', function() {
-          $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
-        });
+        wireRowToggle(html, '#spend-karma');
 
         togglePanels();
         updatePreview();

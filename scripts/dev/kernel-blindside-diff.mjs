@@ -1,3 +1,5 @@
+// scripts/dev/kernel-blindside-diff.mjs v1.5.0 - 2026-11-11
+// v1.5.0: Shooting and Charging take the Blindside row from attack-dialog-kit.js.
 // scripts/dev/kernel-blindside-diff.mjs v1.4.0 - 2026-11-11
 // v1.4.0: Blunt and Edged melee take the Blindside row from attack-dialog-kit.js.
 // scripts/dev/kernel-blindside-diff.mjs v1.3.0 - 2026-11-10
@@ -54,6 +56,8 @@ const DIALOGS = [
   "scripts/modules/actions/charging-action.js",
 ];
 const SHARED = {
+  "scripts/modules/actions/shooting-action.js": ["scripts/modules/actions/attack-dialog-kit.js"],
+  "scripts/modules/actions/charging-action.js": ["scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/blunt-attack-action.js": ["scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/edged-attack-action.js": ["scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/energy-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],

@@ -1,3 +1,7 @@
+// shooting-action.js v3.17.0 - 2026-11-11
+// v3.17.0: Dialog scaffolding (header, Aim / result-cap / Karma / Blindside
+//          rows, effect grid, footer, titlebar and width setup, Enter-to-roll,
+//          option and preference toggles) now comes from attack-dialog-kit.js.
 // shooting-action.js v3.16.1 - 2026-09-10
 // v3.16.1: Fixed-bug — the ammo-variant suffix ("(2× explosive)",
 //          "(Remarkable KO drug)") was appended into the big nowrap damage
@@ -166,7 +170,6 @@ import {
   attachAutoFillRange,
   bannerColors,
   buildActionsBox,
-  buildModeSelector,
   buildResultGrid,
   debugLog,
   effectsFor,
@@ -176,7 +179,6 @@ import {
   labelFor,
   RANKS,
   rollWithKarmaAndHistory,
-  setupModeSelector,
   applyCapabilitiesToDialog,
   shiftRank,
   buildInlineFeatDisplay,
@@ -198,6 +200,10 @@ import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } 
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
+import {
+  saveDialogFlags, headerHtml, aimRowHtml, paidEffectRowHtml, karmaRowHtml, blindsideRowHtml, fxGridHtml, footerHtml,
+  mountDialogFrame, wireRollKeys, wireRowToggle, wireAimToggle, wirePaidEffectToggle, wirePrefToggles
+} from "./attack-dialog-kit.js";
 export class ShootingAction extends RangedAttackAction {
   async execute() {
     const actor = this.actor;
@@ -320,13 +326,11 @@ export class ShootingAction extends RangedAttackAction {
     // === Karma ===
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
-    const hasKarma = availableKarma > 0;
 
     // Shooting results may not be pulled freely; one colour step costs 50 Karma.
     const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingResultCap")) || "none") : "none";
     const canPayReduction = availableKarma >= EFFECT_REDUCTION_COST;
 
-    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // === Build weapon damage source <select> ===
     const damageSrcOptions = shootingWeapons.map(i => {
@@ -360,18 +364,7 @@ export class ShootingAction extends RangedAttackAction {
     <div class="frp-dlg">
 
       <!-- Header: Actor (Base Agility / Rank Value) attacks Target -->
-      <div class="frp-header-v3">
-        <span class="h-actor" title="${actor.name}">${actor.name}</span>
-        <span class="h-paren">(</span>
-        <span class="h-stat">
-          <span class="h-stat-label">Base Agility:</span>
-          <span class="h-stat-rank">${abilityShort} ${ability.value}</span>
-        </span>
-        <span class="h-paren">)</span>
-        ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
-          : ''}
-      </div>
+      ${headerHtml({ actor, ability: { ...ability, name: "Agility" }, targetDisplay })}
 
       ${primaryTarget ? `
       <div class="frp-target-compact">
@@ -444,57 +437,20 @@ export class ShootingAction extends RangedAttackAction {
           <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${(!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>
           <label><input type="radio" name="multiCount" value="3" ${savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
         </div>
-        <div class="frp-opt-row${savedAim === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label><input type="checkbox" id="aim-enabled" ${savedAim !== 'none' ? 'checked' : ''}> <span class="frp-opt-label red">Aim</span></label>
-          <select name="aimMode" ${savedAim === 'none' ? 'disabled' : ''} style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;">
-            <option value="neutralize" ${savedAim === 'neutralize' ? 'selected' : ''}>Neutralize (disarm)</option>
-            <option value="stun" ${(savedAim === 'stun' || savedAim === 'none') ? 'selected' : ''}>Stun</option>
-          </select>
-          <span style="font-size:10px;color:#888;margin-left:auto;">Bullseye effect</span>
-        </div>
-        <div class="frp-opt-row${savedResultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label title="${canPayReduction ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${savedResultCap !== 'none' ? 'checked' : ''} ${canPayReduction ? '' : 'disabled'}> <span class="frp-opt-label orange">Pull</span></label>
-          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(savedResultCap === 'none' || !canPayReduction) ? 'disabled' : ''}>
-            <option value="yellow" ${savedResultCap === 'yellow' ? 'selected' : ''}>Cap at ${effects.yellow}</option>
-            <option value="green" ${savedResultCap === 'green' ? 'selected' : ''}>Cap at ${effects.green}</option>
-          </select>
-          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
-        </div>
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : ' inactive'}">
-          ${hasKarma ? `
-            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-        </div>
-        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
-          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
-          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
-        </div>
+        ${aimRowHtml(savedAim, `<option value="neutralize" ${savedAim === 'neutralize' ? 'selected' : ''}>Neutralize (disarm)</option>
+            <option value="stun" ${(savedAim === 'stun' || savedAim === 'none') ? 'selected' : ''}>Stun</option>`)}
+        ${paidEffectRowHtml({ resultCap: savedResultCap, canPay: canPayReduction, label: "Pull", yellowLabel: effects.yellow, greenLabel: effects.green })}
+        ${karmaRowHtml({ availableKarma, minKarma })}
+        ${blindsideRowHtml()}
       </div>
 
       <!-- Effect preview grid -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w">${effects.white}</div>
-        <div class="frp-fx-cell g">${effects.green}</div>
-        <div class="frp-fx-cell y">${effects.yellow}</div>
-        <div class="frp-fx-cell r">${effects.red}</div>
-      </div>
+      ${fxGridHtml(effects)}
 
       <!-- Footer: checkboxes + buttons on one row -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
+      ${footerHtml({ remember: shouldRemember, skipDice: savedSkipDice })}
     </div>
     `;
-
-    const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_e) {} };
 
     const choice = await new Promise((resolve) => {
       let _resolved = false;
@@ -504,25 +460,7 @@ export class ShootingAction extends RangedAttackAction {
         content: dialogHtml,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
-
-          $dialog.find('.dialog-buttons').hide();
-
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastShootingMode");
-
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-          // Lock width through the AppV2 position API — a CSS-only width is
-          // re-applied as position.width ('auto') on the next auto-measure.
-          try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastShootingMode" });
           html.on('change input', 'input, select', () => {
             try { dlg?.setPosition?.({ width: 360 }); } catch (_) {}
           });
@@ -616,16 +554,7 @@ export class ShootingAction extends RangedAttackAction {
           update();
 
           // Auto-focus Roll button for keyboard Enter and focus ring
-          html.find('#frp-roll').focus();
-
-          // Intercept Enter key — trigger Roll instead of Foundry's native submit
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
+          wireRollKeys(html, $dialog);
 
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
@@ -701,7 +630,7 @@ export class ShootingAction extends RangedAttackAction {
                 lastShootingReason: cs.reason
               });
             }
-            await actor.update({ "flags.msh-faserip": flagUpdate });
+            await saveDialogFlags(actor, flagUpdate);
 
             // Persist ammo variant on the weapon — the gun stays loaded with
             // this ammo until changed. Independent of Remember Settings and
@@ -787,35 +716,20 @@ export class ShootingAction extends RangedAttackAction {
           }
 
           // Aim tactic toggle
-          html.find('#aim-enabled').on('change', function() {
-            const $row = $(this).closest('.frp-opt-row');
-            $row.toggleClass('inactive', !this.checked);
-            $row.find('[name="aimMode"]').prop('disabled', !this.checked);
-          });
+          wireAimToggle(html);
 
           // Result cap toggle (50 Karma per colour, priced downstream)
-          html.find('#pull-effect-enabled').on('change', function() {
-            const $row = $(this).closest('.frp-opt-row');
-            $row.toggleClass('inactive', !this.checked);
-            $row.find('[name="resultCap"]').prop('disabled', !this.checked);
-          });
+          wirePaidEffectToggle(html);
 
           // Karma toggle
-          html.find('#spend-karma').on('change', function() {
-            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
-          });
+          wireRowToggle(html, '#spend-karma');
 
           applyCapabilitiesToDialog(html, "shooting", { actor });
 
           // Attach auto-fill range from token distance
           this._disposeAutoFill = attachAutoFillRange(html, actor, () => update());
 
-          html.find('#msh-skip-dice').on('change', function() {
-            setLS(lsSkipKey, this.checked ? "1" : "0");
-          });
-          html.find('#msh-remember-settings').on('change', function() {
-            setLS(lsRememberKey, this.checked ? "1" : "0");
-          });
+          wirePrefToggles(html, { rememberKey: lsRememberKey, skipKey: lsSkipKey });
         },
         close: () => {
           if (this._disposeAutoFill) this._disposeAutoFill();

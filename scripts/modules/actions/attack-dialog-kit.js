@@ -1,3 +1,5 @@
+// scripts/modules/actions/attack-dialog-kit.js v1.4.0 - 2026-11-11
+// v1.4.0: paidEffectRowHtml cap labels (Shooting caps at Bullseye, not Stun).
 // scripts/modules/actions/attack-dialog-kit.js v1.3.0 - 2026-11-11
 // v1.3.0: headerHtml verb / statLabel / statText; footerHtml ids option;
 //         fxGridHtml hover tips (grapple-family dialogs).
@@ -154,13 +156,13 @@ export function pullDamageInputHtml({ enabled, pulledDamage, initialDamage }) {
 }
 
 // Edged results may not be pulled for free; one colour step costs Karma.
-export function paidEffectRowHtml({ resultCap, canPay, label = "Effect" }) {
+export function paidEffectRowHtml({ resultCap, canPay, label = "Effect", yellowLabel = "Stun", greenLabel = "Hit" }) {
   return `
         <div class="frp-opt-row${resultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label title="${canPay ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${resultCap !== 'none' ? 'checked' : ''} ${canPay ? '' : 'disabled'}> <span class="frp-opt-label orange">${label}</span></label>
           <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(resultCap === 'none' || !canPay) ? 'disabled' : ''}>
-            <option value="yellow" ${resultCap === 'yellow' ? 'selected' : ''}>Cap at Stun</option>
-            <option value="green" ${resultCap === 'green' ? 'selected' : ''}>Cap at Hit</option>
+            <option value="yellow" ${resultCap === 'yellow' ? 'selected' : ''}>Cap at ${yellowLabel}</option>
+            <option value="green" ${resultCap === 'green' ? 'selected' : ''}>Cap at ${greenLabel}</option>
           </select>
           <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
         </div>`;
