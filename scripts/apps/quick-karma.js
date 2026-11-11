@@ -1,5 +1,6 @@
 // scripts/apps/quick-karma.js v1.1.0 - 2026-11-11
-// v1.1.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
+// v1.1.0: V1 dialogs here open as V2 dialogs through dialog-shim.js. Open Team
+//         Trackers are refreshed through foundry.applications.instances.
 // v1.0.0: Karma UI slice 3 — immediate awards from the tokens. GM-only
 //         Karma button in the token HUD and a K keybinding open one dialog
 //         for every selected token (the right-clicked token alone when it is
@@ -273,7 +274,7 @@ async function applyAward(heroes, t) {
         ${rows}
       </div></div>`
   });
-  for (const w of Object.values(ui.windows)) if (w.constructor?.name === "TeamSheet" && w.rendered) w.render(false);
+  for (const w of foundry.applications.instances.values()) if (w.constructor?.name === "TeamSheet" && w.rendered) w.render(false);
 }
 
 /** Token HUD button (GM) and the K keybinding. Call from the init hook. */

@@ -1161,3 +1161,19 @@
 .faserip.sheet.team-tracker .ledger-search-row { display: flex; gap: 6px; align-items: center; margin: 6px 0 4px; }
 .faserip.sheet.team-tracker .ledger-search-row .ledger-search { flex: 1 1 auto; min-width: 0; height: 28px; font-size: 13px; padding: 0 8px; }
 .faserip.sheet.team-tracker .ledger-search-row .ledger-sort { flex: 0 0 auto; width: auto; height: 28px; font-size: 12px; }
+
+/* V2 window frame (teamSheet v4.22.0): keep the content box the V1 window
+   gave these layouts: a flex column that scrolls by itself, with no row gap. */
+.application.team-tracker > .window-content {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 8px;
+  overflow-y: auto;
+}
+.application.team-tracker.encounter-editor > .window-content {
+  padding: 0;
+  overflow: hidden;
+}

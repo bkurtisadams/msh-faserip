@@ -1,3 +1,6 @@
+// tools/test-no-v1-dialogs.mjs v1.4.0 - 2026-11-11
+// v1.4.0: The Team Tracker, GM Tools and Encounter Editor are V2 windows, so
+//         no file may extend a V1 window class or open a V1 dialog.
 // tools/test-no-v1-dialogs.mjs v1.3.0 - 2026-11-11
 // v1.3.0: The Karma files are fully clean (their window classes left the V1
 //         framework; the unused karmaAdvancement.js is gone). No file may
@@ -50,7 +53,7 @@ function walk(dir, out = []) {
   }
   return out;
 }
-const PENDING = ['scripts/teamSheet.js', 'scripts/gm-tools.js', 'scripts/apps/encounter-editor.js'];
+const PENDING = [];
 const V1_CLASS = /extends\s+(?:foundry\.appv1\.[\w.]+|FormApplication|DocumentSheet|Application|ActorSheet|ItemSheet|Dialog)\b/g;
 for (const file of walk('scripts')) {
   const classes = (stripComments(fs.readFileSync(path.join(root, file), 'utf8')).match(V1_CLASS) ?? []).length;

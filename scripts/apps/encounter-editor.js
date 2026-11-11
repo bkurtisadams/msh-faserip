@@ -1,4 +1,5 @@
-// encounter-editor.js v0.2.0 - 2026-05-12
+// encounter-editor.js v0.3.0 - 2026-11-11
+// v0.3.0: The pop-out is a V2 application (LegacyAppV2).
 // v0.2.0: Template body extracted to shared partial
 //         (templates/parts/encounter-editor-body.hbs); inline expansion
 //         in the team sheet renders the same partial so the two views
@@ -10,7 +11,9 @@
 // handlers (foe edits, bonus changes, awards, etc.) fire inside
 // the popout without duplication.
 
-export class EncounterEditor extends Application {
+import { LegacyAppV2 } from "./legacy-app-v2.js";
+
+export class EncounterEditor extends LegacyAppV2 {
   constructor(teamSheet, encId, options = {}) {
     super(options);
     this.teamSheet = teamSheet;

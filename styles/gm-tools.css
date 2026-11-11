@@ -614,3 +614,13 @@
   background: #fff;
   margin-right: 4px;
 }
+
+/* V2 window frame (gm-tools v1.6.0): keep the V1 content box. */
+.application.faserip-gm-tools > .window-content {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 0;
+  overflow-y: auto;
+}

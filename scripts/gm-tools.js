@@ -1,3 +1,7 @@
+// gm-tools.js v1.6.0 - 2026-11-11
+// v1.6.0: The GM Tools window is a V2 application (LegacyAppV2); the two
+//         places that treated this.element as a jQuery handle use the
+//         element directly.
 // gm-tools.js v1.5.0 - 2026-11-11
 // v1.5.0: The 9 V1 confirmations here open as V2 dialogs through
 //         dialog-shim.js. The GM Tools window itself is still a V1
@@ -46,13 +50,14 @@ import { RANKS_ORDERED, rankValue, shiftRank } from "./rules/rules-reference.js"
 import { loseOneEnduranceRank, restoreOneEnduranceRank } from "./modules/effects/ongoing-engine.js";
 import { TURN_SECONDS } from "./modules/recovery-timing.js";
 import { showFaseripConfirm } from "./modules/actions/dialog-shim.js";
+import { LegacyAppV2 } from "./apps/legacy-app-v2.js";
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-export class GMToolsApp extends Application {
+export class GMToolsApp extends LegacyAppV2 {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "faserip-gm-tools",
@@ -298,7 +303,7 @@ export class GMToolsApp extends Application {
     ev.preventDefault();
     const tab = ev.currentTarget.dataset.tab;
     this._activeTab = tab;
-    const root = this.element[0];
+    const root = this.element;
     root.querySelectorAll(".gm-tab-link").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
     root.querySelectorAll(".gm-tab-panel").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
   }
@@ -606,7 +611,7 @@ export class GMToolsApp extends Application {
   _onImport(ev) {
     // Trigger the hidden file input
     const fileInput = ev.currentTarget.closest(".gm-tools-bulk-actions")?.querySelector(".gm-import-file")
-      || this.element.find(".gm-import-file")[0];
+      || this.element?.querySelector(".gm-import-file");
     if (fileInput) fileInput.click();
   }
 

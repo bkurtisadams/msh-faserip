@@ -1,3 +1,7 @@
+// teamSheet.js v4.22.0 - 2026-11-11
+// v4.22.0: The Team Tracker window is a V2 application (LegacyAppV2). Open
+//          trackers are found through foundry.applications.instances; the
+//          V1 ui.windows registry no longer holds them.
 // teamSheet.js v4.21.0 - 2026-11-11
 // v4.21.0: The 14 V1 dialogs here open as V2 dialogs through dialog-shim.js.
 //          The Karma History and Team Karma Pool buttons open the V2 windows
@@ -239,11 +243,12 @@ import { RANKS_ORDERED, rankValueForStorage } from "./rules/rules-reference.js";
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier, getCombatAwardScope } from "./karma-multipliers.js";
 import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey, computeKarmaTotals } from "./karma-rules.js";
 import { EncounterEditor } from "./apps/encounter-editor.js";
+import { LegacyAppV2 } from "./apps/legacy-app-v2.js";
 import { postBattleReport, openBattleReportEditor, registerBattleReportHooks } from "./apps/battle-report.js";
 import { foeDefeatAward, poolAbsorbLoss } from "./lib/faserip-rules/faserip-karma.js";
 import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
-export class TeamSheet extends Application {
+export class TeamSheet extends LegacyAppV2 {
 
   // slice 2b: derived from the shared kernel-backed tables (Beyond 10000
   // drift removed; Beyond persists as the storage sentinel)
@@ -902,7 +907,7 @@ export class TeamSheet extends Application {
 
   /** The open Team Tracker, or a hidden one that runs the award engine. */
   static worker() {
-    const open = Object.values(ui.windows).find(w => w instanceof TeamSheet && w.rendered);
+    const open = LegacyAppV2.instancesOf(TeamSheet).find(w => w.rendered);
     if (open) return open;
     if (!TeamSheet._headless) {
       const w = new TeamSheet();
@@ -924,7 +929,7 @@ export class TeamSheet extends Application {
   }
 
   static _refreshOpenSheets() {
-    for (const w of Object.values(ui.windows)) if (w instanceof TeamSheet && w.rendered) w.render(false);
+    for (const w of LegacyAppV2.instancesOf(TeamSheet)) if (w.rendered) w.render(false);
   }
 
   static async awardEncounterById(encId) {
@@ -3025,9 +3030,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
     const names = villains.map(v => `${v.count > 1 ? `${v.count}× ` : ""}${v.name} (${v.rankLabel})`).join(', ');
     ui.notifications.info(`[FASERIP] Combat ended — captured: ${names}`);
-    for (const w of Object.values(ui.windows)) {
-      if (w instanceof TeamSheet) w.render(true);
-    }
+    for (const w of LegacyAppV2.instancesOf(TeamSheet)) w.render(true);
     try { await postBattleReport(newEncId); }
     catch (e) { console.error("[FASERIP] Battle report card failed:", e); }
   }

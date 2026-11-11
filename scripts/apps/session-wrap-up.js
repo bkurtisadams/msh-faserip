@@ -1,4 +1,6 @@
-// scripts/apps/session-wrap-up.js v1.0.0 - 2026-10-03
+// scripts/apps/session-wrap-up.js v1.0.1 - 2026-11-11
+// v1.0.1: Open Team Trackers are refreshed through TeamSheet._refreshOpenSheets
+//         (they are V2 windows now and no longer in ui.windows).
 // v1.0.0: Close Session wrap-up (Team Tracker, Team tab). One dialog for the
 //         end-of-session personal awards, all individual (Karma chapter):
 //         gaming awards (role-play 0-10, Stump the Judge 0-15, humor 5),
@@ -310,7 +312,7 @@ export class SessionWrapUp extends HandlebarsApplicationMixin(ApplicationV2) {
     const msg = `Session wrap-up: ${plan.length} entr${plan.length === 1 ? "y" : "ies"} written.`
       + (open ? ` ${open} commitment${open === 1 ? "" : "s"} still open, left for the next wrap-up.` : "");
     ui.notifications.info(msg);
-    Object.values(ui.windows).forEach(app => { if (app instanceof TeamSheet && app.rendered) app.render(false); });
+    TeamSheet._refreshOpenSheets();
     this.close();
   }
 }

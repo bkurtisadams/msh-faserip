@@ -26,7 +26,7 @@ import { resolveGrabBreak } from "../../lib/faserip-rules/faserip-effects.js";
 import { kernelKeyFor } from "../../kernel/adapter.js";
 export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName = "Item", actor = null }) {
   // Close any existing instance (same id)
-  const existing = Object.values(ui.windows).find(w => w.id === "grabbing-break-dialog");
+  const existing = foundry.applications.instances.get("grabbing-break-dialog");
   if (existing) existing.close({ force: true });
 
   showFaseripButtonDialog({
