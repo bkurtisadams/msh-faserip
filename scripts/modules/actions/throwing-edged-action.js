@@ -1,3 +1,10 @@
+// throwing-edged-action.js v3.8.1 - 2026-11-11
+// v3.8.1: Fixed-bug: after Slashing Missile had been selected, switching to
+//         a weapon left the Effect checkbox disabled and the cap select
+//         blank, so the paid Effect cap could not be taken until the dialog
+//         was reopened. The Effect checkbox now follows the Karma test again
+//         and the cap select follows the Effect checkbox (it was tied to the
+//         Pull checkbox).
 // throwing-edged-action.js v3.8.0 - 2026-11-10
 // v3.8.0: Dialog flow moved to the shared ThrownWeaponAction base
 //         (thrown-weapon-action.js) over attack-dialog-kit.js. This file
@@ -53,6 +60,7 @@ import { ThrownWeaponAction } from "./thrown-weapon-action.js";
 import { RANKS, computeEdgedDamage, derivePowerDamage, getItemArmorPiercingCS } from "./action-utils.js";
 import { pullDamageInputHtml } from "./attack-dialog-kit.js";
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
+import { getAvailableKarma } from "../dice/dice-roller.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
 // Power types that route to throwing-edged per power-router (Slashing Missile, etc.)
@@ -158,17 +166,20 @@ export class ThrowingEdgedAction extends ThrownWeaponAction {
     const $pullChk = html.find('#pull-punch-enabled');
     const $pullInput = html.find('[name="pulledDamage"]');
     const $resCap = html.find('[name="resultCap"]');
+    const $effectChk = html.find('#pull-effect-enabled');
     if (!isAdHoc && weapon && isThrowingEdgedPower(weapon)) {
       $pullChk.prop('checked', false).prop('disabled', true);
       $pullInput.prop('disabled', true);
-      html.find('#pull-effect-enabled').prop('checked', false).prop('disabled', true)
+      $effectChk.prop('checked', false).prop('disabled', true)
         .closest('.frp-opt-row').addClass('inactive');
-      $resCap.val('none').prop('disabled', true);
+      $resCap.prop('disabled', true);
       $pullChk.closest('.frp-opt-row').addClass('inactive');
     } else {
       $pullChk.prop('disabled', false);
       $pullInput.prop('disabled', !$pullChk.is(':checked'));
-      $resCap.prop('disabled', !$pullChk.is(':checked'));
+      const canPay = getAvailableKarma(this.actor) >= EFFECT_REDUCTION_COST;
+      $effectChk.prop('disabled', !canPay);
+      $resCap.prop('disabled', !canPay || !$effectChk.is(':checked'));
     }
   }
 
