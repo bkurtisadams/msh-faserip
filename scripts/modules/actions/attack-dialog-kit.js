@@ -1,3 +1,6 @@
+// scripts/modules/actions/attack-dialog-kit.js v1.2.0 - 2026-11-11
+// v1.2.0: paidEffectRowHtml / wirePaidEffectToggle (the Karma-paid Effect cap
+//         shared by the edged melee and thrown edged dialogs).
 // scripts/modules/actions/attack-dialog-kit.js v1.1.0 - 2026-11-10
 // v1.1.0: headerHtml titles option (thrown dialogs render no hover titles);
 //         pullDamageInputHtml.
@@ -8,6 +11,7 @@
 
 import { buildModeSelector, setupModeSelector, derivePowerDamage } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 
 const SCOPE = "msh-faserip";
 export const DIALOG_WIDTH = 360;
@@ -143,6 +147,27 @@ export function blindsideRowHtml() {
 
 export function pullDamageInputHtml({ enabled, pulledDamage, initialDamage }) {
   return `<input type="number" class="frp-pull-input" name="pulledDamage" value="${enabled && pulledDamage > 0 ? pulledDamage : initialDamage}" min="0" max="${initialDamage}" ${!enabled ? 'disabled' : ''}>`;
+}
+
+// Edged results may not be pulled for free; one colour step costs Karma.
+export function paidEffectRowHtml({ resultCap, canPay, label = "Effect" }) {
+  return `
+        <div class="frp-opt-row${resultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label title="${canPay ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${resultCap !== 'none' ? 'checked' : ''} ${canPay ? '' : 'disabled'}> <span class="frp-opt-label orange">${label}</span></label>
+          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(resultCap === 'none' || !canPay) ? 'disabled' : ''}>
+            <option value="yellow" ${resultCap === 'yellow' ? 'selected' : ''}>Cap at Stun</option>
+            <option value="green" ${resultCap === 'green' ? 'selected' : ''}>Cap at Hit</option>
+          </select>
+          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
+        </div>`;
+}
+
+export function wirePaidEffectToggle(html) {
+  html.find('#pull-effect-enabled').on('change', function() {
+    const $row = $(this).closest('.frp-opt-row');
+    $row.toggleClass('inactive', !this.checked);
+    $row.find('[name="resultCap"]').prop('disabled', !this.checked);
+  });
 }
 
 export function fxGridHtml(effects) {

@@ -1,3 +1,8 @@
+// edged-attack-action.js v3.8.0 - 2026-11-11
+// v3.8.0: Dialog scaffolding (header, Karma / Effect / Blindside rows, effect
+//         grid, footer, titlebar and width setup, Enter-to-roll, Remember and
+//         Skip dice toggles) now comes from attack-dialog-kit.js. The width
+//         is pinned through the position API like the other attack dialogs.
 // edged-attack-action.js v3.7.0 - 2026-09-05
 // v3.7.0: Karma effect reduction. Edged results may not be pulled for
 //         free (Players Book, Modifying Results in Combat), so the
@@ -83,8 +88,6 @@ import {
   buildResultGrid,
   bannerColors,
   applyDamageToTargets,
-  buildModeSelector,
-  setupModeSelector,
   applyCapabilitiesToDialog,
   buildInlineFeatDisplay,
   debugLog,
@@ -102,6 +105,10 @@ import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 import { showFaseripDialog } from "./dialog-shim.js";
+import {
+  setLS, saveDialogFlags, headerHtml, karmaRowHtml, paidEffectRowHtml, blindsideRowHtml, fxGridHtml, footerHtml,
+  mountDialogFrame, wireRollKeys, wireRowToggle, wirePrefToggles, wirePaidEffectToggle
+} from "./attack-dialog-kit.js";
 
 export class EdgedAttackAction extends AttackAction {
   async execute() {
@@ -238,7 +245,6 @@ export class EdgedAttackAction extends AttackAction {
     // Karma info
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
-    const hasKarma = availableKarma > 0;
 
     // Edged results may not be pulled freely; one colour step costs 50 Karma.
     const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip","lastEdgedResultCap")) || "none") : "none";
@@ -272,7 +278,6 @@ export class EdgedAttackAction extends AttackAction {
     let initDamageSrcVal = "natural";
     if (savedSource === "weapon" && savedItemId) initDamageSrcVal = `weapon:${savedItemId}`;
 
-    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // AP label for initial display
     const initialAPLabel = initialAPCS > 0 ? `${initialAPCS}CS` : "";
@@ -283,18 +288,7 @@ export class EdgedAttackAction extends AttackAction {
     <div class="frp-dlg">
 
       <!-- Header: Actor (Base Fighting / Rank Value) attacks Target -->
-      <div class="frp-header-v3">
-        <span class="h-actor" title="${actor.name}">${actor.name}</span>
-        <span class="h-paren">(</span>
-        <span class="h-stat">
-          <span class="h-stat-label">Base Fighting:</span>
-          <span class="h-stat-rank">${abilityShort} ${ability.value}</span>
-        </span>
-        <span class="h-paren">)</span>
-        ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
-          : ''}
-      </div>
+      ${headerHtml({ actor, ability: { ...ability, name: "Fighting" }, targetDisplay })}
 
       <!-- CS row (manual input + ? reference) -->
       ${csRowHtml}
@@ -331,45 +325,16 @@ export class EdgedAttackAction extends AttackAction {
           <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${(!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>
           <label><input type="radio" name="multiCount" value="3" ${savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
         </div>
-        <div class="frp-opt-row${savedResultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label title="${canPayReduction ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${savedResultCap !== 'none' ? 'checked' : ''} ${canPayReduction ? '' : 'disabled'}> <span class="frp-opt-label orange">Pull</span></label>
-          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(savedResultCap === 'none' || !canPayReduction) ? 'disabled' : ''}>
-            <option value="yellow" ${savedResultCap === 'yellow' ? 'selected' : ''}>Cap at Stun</option>
-            <option value="green" ${savedResultCap === 'green' ? 'selected' : ''}>Cap at Hit</option>
-          </select>
-          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
-        </div>
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
-          ${hasKarma ? `
-            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
-            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
-          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
-        </div>
-        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
-          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
-          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
-        </div>
+        ${paidEffectRowHtml({ resultCap: savedResultCap, canPay: canPayReduction, label: "Pull" })}
+        ${karmaRowHtml({ availableKarma, minKarma })}
+        ${blindsideRowHtml()}
       </div>
 
       <!-- Effect preview grid -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w">Miss</div>
-        <div class="frp-fx-cell g">Hit</div>
-        <div class="frp-fx-cell y">Stun</div>
-        <div class="frp-fx-cell r">Kill</div>
-      </div>
+      ${fxGridHtml({ white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" })}
 
       <!-- Footer -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
+      ${footerHtml({ remember: shouldRemember, skipDice: savedSkipDice })}
     </div>
     `;
 
@@ -381,27 +346,8 @@ export class EdgedAttackAction extends AttackAction {
         content: dialogHtml,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastEdgedMode" });
 
-          // Hide Foundry's native button row
-          $dialog.find('.dialog-buttons').hide();
-          
-          // Inject mode buttons into the titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastEdgedMode");
-
-          // Set dialog width
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-
-          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
           // ── Wire CS panel from shared utility ──
           _csState = wireCSPanel(html, {
@@ -412,16 +358,7 @@ export class EdgedAttackAction extends AttackAction {
           });
 
           // Auto-focus Roll button for keyboard Enter and focus ring
-          html.find('#frp-roll').focus();
-
-          // Intercept Enter key — trigger Roll instead of Foundry's native submit
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
+          wireRollKeys(html, $dialog);
 
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
@@ -514,7 +451,7 @@ export class EdgedAttackAction extends AttackAction {
                 Object.assign(flagUpdate, { lastNaturalWeaponRank: natRank, lastNaturalWeaponDamage: natDmg });
               }
             }
-            await actor.update({ "flags.msh-faserip": flagUpdate });
+            await saveDialogFlags(actor, flagUpdate);
 
             _resolved = true;
             resolve({
@@ -622,24 +559,13 @@ export class EdgedAttackAction extends AttackAction {
           }
 
           // Karma toggle — inactive styling
-          html.find('#pull-effect-enabled').on('change', function() {
-            const $row = $(this).closest('.frp-opt-row');
-            $row.toggleClass('inactive', !this.checked);
-            $row.find('[name="resultCap"]').prop('disabled', !this.checked);
-          });
+          wirePaidEffectToggle(html);
 
-          html.find('#spend-karma').on('change', function() {
-            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
-          });
+          wireRowToggle(html, '#spend-karma');
           
           applyCapabilitiesToDialog(html, "edged-attack", { actor });
 
-          html.find('#msh-skip-dice').on('change', function() {
-            setLS(lsSkipKey, this.checked ? "1" : "0");
-          });
-          html.find('#msh-remember-settings').on('change', function() {
-            setLS(lsRememberKey, this.checked ? "1" : "0");
-          });
+          wirePrefToggles(html, { rememberKey: lsRememberKey, skipKey: lsSkipKey });
         },
         close: () => {
           if (_csState) _csState.destroy();

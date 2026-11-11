@@ -1,3 +1,6 @@
+// scripts/dev/attack-dialog-runtime-tests.js v1.2.0 - 2026-11-11
+// v1.2.0: Blunt and Edged melee dialogs; broken armor no longer protects;
+//         thrown dropdown shows computed damage.
 // scripts/dev/attack-dialog-runtime-tests.js v1.1.0 - 2026-11-11
 // v1.1.0: Throwing Blunt: listed-minimum damage ruling (2026-11-11) and the
 //         Bullseye labels.
@@ -19,13 +22,16 @@ import { EnergyAction } from "../modules/actions/energy-action.js";
 import { ForceAction } from "../modules/actions/force-action.js";
 import { ThrowingEdgedAction } from "../modules/actions/throwing-edged-action.js";
 import { ThrowingBluntAction } from "../modules/actions/throwing-blunt-action.js";
+import { BluntAttackAction } from "../modules/actions/blunt-attack-action.js";
+import { EdgedAttackAction } from "../modules/actions/edged-attack-action.js";
+import { getBodyArmorValues } from "../modules/actions/action-utils.js";
 import { getAvailableKarma } from "../modules/dice/dice-roller.js";
 
 const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Attack Dialog Runtime";
 const DEFAULT_TIMEOUT = 6000;
 const DIALOG_WIDTH = 360;
-const PREF_KEYS = ["energy", "force", "te", "tb"].flatMap(k => [`msh.${k}.remember`, `msh.${k}.skipDice`]);
+const PREF_KEYS = ["energy", "force", "te", "tb", "ba", "ea"].flatMap(k => [`msh.${k}.remember`, `msh.${k}.skipDice`]);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -120,12 +126,12 @@ const openDialogEl = () => document.querySelector(".frp-dlg");
 // Opens one real dialog, hands a driver the live DOM, and returns what the
 // dialog resolved with. The attack hand-off, notifications and actor writes
 // are captured for the driver's assertions.
-async function withDialog(recorder, label, ActionClass, { actor, actionType, opts = {} }, drive) {
+async function withDialog(recorder, label, ActionClass, { actor, actionType, abilityName = "agility", opts = {} }, drive) {
   if (openDialogEl()) {
     recorder.fail(`${label}: no other attack dialog is open`);
     return null;
   }
-  const action = new ActionClass({ actor, actionType, abilityName: "agility", opts: { ...opts } });
+  const action = new ActionClass({ actor, actionType, abilityName, opts: { ...opts } });
   const ctx = { exec: null, notes: [], writes: 0, ret: undefined, error: null, settled: false };
   action._executeSingleAttack = async (args) => { ctx.exec = args; };
 
@@ -315,6 +321,8 @@ async function thrownEdgedTests(recorder, { attacker, targetA }) {
     $html.find('[name="src"][value="carried"]').prop("checked", true).trigger("change");
     setVal($html, "#damage-source-select", shurikenId);
     recorder.assert($html.find(`#damage-source-select option[value="${shurikenId}"]`).text().includes("[AP 1CS]"), "Throwing Edged: dropdown labels the Shuriken's armor piercing");
+    recorder.assert($html.find(`#damage-source-select option[value="${missileId}"]`).text().includes("30 dmg"), "Throwing Edged: dropdown shows a power's computed damage",
+      { label: $html.find(`#damage-source-select option[value="${missileId}"]`).text() });
     recorder.assert($html.find("#ap-display").css("display") !== "none" && $html.find("#ap-val").text() === "1CS", "Throwing Edged: AP line shows 1CS");
     recorder.equal($html.find("#after-armor-display").text(), "4 after armor", "Throwing Edged: preview drops Good armor to Typical (10 - 6 = 4)");
 
@@ -395,6 +403,75 @@ async function thrownBluntTests(recorder, { attacker, targetA }) {
   });
 }
 
+async function meleeTests(recorder, { attacker, targetA, targetB }) {
+  const actor = attacker.actor;
+  const clubId = actor.items.getName("Test Club").id;
+  const shurikenId = actor.items.getName("Test Shuriken").id;
+  const karma = getAvailableKarma(actor);
+  await setTargets([targetA.token]);
+
+  const blunt = { actor, actionType: "blunt-attack", abilityName: "fighting" };
+  await withDialog(recorder, "Blunt Attack", BluntAttackAction, blunt, async (d) => {
+    const { $html } = d;
+    recorder.equal(d.width(), DIALOG_WIDTH, "Blunt Attack: dialog opens at its pinned width");
+    recorder.assert($html.find(".h-stat-label").text() === "Base Fighting:" && $html.find(".h-stat-rank").text() === "Rm 30", "Blunt Attack: header shows Fighting Rm 30",
+      { label: $html.find(".h-stat-label").text(), rank: $html.find(".h-stat-rank").text() });
+    setChk($html, "#msh-remember-settings", true);
+    setVal($html, "#damage-source-select", `weapon:${clubId}`);
+    recorder.equal($html.find("#dmg-val").text(), "10", "Blunt Attack: Club damage at Good Strength");
+    recorder.equal($html.find(".frp-fx-cell.y").text(), "Slam", "Blunt Attack: effect grid names yellow Slam");
+    setChk($html, "#blindside-attack", true);
+    recorder.equal(d.width(), DIALOG_WIDTH, "Blunt Attack: width holds after toggling options");
+    const r = await d.roll();
+    const c = d.exec?.choice ?? {};
+    recorder.assert(r.rolled && c.src === "weapon" && c.itemId === clubId && c.blindside === true && d.exec?.damageType === "physical-blunt" && d.exec?.rawDamage === 10 && d.exec?.attackForm === "blunt",
+      "Blunt Attack: weapon, Blindside, damage and type reach the attack", { src: c.src, itemId: c.itemId, blindside: c.blindside, damageType: d.exec?.damageType, rawDamage: d.exec?.rawDamage, notes: d.notes });
+    recorder.equal(r.writes, 1, "Blunt Attack: Remember flags saved in one actor update");
+  });
+  await withDialog(recorder, "Blunt Attack reopen", BluntAttackAction, blunt, async (d) => {
+    const { $html } = d;
+    recorder.assert($html.find("#msh-remember-settings").prop("checked") && $html.find("#damage-source-select").val() === `weapon:${clubId}`,
+      "Blunt Attack reopen: Remember ticked and weapon restored", { value: $html.find("#damage-source-select").val() });
+    const e = $.Event("keydown"); e.key = "Enter";
+    $html.closest(".dialog").trigger(e);
+    await waitFor(() => d.settled, { timeout: 3000 });
+    recorder.assert(d.settled && !!d.exec, "Blunt Attack: Enter rolls the attack");
+  });
+
+  const edged = { actor, actionType: "edged-attack", abilityName: "fighting" };
+  await withDialog(recorder, "Edged Attack", EdgedAttackAction, edged, async (d) => {
+    const { $html } = d;
+    recorder.equal(d.width(), DIALOG_WIDTH, "Edged Attack: dialog opens at its pinned width");
+    setChk($html, "#msh-remember-settings", true);
+    setVal($html, "#damage-source-select", `weapon:${shurikenId}`);
+    recorder.equal($html.find("#dmg-val").text(), "10", "Edged Attack: weapon damage");
+    recorder.assert($html.find("#ap-display").css("display") !== "none" && $html.find("#ap-val").text() === "1CS", "Edged Attack: AP line shows 1CS");
+    recorder.equal($html.find("#after-armor-display").text(), "4 after armor", "Edged Attack: preview drops Good armor to Typical (10 - 6 = 4)");
+    if (karma < 50) {
+      recorder.skip("Edged Attack: paid result cap", { reason: "test actor has under 50 Karma", karma });
+    } else {
+      recorder.assert(!$html.find("#pull-effect-enabled").prop("disabled"), "Edged Attack: paid result cap is offered with 50+ Karma");
+      setChk($html, "#pull-effect-enabled", true);
+      setVal($html, '[name="resultCap"]', "green");
+    }
+    recorder.equal(d.width(), DIALOG_WIDTH, "Edged Attack: width holds after toggling options");
+    const r = await d.roll();
+    const c = d.exec?.choice ?? {};
+    recorder.assert(r.rolled && c.src === "weapon" && c.itemId === shurikenId && c.armorPiercingCS === 1 && d.exec?.damageType === "physical-edged" && d.exec?.rawDamage === 10,
+      "Edged Attack: weapon, AP 1CS, damage and type reach the attack", { src: c.src, itemId: c.itemId, armorPiercingCS: c.armorPiercingCS, damageType: d.exec?.damageType, rawDamage: d.exec?.rawDamage, notes: d.notes });
+    if (karma >= 50) recorder.equal(c.resultCap, "green", "Edged Attack: paid result cap reaches the attack");
+    recorder.equal(r.writes, 1, "Edged Attack: Remember flags saved in one actor update");
+  });
+  await withDialog(recorder, "Edged Attack reopen", EdgedAttackAction, edged, async (d) => {
+    const { $html } = d;
+    recorder.assert($html.find("#damage-source-select").val() === `weapon:${shurikenId}` && (karma < 50 || $html.find("#pull-effect-enabled").prop("checked")),
+      "Edged Attack reopen: weapon and result cap restored", { value: $html.find("#damage-source-select").val(), cap: $html.find("#pull-effect-enabled").prop("checked") });
+  });
+
+  recorder.equal(getBodyArmorValues(targetA.actor, "physical-edged")?.applicable, 10, "Armor: an intact Good Body Armor counts as 10");
+  recorder.equal(getBodyArmorValues(targetB.actor, "physical-edged")?.applicable, 0, "Armor: an armor item marked broken gives no protection");
+}
+
 async function cleanupState(state, keepArtifacts) {
   try { await setTargets(state.previousTargets ?? []); } catch (_) { /* noop */ }
   for (const [key, value] of Object.entries(state.prefs)) {
@@ -443,12 +520,13 @@ export async function runAttackDialogRuntimeTests({ keepArtifacts = false, postC
     const size = scene.grid?.size ?? canvas.grid?.size ?? 100;
     const x0 = (scene.dimensions?.sceneX ?? 0) + size * 2;
     const y0 = (scene.dimensions?.sceneY ?? 0) + size * 2;
-    const abilities = { agility: { rank: "Excellent", value: 20 }, strength: { rank: "Good", value: 10 } };
+    const abilities = { fighting: { rank: "Remarkable", value: 30 }, agility: { rank: "Excellent", value: 20 }, strength: { rank: "Good", value: 10 } };
     const armor = [power("Body Armor", { rank: "Good", value: 10, armorPhysical: 10, isBodyArmor: true, isActive: true })];
 
+    const brokenArmor = [{ name: "Broken Vest", type: "equipment", system: { category: "armor", protection: "Excellent", broken: true } }];
     const attacker = await createCombatant(state, "Attacker", { x: x0, y: y0, disposition: 1, system: { abilities, karma: { lifetime: 120 } }, items: ATTACKER_ITEMS });
     const targetA = await createCombatant(state, "Target A", { x: x0 + size, y: y0, disposition: -1, items: armor });
-    const targetB = await createCombatant(state, "Target B", { x: x0 + size, y: y0 + size, disposition: -1 });
+    const targetB = await createCombatant(state, "Target B", { x: x0 + size, y: y0 + size, disposition: -1, items: brokenArmor });
     await waitFor(() => attacker.token.object && targetA.token.object && targetB.token.object, { timeout: 3000 });
 
     const targeted = await setTargets([targetA.token]);
@@ -459,6 +537,7 @@ export async function runAttackDialogRuntimeTests({ keepArtifacts = false, postC
       await forceTests(recorder, fixtures);
       await thrownEdgedTests(recorder, fixtures);
       await thrownBluntTests(recorder, fixtures);
+      await meleeTests(recorder, fixtures);
     }
   } catch (error) {
     recorder.fail("Attack dialog suite completed without an uncaught exception", { message: error?.message ?? String(error), stack: error?.stack });

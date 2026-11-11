@@ -1,3 +1,8 @@
+// blunt-attack-action.js v1.6.0 - 2026-11-11
+// v1.6.0: Dialog scaffolding (header, Blindside row, effect grid, footer,
+//         titlebar and width setup, Enter-to-roll, Remember and Skip dice
+//         toggles) now comes from attack-dialog-kit.js. The width is pinned
+//         through the position API like the other attack dialogs.
 // blunt-attack-action.js v1.5.0 - 2026-09-05
 // v1.5.0: Blindside declaration. A checked box marks the target as
 //         blindsided, so the Slam/Stun/Kill FEAT it forces refuses the
@@ -91,7 +96,7 @@ import {
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetData, getBodyArmorValues, applyDamageToTargets,
-  buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector,
+  attachModeSelectorHandlers, debugLog,
   applyCapabilitiesToDialog, buildInlineFeatDisplay, getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
@@ -102,6 +107,10 @@ import { requiredColor as kernelRequiredColor } from "../../lib/faserip-rules/fa
 import { kernelKeyFor } from "../../kernel/adapter.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
+import {
+  saveDialogFlags, headerHtml, blindsideRowHtml, fxGridHtml, footerHtml,
+  mountDialogFrame, wireRollKeys, wireRowToggle, wirePrefToggles
+} from "./attack-dialog-kit.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
 
 function getCombinedPromotion(damage) {
@@ -284,7 +293,6 @@ export class BluntAttackAction extends AttackAction {
 
     const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastBluntReason")) || "") : "";
 
-    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
@@ -409,18 +417,7 @@ export class BluntAttackAction extends AttackAction {
     <div class="frp-dlg">
 
       <!-- Header: Actor (Base Fighting / Rank Value) attacks Target -->
-      <div class="frp-header-v3">
-        <span class="h-actor" title="${actor.name}">${actor.name}</span>
-        <span class="h-paren">(</span>
-        <span class="h-stat">
-          <span class="h-stat-label">Base Fighting:</span>
-          <span class="h-stat-rank">${abilityShort} ${ability.value}</span>
-        </span>
-        <span class="h-paren">)</span>
-        ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
-          : ''}
-      </div>
+      ${headerHtml({ actor, ability: { ...ability, name: "Fighting" }, targetDisplay })}
 
       ${maDZoneHtml}
 
@@ -487,31 +484,14 @@ export class BluntAttackAction extends AttackAction {
           ` : `<span style="font-size:11px;color:#999;">No karma</span>`}
           </span>
         </div>
-        <div class="frp-opt-row" style="border-top:1px solid #e8e0d0;">
-          <label title="RAW: a FEAT forced by a Blindside or an unexpected attack may not be modified by Karma"><input type="checkbox" id="blindside-attack" name="blindside"> <span class="frp-opt-label red">Blindside</span></label>
-          <span style="font-size:10px;color:#888;margin-left:auto;">target adds no Karma to Slam/Stun/Kill</span>
-        </div>
+        ${blindsideRowHtml()}
       </div>
 
       <!-- Effect preview grid -->
-      <div class="frp-fx-grid">
-        <div class="frp-fx-cell w">Miss</div>
-        <div class="frp-fx-cell g">Hit</div>
-        <div class="frp-fx-cell y">Slam</div>
-        <div class="frp-fx-cell r">Stun</div>
-      </div>
+      ${fxGridHtml({ white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" })}
 
       <!-- Footer: checkboxes + buttons on one row -->
-      <div class="frp-foot">
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
-        </div>
-        <div class="frp-foot-checks">
-          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
-        </div>
-      </div>
+      ${footerHtml({ remember: shouldRemember, skipDice: savedSkipDice })}
     </div>
     `;
 
@@ -523,24 +503,8 @@ export class BluntAttackAction extends AttackAction {
         content: dialogHtml,
         render: async (html, dlg) => {
           setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
+          const $dialog = await mountDialogFrame({ html, dlg, actor, opts: this.opts || {}, modeFlag: "lastBluntMode" });
 
-          $dialog.find('.dialog-buttons').hide();
-          
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastBluntMode");
-
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-
-          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
           // ── Wire CS panel from shared utility ──
           let _updateFeatPanel = () => {};  // forward ref, set below
@@ -553,16 +517,7 @@ export class BluntAttackAction extends AttackAction {
           });
 
           // Auto-focus Roll button for keyboard Enter and focus ring
-          html.find('#frp-roll').focus();
-
-          // Intercept Enter key — trigger Roll instead of Foundry's native submit
-          $dialog.on('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
-              html.find('#frp-roll').trigger('click');
-            }
-          });
+          wireRollKeys(html, $dialog);
 
           // ── MA-D Begin Study button handler ──
           // Clicking "Begin study" records a study AE on the attacker
@@ -709,7 +664,7 @@ export class BluntAttackAction extends AttackAction {
                 });
               }
             }
-            await actor.update({ "flags.msh-faserip": flagUpdate });
+            await saveDialogFlags(actor, flagUpdate);
 
             _resolved = true;
             // For blunt, main CS IS the Fighting CS — use it for the FEAT
@@ -909,18 +864,11 @@ export class BluntAttackAction extends AttackAction {
           _updateFeatPanel();
 
           // Karma toggle
-          html.find('#spend-karma').on('change', function() {
-            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
-          });
+          wireRowToggle(html, '#spend-karma');
           
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });
 
-          html.find('#msh-skip-dice').on('change', function() {
-            setLS(lsSkipKey, this.checked ? "1" : "0");
-          });
-          html.find('#msh-remember-settings').on('change', function() {
-            setLS(lsRememberKey, this.checked ? "1" : "0");
-          });
+          wirePrefToggles(html, { rememberKey: lsRememberKey, skipKey: lsSkipKey });
         },
         close: () => {
           if (_csState) _csState.destroy();

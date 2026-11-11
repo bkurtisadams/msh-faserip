@@ -1,3 +1,5 @@
+// action-utils.js v1.14.3 - 2026-11-11
+// v1.14.3: getBodyArmorValues skips armor equipment marked broken.
 // action-utils.js v1.14.2 - 2026-11-10
 // v1.14.2: getRollMode() moved to ../dice/roll-mode.js (re-exported here); the
 //          two remaining bare core.rollMode reads now use it.
@@ -2535,7 +2537,8 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
   let armorItems = targetActor.items.filter(i =>
     i.type === "equipment" &&
     i.system.category === "armor" &&
-    i.system.protection
+    i.system.protection &&
+    i.system.broken !== true
   );
   if (ignoresArtificialArmor) {
     armorItems = armorItems.filter(i => i.system.isForceField === true);

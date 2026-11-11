@@ -1,3 +1,5 @@
+// throwing-edged-action.js v3.8.2 - 2026-11-11
+// v3.8.2: Effect cap row and its toggle come from attack-dialog-kit.js.
 // throwing-edged-action.js v3.8.1 - 2026-11-11
 // v3.8.1: Fixed-bug: after Slashing Missile had been selected, switching to
 //         a weapon left the Effect checkbox disabled and the cap select
@@ -58,7 +60,7 @@
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 import { ThrownWeaponAction } from "./thrown-weapon-action.js";
 import { RANKS, computeEdgedDamage, derivePowerDamage, getItemArmorPiercingCS } from "./action-utils.js";
-import { pullDamageInputHtml } from "./attack-dialog-kit.js";
+import { pullDamageInputHtml, paidEffectRowHtml, wirePaidEffectToggle } from "./attack-dialog-kit.js";
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 import { getAvailableKarma } from "../dice/dice-roller.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
@@ -130,14 +132,7 @@ export class ThrowingEdgedAction extends ThrownWeaponAction {
           ${pullDamageInputHtml({ enabled: saved.pull, pulledDamage: saved.pulledDamage, initialDamage })}
           <span style="font-size:11px;color:#888;margin-left:auto;">damage only</span>
         </div>
-        <div class="frp-opt-row${saved.resultCap === 'none' ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
-          <label title="${canPayReduction ? `Reduce the result one colour for ${EFFECT_REDUCTION_COST} Karma` : `Requires ${EFFECT_REDUCTION_COST} Karma`}"><input type="checkbox" id="pull-effect-enabled" ${saved.resultCap !== 'none' ? 'checked' : ''} ${canPayReduction ? '' : 'disabled'}> <span class="frp-opt-label orange">Effect</span></label>
-          <select style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;margin-left:6px;" name="resultCap" ${(saved.resultCap === 'none' || !canPayReduction) ? 'disabled' : ''}>
-            <option value="yellow" ${saved.resultCap === 'yellow' ? 'selected' : ''}>Cap at Stun</option>
-            <option value="green" ${saved.resultCap === 'green' ? 'selected' : ''}>Cap at Hit</option>
-          </select>
-          <span style="font-size:10px;color:#888;margin-left:auto;">${EFFECT_REDUCTION_COST} Karma / colour</span>
-        </div>`;
+        ${paidEffectRowHtml({ resultCap: saved.resultCap, canPay: canPayReduction })}`;
   }
 
   _readExtras($dlg, { weapon }) {
@@ -184,10 +179,6 @@ export class ThrowingEdgedAction extends ThrownWeaponAction {
   }
 
   _wireExtras(html) {
-    html.find('#pull-effect-enabled').on('change', function() {
-      const $row = $(this).closest('.frp-opt-row');
-      $row.toggleClass('inactive', !this.checked);
-      $row.find('[name="resultCap"]').prop('disabled', !this.checked);
-    });
+    wirePaidEffectToggle(html);
   }
 }

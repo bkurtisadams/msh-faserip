@@ -1,3 +1,5 @@
+// scripts/dev/kernel-blindside-diff.mjs v1.4.0 - 2026-11-11
+// v1.4.0: Blunt and Edged melee take the Blindside row from attack-dialog-kit.js.
 // scripts/dev/kernel-blindside-diff.mjs v1.3.0 - 2026-11-10
 // v1.3.0: Throwing Edged / Blunt build theirs in thrown-weapon-action.js.
 // v1.2.0: Energy and Force build their dialog in power-blast-action.js over
@@ -52,6 +54,8 @@ const DIALOGS = [
   "scripts/modules/actions/charging-action.js",
 ];
 const SHARED = {
+  "scripts/modules/actions/blunt-attack-action.js": ["scripts/modules/actions/attack-dialog-kit.js"],
+  "scripts/modules/actions/edged-attack-action.js": ["scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/energy-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/force-action.js": ["scripts/modules/actions/power-blast-action.js", "scripts/modules/actions/attack-dialog-kit.js"],
   "scripts/modules/actions/throwing-edged-action.js": ["scripts/modules/actions/thrown-weapon-action.js", "scripts/modules/actions/attack-dialog-kit.js"],

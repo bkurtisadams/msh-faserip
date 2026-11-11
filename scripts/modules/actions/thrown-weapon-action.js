@@ -1,4 +1,6 @@
-// scripts/modules/actions/thrown-weapon-action.js v1.0.0 - 2026-11-10
+// scripts/modules/actions/thrown-weapon-action.js v1.0.1 - 2026-11-11
+// v1.0.1: The weapon dropdown shows each item's computed damage (it showed
+//         the printed damage, so powers read "0 dmg").
 // One dialog flow for thrown weapons (Throwing Edged, Throwing Blunt).
 // Subclasses supply static THROWN config and the hooks marked "subclass";
 // the dialog, CS panel, Roll/Cancel plumbing, remembered flags and the
@@ -104,7 +106,7 @@ export class ThrownWeaponAction extends RangedAttackAction {
     };
 
     const weaponOptions = weapons.map(i => {
-      const dmg = Number(i.system?.damage || 0);
+      const dmg = this._damage(actor, i);
       const ap = cfg.armorPiercing ? getItemArmorPiercingCS(i) : 0;
       const apLabel = ap > 0 ? ` [AP ${ap}CS]` : "";
       const sel = (i.id === savedItemId) ? 'selected' : '';
