@@ -1,4 +1,5 @@
-// tools/test-actor-sheet-submit.mjs v1.0.0 - 2026-11-11
+// tools/test-actor-sheet-submit.mjs v1.1.0 - 2026-11-11
+// v1.1.0: The V1 sheet's _updateObject is gone; the V2 sheet is the only caller.
 // Behaviour tests for scripts/actor-sheet-submit.js, the submit rules shared
 // by the V1 and V2 actor sheets. Run: node tools/test-actor-sheet-submit.mjs
 import assert from 'node:assert/strict';
@@ -44,9 +45,9 @@ eq(normalizeActorSubmit(shifted, 'name', { name: 'X', [`${F}.rank`]: 'Remarkable
 eq(normalizeActorSubmit(shifted, 'name', { name: 'X', [`${F}.value`]: 27 }),
   { name: 'X', [`${F}.value`]: 27 }, 'a custom number that is not the shifted display value passes through');
 
-const v1 = fs.readFileSync(path.join(root, 'scripts', 'actorSheet.js'), 'utf8');
+const legacy = fs.readFileSync(path.join(root, 'scripts', 'actorSheet.js'), 'utf8');
 const v2 = fs.readFileSync(path.join(root, 'scripts', 'actor-sheet-v2.js'), 'utf8');
-assert(v1.includes('normalizeActorSubmit(this.actor, changedField, formData);'), 'V1 sheet applies the shared submit rules'); n++;
+assert(!/extends\s+foundry\.appv1/.test(legacy) && !legacy.includes('_updateObject('), 'the legacy sheet class has left the V1 framework and has no submit path of its own'); n++;
 assert(/_processSubmitData\(event, form, submitData, options = \{\}\)[\s\S]{0,300}normalizeActorSubmit\(this\.actor, changedField, flat\)/.test(v2), 'V2 sheet applies the shared submit rules'); n++;
 assert(v2.includes('v1._teardownSheetHooks.call(this._adapterThis(v1))'), 'V2 close runs the V1 teardown'); n++;
 

@@ -1,3 +1,8 @@
+// scripts/dev/actor-sheet-runtime-tests.js v1.5.0 - 2026-11-11
+// v1.5.0: Checks that neither legacy sheet class extends Foundry's V1
+//         framework, that opening a sheet logs no V1 deprecation warning,
+//         and that actor.sheet offers _rollVehicleControl for the
+//         vehicle-control hotbar macros.
 // scripts/dev/actor-sheet-runtime-tests.js v1.4.0 - 2026-11-11
 // v1.4.0: Checks that the edited field keeps keyboard focus through the
 //         re-render, drops an item on an item tab (the tab drop-zone path)
@@ -30,6 +35,8 @@
 // Launch via macros/run-actor-sheet-runtime-tests.js as a GM.
 
 import { FaseripActorSheetV2 } from "../actor-sheet-v2.js";
+import { FaseripActorSheet } from "../actorSheet.js";
+import { MSHVehicleActorSheet } from "../vehicle-actor-sheet.js";
 
 const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Sheet Runtime";
@@ -434,6 +441,7 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
   const recorder = makeRecorder();
   const actors = [];
   let sheet = null;
+  let restoreWarn = () => {};
 
   console.group("FASERIP Character Sheet Runtime Tests");
   try {
@@ -456,6 +464,27 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
     const legacy = await make("hero", { flags: { core: { sheetClass: "msh-faserip.FaseripActorSheet" } }, items: [...ITEMS, { name: "Runtime Gift", type: "power", system: { rank: "Typical", value: 6 } }] });
     recorder.assert(legacy.sheet instanceof FaseripActorSheetV2, "Registration: an actor that was assigned the V1 sheet falls back to the V2 sheet", { got: legacy.sheet?.constructor?.name });
     recorder.assert(!game.settings.settings.has(`${SYSTEM_ID}.useActorSheetV2`), "Registration: the Use V2 Character Sheet setting is gone");
+
+    // Framework
+    const v1Bases = [foundry.appv1?.api?.Application, foundry.appv1?.sheets?.ActorSheet].filter(Boolean);
+    const onV1 = (cls) => v1Bases.some(base => cls.prototype instanceof base);
+    recorder.assert(!onV1(FaseripActorSheet) && Object.getPrototypeOf(FaseripActorSheet) === Function.prototype,
+      "Framework: the character sheet's legacy class no longer extends the V1 framework", { base: Object.getPrototypeOf(FaseripActorSheet)?.name || "(none)" });
+    recorder.assert(!onV1(MSHVehicleActorSheet), "Framework: the vehicle sheet's legacy class no longer extends the V1 framework",
+      { base: Object.getPrototypeOf(MSHVehicleActorSheet)?.name || "(none)" });
+    recorder.assert(typeof actor.sheet._rollVehicleControl === "function", "Framework: actor.sheet offers _rollVehicleControl for the vehicle-control macros");
+
+    const v1Warnings = [];
+    const originalWarn = foundry.utils.logCompatibilityWarning;
+    let warnPatched = false;
+    try {
+      foundry.utils.logCompatibilityWarning = function (message, ...rest) {
+        if (/V1 Application framework/i.test(String(message))) v1Warnings.push(String(message).slice(0, 80));
+        return originalWarn.call(this, message, ...rest);
+      };
+      warnPatched = foundry.utils.logCompatibilityWarning !== originalWarn;
+      if (warnPatched) restoreWarn = () => { try { foundry.utils.logCompatibilityWarning = originalWarn; } catch (_) { /* noop */ } };
+    } catch (_) { warnPatched = false; }
 
     // Render
     const hooksBefore = hookCounts();
@@ -535,10 +564,15 @@ export async function runActorSheetRuntimeTests({ keepArtifacts = false, postCha
       actors.push(vehicle);
       await vehicleTest(recorder, vehicle, actors[0]);
     } catch (e) { recorder.fail("Vehicle: test ran", { message: e?.message ?? String(e) }); }
+
+    restoreWarn();
+    if (!warnPatched) recorder.skip("Framework: no V1 deprecation warning while the sheets were in use", { reason: "could not observe Foundry's compatibility warnings" });
+    else recorder.assert(v1Warnings.length === 0, "Framework: no V1 deprecation warning while the sheets were in use", { count: v1Warnings.length });
   } catch (error) {
     recorder.fail("Character sheet suite completed without an uncaught exception", { message: error?.message ?? String(error), stack: error?.stack });
     console.error("[FASERIP TEST] Character sheet suite aborted", error);
   } finally {
+    restoreWarn();
     if (sheet) await closeSheet(sheet);
     if (!keepArtifacts) for (const a of actors.reverse()) { try { await a.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
     console.table(recorder.results.map(({ status, name }) => ({ status, name })));

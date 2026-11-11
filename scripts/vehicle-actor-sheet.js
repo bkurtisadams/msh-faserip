@@ -1,3 +1,9 @@
+// scripts/vehicle-actor-sheet.js v3.4.0 - 2026-11-11
+// v3.4.0: MSHVehicleActorSheet is no longer a V1 sheet (its base class
+//         FaseripActorSheet left the V1 framework). It holds the vehicle
+//         data preparation and listeners for MSHVehicleActorSheetV2.
+//         defaultOptions is gone; an Actor dropped outside a crew slot is
+//         ignored.
 // scripts/vehicle-actor-sheet.js v3.3.1 - 2026-11-11
 // v3.3.1: Fixed-bug: an actor dropped on a crew slot of the V2 vehicle sheet
 //         did nothing. The V2 sheet now hands Actor drops to the crew logic
@@ -37,19 +43,6 @@ function crewNames(uuids) {
 }
 
 export class MSHVehicleActorSheet extends FaseripActorSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip-sheet", "sheet", "actor", "vehicle"],
-      template: "systems/msh-faserip/templates/actor/vehicle-actor-sheet.html",
-      width: 620,
-      height: 580,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "crew" }],
-      dragDrop: [
-        { dragSelector: ".item[data-item-id]", dropSelector: null }
-      ]
-    });
-  }
-
   getData(options = {}) {
     const data = super.getData(options);
     const sys = this.actor.system;
@@ -266,9 +259,7 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
     const dropZone = event.target.closest?.(".crew-drop-zone");
     const slot = dropZone?.dataset?.slot;
 
-    if (!slot) {
-      return super._onDropActor(event, data);
-    }
+    if (!slot) return false;
 
     if (slot !== "driver" && slot !== "passenger") return false;
     await this._addCrew(slot, doc);

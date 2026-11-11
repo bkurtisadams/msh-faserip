@@ -1,3 +1,11 @@
+// scripts/actor-sheet-v2.js v1.6.0 - 2026-11-11
+// v1.6.0: The legacy class this sheet wraps is now a plain class, not a V1
+//         sheet, so everything it needs comes through the adapter: getData
+//         is called through it, and it supplies title. The adapter no longer
+//         marks itself (nothing checks any more) and the leftover V1
+//         drag-drop reset is gone. Adds _rollVehicleControl, which the
+//         vehicle-control hotbar macros call on actor.sheet and which was
+//         missing from this sheet.
 // scripts/actor-sheet-v2.js v1.5.1 - 2026-11-11
 // v1.5.1: An Actor dropped on the sheet goes to _onDropActor (a no-op here,
 //         overridden by the vehicle sheet for its crew slots). It used to be
@@ -115,7 +123,6 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     return new Proxy(v1, {
       get(target, prop) {
         switch (prop) {
-          case "_isV2Adapter": return true;
           case "actor":      return v2.actor;
           case "object":     return v2.actor;
           case "document":   return v2.actor;
@@ -123,6 +130,7 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
           case "form":       return v2.element;
           case "options":    return v2.options;
           case "isEditable": return v2.isEditable;
+          case "title":      return v2.title;
           case "rendered":   return v2.rendered;
           case "position":         return v2.position;
           case "_normalSheetSize": return { ...v2.constructor.NORMAL_SIZE };
@@ -168,7 +176,8 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     const base = await super._prepareContext(options);
     let legacy = {};
     try {
-      legacy = this._v1().getData() ?? {};
+      const v1 = this._v1();
+      legacy = v1.getData.call(this._adapterThis(v1)) ?? {};
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 getData adapter failed", err);
     }
@@ -232,12 +241,9 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
     // in v14, so we handle it natively via a delegated root listener.
     this._bindEditImage();
 
-    // Legacy listeners. Null v1's own _dragDrop array first so its
-    // activateListeners doesn't try to double-bind on top of ours with
-    // callbacks that close over the unrendered v1 instance.
+    // Legacy listeners.
     try {
       const v1 = this._v1();
-      if (v1._dragDrop) v1._dragDrop = [];
       v1.activateListeners.call(this._adapterThis(v1), html);
     } catch (err) {
       console.error("FaseripActorSheetV2 | v1 activateListeners shim failed", err);
@@ -408,6 +414,12 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /** Handle an Actor dropped on the sheet. Character sheets ignore it. */
   async _onDropActor(_event, _data) {
     return false;
+  }
+
+  /** Vehicle control roll. Hotbar macros made from the Vehicles tab call this on actor.sheet. */
+  _rollVehicleControl(vehicle) {
+    const v1 = this._v1();
+    return v1._rollVehicleControl.call(this._adapterThis(v1), vehicle);
   }
 
   async _onDropItem(event, data) {

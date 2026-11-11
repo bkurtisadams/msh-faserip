@@ -1,3 +1,12 @@
+// actorSheet.js v2.18.0 - 2026-11-11
+// v2.18.0: FaseripActorSheet no longer extends Foundry's V1 ActorSheet. It is
+//          a plain class holding the character sheet's data preparation and
+//          listeners, used only through the V2 sheet's adapter, which
+//          supplies actor, element, options, isEditable, title, render and
+//          the rest. Removed with the base class: defaultOptions, _render,
+//          _updateObject and close (the V2 sheet has its own of each), the
+//          call to the V1 base listeners, and the sheet-level drop binding
+//          that only a V1 window used.
 // actorSheet.js v2.17.0 - 2026-11-11
 // v2.17.0: Fixed-bug: three places read the sheet's root as
 //          `this.element?.[0] ?? this.element`. Under the V2 sheet,
@@ -267,7 +276,6 @@ import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
-import { normalizeActorSubmit } from './actor-sheet-submit.js';
 import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES,
@@ -442,7 +450,16 @@ function sheetRootOf(sheet) {
   return el instanceof HTMLElement ? el : (el[0] ?? null);
 }
 
-export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
+export class FaseripActorSheet {
+  /**
+   * @param {Actor} actor
+   * @param {object} [options]
+   */
+  constructor(actor, options = {}) {
+    this.actor = actor;
+    this.options = options;
+  }
+
   // Add a property to track the biography toggle state
   _isBiographyOpen = false;
   
@@ -455,20 +472,6 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   // Universal Table tab renderer (instantiated lazily in activateListeners)
   _utTab = null;
 
-
-  /** @override */
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip-sheet", "sheet", "actor"],
-      template: "systems/msh-faserip/templates/actor-sheet.html",
-      width: 700,
-      height: 800,
-      tabs: [{ navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", initial: "powers" },
-        { navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", tab: "create-character", label: "Creator" }],
-      submitOnChange: true,
-      closeOnSubmit: false
-    });
-  }
 
   /** @override */
   /**
@@ -1153,24 +1156,6 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     this._coreStatTabRoot = root;
   }
 
-  /** Capture the live focused field immediately before appv1 replaces the DOM. */
-  async _render(force = false, options = {}) {
-    this._captureSheetFocus();
-    return super._render(force, options);
-  }
-
-  /** @override */
-  _updateObject(event, formData) {
-    const changedField = event?.target?.name ?? event?.currentTarget?.name ?? '';
-    normalizeActorSubmit(this.actor, changedField, formData);
-
-    // Expand the form data
-    const expandedData = foundry.utils.expandObject(formData);
-
-    // Call the parent update
-    return super._updateObject(event, expandedData);
-  }
-
   // Replace your existing _onDragStart method with this one
   _onDragStart(event) {
     // Don't process if shift key is held (let the specific item handlers manage sorting)
@@ -1432,11 +1417,6 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       try { await this._utTab._popout.close({ _reattach: true }); } catch (_) {}
       this._utTab._popout = null;
     }
-  }
-
-  async close(options = {}) {
-    await this._teardownSheetHooks();
-    return super.close(options);
   }
 
   _computeHQRentStatus(lastPaidStr) {
@@ -2485,11 +2465,6 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   }
 
   activateListeners(html) {
-    // Under the V2 sheet's adapter the V1 base listeners are not wanted: the
-    // V2 sheet owns form submission, tabs, editors, the portrait click and
-    // the read-only lock. A true V1 subclass (the vehicle sheet) still needs
-    // them.
-    if (!this._isV2Adapter) super.activateListeners(html);
     this._restoreSheetFocus(html);
     this._bindCoreStatTabbing(html);
 
@@ -2498,22 +2473,8 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     // same-event guard if core delivery ever resumes.
     const dropEl = sheetRootOf(this);
     if (dropEl) {
-      // Re-bind every render (remove prior handler, then add) so the CURRENT
-      // element always has exactly one live drop listener. The previous
-      // once-only __mshDropBound guard did not survive appv1-on-14.364
-      // re-renders: the drop worked once, then the re-rendered element had
-      // no live listener.
-      // Under the V2 adapter the V2 sheet binds the sheet-level drop itself.
-      if (!this._isV2Adapter) {
-        if (this._mshDropHandler) {
-          dropEl.removeEventListener("dragover", this._mshDragoverHandler);
-          dropEl.removeEventListener("drop", this._mshDropHandler);
-        }
-        this._mshDragoverHandler = ev => ev.preventDefault();
-        this._mshDropHandler = ev => this._onDrop(ev);
-        dropEl.addEventListener("dragover", this._mshDragoverHandler);
-        dropEl.addEventListener("drop", this._mshDropHandler);
-      }
+      // The V2 sheet binds the sheet-level drop listener; the item tabs'
+      // drop zones (_mshBindItemTabDropZones) route to _onDrop below.
 
       // V14 (core 14.364): appv1's base img[data-edit] click binding is as
       // unreliable as its DragDrop delivery — the portrait was unclickable
