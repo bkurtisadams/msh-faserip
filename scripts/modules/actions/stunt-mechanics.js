@@ -1,15 +1,9 @@
-// scripts/modules/actions/stunt-mechanics.js v2.0.0 - 2026-11-13
-// v2.0.0: Power stunts live on the power. A power item's system.powerStunts
-//         holds stunt definitions { id, name, description, presetKey,
-//         mechanic }; the Stunts tab entry links to one by powerStuntId and
-//         stays the record of attempts, Karma and mastery. runStuntMechanic
-//         runs the linked definition first, then the preset, then the entry's
-//         own mechanic. New kinds: "save" (IntensityAction with CS shift and
-//         Multiple Targets CS) and "attack" (any Battle Effects column).
-//         Sonic Stun preset is a save: full rank vs one target, -1CS vs
-//         several, Endurance FEAT or Stunned 1-10 rounds (RULED 2026-11-13).
-//         migratePowerStunts() moves preset-tagged tab stunts onto their
-//         parent power and links them; history and mastery are untouched.
+// scripts/modules/actions/stunt-mechanics.js v1.5.0 - 2026-11-13
+// v1.5.0: Sonic Stun stunt rolls the actor's "Sonic Stun" power item, built on
+//         the power sheet (Target Save: Endurance, Power Rank, Stunned, 1d10,
+//         Multiple Targets -1CS); info card if he has none. Preset stunts run
+//         the current preset mechanic, so stunts tagged under an older preset
+//         pick up corrections.
 // scripts/modules/actions/stunt-mechanics.js v1.4.0 - 2026-09-09
 // v1.4.0: Light Emission preset group (Illuminate, Blind). Illuminate
 //         is a new mechanic kind "grant-token-light" — creates a real
@@ -91,8 +85,8 @@ export const STUNT_PRESETS = {
       description: "Affects all in a given area at -1CS Power rank damage (Force column).",
       mechanic: { kind: "force-attack", shift: -1, note: "Area attack: target everyone in the area; -1CS damage." } },
     { key: "sound-stun", name: "Sonic Stun", aliases: ["sonic stun", "stunning attack"],
-      description: "Stunning attack: one target at Power rank Intensity, or several targets at -1CS. Each target makes an Endurance FEAT or is Stunned 1-10 rounds.",
-      mechanic: { kind: "save", shift: 0, saveAbility: "endurance", effect: "stunned", duration: "1-10", multiTargetCS: -1 } },
+      description: "Stunning attack: one target at Power rank Intensity, or several targets at -1CS. Each target makes an Endurance FEAT or is Stunned 1-10 rounds. Build it as a \"Sonic Stun\" power on the power sheet.",
+      mechanic: { kind: "use-item", itemNames: ["sonic stun"], fallback: "info" } },
     { key: "sound-flight", name: "Sonic Flight", aliases: ["sonic flight"],
       description: "Flight at -2CS (-1CS with glider wings, cape, or similar glide control).",
       mechanic: { kind: "info" } },
@@ -218,136 +212,6 @@ export async function ensureStuntForPreset(actor, item, preset) {
   return idx;
 }
 
-// ── Power-side stunt definitions (system.powerStunts on the power item) ──
-
-// Kinds a stunt definition can be authored with on the power sheet. Preset-only
-// kinds (absorption, token light, mind link...) are kept as-is when present.
-export const EDITABLE_STUNT_KINDS = ["attack", "save", "info"];
-
-// Battle Effects column → action id and to-hit ability (Universal Table header).
-export const STUNT_ATTACK_COLUMNS = {
-  BA: { action: "blunt-attack",   ability: "fighting", label: "Blunt Attack" },
-  EA: { action: "edged-attack",   ability: "fighting", label: "Edged Attack" },
-  S:  { action: "shooting",       ability: "agility",  label: "Shooting" },
-  TE: { action: "throwing-edged", ability: "agility",  label: "Throwing Edged" },
-  TB: { action: "throwing-blunt", ability: "agility",  label: "Throwing Blunt" },
-  En: { action: "energy",         ability: "agility",  label: "Energy" },
-  Fo: { action: "force",          ability: "agility",  label: "Force" },
-  Gp: { action: "grappling",      ability: "strength", label: "Grappling" },
-  Gb: { action: "grabbing",       ability: "strength", label: "Grabbing" },
-  Ch: { action: "charging",       ability: "endurance", label: "Charging" }
-};
-
-export function getPowerStunts(item) {
-  const raw = item?.system?.powerStunts;
-  if (Array.isArray(raw)) return raw.filter(Boolean);
-  if (raw && typeof raw === "object") return Object.values(raw).filter(Boolean);
-  return [];
-}
-
-export function findPowerStunt(item, id) {
-  if (!id) return null;
-  return getPowerStunts(item).find(d => d.id === id) || null;
-}
-
-export function powerStuntFromPreset(preset, name) {
-  return {
-    id: foundry.utils.randomID(),
-    name: name || preset.name,
-    description: preset.description || "",
-    presetKey: preset.key,
-    mechanic: foundry.utils.deepClone(preset.mechanic || { kind: "info" })
-  };
-}
-
-export function blankPowerStunt() {
-  return { id: foundry.utils.randomID(), name: "New Stunt", description: "", presetKey: "",
-    mechanic: { kind: "info", shift: 0 } };
-}
-
-// Book stunts for this power's type that aren't on the power yet.
-export function undevelopedPresets(item) {
-  const have = new Set(getPowerStunts(item).map(d => d.presetKey).filter(Boolean));
-  return presetsForItem(item).filter(p => !have.has(p.key));
-}
-
-// The Stunts tab entry for a definition, if any (index into system.stunts).
-export function stuntEntryIndex(actor, item, def) {
-  const stunts = actor?.system?.stunts || [];
-  let idx = stunts.findIndex(s => s.powerStuntId === def.id);
-  if (idx < 0 && def.presetKey) idx = stunts.findIndex(s => !s.powerStuntId && s.presetKey === def.presetKey
-    && (!s.parentPowerId || s.parentPowerId === item.id));
-  // A custom definition named like an unlinked tab entry of the same power
-  // picks up that entry, so its existing progress carries over.
-  const nm = (def.name || "").trim().toLowerCase();
-  if (idx < 0 && nm) idx = stunts.findIndex(s => !s.powerStuntId && (s.name || "").trim().toLowerCase() === nm
-    && (!s.parentPowerId || s.parentPowerId === item.id));
-  return idx;
-}
-
-// Find or create the Stunts tab entry for a definition and link it.
-export async function ensureStuntEntryForPowerStunt(actor, item, def) {
-  const stunts = foundry.utils.deepClone(actor.system.stunts || []);
-  let idx = stuntEntryIndex(actor, item, def);
-  if (idx < 0) {
-    const preset = def.presetKey ? presetByKey(def.presetKey) : null;
-    stunts.push({
-      name: def.name,
-      description: def.description || "",
-      rank: item.system.rank || "Typical",
-      value: item.system.value ?? 0,
-      parentPowerId: item.id,
-      parentPower: item.name,
-      timesUsed: preset?.mastered ? POWER_STUNT_MASTERY : 0,
-      presetKey: def.presetKey || "",
-      powerStuntId: def.id
-    });
-    idx = stunts.length - 1;
-    await actor.update({ "system.stunts": stunts });
-  } else if (stunts[idx].powerStuntId !== def.id || stunts[idx].parentPowerId !== item.id) {
-    stunts[idx].powerStuntId = def.id;
-    stunts[idx].parentPowerId = item.id;
-    stunts[idx].parentPower = item.name;
-    await actor.update({ "system.stunts": stunts });
-  }
-  return idx;
-}
-
-// One-time per actor (idempotent): every preset-tagged Stunts tab entry that
-// isn't linked yet gets a definition on its parent power and a powerStuntId.
-// Tab history (timesUsed, Karma) is not touched. Entries with no preset stay
-// as notes until the GM gives them a definition on the power.
-export async function migratePowerStunts(actor) {
-  const entries = actor?.system?.stunts;
-  if (!Array.isArray(entries) || !entries.length) return false;
-  const stunts = foundry.utils.deepClone(entries);
-  const itemDefs = new Map();
-  let entriesChanged = false;
-  for (const s of stunts) {
-    if (s.powerStuntId || !s.presetKey) continue;
-    const item = s.parentPowerId ? actor.items.get(s.parentPowerId) : null;
-    if (!item || item.type !== "power") continue;
-    const preset = presetByKey(s.presetKey);
-    if (!preset) continue;
-    if (!itemDefs.has(item.id)) itemDefs.set(item.id, { item, defs: foundry.utils.deepClone(getPowerStunts(item)), changed: false });
-    const bucket = itemDefs.get(item.id);
-    let def = bucket.defs.find(d => d.presetKey === s.presetKey);
-    if (!def) {
-      def = powerStuntFromPreset(preset, s.name);
-      if (s.description) def.description = s.description;
-      bucket.defs.push(def);
-      bucket.changed = true;
-    }
-    s.powerStuntId = def.id;
-    entriesChanged = true;
-  }
-  const itemUpdates = [...itemDefs.values()].filter(b => b.changed)
-    .map(b => ({ _id: b.item.id, "system.powerStunts": b.defs }));
-  if (itemUpdates.length) await actor.updateEmbeddedDocuments("Item", itemUpdates);
-  if (entriesChanged) await actor.update({ "system.stunts": stunts });
-  return entriesChanged;
-}
-
 // Run the mechanic attached to a stunt (after a successful roll or when mastered).
 function presetByKey(key) {
   if (!key) return null;
@@ -358,14 +222,10 @@ function presetByKey(key) {
   return null;
 }
 
-export async function runStuntMechanic(actor, entry) {
-  const item = entry?.parentPowerId ? actor.items.get(entry.parentPowerId) : null;
-  const def = item ? findPowerStunt(item, entry.powerStuntId) : null;
-  const m = def?.mechanic || presetByKey(entry?.presetKey)?.mechanic || entry?.mechanic;
+export async function runStuntMechanic(actor, stunt) {
+  const m = presetByKey(stunt?.presetKey)?.mechanic || stunt?.mechanic;
   if (!m) return;
-  const stunt = def
-    ? { ...entry, name: def.name || entry.name, description: def.description || entry.description, presetKey: def.presetKey || entry.presetKey }
-    : entry;
+  const item = stunt.parentPowerId ? actor.items.get(stunt.parentPowerId) : null;
   const { ActionDispatcher } = await import("./action-dispatcher.js");
   const { shiftRank, rankValue } = await import("./action-utils.js");
   const baseRank = item?.system?.rank || stunt.rank || "Typical";
@@ -385,30 +245,6 @@ export async function runStuntMechanic(actor, entry) {
 
   if (m.kind === "energy-attack") return attack("energy", "agility");
   if (m.kind === "force-attack")  return attack("force", "agility");
-  if (m.kind === "attack") {
-    const col = STUNT_ATTACK_COLUMNS[m.column] || STUNT_ATTACK_COLUMNS.Fo;
-    return attack(col.action, col.ability);
-  }
-
-  if (m.kind === "save") {
-    if (!item) return ui.notifications.warn(`${stunt.name}: parent power not found.`);
-    return ActionDispatcher.roll("intensity", {
-      actor,
-      abilityName: m.saveAbility || "endurance",
-      opts: {
-        itemId: item.id, item,
-        stuntSave: {
-          name: stunt.name,
-          description: stunt.description || "",
-          rank,
-          ability: m.saveAbility || "endurance",
-          effect: m.effect || "",
-          duration: m.duration || "1-10",
-          multiTargetCS: Number(m.multiTargetCS) || 0
-        }
-      }
-    });
-  }
 
   if (m.kind === "mental-power" || m.kind === "intensity-save") {
     if (!item) return ui.notifications.warn(`${stunt.name}: parent power not found.`);
@@ -423,7 +259,7 @@ export async function runStuntMechanic(actor, entry) {
       || actor.items.find(i => i.type === "power" && names.some(n => (i.name || "").toLowerCase().includes(n)));
     if (target) {
       const { rollPower } = await import("./power-router.js");
-      return rollPower(actor, target, { skipStuntChooser: true });
+      return rollPower(actor, target);
     }
     if (m.fallback === "energy-attack") return attack("energy", "agility");
     if (m.fallback === "force-attack")  return attack("force", "agility");

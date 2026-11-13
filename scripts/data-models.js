@@ -1,5 +1,3 @@
-// scripts/data-models.js v2.4.7 - 2026-11-13
-// v2.4.7: Power gains powerStunts (stunt definitions; see stunt-mechanics.js).
 // scripts/data-models.js v2.4.6 - 2026-09-09
 // v2.4.6: absorptionConvertsToHealth / absorptionCanRedirect keys removed
 //         from the power model (retired with RAW Absorption, 2026-09-09).
@@ -129,7 +127,7 @@ class FaseripPowerData extends PermissiveDataModel {
     "lifeSupportHours", "lifeSupportTurns", "limitRankMax", "limitation",
     "limitationColumnShift", "limitationDetail", "limitationRequired", "limitations",
     "limitedReset", "magic", "mental", "mentalEffect", "movement", "notes",
-    "overridePullPunch", "powerStunts", "preLimitationRank", "primaryEffect", "protectionValue", "range",
+    "overridePullPunch", "preLimitationRank", "primaryEffect", "protectionValue", "range",
     "rangeAreas", "rank", "rankRule", "rankRuleAbility", "rankValue", "reactive",
     "recoveryRate", "regenerationRate", "regenerationType", "replacesAbility",
     "requiresConcentration", "requiresSave", "resistanceEffect", "resistanceIsConductive",

@@ -1,7 +1,3 @@
-// intensity-action.js v4.7.0 - 2026-11-13
-// v4.7.0: opts.stuntSave runs a power stunt's save (rank already shifted,
-//         ability, effect, duration, Multiple Targets CS) without editing the
-//         power item; cards and dialog show the stunt's name.
 // intensity-action.js v4.6.0 - 2026-11-13
 // v4.6.0: Power save block's Multiple Targets CS (save.multiTargetCS) shifts
 //         the Intensity when more than one target is selected (Sonic Stun:
@@ -182,17 +178,11 @@ export class IntensityAction extends BaseAction {
     if (!item) return ui.notifications.warn("No item for Intensity roll.");
 
     const attackMode = this.opts?.attackMode || null;
-    const ss = this.opts?.stuntSave || null;
-    const fields = ss
-      ? { rank: ss.rank || item.system?.rank || "Typical", effect: ss.effect || "", description: ss.description || "",
-          saveAbility: ss.ability || "endurance", durationMode: ss.duration || "1-10", fixedRounds: 0, toxinId: null }
-      : resolveIntensityFields(item, attackMode);
+    const fields = resolveIntensityFields(item, attackMode);
     if (!fields) return ui.notifications.warn(`${item.name} has no Intensity/Save configured.`);
-    fields.displayName = ss?.name ? `${item.name}: ${ss.name}` : item.name;
 
     const { targets } = getTargetData();
-    const multiCS = ss ? (Number(ss.multiTargetCS) || 0)
-      : (!attackMode && item.type === "power") ? (Number(item.system?.save?.multiTargetCS) || 0) : 0;
+    const multiCS = (!attackMode && item.type === "power") ? (Number(item.system?.save?.multiTargetCS) || 0) : 0;
     let multiNote = "";
     if (multiCS && targets.length > 1) {
       const baseRank = fields.rank;
@@ -220,7 +210,7 @@ export class IntensityAction extends BaseAction {
         <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
           <img src="${item.img}" width="32" height="32" style="border:0;"/>
           <div>
-            <div style="font-weight:bold;font-size:1.1em;">${fields.displayName}${isPower ? ' <span style="font-size:.75em;color:#666;">(Power)</span>' : ''}</div>
+            <div style="font-weight:bold;font-size:1.1em;">${item.name}${isPower ? ' <span style="font-size:.75em;color:#666;">(Power)</span>' : ''}</div>
             <div style="font-size:0.85em;color:#666;">Intensity: <b>${intensityRank}</b> — Effect: <b>${effectLabel}</b></div>
           </div>
         </div>
@@ -238,7 +228,7 @@ export class IntensityAction extends BaseAction {
 
     return new Promise(resolve => {
       showFaseripButtonDialog({
-        title: `${fields.displayName} — Intensity (${intensityRank})`,
+        title: `${item.name} — Intensity (${intensityRank})`,
         content,
         buttons: {
           roll: {
@@ -318,7 +308,7 @@ export class IntensityAction extends BaseAction {
         // else a plain roll. Skipped for automatic/impossible (no roll).
         const { resolveResistFeat } = await import("../dice/dice-roller.js");
         const fr = await resolveResistFeat(targetActor, {
-          sourceName: `Resist ${fields.displayName || item.name}`,
+          sourceName: `Resist ${item.name}`,
           rank: endRank,
           intensityRank,
           requirement: req.requirement,
@@ -376,7 +366,7 @@ export class IntensityAction extends BaseAction {
         <span style="color:#666;font-weight:normal;font-size:.85em;">vs ${intensityRank}${effectTag}</span>
       </div>
       <div style="padding:4px 10px;font-size:.95em;">
-        <strong>${actor.name}</strong> uses <strong>${fields.displayName || item.name}</strong>
+        <strong>${actor.name}</strong> uses <strong>${item.name}</strong>
       </div>
       <div style="padding:2px 10px 4px;font-size:.9em;color:#555;">
         ${descLine}
