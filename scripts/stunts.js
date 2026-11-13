@@ -1,3 +1,7 @@
+// scripts/stunts.js v1.4.0 - 2026-11-13
+// v1.4.0: Attempt cost from the parent power via stunt-ledger (Weather
+//         Control 50, else 100). Card reports Successes, not Times
+//         Attempted, and only advances on a success.
 // scripts/stunts.js v1.3.1 - 2026-11-10
 // v1.3.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
@@ -17,6 +21,7 @@
 import { powerStuntRequiredColor, POWER_STUNT_MASTERY } from "./lib/faserip-rules/faserip-karma.js";
 import { runStuntMechanic, ensureStuntForPreset } from "./modules/actions/stunt-mechanics.js";
 import { getRollMode } from "./modules/dice/roll-mode.js";
+import { stuntKarmaCost } from "./stunt-ledger.js";
 
 const DialogV2 = foundry.applications.api.DialogV2;
 
@@ -41,7 +46,7 @@ export class StuntRoller {
     }
 
     const { featColor } = this._getFeatDifficulty(stunt.timesUsed);
-    const baseCost = 100;
+    const baseCost = stuntKarmaCost(stunt.parentPowerId ? this.actor.items.get(stunt.parentPowerId) : null);
     const availableKarma = this._getAvailableKarma();
 
     if (availableKarma < baseCost) {
@@ -107,7 +112,7 @@ export class StuntRoller {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:0.92em;">
             ${resolved.powerName ? `<div style="grid-column:1 / -1;"><strong>Power:</strong> ${resolved.powerName}</div>` : '<div style="grid-column:1 / -1;"><em>General power stunt</em></div>'}
             <div><strong>Rank:</strong> ${resolved.rank} (${resolved.value})</div>
-            <div><strong>Progress:</strong> ${stunt.timesUsed}/10</div>
+            <div><strong>Successes:</strong> ${stunt.timesUsed}/${POWER_STUNT_MASTERY}</div>
             <div><strong>Difficulty:</strong> <span style="color:${featColorHex};font-weight:bold;">${featColor}</span></div>
             <div style="color:#666;">${difficultyDesc}</div>
             ${stunt.description ? `<div style="grid-column:1 / -1;"><strong>Description:</strong> ${stunt.description}</div>` : ''}
@@ -378,7 +383,7 @@ export class StuntRoller {
           <div>Difficulty: ${featColor} FEAT</div>
           <div>Roll: ${rollResult}${extraKarma > 0 ? ` + ${extraKarma} Karma = ${finalResult}` : ''}</div>
           <div>Color: ${String(initialColor).toUpperCase()}${extraKarma > 0 ? ` → ${String(finalColor).toUpperCase()}` : ''}</div>
-          <div>Times Attempted: ${stunt.timesUsed} → ${stunt.timesUsed + 1}</div>
+          <div>Successes: ${success ? `${stunt.timesUsed} → ${stunt.timesUsed + 1}` : `${stunt.timesUsed} (unchanged)`}</div>
           <div>Total Karma Spent: ${totalKarma} (${baseCost} attempt${extraKarma > 0 ? ` + ${extraKarma} boost` : ''})</div>
         </div>
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">

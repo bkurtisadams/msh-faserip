@@ -8,71 +8,50 @@
               <th>Rank</th>
               <th>Value</th>
               <th>Difficulty</th>
-              <th>Times Used</th>
+              <th title="Successful uses; ten masters the stunt">Successes</th>
               <th class="th-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {{#each system.stunts as |stunt stuntIndex|}}
-            <tr class="stunt-row" data-stunt-index="{{stuntIndex}}">
-              <!-- Roll Button Column -->
+            {{#each stuntRows as |row|}}
+            <tr class="stunt-row" data-stunt-index="{{row.index}}">
               <td class="stunt-roll-cell">
-                <a class="stunt-roll-link roll-stunt-tab" 
-                  data-stunt-index="{{stuntIndex}}"
-                  title="Roll stunt">
+                <a class="stunt-roll-link roll-stunt-tab" data-stunt-index="{{row.index}}" title="Roll stunt">
                   <i class="fas fa-dice-d20"></i>
                 </a>
               </td>
-              
-              <!-- Clickable Stunt Name -->
+
               <td class="stunt-name">
-                <a class="stunt-name-link show-stunt-description" 
-                  data-stunt-index="{{stuntIndex}}"
-                  title="Show description in chat">
-                  {{stunt.name}}
-                </a>
+                <a class="stunt-name-link show-stunt-description" data-stunt-index="{{row.index}}" title="Show description in chat">{{row.name}}</a>
               </td>
-              
-              <!-- Parent Power -->
+
               <td class="stunt-parent">
-                {{#if stunt.parentPower}}
-                  <span style="font-style: italic; color: #666;">{{stunt.parentPower}}</span>
+                {{#if row.parentName}}
+                  <span style="font-style: italic; color: #666;">{{row.parentName}}</span>{{#if row.parentMissing}} <span style="color: #c62828;" title="The linked power is no longer on this character; the stored rank is used">(missing)</span>{{/if}}
                 {{else}}
                   <span style="color: #999;">—</span>
                 {{/if}}
               </td>
-              
-              <!-- Rank -->
-              <td class="stunt-rank">{{stunt.rank}}</td>
-              
-              <!-- Value -->
-              <td class="stunt-value">{{stunt.value}}</td>
-              
-              <!-- Difficulty -->
-              <td class="stunt-difficulty">
-                <span class="difficulty-badge 
-                  {{#if (lt stunt.timesUsed 1)}}difficulty-red
-                  {{else if (lt stunt.timesUsed 4)}}difficulty-yellow
-                  {{else if (lt stunt.timesUsed 10)}}difficulty-green
-                  {{else}}difficulty-mastered{{/if}}">
-                  {{#if (lt stunt.timesUsed 1)}}Red FEAT
-                  {{else if (lt stunt.timesUsed 4)}}Yellow FEAT
-                  {{else if (lt stunt.timesUsed 10)}}Green FEAT
-                  {{else}}Mastered{{/if}}
-                </span>
+
+              <td class="stunt-rank">
+                {{row.rank}}
+                {{#if row.shiftLabel}}<div style="font-size: .85em; color: #666;" title="Rank the stunt's effect uses">effect {{row.shiftLabel}}</div>{{/if}}
               </td>
-              
-              <!-- Times Used -->
-              <td class="stunt-uses">{{stunt.timesUsed}}</td>
-              
-              <!-- Actions (Edit/Delete) -->
+
+              <td class="stunt-value">{{row.value}}</td>
+
+              <td class="stunt-difficulty">
+                <span class="difficulty-badge difficulty-{{row.statusKey}}">{{row.statusLabel}}</span>
+                {{#unless row.mastered}}<div style="font-size: .85em; color: #666;">{{row.costLabel}}</div>{{/unless}}
+              </td>
+
+              <td class="stunt-uses" title="{{#if row.mastered}}Mastered{{else}}{{row.toMastery}} more to master{{/if}}">{{row.successes}}</td>
+
               <td class="stunt-controls">
-                <a class="item-control edit-stunt-tab" title="Edit" 
-                  data-stunt-index="{{stuntIndex}}">
+                <a class="item-control edit-stunt-tab" title="Edit" data-stunt-index="{{row.index}}">
                   <i class="fas fa-edit"></i>
                 </a>
-                <a class="item-control delete-stunt-tab" title="Delete" 
-                  data-stunt-index="{{stuntIndex}}">
+                <a class="item-control delete-stunt-tab" title="Delete" data-stunt-index="{{row.index}}">
                   <i class="fas fa-trash"></i>
                 </a>
               </td>
@@ -81,7 +60,7 @@
           </tbody>
         </table>
 
-        {{#unless system.stunts.length}}
+        {{#unless stuntRows.length}}
         <p class="no-stunts">No power stunts created yet.</p>
         {{/unless}}
       </div>

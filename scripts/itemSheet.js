@@ -1,3 +1,7 @@
+// itemSheet.js v2.4.0 - 2026-11-13
+// v2.4.0: Power sheet lists the owner's Stunts-tab stunts for this power
+//         (context.powerStunts) and refreshes when they change; Add stunt
+//         opens the shared stunt-ledger dialog.
 // itemSheet.js v2.3.0 - 2026-11-13
 // v2.3.0: context.ps2 carries the power sheet view model from
 //         power-sheet-view.mjs.
@@ -39,8 +43,10 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 import { buildPowerSheetView } from "./power-sheet-view.mjs";
+import { stuntRows, openAddStuntDialog } from "./stunt-ledger.js";
+import { stuntShift } from "./modules/actions/stunt-mechanics.js";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
-import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
+import { showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -143,6 +149,14 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         isBonusPower: !!this.item.getFlag("msh-faserip", "isBonusPower")
       };
       context.ps2 = buildPowerSheetView(context.system ?? {}, context.powerOriginFlags);
+      const owner = this.item.parent;
+      context.powerStunts = owner?.documentName === "Actor"
+        ? {
+            onActor: true,
+            actorName: owner.name,
+            rows: stuntRows(owner, stuntShift).filter(r => r.parentPowerId === this.item.id)
+          }
+        : { onActor: false, actorName: "", rows: [] };
 
       // Helpful logging (kept from your original)
       console.log("Power sheet data:", context);
@@ -425,6 +439,14 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     return detected;
   }
 
+  async _onClose(options) {
+    if (this._stuntHook) {
+      Hooks.off("updateActor", this._stuntHook);
+      this._stuntHook = null;
+    }
+    return super._onClose(options);
+  }
+
   async _onRender(context, options) {
     await super._onRender(context, options);
     const html = $(this.element);
@@ -434,6 +456,12 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     // gated on isEditable inside ps2ActivateListeners.
     if (this.item.type === "power") {
       ps2ActivateListeners(html, this);
+      const owner = this.item.parent;
+      if (owner?.documentName === "Actor" && !this._stuntHook) {
+        this._stuntHook = Hooks.on("updateActor", (actor, changes) => {
+          if (actor.id === owner.id && foundry.utils.hasProperty(changes, "system.stunts")) this.render();
+        });
+      }
     }
 
     if (!this.isEditable) return;
@@ -621,109 +649,9 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       ui.notifications.info("Test Power functionality coming soon!");
     });
 
-    // Create stunt from power sheet
     html.find('.create-stunt-from-power').click(async ev => {
-      const power = this.item;
-      const actor = power.parent;
-      
-      if (!actor) {
-        return ui.notifications.warn("This power must be on an actor to create stunts.");
-      }
-      
-      const ranks = [
-        "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-        "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-        "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-      ];
-      
-      const rankOptions = ranks.map(r => `<option value="${r}" ${r === power.system.rank ? 'selected' : ''}>${r}</option>`).join('');
-      
-      // Calculate suggested rank (power rank - 1CS)
-      const powerRankIndex = ranks.indexOf(power.system.rank);
-      const suggestedRankIndex = Math.max(0, powerRankIndex - 1);
-      const suggestedRank = ranks[suggestedRankIndex];
-      const suggestedValue = game.msh.getRankValue(suggestedRank);
-      
-      showFaseripButtonDialog({
-        title: `Create Stunt for ${power.name}`,
-        content: `
-          <div>
-            <div class="form-group">
-              <label>Stunt Name:</label>
-              <input type="text" name="name" placeholder="e.g., Enhanced ${power.name}" style="width: 100%;" />
-            </div>
-            <div class="form-group">
-              <label>Rank:</label>
-              <select name="rank" id="stunt-rank-select" style="width: 150px;">
-                ${rankOptions}
-              </select>
-              <small style="display: block; color: #666;">Base power: ${power.system.rank} (${power.system.value}). Stunts often at -1CS.</small>
-            </div>
-            <div class="form-group">
-              <label>Rank Number:</label>
-              <input type="number" name="value" value="${suggestedValue}" min="0" style="width: 100px;" />
-            </div>
-            <div class="form-group">
-              <label>Description:</label>
-              <textarea name="description" rows="4" placeholder="Describe what this stunt does differently from the base power..." style="width: 100%;"></textarea>
-            </div>
-            <p style="margin-top: 10px; padding: 8px; background: #fff3e0; border: 1px solid #ff9800; border-radius: 3px; font-size: 0.9em;">
-              <strong>Note:</strong> First use requires a Red FEAT and costs 100 Karma. This stunt will appear in the actor's Stunts tab.
-            </p>
-          </div>
-        `,
-        buttons: {
-          create: {
-            icon: '<i class="fas fa-plus"></i>',
-            label: "Create Stunt",
-            callback: async html => {
-              const name = html.find('[name="name"]').val()?.trim();
-              
-              if (!name) {
-                ui.notifications.warn("Stunt name is required!");
-                return;
-              }
-              
-              let existingStunts = actor.system.stunts || [];
-              // Convert to array if it's an object
-              if (!Array.isArray(existingStunts)) {
-                existingStunts = Object.values(existingStunts).filter(s => s); // Filter out any null/undefined
-              }
-              const stunts = foundry.utils.deepClone(existingStunts);
-              
-              stunts.push({
-                name: name,
-                parentPower: power.name, // ← Link to parent power
-                parentPowerId: power.id, // ← Store ID for future reference
-                rank: html.find('[name="rank"]').val(),
-                value: parseInt(html.find('[name="value"]').val()) || 6,
-                description: html.find('[name="description"]').val() || "",
-                timesUsed: 0
-              });
-              
-              await actor.update({ "system.stunts": stunts });
-              ui.notifications.info(`Stunt "${name}" created in ${actor.name}'s Stunts tab!`);
-              
-              // Optionally close the power sheet and open the actor sheet to Stunts tab
-              // this.close();
-              // actor.sheet.render(true, { tab: 'stunts' });
-            }
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel"
-          }
-        },
-        default: "create",
-        render: html => {
-          // Auto-update value when rank changes
-          html.find('#stunt-rank-select').change(ev => {
-            const selectedRank = ev.currentTarget.value;
-            const value = game.msh.getRankValue(selectedRank);
-            html.find('[name="value"]').val(value);
-          });
-        }
-      });
+      ev.preventDefault();
+      if (await openAddStuntDialog(this.item.parent, { parentPowerId: this.item.id })) this.render();
     });
 
     // ANCHOR: vehicle-item-create-actor

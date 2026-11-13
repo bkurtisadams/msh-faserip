@@ -1074,6 +1074,33 @@
       </div>
     </fieldset>
 
+    <fieldset class="ps2-fieldset ps2-stunts">
+      <legend>Power Stunts</legend>
+      {{#if powerStunts.onActor}}
+      {{#if powerStunts.rows.length}}
+      <table class="ps2-table">
+        <thead><tr><th>Stunt</th><th>Successes</th><th>Next attempt</th><th>Effect</th></tr></thead>
+        <tbody>
+          {{#each powerStunts.rows}}
+          <tr>
+            <td>{{this.name}}</td>
+            <td>{{this.successes}}</td>
+            <td>{{this.statusLabel}}{{#unless this.mastered}}, {{this.costLabel}}{{/unless}}</td>
+            <td>{{#if this.shiftLabel}}{{this.shiftLabel}}{{else}}—{{/if}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      {{/if}}
+      <div class="ps2-inline-row ps2-between">
+        <p class="ps2-hint">{{#if powerStunts.rows.length}}Kept on {{powerStunts.actorName}}'s Stunts tab. Roll and edit them there.{{else}}{{powerStunts.actorName}} has no stunts for this power yet.{{/if}}</p>
+        <button type="button" class="ps2-add-btn create-stunt-from-power">Add stunt</button>
+      </div>
+      {{else}}
+      <p class="ps2-hint">Stunts are recorded per character. Put this power on a character to see and add its stunts.</p>
+      {{/if}}
+    </fieldset>
+
     <fieldset class="ps2-fieldset ps2-add-section">
       <legend>More fields</legend>
       <div class="ps2-inline-row">
