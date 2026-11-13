@@ -1,3 +1,7 @@
+// scripts/modules/actions/check-action.js v1.15.0 - 2026-11-13
+// v1.15.0: Mental/stunt save failures named "Stunned" apply the real Stun
+//          effect (Effects.applyStun); the manual-roll path now routes
+//          "Unconscious" through Effects.applyUnconscious like the auto path.
 // scripts/modules/actions/check-action.js v1.14.0 - 2026-09-09
 // v1.14.0: Fix Slam/Stun/Kill dialog opening at full width — same class
 //         of bug as energy-action.js v3.4.2, contact-action.js v1.3.0,
@@ -522,6 +526,11 @@ export class CheckAction extends BaseAction {
                 originUuid: actor.uuid,
                 selfNullify: false
               });
+            } else if (customEffectName.toLowerCase() === "stunned") {
+              await Effects.applyStun(saveActor, {
+                rounds: duration,
+                originUuid: actor.uuid
+              });
             } else if (customEffectName.toLowerCase() === "unconscious") {
               // Psionic Attack KO: use the real unconscious effect (statuses,
               // canAct:false, defense shifts) — the generic path below created
@@ -916,6 +925,10 @@ export class CheckAction extends BaseAction {
               originUuid: actor.uuid,
               selfNullify: false
             });
+          } else if (customEffectName.toLowerCase() === "stunned") {
+            await Effects.applyStun(saveActor, { rounds: duration, originUuid: actor.uuid });
+          } else if (customEffectName.toLowerCase() === "unconscious") {
+            await Effects.applyUnconscious(saveActor, { rounds: duration, originUuid: actor.uuid });
           } else {
             await Effects.applyEffect(saveActor, {
               name: customEffectName,

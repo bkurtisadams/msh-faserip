@@ -1,3 +1,9 @@
+// scripts/modules/actions/stunt-mechanics.js v1.5.0 - 2026-11-13
+// v1.5.0: RULED (Sound Generation, 2026-11-13) — Sonic Stun is one target at
+//         full Power rank Intensity, or several targets at -1CS; each makes an
+//         Endurance FEAT or is Stunned 1-10 rounds. Preset stunts run the
+//         current preset mechanic, so stunts tagged under an older preset
+//         pick up corrections.
 // scripts/modules/actions/stunt-mechanics.js v1.4.0 - 2026-09-09
 // v1.4.0: Light Emission preset group (Illuminate, Blind). Illuminate
 //         is a new mechanic kind "grant-token-light" — creates a real
@@ -79,8 +85,8 @@ export const STUNT_PRESETS = {
       description: "Affects all in a given area at -1CS Power rank damage (Force column).",
       mechanic: { kind: "force-attack", shift: -1, note: "Area attack: target everyone in the area; -1CS damage." } },
     { key: "sound-stun", name: "Sonic Stun", aliases: ["sonic stun", "stunning attack"],
-      description: "Stunning attack at -1CS Intensity: target makes an Endurance FEAT or is unconscious 1-10 rounds.",
-      mechanic: { kind: "intensity-save", shift: -1, powerName: "Sonic Stun", effectName: "Unconscious", failMessage: "is knocked unconscious", saveAbility: "endurance" } },
+      description: "Stunning attack: one target at Power rank Intensity, or several targets at -1CS. Each target makes an Endurance FEAT or is Stunned 1-10 rounds.",
+      mechanic: { kind: "intensity-save", shift: 0, multiTarget: true, multiShift: -1, powerName: "Sonic Stun", effectName: "Stunned", failMessage: "is stunned", saveAbility: "endurance" } },
     { key: "sound-flight", name: "Sonic Flight", aliases: ["sonic flight"],
       description: "Flight at -2CS (-1CS with glider wings, cape, or similar glide control).",
       mechanic: { kind: "info" } },
@@ -207,8 +213,17 @@ export async function ensureStuntForPreset(actor, item, preset) {
 }
 
 // Run the mechanic attached to a stunt (after a successful roll or when mastered).
+function presetByKey(key) {
+  if (!key) return null;
+  for (const list of Object.values(STUNT_PRESETS)) {
+    const p = list.find(x => x.key === key);
+    if (p) return p;
+  }
+  return null;
+}
+
 export async function runStuntMechanic(actor, stunt) {
-  const m = stunt?.mechanic;
+  const m = presetByKey(stunt?.presetKey)?.mechanic || stunt?.mechanic;
   if (!m) return;
   const item = stunt.parentPowerId ? actor.items.get(stunt.parentPowerId) : null;
   const { ActionDispatcher } = await import("./action-dispatcher.js");
@@ -233,7 +248,9 @@ export async function runStuntMechanic(actor, stunt) {
 
   if (m.kind === "mental-power" || m.kind === "intensity-save") {
     if (!item) return ui.notifications.warn(`${stunt.name}: parent power not found.`);
-    return ActionDispatcher.roll("mental-power", { actor, opts: { itemId: item.id, item, stuntPreset: { ...m, name: stunt.name } } });
+    const multi = !!m.multiTarget && (game.user?.targets?.size ?? 0) > 1;
+    const shift = multi ? (m.multiShift ?? m.shift ?? 0) : (m.shift ?? 0);
+    return ActionDispatcher.roll("mental-power", { actor, opts: { itemId: item.id, item, stuntPreset: { ...m, shift, multiTarget: multi, name: stunt.name } } });
   }
 
   if (m.kind === "mind-link") return applyMindLink(actor, item, stunt);
