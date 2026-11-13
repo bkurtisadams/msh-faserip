@@ -1,3 +1,6 @@
+// itemSheet.js v2.4.1 - 2026-11-13
+// v2.4.1: Fixed-bug — the Stunt Power toggle saved with render:false, so the
+//         actor sheet never redrew and the Powers tab badge stayed stale.
 // itemSheet.js v2.4.0 - 2026-11-13
 // v2.4.0: Stunt powers (flag isStuntPower) open the short
 //         stunt-power-sheet.html: parent power and shift, Attack, Target
@@ -652,8 +655,8 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       const updates = { "flags.msh-faserip.isStuntPower": on };
       const sp = context.stuntPower;
       if (on && sp?.parentId && !sp.savedParentId) updates["system.stuntParentId"] = sp.parentId;
-      await this.item.update(updates, { render: false });
       await this.close();
+      await this.item.update(updates);
       this.item.sheet.render(true);
     });
 
