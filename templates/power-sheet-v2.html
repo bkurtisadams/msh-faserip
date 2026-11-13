@@ -479,6 +479,14 @@
           </div>
         </div>
         <div class="ps2-field" style="margin-top:4px;">
+          <label>On an Attack Hit</label>
+          <select name="system.save.onHit" title="Only matters when the power also has a Battle Effects Column. Without one, the save is the whole power.">
+            <option value="" {{#unless system.save.onHit}}selected{{/unless}}>Not rolled (attack only)</option>
+            <option value="after-damage" {{#if (eq system.save.onHit "after-damage")}}selected{{/if}}>Rolled after damage</option>
+            <option value="no-damage" {{#if (eq system.save.onHit "no-damage")}}selected{{/if}}>Rolled instead of damage</option>
+          </select>
+        </div>
+        <div class="ps2-field" style="margin-top:4px;">
           <label>Multiple Targets (CS)</label>
           <input type="number" name="system.save.multiTargetCS" value="{{system.save.multiTargetCS}}" max="0" step="1" data-dtype="Number" placeholder="0 = same Intensity" title="Column shift to Intensity when more than one target is selected, e.g. -1" />
         </div>

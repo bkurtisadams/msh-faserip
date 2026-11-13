@@ -1,3 +1,5 @@
+// intensity-action.js v4.7.0 - 2026-11-13
+// v4.7.0: resolveDuration exported (attack-action's power save on hit).
 // intensity-action.js v4.6.0 - 2026-11-13
 // v4.6.0: Power save block's Multiple Targets CS (save.multiTargetCS) shifts
 //         the Intensity when more than one target is selected (Sonic Stun:
@@ -133,7 +135,7 @@ function resolveIntensityFields(item, attackMode = null) {
 /**
  * Resolve duration in rounds based on mode.
  */
-async function resolveDuration(mode, fixedRounds, powerRank) {
+export async function resolveDuration(mode, fixedRounds, powerRank) {
   switch (mode) {
     case "1-10":
     case "1d10": {

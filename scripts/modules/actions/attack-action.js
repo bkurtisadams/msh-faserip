@@ -1,3 +1,13 @@
+// attack-action.js v1.17.0 - 2026-11-13
+// v1.17.0: Power Target Save on a hit. A power with an attack column and a
+//          Target Save set to roll on a hit (save.onHit "after-damage" or
+//          "no-damage") makes the target roll the save's ability vs the
+//          power's Intensity after a hit; failure applies the On Fail effect
+//          for its duration. "no-damage" also drops the column's Slam/Stun/
+//          Kill follow-ups (the save replaces them); its damage is 0 via
+//          derivePowerDamage. Powers with no onHit setting are unchanged.
+//          _applyIntensityOnHit takes an optional save { ability,
+//          intensityRank, effect, desc, durationMode }.
 // attack-action.js v1.16.1 - 2026-09-10
 // v1.16.1: Fixed-bug — the mitigation summary line credited the whole
 //          mitigated total to the primary layer ("Energy Reflection blocked
@@ -809,15 +819,17 @@ export class AttackAction extends BaseAction {
    * system.intensityDuration (default 1d10). FEAT-intensity attack: ignores
    * Body Armor (RAW). Called only when no other post-hit callback applies.
    */
-  async _applyIntensityOnHit({ targetActor, color, weapon, actor }) {
+  async _applyIntensityOnHit({ targetActor, color, weapon, actor, save = null }) {
     if (!targetActor) return;
     if (String(color || "white").toLowerCase() === "white") return; // miss
     const sys = weapon?.system || {};
-    const intensityRank = sys.intensityRank;
+    const intensityRank = save?.intensityRank || sys.intensityRank;
     if (!intensityRank) return;
 
-    const effect = sys.intensityEffect || "stunned";
-    const desc = sys.intensityDescription || "";
+    const effect = save?.effect || sys.intensityEffect || "stunned";
+    const desc = save ? (save.desc || "") : (sys.intensityDescription || "");
+    const abilityKey = save?.ability || "endurance";
+    const abLabel = abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1);
 
     // Poisoned routes through applyCarrierToxinOnHit (penetrating-damage
     // gate + the poison engine's own exposure FEAT with Resistance to
@@ -833,16 +845,21 @@ export class AttackAction extends BaseAction {
     // Resolve duration (default 1d10): plain number used as-is, dice expression
     // rolled, anything unparseable falls back to 1d10. Minimum 1 round.
     let rounds = 1;
-    const durRaw = String(sys.intensityDuration || "1d10").trim();
-    try {
-      if (/^\d+$/.test(durRaw)) rounds = Number(durRaw);
-      else rounds = (await (new Roll(durRaw)).evaluate()).total;
-    } catch {
-      rounds = (await (new Roll("1d10")).evaluate()).total;
+    if (save) {
+      const { resolveDuration } = await import("./intensity-action.js");
+      rounds = (await resolveDuration(save.durationMode || "1-10", 0, intensityRank)).rounds;
+    } else {
+      const durRaw = String(sys.intensityDuration || "1d10").trim();
+      try {
+        if (/^\d+$/.test(durRaw)) rounds = Number(durRaw);
+        else rounds = (await (new Roll(durRaw)).evaluate()).total;
+      } catch {
+        rounds = (await (new Roll("1d10")).evaluate()).total;
+      }
     }
     rounds = Math.max(1, rounds);
 
-    const endInfo = getAbilityInfo(targetActor, "endurance");
+    const endInfo = getAbilityInfo(targetActor, abilityKey);
     const endRank = endInfo?.rank || "Typical";
     // FEAT_DIFFICULTY (GM rulings 2026-07-31): 3+ ranks above = automatic
     // success; intensity 2+ ranks above ability = impossible, auto-fail.
@@ -851,10 +868,10 @@ export class AttackAction extends BaseAction {
     let resisted, featLine;
     if (req.automatic) {
       resisted = true;
-      featLine = `Endurance (${endRank}) vs ${intensityRank} Intensity \u2014 3+ ranks above: AUTOMATIC resist, no roll`;
+      featLine = `${abLabel} (${endRank}) vs ${intensityRank} Intensity \u2014 3+ ranks above: AUTOMATIC resist, no roll`;
     } else if (req.impossible) {
       resisted = false;
-      featLine = `Endurance (${endRank}) vs ${intensityRank} Intensity \u2014 2+ ranks below: IMPOSSIBLE FEAT, no roll`;
+      featLine = `${abLabel} (${endRank}) vs ${intensityRank} Intensity \u2014 2+ ranks below: IMPOSSIBLE FEAT, no roll`;
     } else {
       // Karma on the resist FEAT (RAW two-phase: declare before the roll,
       // 10-point minimum commitment; amount chosen after seeing the die).
@@ -876,7 +893,7 @@ export class AttackAction extends BaseAction {
       const rollPart = fr.karmaUsed > 0
         ? `rolled ${fr.rollTotal} + ${fr.karmaUsed} Karma = ${fr.cappedTotal}`
         : `rolled ${fr.rollTotal}`;
-      featLine = `Endurance FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${req.requirement.toUpperCase()}: ${rollPart} \u2192 <b>${featColor.toUpperCase()}</b>`;
+      featLine = `${abLabel} FEAT (${endRank}) vs ${intensityRank} Intensity \u2014 need ${req.requirement.toUpperCase()}: ${rollPart} \u2192 <b>${featColor.toUpperCase()}</b>`;
     }
 
     let line;
@@ -1472,6 +1489,17 @@ export class AttackAction extends BaseAction {
         showSlam = false;
         showStun = false;
         showKill = false;
+      }
+
+      // A power whose Target Save replaces its damage on a hit: the save is
+      // the effect, so the column's Slam/Stun/Kill follow-ups don't apply.
+      {
+        const _ps = this?.opts?.item?.type === "power" ? this.opts.item.system : null;
+        if (_ps?.requiresSave && _ps.save?.onHit === "no-damage") {
+          showSlam = false;
+          showStun = false;
+          showKill = false;
+        }
       }
 
       // Rubber shot: ignore Slam results per ammo rules
@@ -2274,6 +2302,29 @@ export class AttackAction extends BaseAction {
           await this._applyIntensityOnHit({ targetActor, color: colorLower, weapon: _intensityWeapon, actor });
         } catch (e) {
           console.error("[FASERIP ERROR] intensity-on-hit failed:", e);
+        }
+      } else if (!postHitCallback && targetActor && targetIsHit
+          && _intensityWeapon?.type === "power" && _intensityWeapon.system?.requiresSave) {
+        // Power Target Save on a hit (save.onHit). Unset = attack only.
+        const ps = _intensityWeapon.system;
+        const sv = ps.save || {};
+        const onHit = sv.onHit || "";
+        if ((onHit === "after-damage" || onHit === "no-damage") && sv.intensity && sv.intensity !== "none") {
+          const saveRank = sv.intensity === "fixed-rank" ? (sv.fixedRank || "Typical") : (ps.rank || "Typical");
+          try {
+            await this._applyIntensityOnHit({
+              targetActor, color: colorLower, weapon: _intensityWeapon, actor,
+              save: {
+                ability: sv.ability || "endurance",
+                intensityRank: saveRank,
+                effect: sv.onFail?.effect || "stunned",
+                desc: sv.onFail?.notes || "",
+                durationMode: sv.onFail?.duration || "1-10"
+              }
+            });
+          } catch (e) {
+            console.error("[FASERIP ERROR] power save on hit failed:", e);
+          }
         }
       }
     }

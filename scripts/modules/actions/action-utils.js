@@ -1,3 +1,6 @@
+// action-utils.js v1.16.0 - 2026-11-13
+// v1.16.0: derivePowerDamage returns 0 for a power whose Target Save is set
+//          to roll on a hit instead of damage (save.onHit "no-damage").
 // action-utils.js v1.15.0 - 2026-11-11
 // v1.15.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.14.3: getBodyArmorValues skips armor equipment marked broken.
@@ -275,6 +278,8 @@ export function derivePowerDamage(system, actor) {
   if (isEquipmentWeapon) {
     return parseDamageValue(s.damage, 0);
   }
+
+  if (s.requiresSave && s.save?.onHit === "no-damage") return 0;
 
   const dmgSource = String(s.damageSource || "rank");
   const rankVal = Number(CONFIG.FASERIP?.rankValues?.[s.rank])
