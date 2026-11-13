@@ -1,7 +1,3 @@
-// scripts/modules/actions/mental-power-action.js v2.6.0 - 2026-11-13
-// v2.6.0: Multi-target stunt presets (opts.stuntPreset.multiTarget, e.g. the
-//         Sonic Stun area attack) post one save card per targeted token
-//         instead of using only the first target.
 // scripts/modules/actions/mental-power-action.js v2.5.1 - 2026-11-10
 // v2.5.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
@@ -563,16 +559,13 @@ export class MentalPowerAction extends BaseAction {
       return;
     }
 
-    const multiTarget = !!stuntPreset?.multiTarget && targets.length > 1;
-    if (targets.length > 1 && !multiTarget) {
+    if (targets.length > 1) {
       ui.notifications.warn("Mental powers affect one target at a time. Using first target.");
     }
-    const saveTargets = multiTarget ? targets : [targets[0]];
 
     const target = targets[0];
     const targetActor = target.actor;
     const targetName = targetActor?.name || "Unknown";
-    const dialogTargetNames = saveTargets.map(t => t.actor?.name || t.name || "Unknown").join(", ");
 
     // ── Psionic Attack: check for Force Field intensity reduction ──
     const isPsionicAttack = nameLc.includes("psionic attack");
@@ -642,7 +635,7 @@ export class MentalPowerAction extends BaseAction {
         <strong>Range:</strong> ${calculatedRange}
       </div>
       <div style="margin-bottom:12px;">
-        <strong>${multiTarget ? `Targets (${saveTargets.length})` : "Target"}:</strong> ${dialogTargetNames}
+        <strong>Target:</strong> ${targetName}
       </div>
       ${defenseBlock}
       <div style="padding:8px;background:${ffBlocked ? '#ffebee' : '#fff3cd'};border:1px solid ${ffBlocked ? '#ef9a9a' : '#ffc107'};border-radius:3px;margin-bottom:12px;">
@@ -721,197 +714,193 @@ export class MentalPowerAction extends BaseAction {
     const finalMode = this.opts?.mode || combatMode;
     const isFinalAuto = finalMode === "full";
 
-    for (const target of saveTargets) {
-      const targetActor = target.actor;
-      const targetName = targetActor?.name || "Unknown";
-      // Build action buttons — use effective (FF-reduced) intensity
-      const actionsHtml = buildActionsBox({
-        showNullifySave: requiresSave,
-        nullifyIntensityRank: effectiveIntensityRank,
-        saveAbility: saveAbility,
-        actorUuid: actor.uuid,
-        targetUuid: target.document?.uuid || target.actor?.uuid,
-        targetName: targetName,
-        autoApply: false,
-        autoSave: isFinalAuto,
-        attackForm: "mental"
-      });
+    // Build action buttons — use effective (FF-reduced) intensity
+    const actionsHtml = buildActionsBox({
+      showNullifySave: requiresSave,
+      nullifyIntensityRank: effectiveIntensityRank,
+      saveAbility: saveAbility,
+      actorUuid: actor.uuid,
+      targetUuid: target.document?.uuid || target.actor?.uuid,
+      targetName: targetName,
+      autoApply: false,
+      autoSave: isFinalAuto,
+      attackForm: "mental"
+    });
 
-      // Build chat card
+    // Build chat card
 
-      // Label-ize the save ability
-      const saveAbilityLabel = (saveAbility && typeof saveAbility === "string")
-        ? (saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1))
-        : "Psyche";
+    // Label-ize the save ability
+    const saveAbilityLabel = (saveAbility && typeof saveAbility === "string")
+      ? (saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1))
+      : "Psyche";
 
-      // Show effective defense rank in info grid
-      const defenseDisplay = (mentalDef && mentalDef.source !== "Psyche")
-        ? `${mentalDef.source} (${mentalDef.rank})`
-        : saveAbilityLabel;
+    // Show effective defense rank in info grid
+    const defenseDisplay = (mentalDef && mentalDef.source !== "Psyche")
+      ? `${mentalDef.source} (${mentalDef.rank})`
+      : saveAbilityLabel;
 
-      let intensityDisplay = `${effectiveIntensityRank} (${effectiveIntensityValue})`;
-      if (ffInfo && !ffBlocked) {
-        intensityDisplay += ` <span style="font-size:.8em;color:#e65100;">[reduced from ${powerRank} by ${ffInfo.source}]</span>`;
-      }
-
-      const infoGrid = `<div style="display:grid;grid-template-columns:90px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
-        <span style="font-weight:600;">Save:</span><span>${defenseDisplay}</span>
-        <span style="font-weight:600;">Intensity:</span><span>${intensityDisplay}</span>
-        <span style="font-weight:600;">Range:</span><span>${calculatedRange}</span>
-        <span style="font-weight:600;">Type:</span><span>No attack roll (save required)</span>
-      </div>`;
-
-      // Defense breakdown callout
-      const defBreakdownLines = [];
-      if (mentalDef && mentalDef.source !== "Psyche") {
-        defBreakdownLines.push(`<div style="font-size:.85em;color:#5e35b1;">
-          <strong>\u25B6 ${mentalDef.source}</strong> (${mentalDef.rank}) used instead of Psyche for save</div>`);
-      }
-      if (ffInfo && !ffBlocked) {
-        defBreakdownLines.push(`<div style="font-size:.85em;color:#e65100;">
-          <strong>\u25B6 ${ffInfo.source}</strong> (${ffInfo.rank}/${ffInfo.value}) reduced intensity from ${powerRank} (${powerValue}) to ${effectiveIntensityRank} (${effectiveIntensityValue})</div>`);
-      }
-      const defBreakdown = defBreakdownLines.length
-        ? `<div style="margin-top:6px;padding:4px 6px;background:#f3e5f5;border-left:3px solid #9c27b0;border-radius:2px;">${defBreakdownLines.join("")}</div>`
-        : "";
-
-      const saveCallout = `<div style="font-weight:700;color:#6a1b9a;margin-bottom:4px;">Save Required</div>
-      <div style="font-size:.9em;">
-        ${targetName} must make a <strong>${defenseDisplay.toUpperCase()}</strong> FEAT vs
-        <strong>${effectiveIntensityRank}</strong> intensity.
-      </div>
-      ${defBreakdown}`;
-
-      // Collapsible power description (if present on the item)
-      const powerDesc = (item.system?.description || "").trim();
-      const descSection = powerDesc
-        ? `<div style="padding:0 10px 6px;">
-             <details style="font-size:.85em;color:#555;">
-               <summary style="cursor:pointer;font-weight:600;color:#8b0000;user-select:none;">Power Description</summary>
-               <div style="margin-top:4px;padding:6px 8px;background:#faf8f2;border:1px solid #e0d8c8;border-radius:3px;line-height:1.4;">${powerDesc}</div>
-             </details>
-           </div>`
-        : "";
-
-      // Detect Nullifying Power early (before card build) for aura toggle button
-      const isNullifyAura = nameLc.includes("nullif");
-
-      // Nullify Aura toggle button (only for Nullifying Power)
-      const nullifyAuraBtn = isNullifyAura
-        ? `<div style="padding:4px 10px 6px;text-align:center;">
-             <a class="faserip-chip" data-action="toggle-nullify-aura"
-                style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;padding:4px 12px;border:1px solid #6a1b9a;border-radius:4px;background:#f3e5f5;color:#6a1b9a;cursor:pointer;font-weight:600;"
-                title="Toggle Nullification Aura on/off (self-suppresses caster's inborn powers)">
-                Toggle Nullify Aura
-             </a>
-           </div>`
-        : "";
-
-      const cardHtml = buildCardShell({
-        actionLabel: powerName,
-        headerRight: "Mental Power",
-        actorHtml: buildActorTargetHtml(actor.name, targetName),
-        sections: [
-          buildContentBox(infoGrid),
-          buildContentBox(saveCallout),
-          descSection,
-          `<div style="padding:4px 10px 10px;">${actionsHtml}</div>`,
-          nullifyAuraBtn
-        ]
-      });
-
-      // Build message flags for auto-save — use effective intensity
-      let effectName   = item.system?.save?.onFail?.effectName || null;
-      let failMessage  = item.system?.save?.onFail?.message     || null;
-      let abilityLabel = saveAbility;
-      let intensity    = item.system?.save?.intensity || "power-rank";
-      let fixedRank    = item.system?.save?.fixedRank || powerRank;
-
-      // Sensible defaults per common mental powers
-      if (!effectName && stuntPreset?.effectName) {
-        effectName   = stuntPreset.effectName;
-        failMessage  = stuntPreset.failMessage || failMessage;
-        abilityLabel = stuntPreset.saveAbility || abilityLabel;
-      }
-      if (!effectName) {
-        if (nameLc.includes("psionic attack")) {
-          effectName   = "Unconscious";
-          failMessage  = "is knocked unconscious";
-          abilityLabel = "psyche";
-        } else if (nameLc.includes("mind control")) {
-          effectName   = "Controlled";
-          failMessage  = "falls under psychic control";
-          abilityLabel = "psyche";
-        } else if (nameLc.includes("possession")) {
-          effectName   = "Possessed";
-          failMessage  = "is mentally possessed";
-          abilityLabel = "psyche";
-        } else if (nameLc.includes("emotion control")) {
-          effectName   = "Emotion Controlled";
-          failMessage  = "is overwhelmed by emotion";
-          abilityLabel = "intuition";
-        } else if (nameLc.includes("mental probe")) {
-          effectName   = "Mentally Fatigued";
-          failMessage  = "suffers mental strain";
-          abilityLabel = "psyche";
-        } else if (nameLc.includes("nullif") && nameLc.includes("missile")) {
-          effectName   = "Nullified";
-          failMessage  = "is nullified";
-          abilityLabel = "psyche";
-        }
-      }
-
-      // If FF reduced the intensity, override to fixed-rank with the reduced rank
-      if (ffInfo && !ffBlocked) {
-        intensity = "fixed-rank";
-        fixedRank = effectiveIntensityRank;
-      }
-
-      const defenderUuid = target.document?.uuid || target.actor?.uuid;
-
-      const msgFlags = {
-        "msh-faserip": {
-          actionId: "mental-power",
-          powerName,
-          powerRank: effectiveIntensityRank,
-          powerValue: effectiveIntensityValue,
-          originalPowerRank: powerRank,
-          originalPowerValue: powerValue,
-          requiresSave: requiresSave === true,
-          attackerUuid: actor.uuid,
-          targetUuid: defenderUuid,
-          defenderUuid,
-          saveAbility: abilityLabel,
-          saveIntensity: intensity,
-          saveFixedRank: fixedRank,
-          effectName,
-          failMessage,
-          itemId: item.id,
-          isNullifyAura,
-          nullify: isNullifyAura ? { powerItemUuid: item.uuid } : undefined,
-          saveConfig: item.system.save || {},
-          // Mental defense info for the save resolver
-          mentalDefense: mentalDef && mentalDef.source !== "Psyche" ? {
-            rank: mentalDef.rank,
-            value: mentalDef.value,
-            source: mentalDef.source
-          } : null,
-          forceFieldReduction: ffInfo && !ffBlocked ? {
-            rank: ffInfo.rank,
-            value: ffInfo.value,
-            source: ffInfo.source,
-            reducedIntensityRank: effectiveIntensityRank,
-            reducedIntensityValue: effectiveIntensityValue
-          } : null
-        }
-      };
-
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: cardHtml,
-        flags: msgFlags
-      });
+    let intensityDisplay = `${effectiveIntensityRank} (${effectiveIntensityValue})`;
+    if (ffInfo && !ffBlocked) {
+      intensityDisplay += ` <span style="font-size:.8em;color:#e65100;">[reduced from ${powerRank} by ${ffInfo.source}]</span>`;
     }
+
+    const infoGrid = `<div style="display:grid;grid-template-columns:90px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
+      <span style="font-weight:600;">Save:</span><span>${defenseDisplay}</span>
+      <span style="font-weight:600;">Intensity:</span><span>${intensityDisplay}</span>
+      <span style="font-weight:600;">Range:</span><span>${calculatedRange}</span>
+      <span style="font-weight:600;">Type:</span><span>No attack roll (save required)</span>
+    </div>`;
+
+    // Defense breakdown callout
+    const defBreakdownLines = [];
+    if (mentalDef && mentalDef.source !== "Psyche") {
+      defBreakdownLines.push(`<div style="font-size:.85em;color:#5e35b1;">
+        <strong>\u25B6 ${mentalDef.source}</strong> (${mentalDef.rank}) used instead of Psyche for save</div>`);
+    }
+    if (ffInfo && !ffBlocked) {
+      defBreakdownLines.push(`<div style="font-size:.85em;color:#e65100;">
+        <strong>\u25B6 ${ffInfo.source}</strong> (${ffInfo.rank}/${ffInfo.value}) reduced intensity from ${powerRank} (${powerValue}) to ${effectiveIntensityRank} (${effectiveIntensityValue})</div>`);
+    }
+    const defBreakdown = defBreakdownLines.length
+      ? `<div style="margin-top:6px;padding:4px 6px;background:#f3e5f5;border-left:3px solid #9c27b0;border-radius:2px;">${defBreakdownLines.join("")}</div>`
+      : "";
+
+    const saveCallout = `<div style="font-weight:700;color:#6a1b9a;margin-bottom:4px;">Save Required</div>
+    <div style="font-size:.9em;">
+      ${targetName} must make a <strong>${defenseDisplay.toUpperCase()}</strong> FEAT vs
+      <strong>${effectiveIntensityRank}</strong> intensity.
+    </div>
+    ${defBreakdown}`;
+
+    // Collapsible power description (if present on the item)
+    const powerDesc = (item.system?.description || "").trim();
+    const descSection = powerDesc
+      ? `<div style="padding:0 10px 6px;">
+           <details style="font-size:.85em;color:#555;">
+             <summary style="cursor:pointer;font-weight:600;color:#8b0000;user-select:none;">Power Description</summary>
+             <div style="margin-top:4px;padding:6px 8px;background:#faf8f2;border:1px solid #e0d8c8;border-radius:3px;line-height:1.4;">${powerDesc}</div>
+           </details>
+         </div>`
+      : "";
+
+    // Detect Nullifying Power early (before card build) for aura toggle button
+    const isNullifyAura = nameLc.includes("nullif");
+
+    // Nullify Aura toggle button (only for Nullifying Power)
+    const nullifyAuraBtn = isNullifyAura
+      ? `<div style="padding:4px 10px 6px;text-align:center;">
+           <a class="faserip-chip" data-action="toggle-nullify-aura"
+              style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;padding:4px 12px;border:1px solid #6a1b9a;border-radius:4px;background:#f3e5f5;color:#6a1b9a;cursor:pointer;font-weight:600;"
+              title="Toggle Nullification Aura on/off (self-suppresses caster's inborn powers)">
+              Toggle Nullify Aura
+           </a>
+         </div>`
+      : "";
+
+    const cardHtml = buildCardShell({
+      actionLabel: powerName,
+      headerRight: "Mental Power",
+      actorHtml: buildActorTargetHtml(actor.name, targetName),
+      sections: [
+        buildContentBox(infoGrid),
+        buildContentBox(saveCallout),
+        descSection,
+        `<div style="padding:4px 10px 10px;">${actionsHtml}</div>`,
+        nullifyAuraBtn
+      ]
+    });
+
+    // Build message flags for auto-save — use effective intensity
+    let effectName   = item.system?.save?.onFail?.effectName || null;
+    let failMessage  = item.system?.save?.onFail?.message     || null;
+    let abilityLabel = saveAbility;
+    let intensity    = item.system?.save?.intensity || "power-rank";
+    let fixedRank    = item.system?.save?.fixedRank || powerRank;
+
+    // Sensible defaults per common mental powers
+    if (!effectName && stuntPreset?.effectName) {
+      effectName   = stuntPreset.effectName;
+      failMessage  = stuntPreset.failMessage || failMessage;
+      abilityLabel = stuntPreset.saveAbility || abilityLabel;
+    }
+    if (!effectName) {
+      if (nameLc.includes("psionic attack")) {
+        effectName   = "Unconscious";
+        failMessage  = "is knocked unconscious";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("mind control")) {
+        effectName   = "Controlled";
+        failMessage  = "falls under psychic control";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("possession")) {
+        effectName   = "Possessed";
+        failMessage  = "is mentally possessed";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("emotion control")) {
+        effectName   = "Emotion Controlled";
+        failMessage  = "is overwhelmed by emotion";
+        abilityLabel = "intuition";
+      } else if (nameLc.includes("mental probe")) {
+        effectName   = "Mentally Fatigued";
+        failMessage  = "suffers mental strain";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("nullif") && nameLc.includes("missile")) {
+        effectName   = "Nullified";
+        failMessage  = "is nullified";
+        abilityLabel = "psyche";
+      }
+    }
+
+    // If FF reduced the intensity, override to fixed-rank with the reduced rank
+    if (ffInfo && !ffBlocked) {
+      intensity = "fixed-rank";
+      fixedRank = effectiveIntensityRank;
+    }
+
+    const defenderUuid = target.document?.uuid || target.actor?.uuid;
+
+    const msgFlags = {
+      "msh-faserip": {
+        actionId: "mental-power",
+        powerName,
+        powerRank: effectiveIntensityRank,
+        powerValue: effectiveIntensityValue,
+        originalPowerRank: powerRank,
+        originalPowerValue: powerValue,
+        requiresSave: requiresSave === true,
+        attackerUuid: actor.uuid,
+        targetUuid: defenderUuid,
+        defenderUuid,
+        saveAbility: abilityLabel,
+        saveIntensity: intensity,
+        saveFixedRank: fixedRank,
+        effectName,
+        failMessage,
+        itemId: item.id,
+        isNullifyAura,
+        nullify: isNullifyAura ? { powerItemUuid: item.uuid } : undefined,
+        saveConfig: item.system.save || {},
+        // Mental defense info for the save resolver
+        mentalDefense: mentalDef && mentalDef.source !== "Psyche" ? {
+          rank: mentalDef.rank,
+          value: mentalDef.value,
+          source: mentalDef.source
+        } : null,
+        forceFieldReduction: ffInfo && !ffBlocked ? {
+          rank: ffInfo.rank,
+          value: ffInfo.value,
+          source: ffInfo.source,
+          reducedIntensityRank: effectiveIntensityRank,
+          reducedIntensityValue: effectiveIntensityValue
+        } : null
+      }
+    };
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      flags: msgFlags
+    });
 
     // Play mental power SFX if available
     if (game.msh?.playCombatSFX) {

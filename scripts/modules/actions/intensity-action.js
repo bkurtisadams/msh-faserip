@@ -1,3 +1,7 @@
+// intensity-action.js v4.6.0 - 2026-11-13
+// v4.6.0: Power save block's Multiple Targets CS (save.multiTargetCS) shifts
+//         the Intensity when more than one target is selected (Sonic Stun:
+//         full rank vs one, -1CS vs several).
 // intensity-action.js v4.5.0 - 2026-08-02
 // v4.5.0: Save routed through resolveResistFeat (dice-roller): karma sequence
 //         on the owning player's client via socketlib executeAsUser, 10s
@@ -47,6 +51,7 @@ import {
   getTargetData,
   buildResultBadge,
   getAbilityInfo,
+  shiftRank,
   RANKS
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -176,11 +181,19 @@ export class IntensityAction extends BaseAction {
     const fields = resolveIntensityFields(item, attackMode);
     if (!fields) return ui.notifications.warn(`${item.name} has no Intensity/Save configured.`);
 
+    const { targets } = getTargetData();
+    const multiCS = (!attackMode && item.type === "power") ? (Number(item.system?.save?.multiTargetCS) || 0) : 0;
+    let multiNote = "";
+    if (multiCS && targets.length > 1) {
+      const baseRank = fields.rank;
+      fields.rank = shiftRank(baseRank, multiCS);
+      multiNote = `${targets.length} targets: ${baseRank} ${multiCS > 0 ? "+" : ""}${multiCS}CS = ${fields.rank}`;
+    }
+
     const { rank: intensityRank, effect: intensityEffect, description: intensityDesc,
             saveAbility } = fields;
 
     const saveAbilityLabel = saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1);
-    const { targets } = getTargetData();
 
     const targetList = targets.length
       ? targets.map(t => {
@@ -201,6 +214,7 @@ export class IntensityAction extends BaseAction {
             <div style="font-size:0.85em;color:#666;">Intensity: <b>${intensityRank}</b> — Effect: <b>${effectLabel}</b></div>
           </div>
         </div>
+        ${multiNote ? `<div style="margin-bottom:8px;font-size:0.85em;color:#8b0000;">${multiNote}</div>` : ""}
         ${intensityDesc ? `<div style="background:#f5f0e8;border:1px solid #c0a070;border-radius:3px;padding:6px;margin-bottom:8px;font-size:0.85em;">${intensityDesc}</div>` : ""}
         <div style="margin-bottom:6px;font-weight:bold;font-size:0.9em;">Targets (${saveAbilityLabel} FEAT to resist):</div>
         <div style="margin-bottom:8px;padding:4px 8px;background:#f9f9f9;border:1px solid #ddd;border-radius:3px;font-size:0.9em;">

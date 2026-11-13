@@ -1,8 +1,8 @@
 // scripts/modules/actions/stunt-mechanics.js v1.5.0 - 2026-11-13
-// v1.5.0: RULED (Sound Generation, 2026-11-13) — Sonic Stun is one target at
-//         full Power rank Intensity, or several targets at -1CS; each makes an
-//         Endurance FEAT or is Stunned 1-10 rounds. Preset stunts run the
-//         current preset mechanic, so stunts tagged under an older preset
+// v1.5.0: Sonic Stun stunt rolls the actor's "Sonic Stun" power item, built on
+//         the power sheet (Target Save: Endurance, Power Rank, Stunned, 1d10,
+//         Multiple Targets -1CS); info card if he has none. Preset stunts run
+//         the current preset mechanic, so stunts tagged under an older preset
 //         pick up corrections.
 // scripts/modules/actions/stunt-mechanics.js v1.4.0 - 2026-09-09
 // v1.4.0: Light Emission preset group (Illuminate, Blind). Illuminate
@@ -85,8 +85,8 @@ export const STUNT_PRESETS = {
       description: "Affects all in a given area at -1CS Power rank damage (Force column).",
       mechanic: { kind: "force-attack", shift: -1, note: "Area attack: target everyone in the area; -1CS damage." } },
     { key: "sound-stun", name: "Sonic Stun", aliases: ["sonic stun", "stunning attack"],
-      description: "Stunning attack: one target at Power rank Intensity, or several targets at -1CS. Each target makes an Endurance FEAT or is Stunned 1-10 rounds.",
-      mechanic: { kind: "intensity-save", shift: 0, multiTarget: true, multiShift: -1, powerName: "Sonic Stun", effectName: "Stunned", failMessage: "is stunned", saveAbility: "endurance" } },
+      description: "Stunning attack: one target at Power rank Intensity, or several targets at -1CS. Each target makes an Endurance FEAT or is Stunned 1-10 rounds. Build it as a \"Sonic Stun\" power on the power sheet.",
+      mechanic: { kind: "use-item", itemNames: ["sonic stun"], fallback: "info" } },
     { key: "sound-flight", name: "Sonic Flight", aliases: ["sonic flight"],
       description: "Flight at -2CS (-1CS with glider wings, cape, or similar glide control).",
       mechanic: { kind: "info" } },
@@ -248,9 +248,7 @@ export async function runStuntMechanic(actor, stunt) {
 
   if (m.kind === "mental-power" || m.kind === "intensity-save") {
     if (!item) return ui.notifications.warn(`${stunt.name}: parent power not found.`);
-    const multi = !!m.multiTarget && (game.user?.targets?.size ?? 0) > 1;
-    const shift = multi ? (m.multiShift ?? m.shift ?? 0) : (m.shift ?? 0);
-    return ActionDispatcher.roll("mental-power", { actor, opts: { itemId: item.id, item, stuntPreset: { ...m, shift, multiTarget: multi, name: stunt.name } } });
+    return ActionDispatcher.roll("mental-power", { actor, opts: { itemId: item.id, item, stuntPreset: { ...m, name: stunt.name } } });
   }
 
   if (m.kind === "mind-link") return applyMindLink(actor, item, stunt);

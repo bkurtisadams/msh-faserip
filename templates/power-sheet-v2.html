@@ -478,6 +478,10 @@
             </select>
           </div>
         </div>
+        <div class="ps2-field" style="margin-top:4px;">
+          <label>Multiple Targets (CS)</label>
+          <input type="number" name="system.save.multiTargetCS" value="{{system.save.multiTargetCS}}" max="0" step="1" data-dtype="Number" placeholder="0 = same Intensity" title="Column shift to Intensity when more than one target is selected, e.g. -1" />
+        </div>
         {{#if (eq system.save.intensity "fixed-rank")}}
         <div class="ps2-field" style="margin-top:4px;">
           <label>Fixed Rank</label>
