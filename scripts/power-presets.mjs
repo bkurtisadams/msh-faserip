@@ -179,7 +179,7 @@ export const POWER_ENGINE_PRESETS = {
   "Image Generation":                  { mental: { imageGeneration: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
   "Telekinesis":                       { isAttackPower: true, battleEffectsColumn: "Fo", damageSource: "rank", damageType: "energy-force", specialStrengthType: "tk" },
   "Mind Control":                      { mental: { mindControl: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
-  "Emotion Control":                   { mental: { emotionControl: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
+  "Emotion Control":                   { mental: { emotionControl: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "10-100" } } },
   "Force Field Generation":            { isDefensePower: true, isForceField: true, forceFieldType: "projected", battleEffectsColumn: "Fo", damageType: "energy-force" },
   "Animal Communication and Control":  { mental: { mindControl: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
   "Mechanical Intuition":              { mental: { mechanicalIntuition: true }, isAbilitySubstitution: true, abilitySubstitution: { reason: { enabled: true, context: "Machine/computer intuition" } }, requiresSave: false },

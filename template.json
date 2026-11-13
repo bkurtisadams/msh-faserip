@@ -335,6 +335,7 @@
       "requiresSave": false,
       "save": {
         "ability": "endurance",
+        "ability2": "",
         "intensity": "power-rank",
         "fixedRank": "",
         "onFail": {
@@ -342,12 +343,15 @@
           "duration": "1-10",
           "notes": ""
         },
+        "onHit": "",
+        "multiTargetCS": 0,
         "rerollOnKarmaLoss": false,
         "rerollOnLifeThreat": false
       },
       "isDefensePower": false,
       "defenseType": "bodyArmor",
       "armorNature": "natural",
+      "armorAgilityTrade": false,
       "bodyArmorType": "both",
       "protectionValue": 0,
       "hardware": {
@@ -490,6 +494,8 @@
       },
       "movement": {
         "type": "",
+        "teleportCarry": "touch",
+        "appliesTo": "",
         "areasPerRound": 0,
         "useRankSpeed": false,
         "leavesTunnel": false
@@ -497,6 +503,7 @@
       "control": {
         "controlType": "",
         "controlSpecific": "",
+        "luck": "",
         "manipulateExisting": false,
         "generateNew": false,
         "useAsShield": false,
@@ -530,6 +537,8 @@
       "transformation": {
         "affects": "self",
         "transformType": "",
+        "scope": "",
+        "alwaysOn": false,
         "targetMaterial": "",
         "targetResistsWith": "",
         "duration": "concentration",

@@ -1,3 +1,6 @@
+// attack-action.js v1.18.0 - 2026-11-13
+// v1.18.0: Power Target Save on a hit honors save.ability2 (target's choice:
+//          the higher of the two abilities resists).
 // attack-action.js v1.17.0 - 2026-11-13
 // v1.17.0: Power Target Save on a hit. A power with an attack column and a
 //          Target Save set to roll on a hit (save.onHit "after-damage" or
@@ -828,7 +831,11 @@ export class AttackAction extends BaseAction {
 
     const effect = save?.effect || sys.intensityEffect || "stunned";
     const desc = save ? (save.desc || "") : (sys.intensityDescription || "");
-    const abilityKey = save?.ability || "endurance";
+    let abilityKey = save?.ability || "endurance";
+    if (save?.ability2) {
+      const { pickSaveAbility } = await import("./intensity-action.js");
+      abilityKey = pickSaveAbility(targetActor, abilityKey, save.ability2);
+    }
     const abLabel = abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1);
 
     // Poisoned routes through applyCarrierToxinOnHit (penetrating-damage
@@ -2316,6 +2323,7 @@ export class AttackAction extends BaseAction {
               targetActor, color: colorLower, weapon: _intensityWeapon, actor,
               save: {
                 ability: sv.ability || "endurance",
+                ability2: sv.ability2 || "",
                 intensityRank: saveRank,
                 effect: sv.onFail?.effect || "stunned",
                 desc: sv.onFail?.notes || "",

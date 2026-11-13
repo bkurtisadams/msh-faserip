@@ -1046,7 +1046,7 @@ export class CharacterGenerator {
           rank: p.rank,
           value: p.value,
           category: p.category,
-          isStarred: p.star || false,
+          countsAsTwoPowers: p.star || false,
           isBonus: p.isBonus || false,
           bonusFrom: p.bonusFrom || "",
           initialRoll: p.roll || "",

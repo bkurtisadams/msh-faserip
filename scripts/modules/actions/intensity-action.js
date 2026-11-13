@@ -1,3 +1,8 @@
+// intensity-action.js v4.8.0 - 2026-11-13
+// v4.8.0: Target's-choice saves (save.ability2): each target rolls whichever
+//         of the two abilities is higher, via exported pickSaveAbility.
+//         resolveDuration gains "10-100" (1d10 x 10 turns), "concentration"
+//         and "hour" (600 turns).
 // intensity-action.js v4.7.0 - 2026-11-13
 // v4.7.0: resolveDuration exported (attack-action's power save on hit).
 // intensity-action.js v4.6.0 - 2026-11-13
@@ -123,6 +128,7 @@ function resolveIntensityFields(item, attackMode = null) {
       effect: onFail.effect || "",
       description: onFail.notes || "",
       saveAbility: save.ability || "endurance",
+      saveAbility2: save.ability2 || "",
       durationMode: onFail.duration || "1-10",
       fixedRounds: Number(onFail.rounds) || 0,
       toxinId: onFail.toxinId || null
@@ -130,6 +136,19 @@ function resolveIntensityFields(item, attackMode = null) {
   }
 
   return null;
+}
+
+export function pickSaveAbility(targetActor, first, second) {
+  const a = first || "endurance";
+  if (!second || second === a) return a;
+  const value = key => {
+    try { return Number(getAbilityInfo(targetActor, key).value) || 0; } catch { return -1; }
+  };
+  return value(second) > value(a) ? second : a;
+}
+
+function abilityLabel(key) {
+  return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
 /**
@@ -156,6 +175,16 @@ export async function resolveDuration(mode, fixedRounds, powerRank) {
     }
     case "rounds": {
       return { rounds: fixedRounds || 1, label: `${fixedRounds || 1} fixed` };
+    }
+    case "10-100": {
+      const r = await (new Roll("1d10")).evaluate();
+      return { rounds: r.total * 10, label: `1d10 x 10 = ${r.total * 10} turns` };
+    }
+    case "hour": {
+      return { rounds: 600, label: "one hour" };
+    }
+    case "concentration": {
+      return { rounds: 999, label: "while concentrating" };
     }
     case "scene": {
       return { rounds: 999, label: "scene" };
@@ -193,14 +222,17 @@ export class IntensityAction extends BaseAction {
     }
 
     const { rank: intensityRank, effect: intensityEffect, description: intensityDesc,
-            saveAbility } = fields;
+            saveAbility, saveAbility2 } = fields;
 
-    const saveAbilityLabel = saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1);
+    const saveAbilityLabel = saveAbility2 && saveAbility2 !== saveAbility
+      ? `${abilityLabel(saveAbility)} or ${abilityLabel(saveAbility2)}`
+      : abilityLabel(saveAbility);
 
     const targetList = targets.length
       ? targets.map(t => {
-          const abilRank = t.actor?.system?.abilities?.[saveAbility]?.rank || "Typical";
-          return `<div style="margin:2px 0;"><strong>${t.name}</strong> — ${saveAbilityLabel}: ${abilRank}</div>`;
+          const key = pickSaveAbility(t.actor, saveAbility, saveAbility2);
+          const abilRank = t.actor?.system?.abilities?.[key]?.rank || "Typical";
+          return `<div style="margin:2px 0;"><strong>${t.name}</strong> — ${abilityLabel(key)}: ${abilRank}</div>`;
         }).join("")
       : `<div style="color:#d32f2f;font-style:italic;">No targets selected. Select target tokens first.</div>`;
 
@@ -254,13 +286,17 @@ export class IntensityAction extends BaseAction {
 
   async _resolveTargets(actor, item, fields, targets) {
     const { rank: intensityRank, effect: intensityEffect, description: intensityDesc,
-            saveAbility, durationMode, fixedRounds } = fields;
-    const saveAbilityLabel = saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1);
+            saveAbility: firstAbility, saveAbility2, durationMode, fixedRounds } = fields;
+    const cardAbilityLabel = saveAbility2 && saveAbility2 !== firstAbility
+      ? `${abilityLabel(firstAbility)} or ${abilityLabel(saveAbility2)}`
+      : abilityLabel(firstAbility);
     const resultRows = [];
 
     for (const targetToken of targets) {
       const targetActor = targetToken.actor;
       if (!targetActor) continue;
+      const saveAbility = pickSaveAbility(targetActor, firstAbility, saveAbility2);
+      const saveAbilityLabel = abilityLabel(saveAbility);
 
       // Poisoned: the poison engine's exposure FEAT IS the save (End vs
       // Intensity with Resistance to Toxins substitution, KO + rank loss +
@@ -372,7 +408,7 @@ export class IntensityAction extends BaseAction {
       </div>
       <div style="padding:2px 10px 4px;font-size:.9em;color:#555;">
         ${descLine}
-        <div>Intensity: <strong>${intensityRank}</strong> \u2014 Targets must make ${saveAbilityLabel} FEAT to resist</div>
+        <div>Intensity: <strong>${intensityRank}</strong> \u2014 Targets must make ${cardAbilityLabel} FEAT to resist</div>
       </div>
       ${targetResultsHtml}
     </div>`;

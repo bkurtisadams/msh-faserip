@@ -1,3 +1,6 @@
+// itemSheet.js v2.3.0 - 2026-11-13
+// v2.3.0: context.ps2 carries the power sheet view model from
+//         power-sheet-view.mjs.
 // itemSheet.js v2.2.0 - 2026-11-11
 // v2.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.1.2: carrierToxinOptions feeds the Target Save panel's Poisoned toxin
@@ -35,6 +38,7 @@
 // v1.7.0: Power Sheet layout reorganization
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
+import { buildPowerSheetView } from "./power-sheet-view.mjs";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
 import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
@@ -138,6 +142,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         isStuntPower: !!this.item.getFlag("msh-faserip", "isStuntPower"),
         isBonusPower: !!this.item.getFlag("msh-faserip", "isBonusPower")
       };
+      context.ps2 = buildPowerSheetView(context.system ?? {}, context.powerOriginFlags);
 
       // Helpful logging (kept from your original)
       console.log("Power sheet data:", context);

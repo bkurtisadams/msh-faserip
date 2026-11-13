@@ -1,3 +1,12 @@
+// power-sheet-v2-logic.js v2.1.0 - 2026-11-13
+// v2.1.0: Tabs removed; back to the single scrolling form with Rank and
+//         Value in Rank & Identity. Field changes from v2.0.0 kept.
+// v2.0.0: Defense Kind dropdown replaces the four nested checkboxes; type
+//         blocks come from power-sheet-view.mjs, plus an "add section"
+//         picker for sections the category does not suggest. Legacy fields
+//         folded on first open: isStarred -> countsAsTwoPowers, isBonusPower
+//         flag -> isBonus, limitationDetail -> limitations. Source keeps
+//         grantedByEquipment in step.
 // power-sheet-v2-logic.js v1.12.0 - 2026-09-10
 // v1.12.0: Fixed-bug — matterControl had no "save" section anywhere in
 //          CATEGORY_SECTIONS, so it was UNREACHABLE from the UI (the
@@ -77,71 +86,16 @@
 // Rank → value lookup (canonical source: rules-reference.js)
 import { RANK_VALUES } from "./rules/rules-reference.js";
 import { POWER_TYPES_BY_CATEGORY, buildPowerPresetUpdates, populatePowerTypeOptions } from "./power-presets.mjs";
+import { SECTION_LABELS, typeSections } from "./power-sheet-view.mjs";
 
 const CATEGORY_SECTIONS = {
-  resistances:              ["defense"],
   senses:                   ["detection", "abilitySubstitution"],
   movement:                 ["movement"],
-  matterControl:            ["control", "attack", "save"],
-  energyControl:            ["control", "attack", "defense"],
-  bodyControl:              ["transformation", "defense", "abilitySubstitution"],
-  distanceAttacks:          ["attack", "save"],
-  mentalPowers:             ["mental", "save", "abilitySubstitution"],
-  bodyAlterationsOffensive: ["attack", "save"],
-  bodyAlterationsDefensive: ["defense", "healing"]
-};
-
-
-// Canonical power type lists and engine presets live in power-presets.mjs
-// so the V2 sheet and compendium repair script share one source of truth.
-
-// Category -> suggested activationType
-// passive = always-on (Body Armor, Resistances, Senses)
-// activated = toggled on/off (Flight, Energy Blasts)
-const CATEGORY_ACTIVATION_TYPE = {
-  resistances:              "passive",
-  senses:                   "passive",
-  bodyAlterationsDefensive: "passive",
-  movement:                 "activated",
-  matterControl:            "activated",
-  energyControl:            "activated",
-  bodyControl:              "activated",
-  distanceAttacks:          "activated",
-  mentalPowers:             "activated",
-  bodyAlterationsOffensive: "activated"
-};
-
-// When a category is selected, auto-check these section toggles and sub-toggles
-// so the user doesn't have to manually dig through 3 layers of checkboxes.
-// Keys = category value, values = { sections: [section-check data-section values],
-//                                    subs: [sub-check data-sub values] }
-const CATEGORY_AUTO_EXPAND = {
-  resistances:              { sections: ["defense"], subs: ["resistance"] },
-  bodyAlterationsDefensive: { sections: ["defense"], subs: [] },
-  mentalPowers:             { sections: ["save"], subs: [] },
-  distanceAttacks:          { sections: ["save"], subs: [] },
-  bodyAlterationsOffensive: { sections: ["save"], subs: [] },
-  matterControl:            { sections: ["save"], subs: [] }
-};
-
-// Category -> section flags to auto-tick on category CHANGE (not on render).
-// Only ticks flags that are currently unset. Explicit user choices always win.
-const CATEGORY_FLAG_AUTO_TICK = {
-  resistances:              { isDefensePower: true, isResistance: true },
-  senses:                   { isSensePower: true },
-  movement:                 { isMovementPower: true },
-  matterControl:            { isControlPower: true },
-  energyControl:            { isControlPower: true },
-  bodyControl:              { isTransformPower: true },
-  mentalPowers:             { isMentalPower: true },
-  bodyAlterationsDefensive: { isDefensePower: true },
-  distanceAttacks:          { isAttackPower: true },
-  bodyAlterationsOffensive: { isAttackPower: true }
-};
-
-// Category -> sensible sub-field defaults. Same "unset only" rule.
-const CATEGORY_FIELD_DEFAULTS = {
-  bodyControl: { "transformation.affects": "self" }
+  matterControl:            ["control"],
+  energyControl:            ["control"],
+  bodyControl:              ["transformation", "abilitySubstitution"],
+  mentalPowers:             ["abilitySubstitution"],
+  bodyAlterationsDefensive: ["healing"]
 };
 
 // Resistance type -> derived defaults per Players' Book pp. 71.
@@ -163,46 +117,95 @@ const RESISTANCE_TYPE_DEFAULTS = {
   magical:     { effect: "featReplace",     minRank: "" }
 };
 
-// Sections always shown regardless of category
-const ALWAYS_VISIBLE = ["attack", "limitation", "bonusPowers", "magic"];
+const ALWAYS_VISIBLE = ["attack", "save", "defense", "limitation"];
 
-// All toggleable section keys
-const ALL_SECTIONS = [
-  "attack", "defense", "save", "detection",
-  "abilitySubstitution", "movement", "control", "mental",
-  "transformation", "healing", "magic", "limitation", "bonusPowers"
+const DETAIL_SECTIONS = [
+  "detection", "abilitySubstitution", "movement", "control",
+  "transformation", "healing", "special", "bodyparts"
 ];
 
-function updateSectionVisibility(html, category) {
-  const suggested = CATEGORY_SECTIONS[category] || [];
+const ALL_SECTIONS = [...ALWAYS_VISIBLE, ...DETAIL_SECTIONS];
+
+function sectionHasData(sys, key) {
+  if (key === "special") return !!sys.specialStrengthType;
+  if (key === "bodyparts") return (sys.extraBodyParts?.length > 0) || sys.extraAttacks === true;
+  return false;
+}
+
+function updateSectionVisibility(html, category, sheet) {
+  const sys = sheet?.item?.system ?? {};
+  const suggested = [...(CATEGORY_SECTIONS[category] || []), ...typeSections(sys.type || "")];
+  const revealed = sheet?._ps2Revealed ?? new Set();
+  const hidden = [];
   for (const key of ALL_SECTIONS) {
     const el = html.find(`.ps2-section[data-section="${key}"]`);
     if (!el.length) continue;
-    const isAlways = ALWAYS_VISIBLE.includes(key);
     const isSuggested = suggested.includes(key);
     const toggle = el.find('.ps2-section-check');
     const userEnabled = toggle.length ? toggle.prop('checked') : false;
-    const show = isAlways || isSuggested || userEnabled;
+    const show = ALWAYS_VISIBLE.includes(key) || isSuggested || userEnabled
+      || sectionHasData(sys, key) || revealed.has(key);
     el.attr('data-hidden', show ? 'false' : 'true');
     el.attr('data-suggested', isSuggested ? 'true' : 'false');
+    if (!show) hidden.push(key);
   }
-  // Auto-expand section bodies and sub-sections for this category
-  // We force-show the section body so it's *available* for the category, but
-  // do NOT auto-check the underlying toggle — that would flip the persisted
-  // system flag (e.g. requiresSave) on every sheet open, overriding the user's
-  // explicit choice. The toggle stays as authored; visibility is just the hint.
-  const autoExp = CATEGORY_AUTO_EXPAND[category];
-  if (autoExp) {
-    for (const sectionKey of autoExp.sections) {
-      const sectionEl = html.find(`.ps2-section[data-section="${sectionKey}"]`);
-      sectionEl.attr("data-hidden", "false");
-      sectionEl.attr("data-suggested", "true");
-      sectionEl.find('.ps2-section-body').show();
-    }
-    for (const subKey of autoExp.subs) {
-      html.find(`.ps2-sub-body[data-sub="${subKey}"]`).show();
-    }
+  const picker = html.find('#ps2-add-section');
+  picker.find('option:not([value=""])').remove();
+  for (const key of hidden) {
+    picker.append($('<option></option>').val(key).text(SECTION_LABELS[key] || key));
   }
+  html.find('.ps2-add-section').attr('data-hidden', hidden.length ? 'false' : 'true');
+}
+
+function kindUpdates(sys, kind) {
+  const rankVal = Number(sys.value) || 0;
+  const updates = {
+    "system.isBodyArmor": kind === "bodyArmor",
+    "system.isForceField": kind === "forceField",
+    "system.isResistance": kind === "resistance" || kind === "invulnerability",
+    "system.isEnergyReflection": kind === "reflection",
+    "system.resistanceIsInvulnerability": kind === "invulnerability"
+  };
+  if (kind === "bodyArmor") {
+    if (!sys.armorPhysicalCustom) updates["system.armorPhysical"] = rankVal;
+    if (!sys.armorEnergyCustom) updates["system.armorEnergy"] = Math.max(0, rankVal - 20);
+  } else if (kind === "forceField") {
+    updates["system.armorPhysical"] = 0;
+    updates["system.armorEnergy"] = 0;
+    updates["system.armorPhysicalCustom"] = false;
+    updates["system.armorEnergyCustom"] = false;
+  } else if (kind === "invulnerability") {
+    updates["system.resistanceEffect"] = "invulnerability";
+    updates["system.countsAsTwoPowers"] = true;
+  } else if (kind === "resistance" && sys.resistanceEffect === "invulnerability") {
+    updates["system.resistanceEffect"] = RESISTANCE_TYPE_DEFAULTS[sys.resistanceType]?.effect || "damageReduction";
+  }
+  return updates;
+}
+
+function legacyUpdates(item) {
+  const sys = item.system ?? {};
+  const updates = {};
+  if (!sys.specialStrengthType) {
+    const inferred = sys.clawMaterialStrength ? "claw"
+      : sys.telekinesisStrength ? "tk"
+      : sys.ensnaringStrength ? "ensnare"
+      : "";
+    if (inferred) updates["system.specialStrengthType"] = inferred;
+  }
+  if (sys.isStarred) {
+    updates["system.isStarred"] = false;
+    if (!sys.countsAsTwoPowers) updates["system.countsAsTwoPowers"] = true;
+  }
+  if (item.getFlag?.("msh-faserip", "isBonusPower")) {
+    updates["flags.msh-faserip.-=isBonusPower"] = null;
+    if (!sys.isBonus) updates["system.isBonus"] = true;
+  }
+  if (sys.limitationDetail && !sys.limitations) {
+    updates["system.limitations"] = sys.limitationDetail;
+    if (!sys.isLimited) updates["system.isLimited"] = true;
+  }
+  return updates;
 }
 
 export function ps2ActivateListeners(html, sheet) {
@@ -213,22 +216,41 @@ export function ps2ActivateListeners(html, sheet) {
   const category = html.find('#ps2-category').val();
   const selectedType = sheet.item?.system?.type || html.find('#ps2-type').data('current') || "";
   populatePowerTypeOptions(html, category, selectedType);
-  updateSectionVisibility(html, category);
+  if (!sheet._ps2Revealed) sheet._ps2Revealed = new Set();
+  updateSectionVisibility(html, category, sheet);
+
+  const bodyEl = html.find('.ps2-body');
+  if (sheet._ps2Scroll) bodyEl.scrollTop(sheet._ps2Scroll);
+  bodyEl.on('scroll', () => { sheet._ps2Scroll = bodyEl.scrollTop(); });
+
+  html.find('#ps2-add-section').on('change', ev => {
+    ev.stopPropagation();
+    const key = ev.currentTarget.value;
+    if (!key) return;
+    sheet._ps2Revealed.add(key);
+    updateSectionVisibility(html, html.find('#ps2-category').val(), sheet);
+  });
 
   // Everything below requires write access (data migrations + event handlers).
   if (!sheet.isEditable) return;
 
-  // One-time migration: infer specialStrengthType from existing fields
-  const sys = sheet.item?.system ?? {};
-  if (!sys.specialStrengthType) {
-    const inferred = sys.clawMaterialStrength ? "claw"
-      : sys.telekinesisStrength ? "tk"
-      : sys.ensnaringStrength ? "ensnare"
-      : "";
-    if (inferred) {
-      sheet.item.update({ "system.specialStrengthType": inferred }, { render: false });
-    }
+  if (!sheet._ps2LegacyChecked) {
+    sheet._ps2LegacyChecked = true;
+    const legacy = legacyUpdates(sheet.item);
+    if (Object.keys(legacy).length) sheet.item.update(legacy);
   }
+
+  html.find('#ps2-defense-kind').on('change', async ev => {
+    ev.stopPropagation();
+    await sheet.item.update(kindUpdates(sheet.item.system ?? {}, ev.currentTarget.value));
+  });
+
+  html.find('#ps2-source').on('change', async ev => {
+    const fromEquipment = ev.currentTarget.value === "equipment";
+    if ((sheet.item.system?.grantedByEquipment === true) !== fromEquipment) {
+      await sheet.item.update({ "system.grantedByEquipment": fromEquipment }, { render: false });
+    }
+  });
 
   // Category change -> re-evaluate visibility, repopulate the canonical
   // type list, and seed category-level engine defaults. Only blank/default
@@ -241,7 +263,7 @@ export function ps2ActivateListeners(html, sheet) {
     const selectedType = keepType ? existingType : "";
 
     populatePowerTypeOptions(html, cat, selectedType);
-    updateSectionVisibility(html, cat);
+    updateSectionVisibility(html, cat, sheet);
 
     const updates = {
       "system.category": cat
@@ -305,20 +327,6 @@ export function ps2ActivateListeners(html, sheet) {
     } else {
       body.slideUp(150);
     }
-  });
-
-  // Sub-section toggles (body armor, force field, etc.)
-  html.find('.ps2-sub-check').on('change', ev => {
-    const cb = ev.currentTarget;
-    const sub = cb.dataset.sub;
-    const body = html.find(`.ps2-sub-body[data-sub="${sub}"]`);
-    cb.checked ? body.slideDown(120) : body.slideUp(120);
-  });
-
-  // Damage source -> enable/disable fixed damage field
-  html.find('#ps2-dmg-source').on('change', ev => {
-    const isFixed = ev.currentTarget.value === 'fixed';
-    html.find('input[name="system.damage"]').prop('disabled', !isFixed);
   });
 
   // Damage type -> auto-tick ignore-armor flags for rotting/corrosive touch
@@ -445,7 +453,7 @@ export function ps2ActivateListeners(html, sheet) {
     const item = sheet.item;
     const list = foundry.utils.deepClone(item.system.bonusPowers || []);
     list.push({ name: "", rankMod: "same" });
-    await item.update({ "system.bonusPowers": list });
+    await item.update({ "system.bonusPowers": list, "system.hasBonusPowers": true });
   });
 
   // Bonus powers: remove
@@ -454,7 +462,7 @@ export function ps2ActivateListeners(html, sheet) {
     const item = sheet.item;
     const list = foundry.utils.deepClone(item.system.bonusPowers || []);
     list.splice(idx, 1);
-    await item.update({ "system.bonusPowers": list });
+    await item.update({ "system.bonusPowers": list, "system.hasBonusPowers": list.length > 0 });
   });
 
   // Extra Body Parts: add
