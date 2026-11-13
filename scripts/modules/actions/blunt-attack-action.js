@@ -1,3 +1,9 @@
+// blunt-attack-action.js v1.7.0 - 2026-11-13
+// v1.7.0: Flat of a blade (RAW Blunt Attack). Edged weapons and items with a
+//         blunt attack mode are offered as blunt damage sources. An edged
+//         weapon's listed damage no longer floors blunt damage; a blunt attack
+//         mode supplies its own damage and name. A broken weapon passed in
+//         warns instead of silently falling back to Bare Hands.
 // blunt-attack-action.js v1.6.0 - 2026-11-11
 // v1.6.0: Dialog scaffolding (header, Blindside row, effect grid, footer,
 //         titlebar and width setup, Enter-to-roll, Remember and Skip dice
@@ -93,7 +99,7 @@ import {
 import {
   RANKS, shiftRank, getAbilityInfo, getStrengthInfo,
   effectsFor, labelFor,
-  isBluntCapable, computeBluntDamage,
+  isBluntCapable, isEdgedCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetData, getBodyArmorValues, applyDamageToTargets,
   attachModeSelectorHandlers, debugLog,
@@ -160,7 +166,39 @@ function attrEscape(value) {
     .replaceAll(">", "&gt;");
 }
 
+function bluntModeOf(item) {
+  const modes = Array.isArray(item?.system?.attackModes) ? item.system.attackModes : [];
+  return modes.find(m => m?.actionType === "blunt-attack" || m?.damageType === "BA") || null;
+}
+
+function isBluntSource(item) {
+  if (isBluntCapable(item)) return true;
+  if (item?.type !== "equipment") return false;
+  return isEdgedCapable(item) || !!bluntModeOf(item);
+}
+
 export class BluntAttackAction extends AttackAction {
+  _bluntMode(item) {
+    const passed = this.opts?.attackMode;
+    const passedId = this.opts?.itemId || this.opts?.item?.id || null;
+    if (passed && item?.id === passedId) return passed;
+    return isBluntCapable(item) ? null : bluntModeOf(item);
+  }
+
+  _bluntBase(item) {
+    if (!item) return 0;
+    const mode = this._bluntMode(item);
+    if (mode) return Number(mode.damage) || 0;
+    return isBluntCapable(item) ? (Number(item.system?.damage) || 0) : 0;
+  }
+
+  _bluntName(item) {
+    if (!item) return "";
+    const mode = this._bluntMode(item);
+    if (mode?.name) return `${item.name} — ${mode.name}`;
+    return isBluntCapable(item) ? item.name : `${item.name} (flat)`;
+  }
+
   async execute() {
     const actor = this.actor;
     const actionType = "blunt-attack";
@@ -169,7 +207,7 @@ export class BluntAttackAction extends AttackAction {
 
     const ability = getAbilityInfo(actor, this.abilityName);
     const strength = getStrengthInfo(actor);
-    let attackItems = actor.items.filter(isBluntCapable);
+    let attackItems = actor.items.filter(isBluntSource);
 
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
@@ -178,6 +216,9 @@ export class BluntAttackAction extends AttackAction {
     if (passedItem && passedItem.type === "equipment") {
       if (!attackItems.find(i => i.id === passedItem.id)) {
         attackItems = [passedItem, ...attackItems];
+      }
+      if (passedItem.system?.broken === true) {
+        ui.notifications.warn(`${passedItem.name} is marked broken. Clear Broken on the item to use it.`);
       }
     }
 
@@ -230,7 +271,7 @@ export class BluntAttackAction extends AttackAction {
       const savedItem = attackItems.find(i => i.id === savedItemId);
       if (savedItem) {
         const mat = getItemMaterialRank(savedItem);
-        let base = Number(savedItem.system?.damage || 0);
+        let base = this._bluntBase(savedItem);
         const da = this.opts?.deviceAbility;
         if (da?.rank && savedItem?.system?.category === "device") {
           base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
@@ -311,7 +352,7 @@ export class BluntAttackAction extends AttackAction {
     damageSrcOptions.push(`<option value="hands" ${savedSource==='hands'?'selected':''}>Bare Hands &mdash; ${strength.rank} (${strength.value})</option>`);
     for (const i of attackItems) {
       const mat = getItemMaterialRank(i);
-      let base = Number(i.system?.damage || 0);
+      let base = this._bluntBase(i);
       const da = this.opts?.deviceAbility;
       if (da?.rank && i?.system?.category === "device") {
         base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
@@ -320,7 +361,7 @@ export class BluntAttackAction extends AttackAction {
       const isBroken = i.system?.broken === true;
       const sel = (savedSource === 'weapon' && savedItemId === i.id && !isBroken) ? 'selected' : '';
       const disabled = isBroken ? 'disabled' : '';
-      const label = isBroken ? `[BROKEN] ${i.name}` : i.name;
+      const label = isBroken ? `[BROKEN] ${this._bluntName(i)}` : this._bluntName(i);
       damageSrcOptions.push(`<option value="weapon:${i.id}" ${sel} ${disabled}>${label} &mdash; ${res.damage} dmg</option>`);
     }
     damageSrcOptions.push(`<option value="object" ${savedSource==='object'?'selected':''}>Improvised Object&hellip;</option>`);
@@ -612,8 +653,8 @@ export class BluntAttackAction extends AttackAction {
             if (src === "weapon") {
               const item = attackItems.find(i => i.id === itemId);
               weaponMat  = item ? getItemMaterialRank(item) : "Excellent";
-              weaponName = item ? item.name : "";
-              let base = item ? Number(item.system?.damage || 0) : 0;
+              weaponName = item ? this._bluntName(item) : "";
+              let base = this._bluntBase(item);
               const da = this.opts?.deviceAbility;
               if (da?.rank && item?.system?.category === "device") {
                 base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
@@ -719,7 +760,7 @@ export class BluntAttackAction extends AttackAction {
             if (src === "weapon") {
               const item = attackItems.find(i => i.id === currentItemId) || null;
               const mat  = item ? getItemMaterialRank(item) : "Excellent";
-              let base = item ? Number(item.system?.damage || 0) : 0;
+              let base = this._bluntBase(item);
               const da = this.opts?.deviceAbility;
               if (da?.rank && item?.system?.category === "device") {
                 base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
