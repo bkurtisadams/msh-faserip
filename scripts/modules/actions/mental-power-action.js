@@ -1,3 +1,6 @@
+// scripts/modules/actions/mental-power-action.js v2.5.2 - 2026-11-13
+// v2.5.2: Telepathy dialog no longer lists book stunts; the power-stunt
+//         chooser (power-router) offers them before this dialog opens.
 // scripts/modules/actions/mental-power-action.js v2.5.1 - 2026-11-10
 // v2.5.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
@@ -31,7 +34,6 @@
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
 import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, shiftRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
-import { presetsForItem } from "./stunt-mechanics.js";
 import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
 import { POWER_RANGE, RANKS_ORDERED } from "../../rules/rules-reference.js";
 import { generateKarmaControlsHTML, extractKarmaFromDialog, showKarmaDecisionDialog } from "../dice/dice-roller.js";
@@ -309,7 +311,8 @@ export class MentalPowerAction extends BaseAction {
 
     // ── Telepathy: contested Power rank FEAT (not a save vs intensity) ──
     if (nameLc.includes("telepathy") && !stuntPreset) {
-      const stuntPresets = presetsForItem(item);
+      // Book stunts are offered by the power-stunt chooser before this dialog.
+      const stuntPresets = [];
       const targets = Array.from(game.user.targets);
       if (targets.length === 0) {
         ui.notifications.warn("No target selected for Telepathy");

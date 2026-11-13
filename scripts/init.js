@@ -1,4 +1,7 @@
-﻿// init.js v1.21.0 - 2026-11-11
+﻿// init.js v1.22.0 - 2026-11-13
+// v1.22.0: GM ready hook links preset-tagged Stunts tab entries to stunt
+//          definitions on their parent powers (migratePowerStunts).
+// init.js v1.21.0 - 2026-11-11
 // v1.21.0: Vehicle actors use MSHVehicleActorSheetV2 (the V2 shell); the V1
 //          vehicle sheet is no longer registered.
 // init.js v1.20.0 - 2026-11-11
@@ -2716,6 +2719,21 @@ Hooks.once("setup", () => {
 Hooks.once("ready", async () => {
   try { await migrateKarmaSettings(); }
   catch (e) { console.error("[FASERIP] Karma settings migration failed:", e); }
+
+  // Power stunts move onto their powers: every preset-tagged Stunts tab entry
+  // gets a definition on its parent power and a link to it. Idempotent; tab
+  // history and mastery are not touched. Unlinked tokens migrate on first use
+  // (power-router.rollPower).
+  if (game.user?.isGM) {
+    try {
+      const { migratePowerStunts } = await import("./modules/actions/stunt-mechanics.js");
+      let n = 0;
+      for (const actor of game.actors) {
+        if (await migratePowerStunts(actor)) n++;
+      }
+      if (n) console.log(`[FASERIP] Power stunts linked to their powers on ${n} actor(s).`);
+    } catch (e) { console.error("[FASERIP] Power stunt migration failed:", e); }
+  }
 
   // One-time migration: make existing character actors match FASERIP's preferred
   // prototype token visibility and health-bar defaults. New actors are handled by

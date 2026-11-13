@@ -1,3 +1,6 @@
+// itemSheet.js v2.3.0 - 2026-11-13
+// v2.3.0: Power context gains powerStuntRows / bookStuntOptions /
+//         stuntColumnOptions for the Power Stunts section.
 // itemSheet.js v2.2.0 - 2026-11-11
 // v2.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.1.2: carrierToxinOptions feeds the Target Save panel's Poisoned toxin
@@ -129,6 +132,42 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       // ----- NEW: provide a safe calculatedRange string when range === "rank"
       if (context.system?.range === "rank") {
         context.calculatedRange = POWER_RANGE[context.system?.rank] || "";
+      }
+
+      // Power stunts defined on this power (stunt-mechanics.js), with each
+      // one's Stunts tab progress when the power is on an actor.
+      {
+        const SM = await import("./modules/actions/stunt-mechanics.js");
+        const { describeStuntMechanic } = await import("./modules/actions/power-stunt-chooser.js");
+        const { shiftRank } = await import("./modules/actions/action-utils.js");
+        const { POWER_STUNT_MASTERY } = await import("./lib/faserip-rules/faserip-karma.js");
+        const actor = this.item.parent;
+        const baseRank = context.system?.rank || "Typical";
+        context.powerStuntRows = SM.getPowerStunts(this.item).map((d, index) => {
+          const m = d.mechanic || {};
+          const kind = m.kind || "info";
+          const shift = Number(m.shift) || 0;
+          let status = "Not attempted yet";
+          if (actor) {
+            const idx = SM.stuntEntryIndex(actor, this.item, d);
+            if (idx >= 0) {
+              const used = Number(actor.system.stunts[idx].timesUsed) || 0;
+              status = used >= POWER_STUNT_MASTERY ? "Mastered" : `${used}/${POWER_STUNT_MASTERY} on the Stunts tab`;
+            }
+          }
+          return {
+            index, id: d.id, name: d.name, description: d.description || "",
+            kind, editableKind: SM.EDITABLE_STUNT_KINDS.includes(kind),
+            isAttack: kind === "attack", isSave: kind === "save",
+            summary: describeStuntMechanic(m),
+            shift, column: m.column || "Fo",
+            saveAbility: m.saveAbility || "endurance", effect: m.effect || "stunned",
+            duration: m.duration || "1-10", multiTargetCS: Number(m.multiTargetCS) || 0,
+            rank: shiftRank(baseRank, shift), status
+          };
+        });
+        context.bookStuntOptions = SM.undevelopedPresets(this.item).map(p => ({ key: p.key, name: p.name }));
+        context.stuntColumnOptions = Object.entries(SM.STUNT_ATTACK_COLUMNS).map(([code, c]) => ({ code, label: c.label }));
       }
 
       // Expose power-list origin flags so the editor can control the

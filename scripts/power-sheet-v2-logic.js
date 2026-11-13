@@ -1,3 +1,11 @@
+// power-sheet-v2-logic.js v1.14.0 - 2026-11-13
+// v1.14.0: Power Stunts section — edit, add (book or custom) and remove the
+//          stunt definitions in system.powerStunts. Fields carry no name
+//          attribute; each change writes the whole array.
+// power-sheet-v2-logic.js v1.13.0 - 2026-11-13
+// v1.13.0: Target Save is always visible (header toggle; body stays closed
+//          until ticked). It was hidden for every category but four, the
+//          same closed loop v1.12.0 fixed for matterControl.
 // power-sheet-v2-logic.js v1.12.0 - 2026-09-10
 // v1.12.0: Fixed-bug — matterControl had no "save" section anywhere in
 //          CATEGORY_SECTIONS, so it was UNREACHABLE from the UI (the
@@ -164,7 +172,7 @@ const RESISTANCE_TYPE_DEFAULTS = {
 };
 
 // Sections always shown regardless of category
-const ALWAYS_VISIBLE = ["attack", "limitation", "bonusPowers", "magic"];
+const ALWAYS_VISIBLE = ["attack", "save", "limitation", "bonusPowers", "magic"];
 
 // All toggleable section keys
 const ALL_SECTIONS = [
@@ -217,6 +225,8 @@ export function ps2ActivateListeners(html, sheet) {
 
   // Everything below requires write access (data migrations + event handlers).
   if (!sheet.isEditable) return;
+
+  ps2BindPowerStunts(html, sheet);
 
   // One-time migration: infer specialStrengthType from existing fields
   const sys = sheet.item?.system ?? {};
@@ -580,5 +590,68 @@ export function ps2ActivateListeners(html, sheet) {
         localStorage.setItem(key, lastH);
       }
     });
+  });
+}
+
+
+// ── Power Stunts section ────────────────────────────────────────────────
+function ps2BindPowerStunts(html, sheet) {
+  const item = sheet.item;
+  const load = async () => {
+    const SM = await import("./modules/actions/stunt-mechanics.js");
+    return { SM, defs: foundry.utils.deepClone(SM.getPowerStunts(item)) };
+  };
+  const save = (defs) => item.update({ "system.powerStunts": defs });
+
+  html.find(".ps2-pstunt-field").on("change", async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const el = ev.currentTarget;
+    const index = Number(el.dataset.index);
+    const path = el.dataset.path;
+    const { defs } = await load();
+    if (!defs[index] || !path) return;
+    let value = el.value;
+    if (el.type === "number") value = Number(value) || 0;
+    foundry.utils.setProperty(defs[index], path, value);
+    const m = defs[index].mechanic || (defs[index].mechanic = {});
+    if (path === "mechanic.kind") {
+      if (value === "attack" && !m.column) m.column = "Fo";
+      if (value === "save") {
+        m.saveAbility ??= "endurance"; m.effect ??= "stunned"; m.duration ??= "1-10";
+        m.multiTargetCS ??= 0;
+      }
+    }
+    await save(defs);
+  });
+
+  html.find(".ps2-pstunt-delete").on("click", async (ev) => {
+    ev.preventDefault();
+    const index = Number(ev.currentTarget.dataset.index);
+    const { defs } = await load();
+    if (!defs[index]) return;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Remove Power Stunt" },
+      content: `<p>Remove <strong>${defs[index].name}</strong> from ${item.name}? Its Stunts tab entry and progress stay on the actor.</p>`
+    });
+    if (!ok) return;
+    defs.splice(index, 1);
+    await save(defs);
+  });
+
+  html.find(".ps2-pstunt-add").on("click", async (ev) => {
+    ev.preventDefault();
+    const key = html.find(".ps2-pstunt-add-select").val() || "";
+    const { SM, defs } = await load();
+    let def;
+    if (key) {
+      const preset = SM.presetsForItem(item).find(p => p.key === key);
+      if (!preset) return;
+      def = SM.powerStuntFromPreset(preset);
+    } else {
+      def = SM.blankPowerStunt();
+    }
+    defs.push(def);
+    await save(defs);
   });
 }

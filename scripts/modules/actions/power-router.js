@@ -1,3 +1,8 @@
+// power-router.js v1.14.0 - 2026-11-13
+// v1.14.0: A power with stunts (system.powerStunts) or undeveloped book
+//          stunts opens the power-stunt chooser first; opts.skipStuntChooser
+//          runs the base power. Preset-tagged Stunts tab entries are moved onto
+//          their power (migratePowerStunts) before the chooser builds.
 // power-router.js v1.13.1 - 2026-09-03
 // v1.13.1: rollPower tags existing tab stunts that match book presets for the
 //          power (stunt-mechanics adoptPresets) before dispatch.
@@ -156,16 +161,23 @@ function detectFromList(powerTypeLower, list) {
  * @param {Item} item   - The power item
  * @returns {Promise}   - Result from ActionDispatcher.roll() or undefined
  */
-export async function rollPower(actor, item) {
+export async function rollPower(actor, item, opts = {}) {
   if (!actor || !item) {
     ui.notifications.error("Actor or power not found");
     return;
   }
 
+  let offerStunts = false;
   try {
-    const { adoptPresets } = await import("./stunt-mechanics.js");
+    const { adoptPresets, migratePowerStunts, getPowerStunts, undevelopedPresets } = await import("./stunt-mechanics.js");
     await adoptPresets(actor, item);
-  } catch (err) { console.warn("[FASERIP] stunt preset adoption skipped:", err); }
+    await migratePowerStunts(actor);
+    offerStunts = !opts.skipStuntChooser && (getPowerStunts(item).length > 0 || undevelopedPresets(item).length > 0);
+  } catch (err) { console.warn("[FASERIP] power stunt preparation skipped:", err); }
+  if (offerStunts) {
+    const { showPowerStuntChooser } = await import("./power-stunt-chooser.js");
+    return showPowerStuntChooser(actor, item, () => rollPower(actor, item, { skipStuntChooser: true }));
+  }
 
   const category     = item.system.category || "";
   const powerType    = (item.system.type || "").toLowerCase();
