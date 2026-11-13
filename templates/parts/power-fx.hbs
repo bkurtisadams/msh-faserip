@@ -1,0 +1,126 @@
+    <fieldset class="ps2-fieldset">
+      <legend>Sound</legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Hit</label>
+          <div class="ps2-sfx-row">
+            <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="audio path" />
+            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
+            <button type="button" class="file-picker" data-type="audio" data-target="system.sfx.hit" title="Browse"><i class="fas fa-file-import"></i></button>
+          </div>
+        </div>
+        <div class="ps2-field">
+          <label>Miss</label>
+          <div class="ps2-sfx-row">
+            <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="audio path" />
+            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
+            <button type="button" class="file-picker" data-type="audio" data-target="system.sfx.miss" title="Browse"><i class="fas fa-file-import"></i></button>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="ps2-fieldset">
+      <legend>
+        <label style="font-size:inherit;font-weight:inherit;cursor:pointer;">
+          <input type="checkbox" name="system.vfx.enabled" {{checked system.vfx.enabled}} data-dtype="Boolean" /> Visual effect
+        </label>
+      </legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Preset</label>
+          <select name="system.vfx.preset" data-dtype="String">
+            <option value=""          {{#unless system.vfx.preset}}selected{{/unless}}>(none)</option>
+            <option value="energy"    {{#if (eq system.vfx.preset "energy")}}selected{{/if}}>Energy beam</option>
+            <option value="force"     {{#if (eq system.vfx.preset "force")}}selected{{/if}}>Force impact</option>
+            <option value="bullet"    {{#if (eq system.vfx.preset "bullet")}}selected{{/if}}>Bullet</option>
+            <option value="edged"     {{#if (eq system.vfx.preset "edged")}}selected{{/if}}>Edged melee</option>
+            <option value="blunt"     {{#if (eq system.vfx.preset "blunt")}}selected{{/if}}>Blunt melee</option>
+            <option value="lightning" {{#if (eq system.vfx.preset "lightning")}}selected{{/if}}>Lightning</option>
+            <option value="fire"      {{#if (eq system.vfx.preset "fire")}}selected{{/if}}>Fire bolt</option>
+            <option value="ice"       {{#if (eq system.vfx.preset "ice")}}selected{{/if}}>Ice spikes</option>
+            <option value="laser"     {{#if (eq system.vfx.preset "laser")}}selected{{/if}}>Laser</option>
+            <option value="magic"     {{#if (eq system.vfx.preset "magic")}}selected{{/if}}>Magic missile</option>
+            <option value="mental"    {{#if (eq system.vfx.preset "mental")}}selected{{/if}}>Mental</option>
+            <option value="throw"     {{#if (eq system.vfx.preset "throw")}}selected{{/if}}>Thrown</option>
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Color</label>
+          <input type="text" name="system.vfx.color" value="{{system.vfx.color}}" placeholder="blue, red, white..." data-dtype="String" />
+        </div>
+      </div>
+      <div class="ps2-field" style="margin-top:6px;">
+        <label>Beam asset (overrides preset)</label>
+        <div class="ps2-sfx-row">
+          <input type="text" name="system.vfx.asset" value="{{system.vfx.asset}}" placeholder="jb2a.energy_beam.normal.blue.01" data-dtype="String" />
+          <button type="button" class="vfx-preview" title="Preview"><i class="fas fa-play"></i></button>
+          <button type="button" class="file-picker" data-type="video" data-target="system.vfx.asset" title="Browse"><i class="fas fa-file-import"></i></button>
+        </div>
+      </div>
+      <div class="ps2-field" style="margin-top:6px;">
+        <label>Impact asset (overrides default)</label>
+        <div class="ps2-sfx-row">
+          <input type="text" name="system.vfx.impact" value="{{system.vfx.impact}}" placeholder="jb2a.impact.010.blue" data-dtype="String" />
+          <button type="button" class="file-picker" data-type="video" data-target="system.vfx.impact" title="Browse"><i class="fas fa-file-import"></i></button>
+        </div>
+      </div>
+      <div class="ps2-grid-2col" style="margin-top:6px;">
+        <div class="ps2-field">
+          <label>Scale</label>
+          <input type="number" name="system.vfx.scale" value="{{system.vfx.scale}}" step="0.1" min="0.1" max="5" data-dtype="Number" />
+        </div>
+        <div class="ps2-field">
+          <label>Duration (ms)</label>
+          <input type="number" name="system.vfx.duration" value="{{system.vfx.duration}}" step="100" min="100" max="10000" data-dtype="Number" />
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="ps2-fieldset ps2-effects-fieldset">
+      <legend>
+        <span class="ps2-effects-legend-row">
+          <span class="ps2-effects-label">Active Effects ({{effectCount}})</span>
+          <button type="button" class="ps2-effects-expand" title="Toggle effects"><i class="fas fa-plus"></i></button>
+        </span>
+      </legend>
+      <div class="ps2-effects-body" style="display:none;">
+        <div class="ps2-effect-presets">
+          <button type="button" class="effect-preset-btn" data-preset="body-armor" title="Body Armor"><i class="fas fa-shield-alt"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="forcefield" title="Force Field"><i class="fas fa-circle-notch"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="attack-bonus" title="Attack Bonus"><i class="fas fa-crosshairs"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="ability-boost" title="Ability Boost"><i class="fas fa-arrow-up"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="light" title="Light"><i class="fas fa-lightbulb"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="stealth" title="Stealth"><i class="fas fa-user-secret"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="phasing" title="Phasing"><i class="fas fa-ghost"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="flight" title="Flight"><i class="fas fa-feather-alt"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="darkvision" title="Darkvision"><i class="fas fa-eye"></i></button>
+        </div>
+        {{#each effects as |section|}}
+        <div class="effect-section" data-section-type="{{section.type}}">
+          <div class="ps2-effect-header">
+            <span>{{section.label}}</span>
+            <li data-effect-type="{{section.type}}" style="list-style:none;margin:0;">
+              <a class="effect-control btn-add" data-action="create"><i class="fas fa-plus"></i></a>
+            </li>
+          </div>
+          <ol class="ps2-effects-list">
+            {{#each section.effects as |effect|}}
+            <li class="ps2-effect-row" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+              <img src="{{effect.img}}" alt="" class="ps2-effect-icon" />
+              <span class="ps2-effect-name">{{effect.name}}</span>
+              <div class="ps2-effect-controls">
+                <a class="effect-control" data-action="toggle" title="Toggle"><i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i></a>
+                <a class="effect-control" data-action="edit" title="Edit"><i class="fas fa-edit"></i></a>
+                <a class="effect-control" data-action="delete" title="Delete"><i class="fas fa-trash"></i></a>
+              </div>
+            </li>
+            {{/each}}
+            {{#unless section.effects.length}}
+            <li class="ps2-no-effects">No {{section.label}} effects</li>
+            {{/unless}}
+          </ol>
+        </div>
+        {{/each}}
+      </div>
+    </fieldset>

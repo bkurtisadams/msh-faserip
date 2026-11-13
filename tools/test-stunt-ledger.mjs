@@ -51,7 +51,7 @@ const tab = readFileSync(new URL('../templates/parts/tab-stunts.hbs', import.met
 assert.ok(tab.includes('{{#each stuntRows as |row|}}'));
 assert.ok(tab.includes('>Successes</th>') && !tab.includes('Times Used'));
 const sheet = readFileSync(new URL('../templates/power-sheet-v2.html', import.meta.url), 'utf8');
-assert.ok(sheet.includes('class="ps2-add-btn create-stunt-from-power"'), 'power sheet has the Add stunt button');
+assert.ok(!sheet.includes('create-stunt-from-power') && !sheet.includes('ps2-stunts'), 'no stunt list or Add stunt on the power sheet');
 const roller = readFileSync(new URL('../scripts/stunts.js', import.meta.url), 'utf8');
 assert.ok(!roller.includes('Times Attempted'));
 assert.ok(!roller.includes('const baseCost = 100;'));

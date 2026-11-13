@@ -1,6 +1,7 @@
 // scripts/modules/actions/stunt-mechanics.js v1.6.0 - 2026-11-13
 // v1.6.0: stuntShift(stunt) exported for the Stunts tab and power sheet
-//         (the preset mechanic's column shift, else the stored one).
+//         (the preset mechanic's column shift, else the stored one), and
+//         stuntUsesItem(stunt, name) for the stunt-power sheet.
 // scripts/modules/actions/stunt-mechanics.js v1.5.0 - 2026-11-13
 // v1.5.0: Sonic Stun stunt rolls the actor's "Sonic Stun" power item, built on
 //         the power sheet (Target Save: Endurance, Power Rank, Stunned, 1d10,
@@ -223,6 +224,13 @@ function presetByKey(key) {
     if (p) return p;
   }
   return null;
+}
+
+export function stuntUsesItem(stunt, itemName) {
+  const m = presetByKey(stunt?.presetKey)?.mechanic || stunt?.mechanic;
+  if (m?.kind !== "use-item") return false;
+  const n = String(itemName || "").toLowerCase();
+  return !!n && (m.itemNames || []).some(x => n === x.toLowerCase() || n.includes(x.toLowerCase()));
 }
 
 export function stuntShift(stunt) {

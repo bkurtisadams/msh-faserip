@@ -4,7 +4,8 @@ import {
   buildPowerSheetView, defenseKind, forceFieldRows, typeSections,
 } from '../scripts/power-sheet-view.mjs';
 
-const tpl = readFileSync(new URL('../templates/power-sheet-v2.html', import.meta.url), 'utf8');
+const read = p => readFileSync(new URL(`../templates/${p}`, import.meta.url), 'utf8');
+const tpl = ['power-sheet-v2.html', 'parts/power-attack.hbs', 'parts/power-save.hbs', 'parts/power-fx.hbs'].map(read).join('\n');
 
 assert.ok(!tpl.includes('data-tab='), 'single scrolling form, no tabs');
 const header = tpl.slice(tpl.indexOf('class="ps2-header"'), tpl.indexOf('class="ps2-body"'));

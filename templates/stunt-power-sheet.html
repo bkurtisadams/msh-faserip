@@ -1,0 +1,81 @@
+<form class="{{cssClass}} power-sheet-v2 stunt-power-sheet" autocomplete="off">
+
+  <div class="ps2-header">
+    <img class="ps2-portrait" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+    <input class="ps2-name" name="name" type="text" value="{{item.name}}" placeholder="Stunt Power Name"/>
+    <span class="ps2-stunt-badge">STUNT</span>
+  </div>
+
+  <div class="ps2-body">
+
+    <fieldset class="ps2-fieldset">
+      <legend>Stunt</legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Parent power</label>
+          <select name="system.stuntParentId" {{#unless stuntPower.onActor}}disabled{{/unless}}>
+            <option value="" {{#unless stuntPower.parentId}}selected{{/unless}}>None: rank set here</option>
+            {{#each stuntPower.parentOptions}}
+            <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+            {{/each}}
+          </select>
+        </div>
+        {{#if stuntPower.parentId}}
+        <div class="ps2-field">
+          <label>Rank shift</label>
+          <select name="system.stuntShift" data-dtype="Number">
+            {{#each stuntPower.shiftOptions}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Rank</label>
+          <input type="text" value="{{stuntPower.rank}}" readonly tabindex="-1" />
+        </div>
+        <div class="ps2-field">
+          <label>Value</label>
+          <input type="text" value="{{stuntPower.value}}" readonly tabindex="-1" />
+        </div>
+        {{else}}
+        <div class="ps2-field">
+          <label>Rank</label>
+          <select name="system.rank" id="ps2-rank">
+            {{> "systems/msh-faserip/templates/parts/rank-options.hbs" ranks=rankListFull selected=system.rank}}
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Value</label>
+          <input type="number" name="system.value" id="ps2-value" value="{{system.value}}" data-dtype="Number" />
+        </div>
+        {{/if}}
+        <div class="ps2-field">
+          <label>Stunts tab</label>
+          <input type="text" value="{{stuntPower.statusText}}" readonly tabindex="-1" />
+        </div>
+      </div>
+      {{#if stuntPower.parentId}}
+      <p class="ps2-hint">Rank follows {{stuntPower.parentName}}{{#if stuntPower.shiftLabel}} at {{stuntPower.shiftLabel}}{{/if}}.</p>
+      {{else}}{{#unless stuntPower.onActor}}
+      <p class="ps2-hint">Put this power on a character to link a parent power.</p>
+      {{/unless}}{{/if}}
+      <div class="ps2-flags">
+        <label title="Switch back to the full Edit Power sheet"><input type="checkbox" class="ps2-stunt-power-toggle" {{checked stuntPower.isStuntPower}}> Stunt Power</label>
+      </div>
+    </fieldset>
+
+    {{> "systems/msh-faserip/templates/parts/power-attack.hbs"}}
+
+    {{> "systems/msh-faserip/templates/parts/power-save.hbs"}}
+
+    {{> "systems/msh-faserip/templates/parts/power-fx.hbs"}}
+
+    <fieldset class="ps2-fieldset">
+      <legend>Description</legend>
+      <div class="ps2-field">
+        <textarea name="system.description" rows="6" class="ps2-textarea" aria-label="Description">{{system.description}}</textarea>
+      </div>
+    </fieldset>
+
+  </div>
+</form>

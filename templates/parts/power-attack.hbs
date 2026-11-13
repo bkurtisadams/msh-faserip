@@ -1,0 +1,90 @@
+    <fieldset class="ps2-fieldset ps2-section" data-section="attack">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isAttackPower" {{checked system.isAttackPower}} data-dtype="Boolean" class="ps2-section-check" data-section="attack">
+          Attack
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isAttackPower}}style="display:none;"{{/unless}}>
+        <div class="ps2-grid-3col">
+<div class="ps2-field">
+<label>Battle Effects column</label>
+<select name="system.battleEffectsColumn" id="ps2-battle-col">
+  <option value="" {{#unless system.battleEffectsColumn}}selected{{/unless}}>-- None --</option>
+  <option value="BA" {{#if (eq system.battleEffectsColumn "BA")}}selected{{/if}}>Blunt Attack</option>
+  <option value="EA" {{#if (eq system.battleEffectsColumn "EA")}}selected{{/if}}>Edged Attack</option>
+  <option value="S" {{#if (eq system.battleEffectsColumn "S")}}selected{{/if}}>Shooting</option>
+  <option value="TE" {{#if (eq system.battleEffectsColumn "TE")}}selected{{/if}}>Throwing Edged</option>
+  <option value="TB" {{#if (eq system.battleEffectsColumn "TB")}}selected{{/if}}>Throwing Blunt</option>
+  <option value="En" {{#if (eq system.battleEffectsColumn "En")}}selected{{/if}}>Energy</option>
+  <option value="Fo" {{#if (eq system.battleEffectsColumn "Fo")}}selected{{/if}}>Force</option>
+  <option value="Ch" {{#if (eq system.battleEffectsColumn "Ch")}}selected{{/if}}>Charging</option>
+  <option value="Gp" {{#if (eq system.battleEffectsColumn "Gp")}}selected{{/if}}>Grappling</option>
+  <option value="Gb" {{#if (eq system.battleEffectsColumn "Gb")}}selected{{/if}}>Grabbing</option>
+  <option value="Me" {{#if (eq system.battleEffectsColumn "Me")}}selected{{/if}}>Mental</option>
+</select>
+</div>
+<div class="ps2-field">
+<label>Damage from</label>
+<select name="system.damageSource" id="ps2-dmg-source">
+  <option value="rank" {{#if (eq system.damageSource "rank")}}selected{{/if}}>Power rank</option>
+  <option value="strength" {{#if (eq system.damageSource "strength")}}selected{{/if}}>Strength</option>
+  <option value="endurance" {{#if (eq system.damageSource "endurance")}}selected{{/if}}>Endurance</option>
+  <option value="material" {{#if (eq system.damageSource "material")}}selected{{/if}}>Material strength</option>
+  <option value="fixed" {{#if (eq system.damageSource "fixed")}}selected{{/if}}>Fixed number</option>
+</select>
+</div>
+<div class="ps2-field">
+<label>Damage type</label>
+<select name="system.damageType" id="ps2-dmg-type">
+  <option value="" {{#unless system.damageType}}selected{{/unless}}>-- None --</option>
+  <option value="physical-blunt" {{#if (eq system.damageType "physical-blunt")}}selected{{/if}}>Physical: Blunt</option>
+  <option value="physical-edged" {{#if (eq system.damageType "physical-edged")}}selected{{/if}}>Physical: Edged</option>
+  <option value="energy-generic" {{#if (eq system.damageType "energy-generic")}}selected{{/if}}>Energy: Generic</option>
+  <option value="energy-force" {{#if (eq system.damageType "energy-force")}}selected{{/if}}>Energy: Force</option>
+  <option value="energy-fire" {{#if (eq system.damageType "energy-fire")}}selected{{/if}}>Energy: Fire/Heat</option>
+  <option value="energy-cold" {{#if (eq system.damageType "energy-cold")}}selected{{/if}}>Energy: Cold/Ice</option>
+  <option value="energy-electricity" {{#if (eq system.damageType "energy-electricity")}}selected{{/if}}>Energy: Electricity</option>
+  <option value="energy-sound" {{#if (eq system.damageType "energy-sound")}}selected{{/if}}>Energy: Sound/Sonic</option>
+  <option value="energy-radiation" {{#if (eq system.damageType "energy-radiation")}}selected{{/if}}>Energy: Radiation/Light</option>
+  <option value="energy-darkforce" {{#if (eq system.damageType "energy-darkforce")}}selected{{/if}}>Energy: Darkforce</option>
+  <option value="corrosive" {{#if (eq system.damageType "corrosive")}}selected{{/if}}>Corrosive/Acid</option>
+  <option value="mental" {{#if (eq system.damageType "mental")}}selected{{/if}}>Mental/Psionic</option>
+  <option value="touch-energy" {{#if (eq system.damageType "touch-energy")}}selected{{/if}}>Touch: Energy</option>
+  <option value="touch-paralyzing" {{#if (eq system.damageType "touch-paralyzing")}}selected{{/if}}>Touch: Paralyzing</option>
+  <option value="touch-rotting" {{#if (eq system.damageType "touch-rotting")}}selected{{/if}}>Touch: Rotting</option>
+  <option value="touch-corrosive" {{#if (eq system.damageType "touch-corrosive")}}selected{{/if}}>Touch: Corrosive</option>
+  <option value="touch-healthdrain" {{#if (eq system.damageType "touch-healthdrain")}}selected{{/if}}>Touch: Health Drain</option>
+  <option value="touch-blinding" {{#if (eq system.damageType "touch-blinding")}}selected{{/if}}>Touch: Blinding</option>
+</select>
+</div>
+          {{#if (eq system.damageSource "fixed")}}
+          <div class="ps2-field">
+            <label>Fixed damage</label>
+            <input type="number" name="system.damage" value="{{system.damage}}" data-dtype="Number" />
+          </div>
+          {{/if}}
+        </div>
+        <div class="ps2-grid-2col ps2-flag-groups">
+          <div class="ps2-flag-group">
+            <p class="ps2-group-title">Attacker may reduce</p>
+            <label><input type="checkbox" name="system.canPullPunch" {{checked system.canPullPunch}} data-dtype="Boolean"> Damage</label>
+            <label><input type="checkbox" name="system.canReduceEffect" {{checked system.canReduceEffect}} data-dtype="Boolean"> Effect (result color)</label>
+          </div>
+          <div class="ps2-flag-group">
+            <p class="ps2-group-title">Gets past defenses</p>
+            <label><input type="checkbox" name="system.armorPiercing" {{checked system.armorPiercing}} data-dtype="Boolean"> Armor piercing</label>
+            <label><input type="checkbox" name="system.ignoresNaturalArmor" {{checked system.ignoresNaturalArmor}} data-dtype="Boolean"> Ignores natural Body Armor</label>
+            <label><input type="checkbox" name="system.ignoresArtificialArmor" {{checked system.ignoresArtificialArmor}} data-dtype="Boolean"> Ignores artificial Body Armor</label>
+            <label><input type="checkbox" name="system.bypassForceField" {{checked system.bypassForceField}} data-dtype="Boolean"> Bypasses force fields</label>
+          </div>
+        </div>
+        <div class="ps2-inline-row">
+          <label><input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} data-dtype="Boolean"> Continuing damage</label>
+          {{#if system.continuingDamage}}
+          <label class="ps2-inline-label">Rounds</label>
+          <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="1" placeholder="3" class="ps2-short" data-dtype="Number" />
+          {{/if}}
+        </div>
+      </div>
+    </fieldset>

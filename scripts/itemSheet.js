@@ -1,7 +1,9 @@
 // itemSheet.js v2.4.0 - 2026-11-13
-// v2.4.0: Power sheet lists the owner's Stunts-tab stunts for this power
-//         (context.powerStunts) and refreshes when they change; Add stunt
-//         opens the shared stunt-ledger dialog.
+// v2.4.0: Stunt powers (flag isStuntPower) open the short
+//         stunt-power-sheet.html: parent power and shift, Attack, Target
+//         Save, effects and description, with the Stunts-tab status. The
+//         Stunt Power box toggles between the two sheets. Sheets refresh
+//         when the owner's stunts change.
 // itemSheet.js v2.3.0 - 2026-11-13
 // v2.3.0: context.ps2 carries the power sheet view model from
 //         power-sheet-view.mjs.
@@ -43,8 +45,8 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 import { buildPowerSheetView } from "./power-sheet-view.mjs";
-import { stuntRows, openAddStuntDialog } from "./stunt-ledger.js";
-import { stuntShift } from "./modules/actions/stunt-mechanics.js";
+import { stuntShift, stuntUsesItem } from "./modules/actions/stunt-mechanics.js";
+import { isStuntPower, stuntPowerContext } from "./stunt-power.js";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
 import { showFaseripConfirm } from "./modules/actions/dialog-shim.js";
 
@@ -62,6 +64,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   // Per-type templates. _configureRenderOptions selects exactly one.
   static PARTS = {
     power:   { template: "systems/msh-faserip/templates/power-sheet-v2.html" },
+    stuntPower: { template: "systems/msh-faserip/templates/stunt-power-sheet.html" },
     vehicle: { template: "systems/msh-faserip/templates/vehicle-sheet.html" },
     default: { template: "systems/msh-faserip/templates/item-sheet.html" }
   };
@@ -69,7 +72,8 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   _configureRenderOptions(options) {
     super._configureRenderOptions(options);
     const type = this.item.type;
-    const key = (type === "power" || type === "vehicle") ? type : "default";
+    const key = (type === "power" && isStuntPower(this.item)) ? "stuntPower"
+      : (type === "power" || type === "vehicle") ? type : "default";
     options.parts = [key];
   }
 
@@ -149,14 +153,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         isBonusPower: !!this.item.getFlag("msh-faserip", "isBonusPower")
       };
       context.ps2 = buildPowerSheetView(context.system ?? {}, context.powerOriginFlags);
-      const owner = this.item.parent;
-      context.powerStunts = owner?.documentName === "Actor"
-        ? {
-            onActor: true,
-            actorName: owner.name,
-            rows: stuntRows(owner, stuntShift).filter(r => r.parentPowerId === this.item.id)
-          }
-        : { onActor: false, actorName: "", rows: [] };
+      context.stuntPower = stuntPowerContext(this.item, { usesItem: stuntUsesItem, shiftFor: stuntShift });
 
       // Helpful logging (kept from your original)
       console.log("Power sheet data:", context);
@@ -649,10 +646,24 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       ui.notifications.info("Test Power functionality coming soon!");
     });
 
-    html.find('.create-stunt-from-power').click(async ev => {
-      ev.preventDefault();
-      if (await openAddStuntDialog(this.item.parent, { parentPowerId: this.item.id })) this.render();
+    html.find('.ps2-stunt-power-toggle').on('change', async ev => {
+      ev.stopPropagation();
+      const on = ev.currentTarget.checked;
+      const updates = { "flags.msh-faserip.isStuntPower": on };
+      const sp = context.stuntPower;
+      if (on && sp?.parentId && !sp.savedParentId) updates["system.stuntParentId"] = sp.parentId;
+      await this.item.update(updates, { render: false });
+      await this.close();
+      this.item.sheet.render(true);
     });
+
+    if (this.item.type === "power" && isStuntPower(this.item)) {
+      const sp = context.stuntPower;
+      if (sp?.parentId && !sp.savedParentId && !this._stuntParentSaved) {
+        this._stuntParentSaved = true;
+        await this.item.update({ "system.stuntParentId": sp.parentId });
+      }
+    }
 
     // ANCHOR: vehicle-item-create-actor
     if (this.item?.type === "vehicle") {

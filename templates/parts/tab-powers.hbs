@@ -39,6 +39,9 @@
                   {{/if}}
                   <span class="power-name-label">
                     <span class="power-name-text">{{power.name}}</span>
+                    {{#if (getFlag power 'msh-faserip' 'isStuntPower')}}
+                    <span class="power-origin-badge stunt" title="Stunt power: carries out a stunt on the Stunts tab">STUNT</span>
+                    {{/if}}
                     {{#if (or power.system.isBonus (getFlag power 'msh-faserip' 'isBonusPower'))}}
                     <span class="power-origin-badge bonus" title="Bonus power">BONUS</span>
                     {{/if}}

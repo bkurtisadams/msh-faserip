@@ -352,6 +352,8 @@
       "defenseType": "bodyArmor",
       "armorNature": "natural",
       "armorAgilityTrade": false,
+      "stuntParentId": "",
+      "stuntShift": 0,
       "bodyArmorType": "both",
       "protectionValue": 0,
       "hardware": {

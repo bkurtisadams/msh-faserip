@@ -1,0 +1,105 @@
+    <fieldset class="ps2-fieldset ps2-section" data-section="save">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.requiresSave" {{checked system.requiresSave}} data-dtype="Boolean" class="ps2-section-check" data-section="save">
+          Target Save
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.requiresSave}}style="display:none;"{{/unless}}>
+        <div class="ps2-grid-3col">
+          <div class="ps2-field">
+            <label>Resists with</label>
+            <select name="system.save.ability">
+              {{#each (array "endurance" "psyche" "intuition" "reason" "fighting" "agility" "strength") as |a|}}
+                <option value="{{a}}" {{#if (eq ../system.save.ability a)}}selected{{/if}}>{{capitalize a}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Or, target's choice</label>
+            <select name="system.save.ability2">
+              <option value="" {{#unless system.save.ability2}}selected{{/unless}}>No second ability</option>
+              {{#each (array "endurance" "psyche" "intuition" "reason" "fighting" "agility" "strength") as |a|}}
+                <option value="{{a}}" {{#if (eq ../system.save.ability2 a)}}selected{{/if}}>{{capitalize a}}</option>
+              {{/each}}
+            </select>
+          </div>
+<div class="ps2-field">
+<label>Intensity</label>
+<select name="system.save.intensity">
+  <option value="power-rank" {{#if (eq system.save.intensity "power-rank")}}selected{{/if}}>Power rank</option>
+  <option value="fixed-rank" {{#if (eq system.save.intensity "fixed-rank")}}selected{{/if}}>Fixed rank</option>
+  <option value="none" {{#if (eq system.save.intensity "none")}}selected{{/if}}>None</option>
+</select>
+</div>
+          {{#if (eq system.save.intensity "fixed-rank")}}
+          <div class="ps2-field">
+            <label>Fixed rank</label>
+            <select name="system.save.fixedRank">
+              <option value="">-- Select --</option>
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
+              <option value="{{r}}" {{#if (eq ../system.save.fixedRank r)}}selected{{/if}}>{{r}}</option>
+              {{/each}}
+            </select>
+          </div>
+          {{/if}}
+<div class="ps2-field">
+<label>On a failed FEAT</label>
+<select name="system.save.onFail.effect">
+  <option value="stunned" {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
+  <option value="unconscious" {{#if (eq system.save.onFail.effect "unconscious")}}selected{{/if}}>Unconscious</option>
+  <option value="blinded" {{#if (eq system.save.onFail.effect "blinded")}}selected{{/if}}>Blinded</option>
+  <option value="paralyzed" {{#if (eq system.save.onFail.effect "paralyzed")}}selected{{/if}}>Paralyzed</option>
+  <option value="immobilized" {{#if (eq system.save.onFail.effect "immobilized")}}selected{{/if}}>Immobilized</option>
+  <option value="nullified" {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
+  <option value="slammed" {{#if (eq system.save.onFail.effect "slammed")}}selected{{/if}}>Slammed</option>
+  <option value="grabbed" {{#if (eq system.save.onFail.effect "grabbed")}}selected{{/if}}>Grabbed</option>
+  <option value="weakened" {{#if (eq system.save.onFail.effect "weakened")}}selected{{/if}}>Weakened</option>
+  <option value="poisoned" {{#if (eq system.save.onFail.effect "poisoned")}}selected{{/if}}>Poisoned (Toxin)</option>
+  <option value="custom" {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
+</select>
+</div>
+<div class="ps2-field">
+<label>Lasts</label>
+<select name="system.save.onFail.duration">
+  <option value="1-10" {{#if (eq system.save.onFail.duration "1-10")}}selected{{/if}}>1-10 rounds</option>
+  <option value="10-100" {{#if (eq system.save.onFail.duration "10-100")}}selected{{/if}}>10-100 turns</option>
+  <option value="rank" {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>Power rank rounds</option>
+  <option value="concentration" {{#if (eq system.save.onFail.duration "concentration")}}selected{{/if}}>While concentrating</option>
+  <option value="hour" {{#if (eq system.save.onFail.duration "hour")}}selected{{/if}}>One hour</option>
+  <option value="scene" {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
+  <option value="escape" {{#if (eq system.save.onFail.duration "escape")}}selected{{/if}}>Until escape</option>
+  <option value="custom" {{#if (eq system.save.onFail.duration "custom")}}selected{{/if}}>Custom</option>
+</select>
+</div>
+          <div class="ps2-field">
+            <label>Multiple targets</label>
+            <select name="system.save.multiTargetCS" data-dtype="Number" title="Column shift to Intensity when more than one target is selected">
+              {{#each ps2.multiTargetOptions}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
+            </select>
+          </div>
+          <div class="ps2-field ps2-span-all">
+            <label>When the power also attacks</label>
+            <select name="system.save.onHit" title="Only matters when the power also has a Battle Effects column. Without one, the FEAT is the whole power.">
+              <option value="" {{#unless system.save.onHit}}selected{{/unless}}>FEAT is not rolled (attack only)</option>
+              <option value="after-damage" {{#if (eq system.save.onHit "after-damage")}}selected{{/if}}>FEAT is rolled after damage</option>
+              <option value="no-damage" {{#if (eq system.save.onHit "no-damage")}}selected{{/if}}>FEAT is rolled instead of damage</option>
+            </select>
+          </div>
+          {{#if (eq system.save.onFail.effect "poisoned")}}
+          <div class="ps2-field ps2-span-all">
+            <label>Toxin (catalog, optional)</label>
+            <select name="system.save.onFail.toxinId">
+              <option value="" {{#unless system.save.onFail.toxinId}}selected{{/unless}}>Use the Intensity above as the toxin Intensity</option>
+              {{#each carrierToxinOptions}}
+              <option value="{{this.id}}" {{#if (eq this.id ../system.save.onFail.toxinId)}}selected{{/if}}>{{this.label}}</option>
+              {{/each}}
+            </select>
+          </div>
+          {{/if}}
+        </div>
+        {{#if (eq system.save.onFail.effect "poisoned")}}
+        <p class="ps2-hint">Poisoned: the poison rules run the FEAT and its re-FEAT windows, so Lasts is ignored. Exposure on a hit needs damage past armor.</p>
+        {{/if}}
+      </div>
+    </fieldset>

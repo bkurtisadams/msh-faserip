@@ -1,4 +1,8 @@
-﻿// init.js v1.21.0 - 2026-11-11
+﻿// init.js v1.22.0 - 2026-11-13
+// v1.22.0: Preloads the power-attack / power-save / power-fx partials
+//          shared by the full and stunt-power sheets; registers the
+//          stunt-power rank sync.
+// init.js v1.21.0 - 2026-11-11
 // v1.21.0: Vehicle actors use MSHVehicleActorSheetV2 (the V2 shell); the V1
 //          vehicle sheet is no longer registered.
 // init.js v1.20.0 - 2026-11-11
@@ -232,6 +236,7 @@ import { migrateApCsDocuments } from "./ap-cs-migration.js";
 import { migrateAbsorption } from "./absorption-migration.js";
 import { registerKarmaSettings, migrateKarmaSettings } from "./karma-multipliers.js";
 import { registerQuickKarma } from "./apps/quick-karma.js";
+import { registerStuntPowerSync } from "./stunt-power.js";
 
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
@@ -1820,8 +1825,13 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/parts/tab-chargen.hbs",
     "systems/msh-faserip/templates/parts/encounter-editor-body.hbs",
     "systems/msh-faserip/templates/parts/rank-options.hbs",
+    "systems/msh-faserip/templates/parts/power-attack.hbs",
+    "systems/msh-faserip/templates/parts/power-save.hbs",
+    "systems/msh-faserip/templates/parts/power-fx.hbs",
     "systems/msh-faserip/templates/chat/attack-card.hbs"
   ]);
+
+  registerStuntPowerSync();
 
   game.msh.getRankValue = function(rankName) {
     return _rankValue(rankName);

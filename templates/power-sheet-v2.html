@@ -111,7 +111,11 @@
       <div class="ps2-flags">
         <label><input type="checkbox" name="system.countsAsTwoPowers" {{checked system.countsAsTwoPowers}} data-dtype="Boolean"> Counts as 2</label>
         <label><input type="checkbox" name="system.isBonus" {{checked ps2.isBonus}} data-dtype="Boolean"> Bonus Power</label>
+        <label title="Use the short stunt-power sheet"><input type="checkbox" class="ps2-stunt-power-toggle" {{checked stuntPower.isStuntPower}}> Stunt Power</label>
       </div>
+      {{#if stuntPower.usedByStunt}}
+      <p class="ps2-hint">Used by the {{stuntPower.usedByStunt}} stunt on {{stuntPower.actorName}}'s Stunts tab. Tick Stunt Power to switch to the short stunt sheet.</p>
+      {{/if}}
       {{#if ps2.isBonus}}
       <div class="ps2-field" style="margin-top:4px;">
         <label>Bonus From</label>
@@ -120,96 +124,7 @@
       {{/if}}
     </fieldset>
 
-    <fieldset class="ps2-fieldset ps2-section" data-section="attack">
-      <legend>
-        <label class="ps2-section-toggle">
-          <input type="checkbox" name="system.isAttackPower" {{checked system.isAttackPower}} data-dtype="Boolean" class="ps2-section-check" data-section="attack">
-          Attack
-        </label>
-      </legend>
-      <div class="ps2-section-body" {{#unless system.isAttackPower}}style="display:none;"{{/unless}}>
-        <div class="ps2-grid-3col">
-<div class="ps2-field">
-<label>Battle Effects column</label>
-<select name="system.battleEffectsColumn" id="ps2-battle-col">
-  <option value="" {{#unless system.battleEffectsColumn}}selected{{/unless}}>-- None --</option>
-  <option value="BA" {{#if (eq system.battleEffectsColumn "BA")}}selected{{/if}}>Blunt Attack</option>
-  <option value="EA" {{#if (eq system.battleEffectsColumn "EA")}}selected{{/if}}>Edged Attack</option>
-  <option value="S" {{#if (eq system.battleEffectsColumn "S")}}selected{{/if}}>Shooting</option>
-  <option value="TE" {{#if (eq system.battleEffectsColumn "TE")}}selected{{/if}}>Throwing Edged</option>
-  <option value="TB" {{#if (eq system.battleEffectsColumn "TB")}}selected{{/if}}>Throwing Blunt</option>
-  <option value="En" {{#if (eq system.battleEffectsColumn "En")}}selected{{/if}}>Energy</option>
-  <option value="Fo" {{#if (eq system.battleEffectsColumn "Fo")}}selected{{/if}}>Force</option>
-  <option value="Ch" {{#if (eq system.battleEffectsColumn "Ch")}}selected{{/if}}>Charging</option>
-  <option value="Gp" {{#if (eq system.battleEffectsColumn "Gp")}}selected{{/if}}>Grappling</option>
-  <option value="Gb" {{#if (eq system.battleEffectsColumn "Gb")}}selected{{/if}}>Grabbing</option>
-  <option value="Me" {{#if (eq system.battleEffectsColumn "Me")}}selected{{/if}}>Mental</option>
-</select>
-</div>
-<div class="ps2-field">
-<label>Damage from</label>
-<select name="system.damageSource" id="ps2-dmg-source">
-  <option value="rank" {{#if (eq system.damageSource "rank")}}selected{{/if}}>Power rank</option>
-  <option value="strength" {{#if (eq system.damageSource "strength")}}selected{{/if}}>Strength</option>
-  <option value="endurance" {{#if (eq system.damageSource "endurance")}}selected{{/if}}>Endurance</option>
-  <option value="material" {{#if (eq system.damageSource "material")}}selected{{/if}}>Material strength</option>
-  <option value="fixed" {{#if (eq system.damageSource "fixed")}}selected{{/if}}>Fixed number</option>
-</select>
-</div>
-<div class="ps2-field">
-<label>Damage type</label>
-<select name="system.damageType" id="ps2-dmg-type">
-  <option value="" {{#unless system.damageType}}selected{{/unless}}>-- None --</option>
-  <option value="physical-blunt" {{#if (eq system.damageType "physical-blunt")}}selected{{/if}}>Physical: Blunt</option>
-  <option value="physical-edged" {{#if (eq system.damageType "physical-edged")}}selected{{/if}}>Physical: Edged</option>
-  <option value="energy-generic" {{#if (eq system.damageType "energy-generic")}}selected{{/if}}>Energy: Generic</option>
-  <option value="energy-force" {{#if (eq system.damageType "energy-force")}}selected{{/if}}>Energy: Force</option>
-  <option value="energy-fire" {{#if (eq system.damageType "energy-fire")}}selected{{/if}}>Energy: Fire/Heat</option>
-  <option value="energy-cold" {{#if (eq system.damageType "energy-cold")}}selected{{/if}}>Energy: Cold/Ice</option>
-  <option value="energy-electricity" {{#if (eq system.damageType "energy-electricity")}}selected{{/if}}>Energy: Electricity</option>
-  <option value="energy-sound" {{#if (eq system.damageType "energy-sound")}}selected{{/if}}>Energy: Sound/Sonic</option>
-  <option value="energy-radiation" {{#if (eq system.damageType "energy-radiation")}}selected{{/if}}>Energy: Radiation/Light</option>
-  <option value="energy-darkforce" {{#if (eq system.damageType "energy-darkforce")}}selected{{/if}}>Energy: Darkforce</option>
-  <option value="corrosive" {{#if (eq system.damageType "corrosive")}}selected{{/if}}>Corrosive/Acid</option>
-  <option value="mental" {{#if (eq system.damageType "mental")}}selected{{/if}}>Mental/Psionic</option>
-  <option value="touch-energy" {{#if (eq system.damageType "touch-energy")}}selected{{/if}}>Touch: Energy</option>
-  <option value="touch-paralyzing" {{#if (eq system.damageType "touch-paralyzing")}}selected{{/if}}>Touch: Paralyzing</option>
-  <option value="touch-rotting" {{#if (eq system.damageType "touch-rotting")}}selected{{/if}}>Touch: Rotting</option>
-  <option value="touch-corrosive" {{#if (eq system.damageType "touch-corrosive")}}selected{{/if}}>Touch: Corrosive</option>
-  <option value="touch-healthdrain" {{#if (eq system.damageType "touch-healthdrain")}}selected{{/if}}>Touch: Health Drain</option>
-  <option value="touch-blinding" {{#if (eq system.damageType "touch-blinding")}}selected{{/if}}>Touch: Blinding</option>
-</select>
-</div>
-          {{#if (eq system.damageSource "fixed")}}
-          <div class="ps2-field">
-            <label>Fixed damage</label>
-            <input type="number" name="system.damage" value="{{system.damage}}" data-dtype="Number" />
-          </div>
-          {{/if}}
-        </div>
-        <div class="ps2-grid-2col ps2-flag-groups">
-          <div class="ps2-flag-group">
-            <p class="ps2-group-title">Attacker may reduce</p>
-            <label><input type="checkbox" name="system.canPullPunch" {{checked system.canPullPunch}} data-dtype="Boolean"> Damage</label>
-            <label><input type="checkbox" name="system.canReduceEffect" {{checked system.canReduceEffect}} data-dtype="Boolean"> Effect (result color)</label>
-          </div>
-          <div class="ps2-flag-group">
-            <p class="ps2-group-title">Gets past defenses</p>
-            <label><input type="checkbox" name="system.armorPiercing" {{checked system.armorPiercing}} data-dtype="Boolean"> Armor piercing</label>
-            <label><input type="checkbox" name="system.ignoresNaturalArmor" {{checked system.ignoresNaturalArmor}} data-dtype="Boolean"> Ignores natural Body Armor</label>
-            <label><input type="checkbox" name="system.ignoresArtificialArmor" {{checked system.ignoresArtificialArmor}} data-dtype="Boolean"> Ignores artificial Body Armor</label>
-            <label><input type="checkbox" name="system.bypassForceField" {{checked system.bypassForceField}} data-dtype="Boolean"> Bypasses force fields</label>
-          </div>
-        </div>
-        <div class="ps2-inline-row">
-          <label><input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} data-dtype="Boolean"> Continuing damage</label>
-          {{#if system.continuingDamage}}
-          <label class="ps2-inline-label">Rounds</label>
-          <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="1" placeholder="3" class="ps2-short" data-dtype="Number" />
-          {{/if}}
-        </div>
-      </div>
-    </fieldset>
+    {{> "systems/msh-faserip/templates/parts/power-attack.hbs"}}
 
     <fieldset class="ps2-fieldset ps2-section" data-section="special">
       <legend>Special Strength</legend>
@@ -428,111 +343,7 @@
       {{#unless system.isDefensePower}}<p class="ps2-hint ps2-off-note">This power gives no protection.</p>{{/unless}}
     </fieldset>
 
-    <fieldset class="ps2-fieldset ps2-section" data-section="save">
-      <legend>
-        <label class="ps2-section-toggle">
-          <input type="checkbox" name="system.requiresSave" {{checked system.requiresSave}} data-dtype="Boolean" class="ps2-section-check" data-section="save">
-          Target Save
-        </label>
-      </legend>
-      <div class="ps2-section-body" {{#unless system.requiresSave}}style="display:none;"{{/unless}}>
-        <div class="ps2-grid-3col">
-          <div class="ps2-field">
-            <label>Resists with</label>
-            <select name="system.save.ability">
-              {{#each (array "endurance" "psyche" "intuition" "reason" "fighting" "agility" "strength") as |a|}}
-                <option value="{{a}}" {{#if (eq ../system.save.ability a)}}selected{{/if}}>{{capitalize a}}</option>
-              {{/each}}
-            </select>
-          </div>
-          <div class="ps2-field">
-            <label>Or, target's choice</label>
-            <select name="system.save.ability2">
-              <option value="" {{#unless system.save.ability2}}selected{{/unless}}>No second ability</option>
-              {{#each (array "endurance" "psyche" "intuition" "reason" "fighting" "agility" "strength") as |a|}}
-                <option value="{{a}}" {{#if (eq ../system.save.ability2 a)}}selected{{/if}}>{{capitalize a}}</option>
-              {{/each}}
-            </select>
-          </div>
-<div class="ps2-field">
-<label>Intensity</label>
-<select name="system.save.intensity">
-  <option value="power-rank" {{#if (eq system.save.intensity "power-rank")}}selected{{/if}}>Power rank</option>
-  <option value="fixed-rank" {{#if (eq system.save.intensity "fixed-rank")}}selected{{/if}}>Fixed rank</option>
-  <option value="none" {{#if (eq system.save.intensity "none")}}selected{{/if}}>None</option>
-</select>
-</div>
-          {{#if (eq system.save.intensity "fixed-rank")}}
-          <div class="ps2-field">
-            <label>Fixed rank</label>
-            <select name="system.save.fixedRank">
-              <option value="">-- Select --</option>
-              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
-              <option value="{{r}}" {{#if (eq ../system.save.fixedRank r)}}selected{{/if}}>{{r}}</option>
-              {{/each}}
-            </select>
-          </div>
-          {{/if}}
-<div class="ps2-field">
-<label>On a failed FEAT</label>
-<select name="system.save.onFail.effect">
-  <option value="stunned" {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
-  <option value="unconscious" {{#if (eq system.save.onFail.effect "unconscious")}}selected{{/if}}>Unconscious</option>
-  <option value="blinded" {{#if (eq system.save.onFail.effect "blinded")}}selected{{/if}}>Blinded</option>
-  <option value="paralyzed" {{#if (eq system.save.onFail.effect "paralyzed")}}selected{{/if}}>Paralyzed</option>
-  <option value="immobilized" {{#if (eq system.save.onFail.effect "immobilized")}}selected{{/if}}>Immobilized</option>
-  <option value="nullified" {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
-  <option value="slammed" {{#if (eq system.save.onFail.effect "slammed")}}selected{{/if}}>Slammed</option>
-  <option value="grabbed" {{#if (eq system.save.onFail.effect "grabbed")}}selected{{/if}}>Grabbed</option>
-  <option value="weakened" {{#if (eq system.save.onFail.effect "weakened")}}selected{{/if}}>Weakened</option>
-  <option value="poisoned" {{#if (eq system.save.onFail.effect "poisoned")}}selected{{/if}}>Poisoned (Toxin)</option>
-  <option value="custom" {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
-</select>
-</div>
-<div class="ps2-field">
-<label>Lasts</label>
-<select name="system.save.onFail.duration">
-  <option value="1-10" {{#if (eq system.save.onFail.duration "1-10")}}selected{{/if}}>1-10 rounds</option>
-  <option value="10-100" {{#if (eq system.save.onFail.duration "10-100")}}selected{{/if}}>10-100 turns</option>
-  <option value="rank" {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>Power rank rounds</option>
-  <option value="concentration" {{#if (eq system.save.onFail.duration "concentration")}}selected{{/if}}>While concentrating</option>
-  <option value="hour" {{#if (eq system.save.onFail.duration "hour")}}selected{{/if}}>One hour</option>
-  <option value="scene" {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
-  <option value="escape" {{#if (eq system.save.onFail.duration "escape")}}selected{{/if}}>Until escape</option>
-  <option value="custom" {{#if (eq system.save.onFail.duration "custom")}}selected{{/if}}>Custom</option>
-</select>
-</div>
-          <div class="ps2-field">
-            <label>Multiple targets</label>
-            <select name="system.save.multiTargetCS" data-dtype="Number" title="Column shift to Intensity when more than one target is selected">
-              {{#each ps2.multiTargetOptions}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
-            </select>
-          </div>
-          <div class="ps2-field ps2-span-all">
-            <label>When the power also attacks</label>
-            <select name="system.save.onHit" title="Only matters when the power also has a Battle Effects column. Without one, the FEAT is the whole power.">
-              <option value="" {{#unless system.save.onHit}}selected{{/unless}}>FEAT is not rolled (attack only)</option>
-              <option value="after-damage" {{#if (eq system.save.onHit "after-damage")}}selected{{/if}}>FEAT is rolled after damage</option>
-              <option value="no-damage" {{#if (eq system.save.onHit "no-damage")}}selected{{/if}}>FEAT is rolled instead of damage</option>
-            </select>
-          </div>
-          {{#if (eq system.save.onFail.effect "poisoned")}}
-          <div class="ps2-field ps2-span-all">
-            <label>Toxin (catalog, optional)</label>
-            <select name="system.save.onFail.toxinId">
-              <option value="" {{#unless system.save.onFail.toxinId}}selected{{/unless}}>Use the Intensity above as the toxin Intensity</option>
-              {{#each carrierToxinOptions}}
-              <option value="{{this.id}}" {{#if (eq this.id ../system.save.onFail.toxinId)}}selected{{/if}}>{{this.label}}</option>
-              {{/each}}
-            </select>
-          </div>
-          {{/if}}
-        </div>
-        {{#if (eq system.save.onFail.effect "poisoned")}}
-        <p class="ps2-hint">Poisoned: the poison rules run the FEAT and its re-FEAT windows, so Lasts is ignored. Exposure on a hit needs damage past armor.</p>
-        {{/if}}
-      </div>
-    </fieldset>
+    {{> "systems/msh-faserip/templates/parts/power-save.hbs"}}
 
     {{#if ps2.hasTypeBlock}}
     <fieldset class="ps2-fieldset ps2-typeblock">
@@ -1074,33 +885,6 @@
       </div>
     </fieldset>
 
-    <fieldset class="ps2-fieldset ps2-stunts">
-      <legend>Power Stunts</legend>
-      {{#if powerStunts.onActor}}
-      {{#if powerStunts.rows.length}}
-      <table class="ps2-table">
-        <thead><tr><th>Stunt</th><th>Successes</th><th>Next attempt</th><th>Effect</th></tr></thead>
-        <tbody>
-          {{#each powerStunts.rows}}
-          <tr>
-            <td>{{this.name}}</td>
-            <td>{{this.successes}}</td>
-            <td>{{this.statusLabel}}{{#unless this.mastered}}, {{this.costLabel}}{{/unless}}</td>
-            <td>{{#if this.shiftLabel}}{{this.shiftLabel}}{{else}}—{{/if}}</td>
-          </tr>
-          {{/each}}
-        </tbody>
-      </table>
-      {{/if}}
-      <div class="ps2-inline-row ps2-between">
-        <p class="ps2-hint">{{#if powerStunts.rows.length}}Kept on {{powerStunts.actorName}}'s Stunts tab. Roll and edit them there.{{else}}{{powerStunts.actorName}} has no stunts for this power yet.{{/if}}</p>
-        <button type="button" class="ps2-add-btn create-stunt-from-power">Add stunt</button>
-      </div>
-      {{else}}
-      <p class="ps2-hint">Stunts are recorded per character. Put this power on a character to see and add its stunts.</p>
-      {{/if}}
-    </fieldset>
-
     <fieldset class="ps2-fieldset ps2-add-section">
       <legend>More fields</legend>
       <div class="ps2-inline-row">
@@ -1109,132 +893,7 @@
       </div>
     </fieldset>
 
-    <fieldset class="ps2-fieldset">
-      <legend>Sound</legend>
-      <div class="ps2-grid-2col">
-        <div class="ps2-field">
-          <label>Hit</label>
-          <div class="ps2-sfx-row">
-            <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="audio path" />
-            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
-            <button type="button" class="file-picker" data-type="audio" data-target="system.sfx.hit" title="Browse"><i class="fas fa-file-import"></i></button>
-          </div>
-        </div>
-        <div class="ps2-field">
-          <label>Miss</label>
-          <div class="ps2-sfx-row">
-            <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="audio path" />
-            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
-            <button type="button" class="file-picker" data-type="audio" data-target="system.sfx.miss" title="Browse"><i class="fas fa-file-import"></i></button>
-          </div>
-        </div>
-      </div>
-    </fieldset>
-
-    <fieldset class="ps2-fieldset">
-      <legend>
-        <label style="font-size:inherit;font-weight:inherit;cursor:pointer;">
-          <input type="checkbox" name="system.vfx.enabled" {{checked system.vfx.enabled}} data-dtype="Boolean" /> Visual effect
-        </label>
-      </legend>
-      <div class="ps2-grid-2col">
-        <div class="ps2-field">
-          <label>Preset</label>
-          <select name="system.vfx.preset" data-dtype="String">
-            <option value=""          {{#unless system.vfx.preset}}selected{{/unless}}>(none)</option>
-            <option value="energy"    {{#if (eq system.vfx.preset "energy")}}selected{{/if}}>Energy beam</option>
-            <option value="force"     {{#if (eq system.vfx.preset "force")}}selected{{/if}}>Force impact</option>
-            <option value="bullet"    {{#if (eq system.vfx.preset "bullet")}}selected{{/if}}>Bullet</option>
-            <option value="edged"     {{#if (eq system.vfx.preset "edged")}}selected{{/if}}>Edged melee</option>
-            <option value="blunt"     {{#if (eq system.vfx.preset "blunt")}}selected{{/if}}>Blunt melee</option>
-            <option value="lightning" {{#if (eq system.vfx.preset "lightning")}}selected{{/if}}>Lightning</option>
-            <option value="fire"      {{#if (eq system.vfx.preset "fire")}}selected{{/if}}>Fire bolt</option>
-            <option value="ice"       {{#if (eq system.vfx.preset "ice")}}selected{{/if}}>Ice spikes</option>
-            <option value="laser"     {{#if (eq system.vfx.preset "laser")}}selected{{/if}}>Laser</option>
-            <option value="magic"     {{#if (eq system.vfx.preset "magic")}}selected{{/if}}>Magic missile</option>
-            <option value="mental"    {{#if (eq system.vfx.preset "mental")}}selected{{/if}}>Mental</option>
-            <option value="throw"     {{#if (eq system.vfx.preset "throw")}}selected{{/if}}>Thrown</option>
-          </select>
-        </div>
-        <div class="ps2-field">
-          <label>Color</label>
-          <input type="text" name="system.vfx.color" value="{{system.vfx.color}}" placeholder="blue, red, white..." data-dtype="String" />
-        </div>
-      </div>
-      <div class="ps2-field" style="margin-top:6px;">
-        <label>Beam asset (overrides preset)</label>
-        <div class="ps2-sfx-row">
-          <input type="text" name="system.vfx.asset" value="{{system.vfx.asset}}" placeholder="jb2a.energy_beam.normal.blue.01" data-dtype="String" />
-          <button type="button" class="vfx-preview" title="Preview"><i class="fas fa-play"></i></button>
-          <button type="button" class="file-picker" data-type="video" data-target="system.vfx.asset" title="Browse"><i class="fas fa-file-import"></i></button>
-        </div>
-      </div>
-      <div class="ps2-field" style="margin-top:6px;">
-        <label>Impact asset (overrides default)</label>
-        <div class="ps2-sfx-row">
-          <input type="text" name="system.vfx.impact" value="{{system.vfx.impact}}" placeholder="jb2a.impact.010.blue" data-dtype="String" />
-          <button type="button" class="file-picker" data-type="video" data-target="system.vfx.impact" title="Browse"><i class="fas fa-file-import"></i></button>
-        </div>
-      </div>
-      <div class="ps2-grid-2col" style="margin-top:6px;">
-        <div class="ps2-field">
-          <label>Scale</label>
-          <input type="number" name="system.vfx.scale" value="{{system.vfx.scale}}" step="0.1" min="0.1" max="5" data-dtype="Number" />
-        </div>
-        <div class="ps2-field">
-          <label>Duration (ms)</label>
-          <input type="number" name="system.vfx.duration" value="{{system.vfx.duration}}" step="100" min="100" max="10000" data-dtype="Number" />
-        </div>
-      </div>
-    </fieldset>
-
-    <fieldset class="ps2-fieldset ps2-effects-fieldset">
-      <legend>
-        <span class="ps2-effects-legend-row">
-          <span class="ps2-effects-label">Active Effects ({{effectCount}})</span>
-          <button type="button" class="ps2-effects-expand" title="Toggle effects"><i class="fas fa-plus"></i></button>
-        </span>
-      </legend>
-      <div class="ps2-effects-body" style="display:none;">
-        <div class="ps2-effect-presets">
-          <button type="button" class="effect-preset-btn" data-preset="body-armor" title="Body Armor"><i class="fas fa-shield-alt"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="forcefield" title="Force Field"><i class="fas fa-circle-notch"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="attack-bonus" title="Attack Bonus"><i class="fas fa-crosshairs"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="ability-boost" title="Ability Boost"><i class="fas fa-arrow-up"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="light" title="Light"><i class="fas fa-lightbulb"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="stealth" title="Stealth"><i class="fas fa-user-secret"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="phasing" title="Phasing"><i class="fas fa-ghost"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="flight" title="Flight"><i class="fas fa-feather-alt"></i></button>
-          <button type="button" class="effect-preset-btn" data-preset="darkvision" title="Darkvision"><i class="fas fa-eye"></i></button>
-        </div>
-        {{#each effects as |section|}}
-        <div class="effect-section" data-section-type="{{section.type}}">
-          <div class="ps2-effect-header">
-            <span>{{section.label}}</span>
-            <li data-effect-type="{{section.type}}" style="list-style:none;margin:0;">
-              <a class="effect-control btn-add" data-action="create"><i class="fas fa-plus"></i></a>
-            </li>
-          </div>
-          <ol class="ps2-effects-list">
-            {{#each section.effects as |effect|}}
-            <li class="ps2-effect-row" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
-              <img src="{{effect.img}}" alt="" class="ps2-effect-icon" />
-              <span class="ps2-effect-name">{{effect.name}}</span>
-              <div class="ps2-effect-controls">
-                <a class="effect-control" data-action="toggle" title="Toggle"><i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i></a>
-                <a class="effect-control" data-action="edit" title="Edit"><i class="fas fa-edit"></i></a>
-                <a class="effect-control" data-action="delete" title="Delete"><i class="fas fa-trash"></i></a>
-              </div>
-            </li>
-            {{/each}}
-            {{#unless section.effects.length}}
-            <li class="ps2-no-effects">No {{section.label}} effects</li>
-            {{/unless}}
-          </ol>
-        </div>
-        {{/each}}
-      </div>
-    </fieldset>
+    {{> "systems/msh-faserip/templates/parts/power-fx.hbs"}}
 
     <fieldset class="ps2-fieldset">
       <legend>Description &amp; Notes</legend>
