@@ -1,3 +1,6 @@
+// action-utils.js v1.16.1 - 2026-11-13
+// v1.16.1: Karma spent on a die roll is stamped with the time it was
+//          recorded, so Karma History orders it correctly within the day.
 // action-utils.js v1.16.0 - 2026-11-13
 // v1.16.0: derivePowerDamage returns 0 for a power whose Target Save is set
 //          to roll on a hit instead of damage (save.onHit "no-damage").
@@ -881,6 +884,7 @@ export async function rollWithKarma(actor, actionLabel, requestedKarma = 0) {
 
     // Create history entry for karma spending
     const historyEntry = {
+      timestamp: new Date().toISOString(),
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
       amount: -karmaUsed,
@@ -1004,6 +1008,7 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
     karmaUsed = karmaToSpend;
 
     const historyEntry = {
+      timestamp: new Date().toISOString(),
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
       amount: -karmaUsed,

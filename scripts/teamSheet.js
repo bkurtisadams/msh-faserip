@@ -1,3 +1,11 @@
+// teamSheet.js v4.23.0 - 2026-11-13
+// v4.23.0: Award lines on Karma History no longer repeat themselves: a bonus
+//          named like its report is dropped, a lone bonus loses its amount
+//          (the amount column shows it), and the "(full award to each hero
+//          ×1)" note is gone (×N shown only when a multiplier is not 1). A
+//          report made only of bonuses of one kind (e.g. Weekly Award) is
+//          entered as that type instead of Encounter Award; re-saving an
+//          awarded report updates the type on its history lines too.
 // teamSheet.js v4.22.0 - 2026-11-11
 // v4.22.0: The Team Tracker window is a V2 application (LegacyAppV2). Open
 //          trackers are found through foundry.applications.instances; the
@@ -1018,12 +1026,15 @@ export class TeamSheet extends LegacyAppV2 {
       const mine = byHero[r.id] || [];
       const posDesc = mine.filter(e => e.amount > 0).map(e => e.description).join(" · ");
       const negDesc = mine.filter(e => e.amount < 0).map(e => e.description).join(" · ");
+      const posTypes = [...new Set(mine.filter(e => e.amount > 0).map(e => e.type))];
+      const posType = posTypes.length === 1 ? posTypes[0] : "";
       const history = foundry.utils.deepClone(hero.system.karma?.history || []);
       let changed = false;
       for (const h of history) {
         if (h.encounterId !== encId || h.type === "Encounter Adjustment") continue;
         const text = h.amount > 0 ? posDesc : h.amount < 0 ? negDesc : "";
         if (text && h.description !== text) { h.description = text; changed = true; }
+        if (h.amount > 0 && posType && h.type !== posType) { h.type = posType; changed = true; }
       }
       if (changed) await hero.update({ "system.karma.history": history });
     }
@@ -2290,6 +2301,29 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
    * anything. The Award button writes these; editing an awarded encounter
    * compares them with what was paid. Pool mode has its own path.
    */
+  static RULE_HISTORY_TYPE = {
+    rescue: "Rescue",
+    publicDefeat: "Public Defeat",
+    privateDefeat: "Private Defeat",
+    propertyDamage: "Property Damage",
+    personalCommitment: "Personal Commitment",
+    weeklyAward: "Weekly Award",
+    charityAppearance: "Charity - Appearance",
+    charityAct: "Charity - Act",
+    charityDonation: "Charity - Donation",
+    failingCommitment: "Failing Commitment",
+    leavingEarly: "Leaving Early",
+    negativePopularity: "Negative Popularity",
+    rolePlayAward: "Role-Playing",
+    stumpJudge: "Stump the Judge",
+    humorAward: "Humor Award"
+  };
+
+  static _labelKey(text) {
+    return String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+      .split(" ").map(w => w.length > 3 ? w.replace(/s$/, "") : w).join(" ");
+  }
+
   _planHeroAward(enc) {
     const mode = getGroupAwardMode();
     const heroes = this._presentTeamIds(enc).map(id => game.actors.get(id)).filter(Boolean);
@@ -2327,34 +2361,48 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     }
 
     const foeNames = (enc.villains || []).filter(v => foeDefeatAward(Number(v.rankValue) || 0) > 0).map(v => `${v.name}(${v.rankValue})`).join('+');
+    const nameKey = TeamSheet._labelKey(enc.name);
     const sharedDescParts = [];
     if (enc.name) sharedDescParts.push(enc.name);
     if (foeNames) sharedDescParts.push(`Foe: ${foeNames}`);
-    for (const c of TeamSheet._normalizeCrimes(enc)) {
-      if (!c.type) continue;
+    const crimes = TeamSheet._normalizeCrimes(enc).filter(c => c.type);
+    for (const c of crimes) {
       if (c.stopped) sharedDescParts.push(`Stop ${this._crimeLabel(c.type)}`);
       if (c.arrested) sharedDescParts.push(`Arrest ${this._crimeLabel(c.type)}`);
     }
     if (enc.rescues > 0) sharedDescParts.push(`Rescue ×${enc.rescues}`);
     if (enc.gmAward > 0) sharedDescParts.push(`GM +${enc.gmAward}`);
     const splitBonuses = (enc.bonuses || []).filter(b => (b.scope || "split") === "split" && b.amount);
-    for (const b of splitBonuses) {
-      sharedDescParts.push(`${b.label || 'Award'} ${b.amount > 0 ? '+' : ''}${b.amount}`);
-    }
     const perHeroBonuses = (enc.bonuses || []).filter(b => b.scope === "per_hero" && b.amount);
+    const positiveBonuses = [...splitBonuses, ...perHeroBonuses].filter(b => b.amount > 0);
+    const hasCoreGains = !!foeNames || crimes.some(c => c.stopped || c.arrested) || enc.rescues > 0 || enc.gmAward > 0;
+    const showBonusAmounts = hasCoreGains || positiveBonuses.length > 1;
+    const bonusText = (b, fallback) => {
+      const label = b.label || fallback;
+      if (TeamSheet._labelKey(label) === nameKey) return "";
+      return showBonusAmounts ? `${label} ${b.amount > 0 ? '+' : ''}${b.amount}` : label;
+    };
+    for (const b of splitBonuses) {
+      const t = b.amount > 0 ? bonusText(b, 'Award') : `${b.label || 'Penalty'} ${b.amount}`;
+      if (t) sharedDescParts.push(t);
+    }
     const desc = sharedDescParts.join(', ');
     const fullShare = getCombatAwardScope() === "individual";
     const baseNote = `(split base ${splitPositive} ×${multiplier} ÷${heroCount})`;
+    const multNote = multiplier !== 1 ? ` (×${multiplier})` : "";
+    const ruleKeys = [...new Set(positiveBonuses.map(b => normalizeRuleKey(b.rule || "custom")))];
+    const gainType = (!hasCoreGains && ruleKeys.length === 1 && TeamSheet.RULE_HISTORY_TYPE[ruleKeys[0]])
+      || "Encounter Award";
 
     const entries = [];
     for (const hero of heroes) {
       const add = (amount, type, description) => entries.push({ heroId: hero.id, amount, type, description });
-      if (perHeroFromSplit > 0) add(perHeroFromSplit, "Encounter Award", `${desc} ${baseNote}`);
+      if (perHeroFromSplit > 0) add(perHeroFromSplit, gainType, `${desc} ${baseNote}`);
       if (perHeroPosShown > 0) {
-        const phLabels = perHeroBonuses.filter(b => b.amount > 0).map(b => `${b.label || 'Award'} +${b.amount}`).join(', ');
-        add(perHeroPosShown, "Encounter Award", fullShare
-          ? `${[desc, phLabels].filter(Boolean).join(', ')} (full award to each hero ×${multiplier})`
-          : `Per-hero: ${phLabels} (×${multiplier})`);
+        const phLabels = perHeroBonuses.filter(b => b.amount > 0).map(b => bonusText(b, 'Award')).filter(Boolean).join(', ');
+        add(perHeroPosShown, gainType, fullShare
+          ? `${[desc, phLabels].filter(Boolean).join(', ') || encLabel}${multNote}`
+          : `${phLabels || encLabel}${multNote}`);
       }
       if (splitLossPerHero < 0) add(splitLossPerHero, "Encounter Loss", `Shared losses — ${encLabel}`);
       if (perHeroLossShown < 0) {
@@ -2370,7 +2418,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         if (!it.amount) continue;
         const indMult = it.amount > 0 ? multiplier : lossMult;
         const indAmt = it.amount > 0 ? Math.floor(it.amount * indMult) : Math.ceil(it.amount * indMult);
-        add(indAmt, it.amount > 0 ? "Encounter Award" : "Encounter Loss", `${it.label || 'Individual'} (×${indMult})`);
+        add(indAmt, it.amount > 0 ? "Encounter Award" : "Encounter Loss", `${it.label || 'Individual'}${indMult !== 1 ? ` (×${indMult})` : ""}`);
       }
     }
     return {

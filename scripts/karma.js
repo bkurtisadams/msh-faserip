@@ -1,3 +1,10 @@
+// karma.js v2.6.0 - 2026-11-13
+// v2.6.0: Fixed-bug — Karma History sorted on the date alone, so entries from
+//         the same day kept whatever order they were saved in and new ones
+//         could land below older ones. Sorting now uses the day, then the
+//         time recorded, then save order (KarmaSheet.sortHistory), in every
+//         view, edit, delete and drag. Dragging within a day rewrites that
+//         day's timestamps to keep the chosen order.
 // karma.js v2.5.0 - 2026-11-11
 // v2.5.0: KarmaSheet no longer extends Foundry's V1 DocumentSheet. It is a
 //         plain class holding the Karma window's data preparation, listeners
@@ -187,6 +194,29 @@ export class KarmaSheet {
     return new Date(0);
   }
 
+  // Sort key: the entry's day (realDate, else its timestamp's day), then the
+  // time it was recorded (timestamp), then the order it was saved in. Every
+  // view, edit, delete and drag uses this, so row indexes always agree.
+  static _dayOf(entry) {
+    const d = KarmaSheet._historyEntryDate(entry);
+    return d.getTime() ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() : 0;
+  }
+
+  static _timeOf(entry) {
+    const t = entry?.timestamp ? new Date(entry.timestamp).getTime() : NaN;
+    return isNaN(t) ? 0 : t;
+  }
+
+  static sortHistory(list, newestFirst = true) {
+    const order = new Map(list.map((e, i) => [e, i]));
+    list.sort((a, b) =>
+      (KarmaSheet._dayOf(a) - KarmaSheet._dayOf(b))
+      || (KarmaSheet._timeOf(a) - KarmaSheet._timeOf(b))
+      || (order.get(a) - order.get(b)));
+    if (newestFirst) list.reverse();
+    return list;
+  }
+
   // Compact uppercase label for the type pill. Known types get
   // shortened forms; anything else falls back to uppercase.
   static _pillLabel(type) {
@@ -236,11 +266,7 @@ export class KarmaSheet {
     context.karmaMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     
     // Sort history
-    context.system.karma.history.sort((a, b) => {
-      const dateA = KarmaSheet._historyEntryDate(a);
-      const dateB = KarmaSheet._historyEntryDate(b);
-      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
-    });
+    KarmaSheet.sortHistory(context.system.karma.history, this.sortNewestFirst);
     
     context.sortToggle = {
       icon: this.sortNewestFirst ? 'fa-arrow-down' : 'fa-arrow-up',
@@ -1423,11 +1449,7 @@ export class KarmaSheet {
   _onEditKarma(index) {
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
-    history.sort((a, b) => {
-      const dateA = KarmaSheet._historyEntryDate(a);
-      const dateB = KarmaSheet._historyEntryDate(b);
-      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
-    });
+    KarmaSheet.sortHistory(history, this.sortNewestFirst);
     
     if (index < 0 || index >= history.length) return;
     const event = history[index];
@@ -1508,11 +1530,7 @@ export class KarmaSheet {
   _onDropKarmaRow(sourceIdx, targetIdx) {
     if (sourceIdx === targetIdx) return;
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
-    history.sort((a, b) => {
-      const dateA = KarmaSheet._historyEntryDate(a);
-      const dateB = KarmaSheet._historyEntryDate(b);
-      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
-    });
+    KarmaSheet.sortHistory(history, this.sortNewestFirst);
 
     if (sourceIdx < 0 || sourceIdx >= history.length) return;
     if (targetIdx < 0 || targetIdx >= history.length) return;
@@ -1532,17 +1550,29 @@ export class KarmaSheet {
     history.splice(sourceIdx, 1);
     const adjustedTarget = sourceIdx < targetIdx ? targetIdx - 1 : targetIdx;
     history.splice(adjustedTarget, 0, source);
+    KarmaSheet._restampDay(history, source.realDate || "", this.sortNewestFirst);
 
     this._updateKarmaHistory(history);
   }
 
+  // After a drag within one day, rewrite that day's timestamps in their new
+  // display order so the sort keeps the order the GM chose.
+  static _restampDay(history, realDate, newestFirst) {
+    const day = history.filter(e => (e.realDate || "") === realDate);
+    const times = day.map(e => KarmaSheet._timeOf(e)).sort((a, b) => a - b);
+    const ordered = newestFirst ? [...day].reverse() : day;
+    let last = -Infinity;
+    ordered.forEach((e, i) => {
+      let t = times[i] || 0;
+      if (t <= last) t = last + 1;
+      last = t;
+      e.timestamp = new Date(t).toISOString();
+    });
+  }
+
   _onDeleteKarma(index) {
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
-    history.sort((a, b) => {
-      const dateA = KarmaSheet._historyEntryDate(a);
-      const dateB = KarmaSheet._historyEntryDate(b);
-      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
-    });
+    KarmaSheet.sortHistory(history, this.sortNewestFirst);
     
     if (index < 0 || index >= history.length) return;
     
@@ -1594,11 +1624,7 @@ export class KarmaSheet {
           label: `Delete ${count} ${count === 1 ? 'Entry' : 'Entries'}`,
           callback: () => {
             const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
-            history.sort((a, b) => {
-              const dateA = KarmaSheet._historyEntryDate(a);
-              const dateB = KarmaSheet._historyEntryDate(b);
-              return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
-            });
+            KarmaSheet.sortHistory(history, this.sortNewestFirst);
             indices.sort((a, b) => b - a);
             for (const idx of indices) { history.splice(idx, 1); }
             this._updateKarmaHistory(history);
