@@ -1,4 +1,6 @@
-// chat-hooks.js v1.8.5 - 2026-10-03
+// chat-hooks.js v1.8.6 - 2026-11-16
+// v1.8.6: Slam/Stun chips honor data-ignore-gate (MA-D) — no "No
+//         penetrating damage" block, ignoreDamageGate passed to the check.
 // v1.8.5: battle report revise buttons (br-revise / br-revise-cancel /
 //         br-revise-save).
 // chat-hooks.js v1.8.4 - 2026-10-01
@@ -518,7 +520,10 @@ export function installActionChatHandlers() {
       const attackForm   = el.dataset.attackForm || "blunt";
       const dmgThrough   = Number(el.dataset.dmg || 0);
       const borderline   = el.dataset.borderline === "1";
-      if (dmgThrough <= 0 && !borderline && checkType !== "escape") {
+      // MA-D: Stun/Slam chips carry data-ignore-gate when the attacker's
+      // talent lets the check fire without penetrating damage.
+      const ignoreGate   = el.dataset.ignoreGate === "1" && (checkType === "slam" || checkType === "stun");
+      if (dmgThrough <= 0 && !borderline && !ignoreGate && checkType !== "escape") {
         // Re-enable if not applicable
         el.removeAttribute("aria-disabled");
         el.style.pointerEvents = "";
@@ -593,7 +598,8 @@ export function installActionChatHandlers() {
           actor: ownerActor,
           opts: {
             attackForm,
-            prefill
+            prefill,
+            ignoreDamageGate: ignoreGate
           }
         });
 

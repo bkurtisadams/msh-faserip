@@ -1,4 +1,11 @@
-// attack-action.js v1.18.0 - 2026-11-13
+// attack-action.js v1.19.0 - 2026-11-16
+// v1.19.0: Martial Arts D Stun/Slam mechanic. Per target, maDOpensEffectsGate
+//          (ma-d.js) opens the effects damage gate when the attacker's talent
+//          flags (ignore-armor-fx / no-damage-needed) apply, study is complete
+//          (if study-required), and the target's defense isn't a Force Field.
+//          A Yellow Slam / Red Stun now resolves even at 0 damage through.
+//          Gate flag also passed to the inline/auto slam+stun rolls and the
+//          manual chips. MA-D badge no longer says "mechanic next slice".
 // v1.18.0: Power Target Save on a hit honors save.ability2 (target's choice:
 //          the higher of the two abilities resists).
 // attack-action.js v1.17.0 - 2026-11-13
@@ -305,6 +312,7 @@ import {
 import { executeBreakingFeat } from "./breaking-feat.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { maDOpensEffectsGate } from "./ma-d.js";
 import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS, ACTION_COLUMNS } from "./action-config.js";
 import { RANK_ABBR, valueToRank } from "../../rules/rules-reference.js";
@@ -1426,6 +1434,19 @@ export class AttackAction extends BaseAction {
 
       const afterArmor = penetratingDamage;
 
+      // Martial Arts D (RAW): ignore Body Armor (not Force Fields) for
+      // Stun/Slam, and the blow need not inflict damage to force the
+      // check — once the target has been studied 2 rounds. Driven by the
+      // talent's Special Flags. Opens the effects damage gate for this
+      // target only; damage itself is unchanged.
+      const maDFxBypass = !!(targetIsHit && targetActor && maDOpensEffectsGate(actor, {
+        actionType: String(actionType || "").toLowerCase(),
+        targetUuid: target?.document?.uuid ?? targetActor?.uuid,
+        engaged: choice?.maDEngaged,
+        isForceField: !!armorData?.isForceField
+      }));
+      const effectsGateOpts = { borderline: isBorderline, ignoreDamageGate: maDFxBypass };
+
       // Calculate breaking feat for this attack - include target material for auto-population
       // Show button when weapon material < target material (regardless of penetrating damage)
       let currentBreakingFeat = null;
@@ -1564,9 +1585,8 @@ export class AttackAction extends BaseAction {
       // this badge is informational only; the actual Stun/Slam armor
       // bypass mechanic ships in the next slice. Renders in teal to
       // visually echo the dialog's State-3 styling.
-      const maDEngaged = choice?.maDEngaged === true;
-      const maDBadge = maDEngaged
-        ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#0F6E56;"><i class="fas fa-bullseye"></i> MA-D engaged — armor bypass for Stun/Slam <span style="color:#888;font-size:.85em;">(mechanic next slice)</span></div>`
+      const maDBadge = maDFxBypass
+        ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#0F6E56;"><i class="fas fa-bullseye"></i> MA-D — Body Armor ignored for Stun/Slam; no damage needed</div>`
         : "";
 
       // Kill result karma warning for attack card
@@ -1611,7 +1631,7 @@ export class AttackAction extends BaseAction {
       }
 
       // Show actions box if there are effects to apply OR a Breaking FEAT check is needed
-      const hasEffects = canEffectsApply(penetratingDamage, { borderline: isBorderline });
+      const hasEffects = canEffectsApply(penetratingDamage, effectsGateOpts);
       const needsActionsBox = !isManualMode && targetIsHit && targetActor && (hasEffects || currentBreakingFeat);
       
       const actions = needsActionsBox
@@ -1642,6 +1662,7 @@ export class AttackAction extends BaseAction {
             autoSave: false,  // prevent chat button duplicates
             sourceItemUuid: choice?.weapon?.uuid || "",
             isMagic,
+            ignoreDamageGate: maDFxBypass,
           })
         : "";
 
@@ -1663,7 +1684,7 @@ export class AttackAction extends BaseAction {
       
       // Get inline check results if: consolidated mode + full auto + effect applies + has target
       // Effects will be applied by the regular auto-trigger block, we just capture the results for display
-      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor && !targetIsVehicle) {
+      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, effectsGateOpts) && targetActor && !targetIsVehicle) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
@@ -1696,6 +1717,7 @@ export class AttackAction extends BaseAction {
               opts: {
                 autoApply: true,
                 returnResultOnly: true,
+                ignoreDamageGate: maDFxBypass,
                 attackForm: attackForm,
                 prefill: {
                   ...inlinePrefill,
@@ -1723,6 +1745,7 @@ export class AttackAction extends BaseAction {
               opts: {
                 autoApply: true,
                 returnResultOnly: true,
+                ignoreDamageGate: maDFxBypass,
                 attackForm: attackForm,
                 damageType: damageType,
                 prefill: { ...inlinePrefill }
@@ -2119,7 +2142,7 @@ export class AttackAction extends BaseAction {
       // not player choices — they should resolve before the next attack.
       // Damage application (above) remains gated on autoApply (full auto only).
       // ============================================================
-      if (!isManualMode && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor && !targetIsVehicle) {
+      if (!isManualMode && canEffectsApply(penetratingDamage, effectsGateOpts) && targetActor && !targetIsVehicle) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
@@ -2160,6 +2183,7 @@ export class AttackAction extends BaseAction {
               opts: {
                 autoApply: true,
                 showConfirm: false,
+                ignoreDamageGate: maDFxBypass,
                 attackForm: attackForm,
                 // In consolidated mode, skip chat message and use pre-rolled result
                 skipChatMessage: useConsolidated,
@@ -2194,6 +2218,7 @@ export class AttackAction extends BaseAction {
               opts: {
                 autoApply: true,
                 showConfirm: false,
+                ignoreDamageGate: maDFxBypass,
                 attackForm: attackForm,
                 damageType: damageType,
                 // In consolidated mode, skip chat message and use pre-rolled result

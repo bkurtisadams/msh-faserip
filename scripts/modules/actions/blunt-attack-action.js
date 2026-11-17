@@ -1,4 +1,6 @@
-// blunt-attack-action.js v1.7.0 - 2026-11-13
+// blunt-attack-action.js v1.7.1 - 2026-11-16
+// v1.7.1: maDEngaged is null (not false) when no engage toggle is shown,
+//         so attack-action defers to study status instead of an opt-out.
 // v1.7.0: Flat of a blade (RAW Blunt Attack). Edged weapons and items with a
 //         blunt attack mode are offered as blunt damage sources. An edged
 //         weapon's listed damage no longer floors blunt damage; a blunt attack
@@ -643,7 +645,7 @@ export class BluntAttackAction extends AttackAction {
             // exists in the dialog (State 3, study complete). Defaults
             // to false if the zone is in States 1/2 or absent entirely.
             const $maDEngage   = $dlg('#ma-d-engage');
-            const maDEngaged   = $maDEngage.length > 0 ? $maDEngage.is(':checked') : false;
+            const maDEngaged   = $maDEngage.length > 0 ? $maDEngage.is(":checked") : null;
 
             // Get CS state from shared utility
             const cs = _csState.get();

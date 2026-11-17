@@ -1,4 +1,7 @@
-// scripts/modules/actions/ma-d.js v1.0.0 - 2026-05-16
+// scripts/modules/actions/ma-d.js v1.1.0 - 2026-11-16
+// v1.1.0: getMartialArtsFx / maDOpensEffectsGate — read the Edit Talent
+//         Special Flags (ignore-armor-fx, no-damage-needed, study-required)
+//         to decide whether Stun/Slam checks fire without damage through.
 // Martial Arts D / A helper module.
 //   - Talent detection (MA-D, MA-A) via talent-item name match
 //   - Study lifecycle: create, status lookup, list, clear
@@ -39,6 +42,56 @@ export function hasMartialArtsD(actor) {
 export function hasMartialArtsA(actor) {
   if (!actor) return false;
   return actor.items.some(i => i.type === "talent" && _matchTalentName(i.name, "a"));
+}
+
+// ── Talent-flag driven Stun/Slam effects ────────────────────────────
+// Reads the Special Flags checkboxes on the Edit Talent dialog
+// (system.flags) across all of the actor's talents. A talent counts when
+// its appliesTo list includes this actionType (or appliesTo is empty).
+// Legacy MA-D items saved before flags existed fall back to the RAW
+// defaults by name match.
+//   ignore-armor-fx  — Body Armor ignored for Stun/Slam determination
+//   no-damage-needed — Stun/Slam check fires even with 0 damage through
+//   study-required   — above only once the target's been studied 2 rds
+const MAD_DEFAULT_FLAGS = ["ignore-armor-fx", "no-damage-needed", "study-required"];
+
+export function getMartialArtsFx(actor, actionType = "") {
+  const out = { ignoreArmorFx: false, noDamageNeeded: false, studyRequired: false, talentName: "" };
+  if (!actor) return out;
+  const at = String(actionType || "").toLowerCase();
+  for (const i of actor.items) {
+    if (i.type !== "talent") continue;
+    let flags = Array.isArray(i.system?.flags) ? i.system.flags : [];
+    if (!flags.length && _matchTalentName(i.name, "d")) flags = MAD_DEFAULT_FLAGS;
+    const fxIgnore = flags.includes("ignore-armor-fx");
+    const fxNoDmg  = flags.includes("no-damage-needed");
+    if (!fxIgnore && !fxNoDmg) continue;
+    const applies = Array.isArray(i.system?.appliesTo) ? i.system.appliesTo : [];
+    if (applies.length && at && !applies.includes(at)) continue;
+    out.ignoreArmorFx  ||= fxIgnore;
+    out.noDamageNeeded ||= fxNoDmg;
+    out.studyRequired  ||= flags.includes("study-required");
+    out.talentName     ||= i.name;
+  }
+  return out;
+}
+
+// Per-target resolution used by attack-action. Returns true when the
+// Stun/Slam damage gate should be opened for this target.
+//   engaged: choice.maDEngaged — false = player unticked the bypass;
+//            null/undefined = no toggle shown (defer to study status).
+//   isForceField: the target's applicable defense is a Force Field —
+//            RAW: MA-D does not bypass FFs, so the normal gate applies.
+export function maDOpensEffectsGate(actor, { actionType, targetUuid, engaged, isForceField } = {}) {
+  const fx = getMartialArtsFx(actor, actionType);
+  if (!fx.ignoreArmorFx && !fx.noDamageNeeded) return false;
+  if (isForceField) return false;
+  if (engaged === false) return false;
+  if (fx.studyRequired) {
+    if (!targetUuid) return false;
+    if (!getStudyStatus(actor, targetUuid).complete) return false;
+  }
+  return true;
 }
 
 // ── Study state lookup ──────────────────────────────────────────────

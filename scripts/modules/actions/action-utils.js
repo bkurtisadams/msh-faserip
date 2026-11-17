@@ -1,4 +1,6 @@
-// action-utils.js v1.16.1 - 2026-11-13
+// action-utils.js v1.16.2 - 2026-11-16
+// v1.16.2: buildActionsBox ignoreDamageGate param → data-ignore-gate on the
+//          Slam/Stun chips (MA-D).
 // v1.16.1: Karma spent on a die roll is stamped with the time it was
 //          recorded, so Karma History orders it correctly within the day.
 // action-utils.js v1.16.0 - 2026-11-13
@@ -1194,7 +1196,8 @@ export function buildActionsBox({
   ignoresNaturalArmor = false,
   ignoresArtificialArmor = false,
   sourceItemUuid = "",  // UUID of source power/weapon; lets manual-apply path fire follow-ups (continuing damage, etc.)
-  isMagic = false       // magical attack → magical resistance reduces the damage (slice 4b)
+  isMagic = false,      // magical attack → magical resistance reduces the damage (slice 4b)
+  ignoreDamageGate = false  // MA-D: Stun/Slam chips fire even with 0 damage through
 }) {
 
   // Small helper to render a chip
@@ -1254,7 +1257,7 @@ export function buildActionsBox({
         "Open Slam dialog using penetrating damage",
         true,
         
-        `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-borderline="${prefillData?.borderline ? '1' : ''}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
+        `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-borderline="${prefillData?.borderline ? '1' : ''}" data-ignore-gate="${ignoreDamageGate ? '1' : ''}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
     );
   }
@@ -1270,7 +1273,7 @@ export function buildActionsBox({
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
         data-dmg="${dmgPen}"
-        data-borderline="${prefillData?.borderline ? '1' : ''}"
+        data-borderline="${prefillData?.borderline ? '1' : ''}" data-ignore-gate="${ignoreDamageGate ? '1' : ''}"
         data-attacker-uuid="${actorUuid}"
         ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
