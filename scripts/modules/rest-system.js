@@ -1,4 +1,9 @@
-// scripts/modules/rest-system.js v1.9.1 - 2026-10-01
+// scripts/modules/rest-system.js v1.10.0 - 2026-11-16
+// v1.10.0: Manual Recovery mode. With Automatic Hourly Healing off, the
+//          sheet Recovery button skips the 10-turn world-time wait (the
+//          player declares the 10 turns) and stays once per game day.
+//          With it on, only the GM can click Recovery; players get it
+//          automatically at the 10-turn mark.
 // v1.9.1: Recovery card ("recovery-heal") posts publicly for NPCs on the
 //         active scene under the default "critical" NPC output policy, like
 //         wake-success. Off-scene NPCs still log to the ledger only.
@@ -492,7 +497,7 @@ export class RestSystem {
    * @param {Actor} actor - The actor to check
    * @returns {Object} {canRest: boolean, reason: string}
    */
-  static canAttemptRecovery(actor) {
+  static canAttemptRecovery(actor, { manual = false } = {}) {
     if (!actor) {
       return { canRest: false, reason: "No actor provided" };
     }
@@ -546,10 +551,21 @@ export class RestSystem {
       };
     }
 
+    // Manual mode (automatic Recovery off): the player declares the 10
+    // turns, so world time isn't checked. Automatic mode: Recovery lands on
+    // its own at the 10-turn mark; only the GM may click it.
+    const autoOn = game.settings?.get?.(SCOPE, "autoHealingEnabled") ?? true;
+    if (manual && autoOn && !game.user?.isGM) {
+      return {
+        canRest: false,
+        reason: "Automatic Recovery is on — it applies on its own 10 turns after damage"
+      };
+    }
+
     // RAW p.32: Recovery lands 10 turns after damage, measured in WORLD time
     // (RECOVERY_DELAY_TURNS x TURN_SECONDS), not seconds at the table.
     const lastDamageWorldTime = actor.getFlag(SCOPE, "lastDamageWorldTime");
-    if (lastDamageWorldTime != null) {
+    if (lastDamageWorldTime != null && !(manual && !autoOn)) {
       const worldNow = game.time?.worldTime ?? 0;
       const timeSinceDamage = worldNow - lastDamageWorldTime;
       const tenTurns = RECOVERY_DELAY_SECONDS;
@@ -572,7 +588,7 @@ export class RestSystem {
    * @returns {Promise<Object>} {success: boolean, message: string, healed: number}
    */
   static async attemptRecovery(actor, { auto = false } = {}) {
-    const check = this.canAttemptRecovery(actor);
+    const check = this.canAttemptRecovery(actor, { manual: !auto });
     
     if (!check.canRest) {
       if (!auto) ui.notifications.warn(check.reason);

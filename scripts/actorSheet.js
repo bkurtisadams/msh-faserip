@@ -1,4 +1,7 @@
-// actorSheet.js v2.20.0 - 2026-11-13
+// actorSheet.js v2.20.1 - 2026-11-16
+// v2.20.1: Health Recovery button eligibility uses manual mode
+//          (canAttemptRecovery manual:true) so players can take it
+//          once per game day when automatic Recovery is off.
 // v2.20.0: Stunts tab rows from stunt-ledger (live parent rank, effect
 //          shift, Successes, attempt cost); Add Stunt is the shared dialog
 //          with earlier successes; Edit keeps preset fields; dead
@@ -726,7 +729,7 @@ export class FaseripActorSheet {
     // Reuses rest-system.canAttemptRecovery so logic stays in one place.
     context.recoveryDisabledReason = null;
     try {
-      const check = game.msh?.rest?.canAttemptRecovery?.(this.actor);
+      const check = game.msh?.rest?.canAttemptRecovery?.(this.actor, { manual: true });
       context.recoveryEligible = !!check?.canRest;
       if (!context.recoveryEligible) context.recoveryDisabledReason = check?.reason || "Not available";
     } catch (_e) {

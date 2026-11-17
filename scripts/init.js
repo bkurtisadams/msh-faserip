@@ -1,4 +1,6 @@
-﻿// init.js v1.22.0 - 2026-11-13
+﻿// init.js v1.22.1 - 2026-11-16
+// v1.22.1: autoHealingEnabled renamed/hinted as Automatic Recovery &
+//          Hourly Healing (also gates player Recovery clicks).
 // v1.22.0: Preloads the power-attack / power-save / power-fx partials
 //          shared by the full and stunt-power sheets; registers the
 //          stunt-power rank sync.
@@ -994,8 +996,8 @@ Hooks.once("init", async () => {
   // Auto-Healing: RAW hourly Healing fires automatically as worldTime advances.
   // When off, players heal only by clicking the Attempt Healing button on the sheet.
   game.settings.register('msh-faserip', 'autoHealingEnabled', {
-    name: "Automatic Hourly Healing",
-    hint: "When enabled, characters heal their Endurance rank number in HP per hour after last damage (doubled with medical care) automatically as you advance time. When disabled, healing is manual only.",
+    name: "Automatic Recovery & Hourly Healing",
+    hint: "When enabled, Recovery lands automatically 10 turns after damage and characters heal their Endurance rank number in HP per hour after last damage (doubled with medical care) as you advance time; only the GM can click Recovery. When disabled, players click Recovery (once per game day) and Healing on the sheet.",
     scope: "world",
     config: true,
     type: Boolean,
