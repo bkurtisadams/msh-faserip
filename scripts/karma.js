@@ -1,4 +1,6 @@
-// karma.js v2.6.0 - 2026-11-13
+// karma.js v2.6.1 - 2026-11-16
+// v2.6.1: Advancement dialog styles moved to action-dialog.css — DialogV2
+//         strips inline <style> from content, which collapsed the layout.
 // v2.6.0: Fixed-bug — Karma History sorted on the date alone, so entries from
 //         the same day kept whatever order they were saved in and new ones
 //         could land below older ones. Sorting now uses the day, then the
@@ -1037,30 +1039,7 @@ export class KarmaSheet {
     showFaseripButtonDialog({
       title: `${info.title}: ${actor.name}`,
       content: `
-        <div class="${S}-wrap" style="all:initial;font-family:inherit;font-size:13px;color:#333;line-height:1.4;min-width:480px;">
-          <style>
-            .${S}-wrap *{box-sizing:border-box;}
-            .${S}-wrap select,.${S}-wrap input[type=number],.${S}-wrap input[type=text]{
-              font-family:inherit;font-size:13px;color:#333;background:#fff;
-              border:1px solid #bbb;border-radius:3px;padding:4px 8px;margin:0;
-              height:28px;line-height:28px;
-            }
-            .${S}-wrap select{padding-right:20px;cursor:pointer;}
-            .${S}-wrap input[type=number]{width:70px;text-align:center;-moz-appearance:textfield;}
-            .${S}-wrap input[type=number]::-webkit-inner-spin-button,
-            .${S}-wrap input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
-            .${S}-wrap input[type=text]{width:100%;}
-            .${S}-wrap label{font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px;}
-            .${S}-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-            .${S}-calc{background:#faf8f2;border:1px solid #c0a070;border-radius:4px;padding:8px 10px;margin:10px 0;min-height:60px;}
-            .${S}-calc-line{display:flex;justify-content:space-between;padding:2px 0;font-size:12px;color:#555;}
-            .${S}-calc-line.cresting{color:#8b0000;}
-            .${S}-calc-total{display:flex;justify-content:space-between;padding:4px 0 0;margin-top:4px;border-top:1px solid #c0a070;font-weight:bold;font-size:13px;color:#333;}
-            .${S}-insuf{color:#c62828;font-weight:bold;font-size:12px;margin-top:4px;}
-            .${S}-avail{font-size:13px;font-weight:bold;margin-bottom:10px;color:#333;}
-            .${S}-amount input[type=number]{width:90px;}
-            .${S}-adjusted{font-size:11px;color:#8b0000;}
-          </style>
+        <div class="${S}-wrap">
 
           <div class="${S}-avail">Available Karma: ${availableKarma}</div>
           ${popNote}

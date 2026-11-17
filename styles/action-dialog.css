@@ -1,4 +1,6 @@
-/* action-dialog.css v3.10.0 - 2026-07-05 */
+/* action-dialog.css v3.11.0 - 2026-11-16 */
+/* v3.11.0: Karma Advancement dialog (.ka-adv-*) styles, moved out of the
+           inline <style> block DialogV2 was stripping. */
 /* v3.10.0: Header banner outlined white — .frp-header-v3 drops the red
            gradient for #fff + 1px var(--mred) outline (frp-feat variant:
            green outline); text flipped for light bg (h-actor ink, h-target
@@ -1467,3 +1469,27 @@ body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-cal
 .chat-message .frp-feat-pill.is-yellow { background: #fef102; border-color: #9a8f00; color: #222; }
 .chat-message .frp-feat-pill.is-red,
 .chat-message .frp-feat-pill.is-impossible { background: #ee1e25; border-color: #9b1118; color: #fff; }
+
+/* Karma Advancement dialog (karma.js _onAdvancement) */
+.ka-adv-wrap{font-size:13px;color:#333;line-height:1.4;min-width:480px;}
+.ka-adv-wrap *{box-sizing:border-box;}
+.ka-adv-wrap select,.ka-adv-wrap input[type=number],.ka-adv-wrap input[type=text]{
+  font-family:inherit;font-size:13px;color:#333;background:#fff;
+  border:1px solid #bbb;border-radius:3px;padding:4px 8px;margin:0;
+  height:28px;line-height:28px;
+}
+.ka-adv-wrap select{padding-right:20px;cursor:pointer;}
+.ka-adv-wrap input[type=number]{width:70px;text-align:center;-moz-appearance:textfield;}
+.ka-adv-wrap input[type=number]::-webkit-inner-spin-button,
+.ka-adv-wrap input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.ka-adv-wrap input[type=text]{width:100%;}
+.ka-adv-wrap label{font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px;}
+.ka-adv-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.ka-adv-calc{background:#faf8f2;border:1px solid #c0a070;border-radius:4px;padding:8px 10px;margin:10px 0;min-height:60px;}
+.ka-adv-calc-line{display:flex;justify-content:space-between;padding:2px 0;font-size:12px;color:#555;}
+.ka-adv-calc-line.cresting{color:#8b0000;}
+.ka-adv-calc-total{display:flex;justify-content:space-between;padding:4px 0 0;margin-top:4px;border-top:1px solid #c0a070;font-weight:bold;font-size:13px;color:#333;}
+.ka-adv-insuf{color:#c62828;font-weight:bold;font-size:12px;margin-top:4px;}
+.ka-adv-avail{font-size:13px;font-weight:bold;margin-bottom:10px;color:#333;}
+.ka-adv-amount input[type=number]{width:90px;}
+.ka-adv-adjusted{font-size:11px;color:#8b0000;}
