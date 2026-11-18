@@ -1,4 +1,6 @@
-// blunt-attack-action.js v1.7.1 - 2026-11-16
+// blunt-attack-action.js v1.8.0 - 2026-11-18
+// v1.8.0: Opened from a talent roll, the CS row starts at the talent's shift
+//         (Ultimate Skill override included) and that shift is not remembered.
 // v1.7.1: maDEngaged is null (not false) when no engage toggle is shown,
 //         so attack-action defers to study status instead of an opt-out.
 // v1.7.0: Flat of a blade (RAW Blunt Attack). Edged weapons and items with a
@@ -113,7 +115,7 @@ import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from ".
 import { RANK_ABBR, RANK_RANGES, RANKS_ORDERED, rankValue, valueToRank } from "../../rules/rules-reference.js";
 import { requiredColor as kernelRequiredColor } from "../../lib/faserip-rules/faserip-kernel.js";
 import { kernelKeyFor } from "../../kernel/adapter.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 import {
   saveDialogFlags, headerHtml, blindsideRowHtml, fxGridHtml, footerHtml,
@@ -338,9 +340,10 @@ export class BluntAttackAction extends AttackAction {
 
 
     // Build CS row via shared utility (manual input + ? reference)
+    const talentSeed = talentCSSeed(this.opts);
     const csRowHtml = buildCSRow({
-      savedCS: savedColumnShift,
-      savedReason,
+      savedCS: talentSeed ? talentSeed.cs : savedColumnShift,
+      savedReason: talentSeed ? talentSeed.reason : savedReason,
       abilityRank: ability.rank
     });
 
@@ -707,6 +710,7 @@ export class BluntAttackAction extends AttackAction {
                 });
               }
             }
+            forgetTalentSeededCS(flagUpdate, talentSeed, ["lastBluntShift", "lastBluntReason", "cs_blunt-attack"]);
             await saveDialogFlags(actor, flagUpdate);
 
             _resolved = true;

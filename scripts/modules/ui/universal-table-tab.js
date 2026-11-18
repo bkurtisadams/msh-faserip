@@ -1,4 +1,14 @@
-// scripts/modules/ui/universal-table-tab.js v1.1.2 - 2026-04-23
+// scripts/modules/ui/universal-table-tab.js v1.2.2 - 2026-11-17
+// v1.2.2: Roll highlight resolves the column through kernelKeyFor, so
+//         kernel keys ("EX") and "Shift X" spellings find their column.
+// v1.2.1: Export postActionInfoCard; actorSheet._showActionInfo now
+//         delegates to it (single copy of the rules card).
+// v1.2.0: Add FaseripUniversalTableStandalone — sheet-independent window
+//         opened from the Action HUD's Table button. Reuses the tab
+//         renderer via a host object; posts action-rules cards through
+//         postActionInfoCard (mirrors actorSheet._showActionInfo); pulses
+//         cells on msh-faserip.universalTableRoll; position saved on the
+//         user flag utHudWindowPos. Detach button removed in this window.
 // v1.1.2: Move detach button from floating corner (v1.1.1) into the empty
 //         upper-left corner cell of the action table header. Add explicit
 //         .ut-gap-row blue spacer div between action and rank tables to
@@ -34,8 +44,12 @@ import {
 import {
   RANKS_ORDERED,
   RANK_VALUES,
-  RANK_RANGES
+  RANK_RANGES,
+  RANK_ALIASES
 } from "../../rules/rules-reference.js";
+
+import { ACTION_INFO } from "../actions/action-config.js";
+import { kernelKeyFor } from "../../kernel/adapter.js";
 
 // ── Display data ──────────────────────────────────────────────────
 
@@ -399,7 +413,12 @@ export class UniversalTableTab {
   }
 
   _highlightRollIn(root, rankName, roll) {
-    const col = RANKS_ORDERED.indexOf(rankName);
+    // Accept display names, "Shift X"/"Shift-X", or kernel keys ("EX").
+    let col = RANKS_ORDERED.indexOf(rankName);
+    if (col === -1) {
+      const key = kernelKeyFor(rankName);
+      if (key) col = RANKS_ORDERED.findIndex(n => kernelKeyFor(n) === key);
+    }
     if (col === -1) return;
 
     let row = -1;
@@ -512,5 +531,143 @@ export class FaseripUniversalTableWindow extends ApplicationV2 {
     const result = await super.close(options);
     if (!options?._reattach) this.tab?._onPopoutClosed?.();
     return result;
+  }
+}
+
+// ── Standalone window (opened from the Action HUD, no sheet needed) ──
+//
+// Reuses UniversalTableTab's renderer with a lightweight "host" object in
+// place of an actor sheet. One shared instance; position/size persisted on
+// the user flag msh-faserip.utHudWindowPos. Listens for the same
+// msh-faserip.universalTableRoll hook the sheet tab uses, so rolls pulse
+// the matching cell here too.
+
+/** Post an action's rules card to chat. Shared by the sheet's Table tab
+ *  (actorSheet._showActionInfo) and the standalone HUD window. */
+export async function postActionInfoCard(actionType, actor) {
+  const info = ACTION_INFO[actionType];
+  if (!info) {
+    ui.notifications.warn(`No information found for action: ${actionType}`);
+    return;
+  }
+  const content = `
+    <div class="marvel-action-info">
+      <h3 style="margin-top:0; border-bottom: 2px solid #444; padding-bottom: 8px;">
+        <strong>${info.name}</strong>
+        <span style="color: #666; font-size: 0.9em;">(${info.ability})</span>
+      </h3>
+      <p style="font-style: italic; color: #555;">${info.description}</p>
+      <p style="margin: 8px 0;"><strong>Possible Results:</strong> ${info.effects.join(", ")}</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px;">
+        <strong>Details:</strong><br>${info.details}
+      </div>
+    </div>`;
+  await ChatMessage.create({
+    user: game.user.id,
+    speaker: ChatMessage.getSpeaker(actor ? { actor } : {}),
+    content
+  });
+}
+
+function _hudActor() {
+  return canvas?.tokens?.controlled?.[0]?.actor ?? game.user?.character ?? null;
+}
+
+export class FaseripUniversalTableStandalone extends ApplicationV2 {
+  constructor(options = {}) {
+    super(options);
+    // Host stands in for the actor sheet that UniversalTableTab expects.
+    const host = {
+      id: "hud",
+      rendered: false,
+      render() {},
+      get actor() { return _hudActor(); },
+      _showActionInfo: (id) => postActionInfoCard(id, _hudActor()),
+    };
+    this.tab = new UniversalTableTab(host);
+    this._rollHookId = null;
+  }
+
+  static DEFAULT_OPTIONS = {
+    id: "faserip-universal-table-hud",
+    classes: ["faserip-universal-table-window"],
+    tag: "div",
+    window: {
+      frame: true,
+      positioned: true,
+      title: "Universal Table",
+      icon: "fas fa-table",
+      minimizable: true,
+      resizable: true,
+    },
+    position: { width: 980, height: "auto" },
+  };
+
+  /** Open the shared window, or close it if it is already open. */
+  static async toggle() {
+    const existing = foundry.applications.instances.get(this.DEFAULT_OPTIONS.id);
+    if (existing?.rendered) return existing.close();
+    return new this().render(true);
+  }
+
+  _initializeApplicationOptions(options) {
+    const opts = super._initializeApplicationOptions(options);
+    const saved = game.user?.getFlag?.("msh-faserip", "utHudWindowPos");
+    if (saved?.left != null && saved?.top != null) {
+      opts.position = { ...opts.position, left: saved.left, top: saved.top };
+    }
+    if (saved?.width)  opts.position.width  = saved.width;
+    if (saved?.height) opts.position.height = saved.height;
+    return opts;
+  }
+
+  async _renderHTML(context, options) { return ""; }
+
+  _replaceHTML(result, content, options) {
+    if (!content.querySelector(".ut-tab-root")) {
+      const root = document.createElement("div");
+      root.className = "ut-tab-root ut-tab-root-popout";
+      content.appendChild(root);
+    }
+    const root = content.querySelector(".ut-tab-root");
+    this.tab.renderIntoRoot(root);
+    // No sheet tab to return to — drop the detach/reattach button.
+    root.querySelector("[data-ut-action='detach']")?.remove();
+  }
+
+  _onRender(context, options) {
+    super._onRender?.(context, options);
+    this.element?.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") this.close();
+    });
+    this.element?.setAttribute("tabindex", "-1");
+    this.element?.focus?.();
+
+    if (this._rollHookId == null) {
+      this._rollHookId = Hooks.on("msh-faserip.universalTableRoll", (data) => {
+        const root = this.element?.querySelector(".ut-tab-root");
+        if (!root) return;
+        const rank = RANK_ALIASES[data.rank] || data.rank;
+        this.tab._highlightRollIn(root, rank, data.roll);
+      });
+    }
+  }
+
+  async close(options = {}) {
+    if (this._rollHookId != null) {
+      Hooks.off("msh-faserip.universalTableRoll", this._rollHookId);
+      this._rollHookId = null;
+    }
+    try {
+      if (this.position) {
+        await game.user.setFlag("msh-faserip", "utHudWindowPos", {
+          left: this.position.left,
+          top: this.position.top,
+          width: this.position.width,
+          height: this.position.height,
+        });
+      }
+    } catch (_) {}
+    return super.close(options);
   }
 }

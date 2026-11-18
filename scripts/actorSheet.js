@@ -1,4 +1,6 @@
-// actorSheet.js v2.20.1 - 2026-11-16
+// actorSheet.js v2.20.2 - 2026-11-17
+// v2.20.2: _showActionInfo delegates to postActionInfoCard in
+//          universal-table-tab.js (shared with the HUD's Table window).
 // v2.20.1: Health Recovery button eligibility uses manual mode
 //          (canAttemptRecovery manual:true) so players can take it
 //          once per game day when automatic Recovery is off.
@@ -295,7 +297,7 @@ import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
-import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
+import { UniversalTableTab, postActionInfoCard } from './modules/ui/universal-table-tab.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES,
   RANK_ABBR as _RANK_ABBR, RANK_ALIASES, normalizeRank, shiftRank, valueToRank,
@@ -6565,41 +6567,7 @@ async _rollAction(actionType, abilityName) {
 }
 
   async _showActionInfo(actionType) {
-    const actionInfo = ACTION_INFO[actionType];
-    
-    if (!actionInfo) {
-      ui.notifications.warn(`No information found for action: ${actionType}`);
-      return;
-    }
-    
-    // Create simple info card
-    const content = `
-      <div class="marvel-action-info">
-        <h3 style="margin-top:0; border-bottom: 2px solid #444; padding-bottom: 8px;">
-          <strong>${actionInfo.name}</strong>
-          <span style="color: #666; font-size: 0.9em;">(${actionInfo.ability})</span>
-        </h3>
-        
-        <p style="font-style: italic; color: #555;">
-          ${actionInfo.description}
-        </p>
-        
-        <p style="margin: 8px 0;">
-          <strong>Possible Results:</strong> ${actionInfo.effects.join(', ')}
-        </p>
-        
-        <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px;">
-          <strong>Details:</strong><br>
-          ${actionInfo.details}
-        </div>
-      </div>
-    `;
-    
-    await ChatMessage.create({
-      user: game.user.id,
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      content
-    });
+    return postActionInfoCard(actionType, this.actor);
   }
 
   _getResultHoverText(actionType, color) {

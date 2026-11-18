@@ -1,4 +1,9 @@
-// scripts/action-hud.js v3.3.0 - 2026-04-30
+// scripts/action-hud.js v3.4.0 - 2026-11-17
+// v3.4.0: Add Universal Table button after FEAT (fa-table glyph, label
+//         "TBL" in Labels style). Click toggles the standalone Universal
+//         Table window; works with no token selected. Not draggable to
+//         the hotbar (no macro type for it). Buttons can now carry a
+//         Font Awesome glyph via faIcon.
 // v3.3.0: Add Generic FEAT button (yellow #FFD54A, label "FEAT" at 11px).
 //         Click routes to showGenericFeatDialog instead of the combat
 //         dispatcher. Per-button CSS override scopes the smaller font
@@ -46,8 +51,13 @@ const ACTIONS = [
   { id:"stun",           label:"St",  full:"Stun",           ability:"endurance", color:"#9932CC", textColor:"#FFF", icon:`${ICON_PATH}/stun.png` },
   { id:"slam",           label:"Sl",  full:"Slam",           ability:"endurance", color:"#9932CC", textColor:"#FFF", icon:`${ICON_PATH}/slam.png` },
   { id:"kill",           label:"Kl",  full:"Kill",           ability:"endurance", color:"#8B008B", textColor:"#FFF", icon:`${ICON_PATH}/kill.png` },
-  { id:"generic-feat",   label:"FEAT",full:"Generic FEAT",   ability:"any",       color:"#FFD54A", textColor:"#1a1a1a" }
+  { id:"generic-feat",   label:"FEAT",full:"Generic FEAT",   ability:"any",       color:"#FFD54A", textColor:"#1a1a1a" },
+  { id:"universal-table",label:"TBL", full:"Universal Table",ability:"",          color:"#2F5D8A", textColor:"#FFF", faIcon:"fa-table" }
 ];
+
+// Buttons that open reference windows instead of rolling — no actor needed,
+// no hotbar macro.
+const UTILITY_ACTIONS = new Set(["universal-table"]);
 
 const SHORTCUTS = [
   ["Alt+H",        "Toggle HUD"],
@@ -132,6 +142,11 @@ const CSS = `
 .fah-btn.drop-indicator { outline: 2px dashed #fff; outline-offset: -2px; }
 /* Generic FEAT button — 4-letter label needs smaller font to fit the square */
 .fah-btn[data-action="generic-feat"] .fah-code { font-size: 11px; }
+.fah-btn[data-action="universal-table"] .fah-code { font-size: 12px; }
+/* Font Awesome glyph buttons: glyph in Icons style, text code in Labels style */
+.fah-btn .fah-fa { font-size: 20px; text-shadow: 0 1px 2px rgba(0,0,0,.6); pointer-events: none; }
+.fah-btn.has-fa .fah-code { display: none; }
+.fah-style-labels .fah-fa { display: none !important; }
 
 /* Context menu */
 .fah-ctx-menu {
@@ -348,6 +363,7 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
             btn.classList.add("dragging");
             ev.dataTransfer.effectAllowed = "move";
           } else {
+            if (UTILITY_ACTIONS.has(btn.dataset.action)) { ev.preventDefault(); return; }
             const actor = this.actor;
             if (!actor) {
               ui.notifications.warn("Select a token first.");
@@ -376,6 +392,15 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       if (this.editMode) return;
       const btn = ev.target.closest(".fah-btn");
       if (!btn) return;
+      if (btn.dataset.action === "universal-table") {
+        try {
+          const { FaseripUniversalTableStandalone } = await import("./modules/ui/universal-table-tab.js");
+          await FaseripUniversalTableStandalone.toggle();
+        } catch (e) {
+          console.error("[FASERIP:HUD] Universal Table error:", e);
+        }
+        return;
+      }
       const actor = this.actor;
       if (!actor) return ui.notifications.warn("Select a token first.");
       try {

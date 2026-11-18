@@ -1,3 +1,7 @@
+// talent-action.js v1.3.0 - 2026-11-18
+// v1.3.0: Combat dispatch passes the talent as opts.talentItem (not opts.item,
+//         which attack dialogs read as the weapon/power source) and passes
+//         talentRankOverride so the dialog's CS Reason names the override.
 // talent-action.js v1.2.1 - 2026-09-09
 // v1.2.1: Fixed-bug — the v1.2.0 picker-skip for unambiguous Fighting
 //         Skill talents (Wrestling, MA-A/B/C/D/E, Acrobatics, Thrown
@@ -281,7 +285,7 @@ export async function rollTalent(actor, talent, options = {}) {
         shift: talentBonus,
         fromTalent: true,
         talentName: talent.name,
-        item: talent
+        talentItem: talent
       }
     });
   }
@@ -447,7 +451,8 @@ export async function rollTalent(actor, talent, options = {}) {
                   skipDice,
                   fromTalent: true,
                   talentName: talent.name,
-                  item: talent,
+                  talentItem: talent,
+                  talentRankOverride: rankOverride || "",
                   multiAdjacent,
                   multiAttacks,
                   attackCount

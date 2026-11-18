@@ -1,4 +1,6 @@
-﻿// init.js v1.22.1 - 2026-11-16
+﻿// init.js v1.22.2 - 2026-11-17
+// v1.22.2: game.msh.rollUniversalTable is the plain table function; the
+//          universalTableRoll hook now fires inside it (no double-fire).
 // v1.22.1: autoHealingEnabled renamed/hinted as Automatic Recovery &
 //          Hourly Healing (also gates player Recovery clicks).
 // v1.22.0: Preloads the power-attack / power-save / power-fx partials
@@ -1905,18 +1907,9 @@ Hooks.once("init", async () => {
       opts: { shift: columnShift, karma, ...options }
     });
   };
-  // Add the rollUniversalTable function to the namespace, wrapped to emit hook
-  const originalRollUniversalTable = rollUniversalTable;
-  game.msh.rollUniversalTable = function(rank, roll) {
-    const color = originalRollUniversalTable(rank, roll);
-    // Emit hook for universal table popout to catch
-    Hooks.call('msh-faserip.universalTableRoll', {
-      rank: rank,
-      roll: roll,
-      color: color
-    });
-    return color;
-  };
+  // rollUniversalTable fires msh-faserip.universalTableRoll itself (v2.1.0),
+  // so direct importers and game.msh callers both highlight the table.
+  game.msh.rollUniversalTable = rollUniversalTable;
 
   // Back-compat / public wrapper so code can call game.msh.actions.roll()
   // (internally delegates to the new ActionDispatcher)

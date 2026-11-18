@@ -1,4 +1,9 @@
-// File: scripts/modules/dice/universal-table.js v2.0.1 - 2026-09-01
+// File: scripts/modules/dice/universal-table.js v2.1.0 - 2026-11-17
+// v2.1.0: rollUniversalTable now fires msh-faserip.universalTableRoll itself
+//         (via new announceTableRoll), so direct importers highlight the
+//         table too — previously only game.msh.rollUniversalTable did.
+//         announceTableRoll is exported for kernel paths that resolve
+//         color without calling this function.
 // v2.0.1: POWER_RANGE_VALUES cosmic rows corrected (1 mile = 40 areas, not
 //         1760): Cl1000 176000->4000, Cl3000 ->400000, Cl5000 ->40000000
 //         (matches equipment.js, now the single consumer of this copy);
@@ -145,5 +150,23 @@ export function rollUniversalTable(rank, roll) {
     if (typeof ui !== 'undefined') ui.notifications?.error(`Rank ${rank} not found.`);
     return 'white';
   }
-  return colorForRoll(key, roll);
+  const color = colorForRoll(key, roll);
+  announceTableRoll(rank, roll, color);
+  return color;
+}
+
+/**
+ * Tell any open Universal Table (sheet tab or HUD window) that a FEAT was
+ * rolled, so it can pulse the matching cell. Safe outside Foundry (tests).
+ * @param {String} rank  - rank name or kernel key of the column rolled on
+ * @param {Number} roll  - d100 total read on the table
+ * @param {String} color - resulting color
+ */
+export function announceTableRoll(rank, roll, color) {
+  if (typeof Hooks === 'undefined') return;
+  try {
+    Hooks.call('msh-faserip.universalTableRoll', { rank, roll, color });
+  } catch (e) {
+    console.warn('[FASERIP] universalTableRoll hook failed:', e);
+  }
 }

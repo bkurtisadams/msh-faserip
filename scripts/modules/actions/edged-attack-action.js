@@ -1,4 +1,6 @@
-// edged-attack-action.js v3.8.0 - 2026-11-11
+// edged-attack-action.js v3.9.0 - 2026-11-18
+// v3.9.0: Opened from a talent roll, the CS row starts at the talent's shift
+//         (Ultimate Skill override included) and that shift is not remembered.
 // v3.8.0: Dialog scaffolding (header, Karma / Effect / Blindside rows, effect
 //         grid, footer, titlebar and width setup, Enter-to-roll, Remember and
 //         Skip dice toggles) now comes from attack-dialog-kit.js. The width
@@ -102,7 +104,7 @@ import { getItemMaterialRank } from "../../gm-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { executePenetrationFeat } from "./breaking-feat.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 import {
@@ -216,6 +218,7 @@ export class EdgedAttackAction extends AttackAction {
     }
     const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedShift") || 0) : 0;
     const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip","lastEdgedReason")) || "") : "";
+    const talentSeed = talentCSSeed(this.opts);
     
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
@@ -252,8 +255,8 @@ export class EdgedAttackAction extends AttackAction {
 
     // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
-      savedCS: savedColumnShift,
-      savedReason,
+      savedCS: talentSeed ? talentSeed.cs : savedColumnShift,
+      savedReason: talentSeed ? talentSeed.reason : savedReason,
       abilityRank: ability.rank
     });
 
@@ -451,6 +454,7 @@ export class EdgedAttackAction extends AttackAction {
                 Object.assign(flagUpdate, { lastNaturalWeaponRank: natRank, lastNaturalWeaponDamage: natDmg });
               }
             }
+            forgetTalentSeededCS(flagUpdate, talentSeed, ["lastEdgedShift", "lastEdgedReason", "cs_edged-attack"]);
             await saveDialogFlags(actor, flagUpdate);
 
             _resolved = true;

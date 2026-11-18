@@ -1,5 +1,9 @@
-// scripts/modules/actions/cs-modifiers.js v3.6.0 - 2026-09-05
+// scripts/modules/actions/cs-modifiers.js v3.7.0 - 2026-11-18
 // Manual CS input with base rank, optional range penalty, and ? reference panel.
+// v3.7.0: talentCSSeed(opts) — a dialog opened from a talent roll seeds its CS
+//         and Reason from the talent's shift (incl. an Ultimate Skill rank
+//         override) instead of the remembered value; forgetTalentSeededCS()
+//         keeps that seeded shift out of the remembered flags.
 // v3.6.0: Automatic situational modifiers (HOUSE 2026-09-05). AUTO_SITUATIONAL
 //         is a registry of detectors run against the attacker and target
 //         tokens; detectAutoSituational() returns the ones that apply, gated
@@ -194,6 +198,21 @@ export const CS_REFERENCE = {
     ],
   },
 };
+
+export function talentCSSeed(opts) {
+  if (!opts?.fromTalent) return null;
+  const cs = Number(opts.shift);
+  if (!Number.isFinite(cs)) return null;
+  const name = opts.talentName || "Talent";
+  const reason = opts.talentRankOverride ? `${name} (${opts.talentRankOverride})` : name;
+  return { cs, reason };
+}
+
+export function forgetTalentSeededCS(flagUpdate, seed, keys) {
+  if (!seed || !flagUpdate) return flagUpdate;
+  for (const k of keys) delete flagUpdate[k];
+  return flagUpdate;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // buildCSRow({ savedCS, abilityRank, rangePenalty })

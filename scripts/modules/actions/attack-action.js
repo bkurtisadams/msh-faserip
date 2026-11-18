@@ -1,4 +1,7 @@
-// attack-action.js v1.19.0 - 2026-11-16
+// attack-action.js v1.19.1 - 2026-11-17
+// v1.19.1: Kernel-resolved to-hit now announces the roll
+//          (announceTableRoll) so the Universal Table highlights the cell
+//          again — lost when attacks moved onto resolveAttack.
 // v1.19.0: Martial Arts D Stun/Slam mechanic. Per target, maDOpensEffectsGate
 //          (ma-d.js) opens the effects damage gate when the attacker's talent
 //          flags (ignore-armor-fx / no-damage-needed) apply, study is complete
@@ -319,6 +322,7 @@ import { RANK_ABBR, valueToRank } from "../../rules/rules-reference.js";
 import { rankDistance as kernelRankDistance, requiredColor as kernelRequiredColor, colorAtLeast as kernelColorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
 import { resolveAttack, reduceEffectColor, effectForColor } from "../../lib/faserip-rules/faserip-effects.js";
 import { kernelKeyFor } from "../../kernel/adapter.js";
+import { announceTableRoll } from "../dice/universal-table.js";
 import { applyArmorPiercingCS } from "../../rules/mitigation.js";
 import { deductKarma, getAvailableKarma } from "../dice/dice-roller.js";
 import { SCOPE, getFlagScope } from "./flags.js";
@@ -1215,6 +1219,10 @@ export class AttackAction extends BaseAction {
       ? resolveAttack({ column: kernelColumn, rank: attackKernelKey, shifts: attackShiftable ? attackShifts : [], roll: cappedTotal, karma: 0 })
       : null;
     let color = kernelAttack ? kernelAttack.color : universalColor(effectiveRank, cappedTotal);
+    // Kernel path skips rollUniversalTable — announce so open tables highlight.
+    if (kernelAttack?.color) {
+      announceTableRoll(kernelAttack.effectiveRank, cappedTotal, kernelAttack.color);
+    }
     const colorLower = String(color || "white").toLowerCase();
 
     // Apply result cap if pulling punch

@@ -1,4 +1,6 @@
-// scripts/modules/actions/thrown-weapon-action.js v1.0.1 - 2026-11-11
+// scripts/modules/actions/thrown-weapon-action.js v1.1.0 - 2026-11-18
+// v1.1.0: Opened from a talent roll, the CS row starts at the talent's shift
+//         (Ultimate Skill override included) and that shift is not remembered.
 // v1.0.1: The weapon dropdown shows each item's computed damage (it showed
 //         the printed damage, so powers read "0 dmg").
 // One dialog flow for thrown weapons (Throwing Edged, Throwing Blunt).
@@ -24,7 +26,7 @@ import {
   getEffectiveArmor,
   getItemArmorPiercingCS
 } from "./action-utils.js";
-import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 import {
   setLS, dialogPrefs, flagRecall, saveDialogFlags,
@@ -98,6 +100,7 @@ export class ThrownWeaponAction extends RangedAttackAction {
     const savedRange = recall(flag("Range"), 1);
     const savedColumnShift = recall.nullish(flag("Shift"), 0);
     const savedReason = recall(flag("Reason"), "");
+    const talentSeed = talentCSSeed(this.opts);
     const saved = {
       pull: recall(flag("PullEnabled"), false),
       pulledDamage: recall(flag("PulledDamage"), 0),
@@ -134,8 +137,8 @@ export class ThrownWeaponAction extends RangedAttackAction {
 
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
-      savedCS: savedColumnShift,
-      savedReason,
+      savedCS: talentSeed ? talentSeed.cs : savedColumnShift,
+      savedReason: talentSeed ? talentSeed.reason : savedReason,
       abilityRank: ability.rank,
       rangePenalty: thrownRangePenalty(savedRange, strRank),
       showRange: true,
@@ -367,6 +370,7 @@ export class ThrownWeaponAction extends RangedAttackAction {
                 ...extras.flags
               });
             }
+            forgetTalentSeededCS(flagUpdate, talentSeed, [flag("Shift"), flag("Reason")]);
             await saveDialogFlags(actor, flagUpdate);
 
             _resolved = true;

@@ -1,4 +1,6 @@
-// movement-feats.js v1.10.0 - 2026-11-11
+// movement-feats.js v1.10.1 - 2026-11-17
+// v1.10.1: featColor announces kernel-resolved rolls so the Universal
+//          Table highlights them.
 // v1.10.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.9.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
@@ -39,6 +41,7 @@ import {
   teleportPassengerFeatColor, teleportIntoObjectDamage
 } from './lib/faserip-rules/faserip-movement.js';
 import { kernelKeyFor } from './kernel/adapter.js';
+import { announceTableRoll } from './modules/dice/universal-table.js';
 import { getRollMode } from './modules/dice/roll-mode.js';
 import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 
@@ -62,7 +65,10 @@ function applyColumnShift(rank, shift) {
 function featColor(rankName, total) {
   const key = kernelKeyFor(rankName);
   if (!key) return game.msh.rollUniversalTable(rankName, total);
-  return colorForRoll(key, Math.min(Math.max(Number(total) || 0, 1), 100));
+  const roll = Math.min(Math.max(Number(total) || 0, 1), 100);
+  const color = colorForRoll(key, roll);
+  announceTableRoll(key, roll, color);
+  return color;
 }
 
 const cap = (c) => c ? c.charAt(0).toUpperCase() + c.slice(1) : c;

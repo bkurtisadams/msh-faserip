@@ -1,4 +1,6 @@
-// shooting-action.js v3.17.0 - 2026-11-11
+// shooting-action.js v3.18.0 - 2026-11-18
+// v3.18.0: Opened from a talent roll, the CS row starts at the talent's shift
+//          (Ultimate Skill override included) and that shift is not remembered.
 // v3.17.0: Dialog scaffolding (header, Aim / result-cap / Karma / Blindside
 //          rows, effect grid, footer, titlebar and width setup, Enter-to-roll,
 //          option and preference toggles) now comes from attack-dialog-kit.js.
@@ -196,7 +198,7 @@ import { AreaTemplate } from "./area-template.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";
@@ -281,6 +283,7 @@ export class ShootingAction extends RangedAttackAction {
     const savedVariantType = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingVariant")) || "") : "";
     const savedAim = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAim")) || "none") : "none";
     const savedReason = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingReason")) || "") : "";
+    const talentSeed = talentCSSeed(this.opts);
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     // === Target info ===
@@ -349,8 +352,8 @@ export class ShootingAction extends RangedAttackAction {
     const initialRangePenalty = (initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) ? 0 : weaponRangePenalty(savedRange);
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
-      savedCS: savedColumnShift,
-      savedReason,
+      savedCS: talentSeed ? talentSeed.cs : savedColumnShift,
+      savedReason: talentSeed ? talentSeed.reason : savedReason,
       abilityRank: ability.rank,
       rangePenalty: initialRangePenalty,
       showRange: true,
@@ -630,6 +633,7 @@ export class ShootingAction extends RangedAttackAction {
                 lastShootingReason: cs.reason
               });
             }
+            forgetTalentSeededCS(flagUpdate, talentSeed, ["lastShootingShift", "lastShootingReason", "cs_shooting"]);
             await saveDialogFlags(actor, flagUpdate);
 
             // Persist ammo variant on the weapon — the gun stays loaded with

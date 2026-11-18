@@ -1,4 +1,6 @@
-// scripts/modules/actions/power-blast-action.js v1.0.0 - 2026-11-10
+// scripts/modules/actions/power-blast-action.js v1.1.0 - 2026-11-18
+// v1.1.0: Opened from a talent roll, the CS row starts at the talent's shift
+//         (Ultimate Skill override included) and that shift is not remembered.
 // One dialog flow for ranged power blasts (Energy, Force). Subclasses supply
 // static BLAST config and the hooks marked "subclass" below; the dialog,
 // CS panel, Roll/Cancel plumbing, remembered flags and the hand-off to
@@ -23,7 +25,7 @@ import {
   derivePowerDamage
 } from "./action-utils.js";
 import { POWER_RANGE } from "../../rules/rules-reference.js";
-import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
 import { showFaseripDialog } from "./dialog-shim.js";
 import {
   setLS, dialogPrefs, flagRecall, saveDialogFlags, targetSummary,
@@ -97,6 +99,7 @@ export class PowerBlastAction extends RangedAttackAction {
     const savedColumnShift = recall.nullish(flag("Shift"), 0);
     const savedAim = recall(flag("Aim"), "none");
     const savedReason = recall(flag("Reason"), "");
+    const talentSeed = talentCSSeed(this.opts);
     const saved = {
       multiAdjacent: recall(flag("MultiAdjacent"), false),
       ...this._recallExtras(recall, flag)
@@ -124,8 +127,8 @@ export class PowerBlastAction extends RangedAttackAction {
     };
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
-      savedCS: savedColumnShift,
-      savedReason,
+      savedCS: talentSeed ? talentSeed.cs : savedColumnShift,
+      savedReason: talentSeed ? talentSeed.reason : savedReason,
       abilityRank: initialDisplayRank,
       rangePenalty: rangePenaltyAt(initialPowerRank, savedRange),
       showRange: true,
@@ -290,6 +293,7 @@ export class PowerBlastAction extends RangedAttackAction {
                 ...extras.flags
               });
             }
+            forgetTalentSeededCS(flagUpdate, talentSeed, [flag("Shift"), flag("Reason"), `cs_${cfg.key}`]);
             await saveDialogFlags(actor, flagUpdate);
 
             _resolved = true;

@@ -1,3 +1,8 @@
+// power-router.js v1.14.0 - 2026-11-18
+// v1.14.0: Ultimate Skill early-route — the power is not an attack; it opens
+//          the roll for the talent carrying the Unearthly rank override
+//          (asks which when there are several) instead of dispatching by its
+//          Battle Effects column at the plain ability rank.
 // power-router.js v1.13.1 - 2026-09-03
 // v1.13.1: rollPower tags existing tab stunts that match book presets for the
 //          power (stunt-mechanics adoptPresets) before dispatch.
@@ -148,6 +153,29 @@ function detectFromList(powerTypeLower, list) {
   return false;
 }
 
+async function rollUltimateSkill(actor, item) {
+  const talents = actor.items.filter(i => i.type === "talent" && i.system?.rankOverride);
+  if (!talents.length) {
+    ui.notifications.warn(`${item.name}: no talent on ${actor.name} has a Rank Override set. Set the chosen talent's Rank Override to ${item.system?.rank || "Unearthly"}.`);
+    return;
+  }
+  const { rollTalent } = await import("./talent-action.js");
+  if (talents.length === 1) return rollTalent(actor, talents[0]);
+  const { showFaseripButtonDialog } = await import("./dialog-shim.js");
+  const picked = await new Promise(resolve => {
+    showFaseripButtonDialog({
+      title: `${item.name}: ${actor.name}`,
+      content: `<p>Which talent?</p>`,
+      buttons: Object.fromEntries(talents.map(t => [t.id, {
+        label: `${t.name} (${t.system.rankOverride})`,
+        callback: () => resolve(t)
+      }])),
+      close: () => resolve(null)
+    });
+  });
+  return picked ? rollTalent(actor, picked) : undefined;
+}
+
 // ── Main entry point ───────────────────────────────────────
 
 /**
@@ -184,6 +212,11 @@ export async function rollPower(actor, item) {
       actor,
       opts: { itemId: item.id, item }
     });
+  }
+
+  // Ultimate Skill: roll the talent it makes Unearthly (rankOverride on the talent).
+  if (nameLower === "ultimate skill" || powerType === "ultimate skill") {
+    return rollUltimateSkill(actor, item);
   }
 
   // Psi-Screen: extend the screen over others (own dialog; passive defense otherwise)
