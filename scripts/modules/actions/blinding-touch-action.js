@@ -1,3 +1,6 @@
+// blinding-touch-action.js 2026-11-19: Protected Senses found by type as
+// well as name; it must cover sight (when it lists senses) and its gear
+// must be working.
 // scripts/modules/actions/blinding-touch-action.js v1.3.0 - 2026-09-09
 // v1.3.0: Generalized for reuse by Light Emission's Blind stunt (ranged
 //         Agility instead of touch Fighting) rather than writing a near-
@@ -34,6 +37,8 @@
 // Helmet detection deferred (would need equipment metadata to identify
 // helmet items reliably).
 
+import { protectedSensesOf } from "../../power-sheet-view.mjs";
+import { powerGearState } from "../../equipment-link.mjs";
 import { showFaseripDialog } from "./dialog-shim.js";
 import { getRollMode } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
@@ -80,7 +85,13 @@ function protectedSensesRank(actor) {
   for (const item of actor.items) {
     if (item.type !== "power") continue;
     const nm = String(item.name || "").trim().toLowerCase();
-    if (nm === "protected senses") return item.system?.rank || null;
+    if (nm !== "protected senses" && item.system?.type !== "Protected Senses") continue;
+    if (powerGearState(item).status !== "ok") continue;
+    // Blinding Touch attacks sight; a power listing senses must include it.
+    const covered = protectedSensesOf(item.system?.detection);
+    const listsAny = covered.length > 0;
+    if (listsAny && !covered.includes("sight")) continue;
+    return item.system?.rank || null;
   }
   return null;
 }

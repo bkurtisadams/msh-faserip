@@ -1,3 +1,5 @@
+// power-sheet-view.mjs v1.2.0 - 2026-11-19
+// v1.2.0: Protected Senses covers one or more senses (protectedSensesOf).
 // power-sheet-view.mjs v1.1.0 - 2026-11-19
 // v1.1.0: New per-type fields: Density Manipulation Others mode, Body
 //         Transformation Others non-living, Animal Transformation Self form,
@@ -115,6 +117,15 @@ export function resistanceTypesOf(sys = {}) {
   return sys.resistanceType ? [sys.resistanceType] : [];
 }
 
+/** Senses a Protected Senses power covers: the checkbox map, else the legacy
+ *  single protectedSense ("all" = every sense). */
+export function protectedSensesOf(det = {}) {
+  const map = det.protectedSenses;
+  if (map && typeof map === "object" && Object.keys(map).length) return SENSES.map(([k]) => k).filter(k => map[k] === true);
+  if (det.protectedSense === "all") return SENSES.map(([k]) => k);
+  return SENSES.some(([k]) => k === det.protectedSense) ? [det.protectedSense] : [];
+}
+
 function enhancedSensesOf(det = {}) {
   const map = det.senses;
   if (map && typeof map === "object" && Object.keys(map).length) return SENSES.map(([k]) => k).filter(k => map[k] === true);
@@ -171,6 +182,8 @@ export function buildPowerSheetView(sys = {}, flags = {}) {
     invulnForms: (() => { const on = resistanceTypesOf(sys); return INVULN_FORMS.map(([key, label]) => ({ key, label, checked: on.includes(key) })); })(),
     senses: (() => { const on = enhancedSensesOf(sys.detection); return SENSES.map(([key, label]) => ({ key, label, checked: on.includes(key) })); })(),
     isEnhancedSenses: is("Enhanced Senses"),
+    protectedSenses: (() => { const on = protectedSensesOf(sys.detection); return SENSES.map(([key, label]) => ({ key, label, checked: on.includes(key) })); })(),
+    isProtectedSenses: is("Protected Senses"),
     emotionSingle: sys.mental?.singleEmotionBonus === true,
     emotionOptions1: EMOTIONS.map(([value, label]) => ({ value, label, selected: value === (sys.mental?.emotionType || "fear") })),
     emotionOptions2: EMOTIONS.map(([value, label]) => ({ value, label, selected: value === (sys.mental?.emotionType2 || "love") })),

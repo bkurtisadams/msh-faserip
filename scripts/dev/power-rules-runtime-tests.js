@@ -1,3 +1,6 @@
+// scripts/dev/power-rules-runtime-tests.js v1.4.0 - 2026-11-19
+// v1.4.0: Migration of object-shaped lists with blank names; Protected
+//         Senses covering several senses.
 // scripts/dev/power-rules-runtime-tests.js v1.3.0 - 2026-11-19
 // v1.3.0: "Equipment powers" section: link, broken / missing item turns the
 //         power and its effects off, repair and unlink restore it, the sheets
@@ -33,7 +36,7 @@ import { POWER_ENGINE_PRESETS, buildPowerTypeResetUpdates } from "../power-prese
 import { buildLimitationView } from "../power-limitations.mjs";
 import { buildRankValidation } from "../power-validation.mjs";
 import { prepareActiveEffectCategories } from "../../helpers/effects.mjs";
-import { buildPowerSheetView } from "../power-sheet-view.mjs";
+import { buildPowerSheetView, protectedSensesOf } from "../power-sheet-view.mjs";
 import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } from "../power-sheet-actor-view.mjs";
 import { stuntKarmaCost } from "../stunt-ledger.js";
 import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
@@ -514,6 +517,20 @@ async function equipmentTests(recorder, state) {
   recorder.assert(!!gb && gb.system.equipmentId === item(old, "Power Gauntlet").id && gb.system.rank === "Remarkable"
     && !(item(old, "Power Gauntlet").system.powers ?? []).length, "Migration: old granted-power entry becomes a linked power item",
     { made: !!gb, link: gb?.system?.equipmentId, left: item(old, "Power Gauntlet").system.powers });
+
+  // Lists saved as objects ("0": {...}) with a blank name, as on older actors.
+  const obj = await createActor(state, "Old Object List", { items: [
+    { name: "Helmet", type: "equipment", system: { category: "gear", powers: { "0": { name: "", rank: "Remarkable", value: 30, damageType: "sensory", grantedByEquipment: "true" } } } }
+  ] });
+  await migrateGrantedPowerLists();
+  await sleep(200);
+  const hp = obj.items.find(i => i.type === "power");
+  recorder.assert(hp?.name === "Helmet" && hp.system.equipmentId === item(obj, "Helmet").id,
+    "Migration: an object-shaped list with a blank name becomes a power named after its item", { name: hp?.name });
+
+  // Protected Senses: several senses; Blinding Touch only cares about sight.
+  recorder.equal(protectedSensesOf({ protectedSenses: { sight: true, hearing: true } }).join(), "sight,hearing", "Protected Senses: covers sight and hearing");
+  recorder.equal(protectedSensesOf({ protectedSense: "all" }).length, 5, "Protected Senses: legacy All covers every sense");
 }
 
 async function cleanupState(state, keepArtifacts) {

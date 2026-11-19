@@ -628,15 +628,14 @@
           {{#if ps2.isEnhancedSenses}}<p class="ps2-hint">Power rank replaces Intuition for clues and spotting (Hearing: initiative too). Attacks on an enhanced sense are at +1CS.</p>{{/if}}
         </div>
         <div class="ps2-grid-2col" style="margin-top:4px;">
-          <div class="ps2-field">
-            <label>Protected Sense</label>
-            <select name="system.detection.protectedSense">
-              <option value="">None</option>
-              <option value="sight"   {{#if (eq system.detection.protectedSense "sight")}}selected{{/if}}>Sight</option>
-              <option value="hearing" {{#if (eq system.detection.protectedSense "hearing")}}selected{{/if}}>Hearing</option>
-              <option value="smell"   {{#if (eq system.detection.protectedSense "smell")}}selected{{/if}}>Smell</option>
-              <option value="all"     {{#if (eq system.detection.protectedSense "all")}}selected{{/if}}>All</option>
-            </select>
+          <div class="ps2-field ps2-span-full">
+            <label>Protected (one or more)</label>
+            <div class="ps2-chk" role="group" aria-label="Protected senses">
+              {{#each ps2.protectedSenses}}
+              <label><input type="checkbox" name="system.detection.protectedSenses.{{key}}" {{checked checked}} data-dtype="Boolean">{{label}}</label>
+              {{/each}}
+            </div>
+            {{#if ps2.isProtectedSenses}}<p class="ps2-hint">Attacks on a protected sense below the Power rank's Intensity are ignored.</p>{{/if}}
           </div>
           <div class="ps2-field">
             <label>Detection Type</label>

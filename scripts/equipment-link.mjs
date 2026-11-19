@@ -1,3 +1,6 @@
+// equipment-link.mjs v1.1.0 - 2026-11-19
+// v1.1.0: Migration reads lists saved as objects ("0", "1"...) and names a
+//         nameless entry after its equipment; rerun as migration version 2.
 // equipment-link.mjs v1.0.1 - 2026-11-19
 // v1.0.1: Fixed-bug: migration called flatMap on the scenes collection
 //         (not an array); now uses .contents.
@@ -118,6 +121,14 @@ export function registerEquipmentLinkHooks() {
   });
 }
 
+/** The old name-and-rank list, stored either as an array or as an object
+ *  keyed "0", "1"... (how the old sheet saved it). Empty entries dropped. */
+function oldGrantedList(eq) {
+  const raw = eq.system?.powers;
+  const list = Array.isArray(raw) ? raw : (raw && typeof raw === "object" ? Object.values(raw) : []);
+  return list.filter(p => p && typeof p === "object" && (p.name || p.rank || p.value));
+}
+
 /** One-time: the old equipment "granted powers" list (name and rank only)
  *  becomes real power items linked to the equipment. GM only. */
 export async function migrateGrantedPowerLists() {
@@ -125,9 +136,9 @@ export async function migrateGrantedPowerLists() {
   let made = 0;
   const actors = [...game.actors, ...game.scenes.contents.flatMap(s => s.tokens.contents.filter(t => !t.actorLink && t.actor).map(t => t.actor))];
   for (const actor of actors) {
-    for (const eq of actor.items.filter(i => i.type === "equipment" && Array.isArray(i.system?.powers) && i.system.powers.length)) {
-      const docs = eq.system.powers.filter(p => p?.name).map(p => ({
-        name: p.name, type: "power",
+    for (const eq of actor.items.filter(i => i.type === "equipment" && oldGrantedList(i).length)) {
+      const docs = oldGrantedList(eq).map(p => ({
+        name: String(p.name || "").trim() || eq.name, type: "power",
         system: {
           rank: p.rank || "Typical", value: Number(p.value) || 0, damageType: p.damageType || "",
           source: "equipment", grantedByEquipment: true, equipmentId: eq.id, equipmentName: eq.name, isActive: true

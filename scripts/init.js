@@ -1,4 +1,6 @@
-﻿// init.js v1.25.0 - 2026-11-19
+﻿// init.js v1.25.1 - 2026-11-19
+// v1.25.1: Granted-powers migration version 2 (reruns for object-shaped lists).
+// init.js v1.25.0 - 2026-11-19
 // v1.25.0: Equipment-granted powers: registers the equipment-link refresh
 //          hooks and runs the one-time granted-power-list migration.
 // init.js v1.24.0 - 2026-11-19
@@ -2811,10 +2813,10 @@ Hooks.once("ready", async () => {
   }
   // One-time migration: equipment granted-power lists -> linked power items.
   try {
-    if (game.user?.isGM && Number(game.settings.get("msh-faserip", "grantedPowersMigrationVersion") ?? 0) < 1) {
+    if (game.user?.isGM && Number(game.settings.get("msh-faserip", "grantedPowersMigrationVersion") ?? 0) < 2) {
       const { migrateGrantedPowerLists } = await import("./equipment-link.mjs");
       const made = await migrateGrantedPowerLists();
-      await game.settings.set("msh-faserip", "grantedPowersMigrationVersion", 1);
+      await game.settings.set("msh-faserip", "grantedPowersMigrationVersion", 2);
       if (made) console.log(`[FASERIP] Granted powers migration made ${made} linked power(s)`);
     }
   } catch (e) {
