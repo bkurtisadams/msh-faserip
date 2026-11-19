@@ -1,4 +1,9 @@
-// power-sheet-v2-logic.js v2.2.0 - 2026-11-18
+// power-sheet-v2-logic.js v2.3.0 - 2026-11-18
+// v2.3.0: Changing an already-set power type (or a category change that clears
+//         it) resets the preset-owned fields to defaults, then applies the new
+//         type's preset in full — after a confirm — so no attack/save/defense
+//         settings carry over from the old type. First type pick stays
+//         conservative (fills blanks only).
 // v2.2.0: Sonic resistance type (Sound Manipulation) reduces damage by rank#.
 // power-sheet-v2-logic.js v2.1.0 - 2026-11-13
 // v2.1.0: Tabs removed; back to the single scrolling form with Rank and
@@ -87,7 +92,7 @@
 
 // Rank → value lookup (canonical source: rules-reference.js)
 import { RANK_VALUES } from "./rules/rules-reference.js";
-import { POWER_TYPES_BY_CATEGORY, buildPowerPresetUpdates, populatePowerTypeOptions } from "./power-presets.mjs";
+import { POWER_TYPES_BY_CATEGORY, buildPowerPresetUpdates, buildPowerTypeResetUpdates, populatePowerTypeOptions } from "./power-presets.mjs";
 import { SECTION_LABELS, typeSections } from "./power-sheet-view.mjs";
 
 const CATEGORY_SECTIONS = {
@@ -119,6 +124,16 @@ const RESISTANCE_TYPE_DEFAULTS = {
   mental:      { effect: "featReplace",     minRank: "psyche+1" },
   magical:     { effect: "featReplace",     minRank: "" }
 };
+
+async function confirmTypeReset(oldType, newType) {
+  const { DialogV2 } = foundry.applications.api;
+  const to = newType ? `<strong>${newType}</strong>` : "no type";
+  return !!(await DialogV2.confirm({
+    window: { title: "Change power type" },
+    content: `<p>Change from <strong>${oldType}</strong> to ${to}?</p><p>Attack, damage, save, defense and other type settings reset to the new type's defaults. Name, rank, description, limitations and FX are kept.</p>`,
+    rejectClose: false
+  }));
+}
 
 const ALWAYS_VISIBLE = ["attack", "save", "defense", "limitation"];
 
@@ -271,7 +286,16 @@ export function ps2ActivateListeners(html, sheet) {
     const updates = {
       "system.category": cat
     };
-    if (!keepType && existingType) updates["system.type"] = "";
+    if (!keepType && existingType) {
+      if (!(await confirmTypeReset(existingType, ""))) {
+        ev.currentTarget.value = sheet.item.system?.category || "";
+        populatePowerTypeOptions(html, sheet.item.system?.category || "", existingType);
+        updateSectionVisibility(html, sheet.item.system?.category || "", sheet);
+        return;
+      }
+      updates["system.type"] = "";
+      Object.assign(updates, buildPowerTypeResetUpdates(cat, ""));
+    }
 
     // Do not seed category-only automation before a type is chosen. Many
     // categories contain exceptions (e.g. Telepathy, Probability Manipulation,
@@ -294,10 +318,19 @@ export function ps2ActivateListeners(html, sheet) {
   html.find('#ps2-type').on('change', async ev => {
     const type = ev.currentTarget.value;
     const cat = html.find('#ps2-category').val();
+    const oldType = sheet.item.system?.type || "";
     const updates = {
       "system.type": type
     };
-    Object.assign(updates, buildPowerPresetUpdates(sheet.item.system, cat, type));
+    if (oldType && oldType !== type) {
+      if (!(await confirmTypeReset(oldType, type))) {
+        ev.currentTarget.value = oldType;
+        return;
+      }
+      Object.assign(updates, buildPowerTypeResetUpdates(cat, type));
+    } else {
+      Object.assign(updates, buildPowerPresetUpdates(sheet.item.system, cat, type));
+    }
     await sheet.item.update(updates);
   });
 

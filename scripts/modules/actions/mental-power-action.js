@@ -1,4 +1,7 @@
-// scripts/modules/actions/mental-power-action.js v2.5.1 - 2026-11-10
+// scripts/modules/actions/mental-power-action.js v2.6.0 - 2026-11-18
+// v2.6.0: Nullifying Power / Nullifier Missile detection reads the power type as
+//         well as the name, and the aura toggle button is no longer shown on a
+//         Nullifier Missile card.
 // v2.5.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
 // v2.5.0: Telepathy dialog offers the book's Power Stunts (Telepathic Push,
@@ -76,7 +79,9 @@ export class MentalPowerAction extends BaseAction {
     // Nullifier Missile (single-target concentration) falls through to
     // the default mental dispatch — the aura model is for inborn nullify only.
     const nameLc = (powerName || "").toLowerCase();
-    if (nameLc.includes("nullif") && !nameLc.includes("missile")) {
+    const nullKey = `${nameLc} ${(item.system.type || "").toLowerCase()}`;
+    const isNullifierMissile = nullKey.includes("nullif") && nullKey.includes("missile");
+    if (nullKey.includes("nullif") && !isNullifierMissile) {
       const { isAuraMaintained, startAura, stopAura } = await import("./nullify.js");
       const { getNullifyRange, rIdx, requiredColorFromDelta, meetsThreshold } = await import("./nullify-utils.js");
       const { drawAuraVisual, refreshAllAuraVisuals, setActivationCooldown } = await import("./nullify-aura.js");
@@ -784,7 +789,7 @@ export class MentalPowerAction extends BaseAction {
       : "";
 
     // Detect Nullifying Power early (before card build) for aura toggle button
-    const isNullifyAura = nameLc.includes("nullif");
+    const isNullifyAura = nullKey.includes("nullif") && !isNullifierMissile;
 
     // Nullify Aura toggle button (only for Nullifying Power)
     const nullifyAuraBtn = isNullifyAura
@@ -844,7 +849,7 @@ export class MentalPowerAction extends BaseAction {
         effectName   = "Mentally Fatigued";
         failMessage  = "suffers mental strain";
         abilityLabel = "psyche";
-      } else if (nameLc.includes("nullif") && nameLc.includes("missile")) {
+      } else if (isNullifierMissile) {
         effectName   = "Nullified";
         failMessage  = "is nullified";
         abilityLabel = "psyche";

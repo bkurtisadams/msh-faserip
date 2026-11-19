@@ -135,7 +135,7 @@ export const POWER_ENGINE_PRESETS = {
   // Energy Control
   "Magnetic Manipulation":    { control: { controlType: "magnetism", manipulateExisting: true, useAsWeapon: true }, battleEffectsColumn: "Fo", damageType: "energy-force" },
   "Electrical Manipulation":  { control: { controlType: "electricity", manipulateExisting: true, useAsWeapon: true }, isEnergyAttack: true, battleEffectsColumn: "En", damageType: "energy-electricity", isDefensePower: true, isResistance: true, resistanceType: "electricity", resistanceEffect: "damageReduction" },
-  "Light Manipulation":       { control: { controlType: "light", manipulateExisting: true, generateNew: true, useAsWeapon: true }, isEnergyAttack: true, battleEffectsColumn: "En", damageType: "energy-radiation", requiresSave: true, save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "blinded", duration: "1-10" } } },
+  "Light Manipulation":       { control: { controlType: "light", manipulateExisting: true, generateNew: true }, isAttackPower: false, requiresSave: true, save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "blinded", duration: "1-10" } } },
   "Sound Manipulation":       { control: { controlType: "sound", manipulateExisting: true }, isAttackPower: false, isDefensePower: true, isResistance: true, resistanceType: "sound", resistanceEffect: "damageReduction", hasBonusPowers: true, bonusPowers: [{ name: "Sound Generation", rankMod: "same" }], specialMechanics: "Dampen existing noise by rank# Intensity, or raise it one level on a Power rank FEAT. Sonic attacks on the hero reduced by rank#. Sound Generation may be taken as a bonus Power." },
   "Darkforce Manipulation":   { control: { controlType: "darkforce", manipulateExisting: true, generateNew: true, useAsShield: true, useAsWeapon: true }, isEnergyAttack: true, battleEffectsColumn: "En", damageType: "energy-darkforce" },
   "Gravity Manipulation":     { control: { controlType: "gravity", manipulateExisting: true, useAsWeapon: true }, battleEffectsColumn: "Fo", damageType: "energy-force", requiresSave: true, save: { ability: "strength", intensity: "power-rank", onFail: { effect: "slammed", duration: "1-10" } } },
@@ -171,7 +171,7 @@ export const POWER_ENGINE_PRESETS = {
   "Stunning Missile":         { isEnergyAttack: true, battleEffectsColumn: "Fo", damageType: "energy-force", requiresSave: true, save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "unconscious", duration: "1-10" } } },
   "Corrosive Missile":        { battleEffectsColumn: "En", damageType: "corrosive", continuingDamage: true, continuingDamageRounds: 3, canPullPunch: false, canReduceEffect: false },
   "Slashing Missile":         { battleEffectsColumn: "TE", damageType: "physical-edged", canPullPunch: false, canReduceEffect: false },
-  "Nullifier Missile":        { battleEffectsColumn: "Fo", requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "nullified", duration: "custom" } } },
+  "Nullifier Missile":        { isAttackPower: false, isMentalPower: true, battleEffectsColumn: "Me", duration: "concentration", requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "nullified", duration: "concentration", notes: "Psyche FEAT for inborn powers, Reason FEAT for hi-tech; target re-rolls each round." } } },
   "Darkforce Generation":     { isEnergyAttack: true, battleEffectsColumn: "En", damageType: "energy-darkforce", canPullPunch: true, canReduceEffect: true },
 
   // Mental Powers
@@ -233,6 +233,8 @@ export const PRESET_DEFAULTS = {
   duration: "",
   customDuration: "",
   isAttackPower: false,
+  isEnergyAttack: false,
+  attackType: "",
   battleEffectsColumn: "",
   damageSource: "rank",
   damageType: "",
@@ -345,6 +347,19 @@ export function populatePowerTypeOptions(html, category, selectedType = "") {
     select.append($('<option></option>').attr('value', selectedType).text(`${selectedType} (legacy/custom)`));
   }
   select.val(selectedType || "");
+}
+
+export function buildPowerTypeResetUpdates(category, type) {
+  const merged = foundry.utils.deepClone(PRESET_DEFAULTS);
+  if (type) {
+    foundry.utils.mergeObject(merged, foundry.utils.deepClone(CATEGORY_ENGINE_PRESETS[category] || {}));
+    foundry.utils.mergeObject(merged, foundry.utils.deepClone(POWER_ENGINE_PRESETS[type] || {}));
+  }
+  const updates = {};
+  for (const [path, value] of Object.entries(flattenPreset(merged))) {
+    updates[`system.${path}`] = clonePresetValue(value);
+  }
+  return updates;
 }
 
 export function buildPowerPresetUpdates(system, category, type) {

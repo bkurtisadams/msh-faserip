@@ -1,4 +1,7 @@
-// power-router.js v1.15.0 - 2026-11-18
+// power-router.js v1.16.0 - 2026-11-18
+// v1.16.0: Nullify route matches the power type as well as the name.
+//          Light Manipulation is not a damage attack: it opens the intensity
+//          (blinding) FEAT regardless of any stale attack column.
 // v1.15.0: Sound Manipulation early-route — not an attack; opens the
 //          Dampen / Raise noise dialog regardless of any stale attack column.
 // power-router.js v1.14.0 - 2026-11-18
@@ -97,7 +100,7 @@ const FORCE_TYPES = [
 
 const ENERGY_TYPES = [
   "fire control", "fire generation", "energy generation",
-  "electrical manipulation", "light manipulation",
+  "electrical manipulation",
   "energy touch", "darkforce manipulation", "darkforce generation",
   "shocking touch", "corrosive touch", "rotting touch"
 ];
@@ -210,7 +213,7 @@ export async function rollPower(actor, item) {
 
   // Nullifying Power: always route to mental-power regardless of category/type settings
   const nameLower = (item.name || "").toLowerCase();
-  if (nameLower.includes("nullif")) {
+  if (nameLower.includes("nullif") || powerType.includes("nullif")) {
     return ActionDispatcher.roll("mental-power", {
       actor,
       opts: { itemId: item.id, item }
@@ -220,6 +223,15 @@ export async function rollPower(actor, item) {
   // Ultimate Skill: roll the talent it makes Unearthly (rankOverride on the talent).
   if (nameLower === "ultimate skill" || powerType === "ultimate skill") {
     return rollUltimateSkill(actor, item);
+  }
+
+  if (powerType === "light manipulation" || nameLower === "light manipulation") {
+    const saveAbility = item.system.save?.ability || "endurance";
+    return ActionDispatcher.roll("intensity", {
+      actor,
+      abilityName: saveAbility,
+      opts: { itemId: item.id, item }
+    });
   }
 
   if (powerType === "sound manipulation" || nameLower === "sound manipulation") {
