@@ -18,8 +18,8 @@
     "grantsContact": "",
     "appliesTo": [
       "shooting",
-      "blunt-attack",
-      "edged-attack"
+      "edged-attack",
+      "throwing-edged"
     ],
     "flags": []
   },

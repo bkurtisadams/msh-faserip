@@ -1,3 +1,6 @@
+// karma-rules.js v1.2.0 - 2026-11-19
+// v1.2.0: withKarmaBaseline(actor, history) seeds a Starting Karma entry
+//         before the first spend on a ledger with no earned entries.
 // karma-rules.js v1.1.1 - 2026-09-05
 // v1.1.1: Parked sweep — permitCrime no longer auto-sets -5. The permit
 //         loss equals the arrest award and so varies by crime class;
@@ -27,6 +30,26 @@ export function computeKarmaTotals(history, { advancement = 0 } = {}) {
   }
   const adv = Number(advancement) || 0;
   return { earned, spent, value: Math.max(0, earned - spent - adv) };
+}
+
+/**
+ * History with a Starting Karma baseline in front when it has no earned
+ * entries yet (actor made outside chargen, after the ledger migration).
+ * Same seed as the init.js migration: source value + spent + advancement,
+ * so the reconciled value stays what the sheet showed. Returns a copy.
+ */
+export function withKarmaBaseline(actor, history) {
+  const list = Array.isArray(history) ? [...history] : [];
+  const { earned, spent } = computeKarmaTotals(list);
+  if (earned > 0) return list;
+  const src = actor?._source?.system ?? actor?.system ?? {};
+  const seed = (Number(src.attributes?.karma?.value) || 0) + spent + (Number(src.karma?.advancement) || 0);
+  if (seed <= 0) return list;
+  list.unshift({
+    timestamp: new Date().toISOString(), realDate: new Date().toLocaleDateString(), gameDate: "",
+    amount: seed, type: "Starting Karma", description: "Baseline seeded on first spend"
+  });
+  return list;
 }
 
 export const KARMA_RULES = {

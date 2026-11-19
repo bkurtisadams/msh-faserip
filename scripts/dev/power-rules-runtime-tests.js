@@ -1,3 +1,7 @@
+// scripts/dev/power-rules-runtime-tests.js v1.2.0 - 2026-11-19
+// v1.2.0: Karma per use now checks the balance (50 -> 40, Starting Karma
+//         baseline seeded). New "Talents" section checks the rebuilt talents
+//         compendium against Appendix B.
 // scripts/dev/power-rules-runtime-tests.js v1.1.0 - 2026-11-19
 // v1.1.0: "New power fields" section (2.55.14): multi-form Invulnerability,
 //         Ultimate Skill talent link, Raise Lowest Ability +20 effect, Karma
@@ -349,10 +353,13 @@ async function newFieldTests(recorder, state) {
       power("Pricey", { rank: "Good", value: 10, category: "mentalPowers", type: "Telepathy", karmaCost: 999 })]
   });
   recorder.equal(Number(item(kc, "Mind Control").system.karmaCost), 10, "Karma: Mind Control preset costs 10 Karma per use");
-  const spentBefore = (kc.system.karma?.history ?? []).length;
   await route(kc, item(kc, "Mind Control"));
+  await sleep(150);
   const hist = kc.system.karma?.history ?? [];
-  recorder.assert(hist.length === spentBefore + 1 && hist.at(-1)?.amount === -10, "Karma: using Mind Control spends 10 Karma", { last: hist.at(-1) });
+  recorder.assert(hist.at(-1)?.amount === -10 && kc.system.attributes.karma.value === 40,
+    "Karma: using Mind Control spends 10 Karma (50 -> 40, no ledger reset)",
+    { value: kc.system.attributes.karma.value, history: hist.map(h => `${h.type}:${h.amount}`) });
+  recorder.assert(hist[0]?.type === "Starting Karma" && hist[0]?.amount === 50, "Karma: first spend seeds a Starting Karma 50 baseline", { first: hist[0] });
   const pricey = await route(kc, item(kc, "Pricey"));
   recorder.assert(!pricey.dispatched.length && !pricey.window && (kc.system.karma?.history ?? []).length === hist.length,
     "Karma: a power costing more than the character has does not fire or charge", pricey);
@@ -396,6 +403,28 @@ async function newFieldTests(recorder, state) {
     "Edit Power sheet: Emotion 2, Costs and Active Effects render");
 }
 
+async function talentTests(recorder) {
+  const pack = game.packs.get(`${SYSTEM_ID}.talents`);
+  if (!pack) { recorder.skip("Talents: compendium found"); return; }
+  const docs = await pack.getDocuments();
+  const t = n => docs.find(d => d.name === n)?.system ?? {};
+  const has = (n, k) => (t(n).appliesTo ?? []).includes(k);
+  recorder.assert(has("Sharp Weapons", "edged-attack") && !has("Sharp Weapons", "throwing-edged"), "Talents: Sharp Weapons not for thrown daggers");
+  recorder.assert(has("Oriental Weapons", "throwing-edged") && has("Oriental Weapons", "shooting") && !has("Oriental Weapons", "blunt-attack"),
+    "Talents: Oriental Weapons covers shuriken and crossbows, not blunt", t("Oriental Weapons").appliesTo);
+  recorder.assert(!has("Martial Arts E", "shooting") && !has("Martial Arts E", "energy") && !has("Martial Arts E", "throwing-edged"),
+    "Talents: Martial Arts E is unarmed combat only", t("Martial Arts E").appliesTo);
+  recorder.assert(!has("Military", "shooting"), "Talents: Military gives no shooting bonus");
+  recorder.equal(t("Repair/Tinkering").isCumulative, true, "Talents: Repair/Tinkering stacks with other Talents");
+  const contacts = ["Business/Finance", "Criminology", "Detective/Espionage", "Journalism", "Military"].filter(n => !t(n).grantsContact);
+  recorder.assert(!contacts.length, "Talents: contact-granting Talents name their Contact", { missing: contacts });
+  const weaponsCum = docs.filter(d => d.system?.category === "Weapon Skills" && d.system.isCumulative === true).map(d => d.name);
+  const sciCum = docs.filter(d => d.system?.category === "Scientific Skills" && d.system.isCumulative === true).map(d => d.name);
+  const fightNot = docs.filter(d => d.system?.category === "Fighting Skills" && d.system.isCumulative !== true).map(d => d.name);
+  recorder.assert(!weaponsCum.length && !sciCum.length && !fightNot.length,
+    "Talents: Weapon and Scientific Talents don't stack; Fighting Talents do", { weaponsCum, sciCum, fightNot });
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -434,7 +463,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["Routing", () => routingTests(recorder, state)],
     ["Damage and Shred", () => damageTests(recorder, state)],
     ["Limitations and sheet", () => sheetTests(recorder, state)],
-    ["New power fields", () => newFieldTests(recorder, state)]
+    ["New power fields", () => newFieldTests(recorder, state)],
+    ["Talents", () => talentTests(recorder)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

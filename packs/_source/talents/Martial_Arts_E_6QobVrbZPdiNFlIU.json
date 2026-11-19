@@ -19,11 +19,6 @@
     "appliesTo": [
       "blunt-attack",
       "edged-attack",
-      "shooting",
-      "energy",
-      "force",
-      "throwing-blunt",
-      "throwing-edged",
       "grappling",
       "charging"
     ],

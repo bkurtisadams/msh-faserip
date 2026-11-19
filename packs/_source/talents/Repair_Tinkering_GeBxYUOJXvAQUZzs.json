@@ -10,7 +10,7 @@
     "type": "Other",
     "specialty": "Repair/Tinkering",
     "rankOverride": "",
-    "isCumulative": false,
+    "isCumulative": true,
     "isWeaponTalent": false,
     "notes": "",
     "category": "Other Talents",

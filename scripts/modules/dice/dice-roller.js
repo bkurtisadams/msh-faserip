@@ -1,4 +1,6 @@
 // File: systems/msh-faserip/scripts/modules/dice/dice-roller.js
+// 2026-11-19: deductKarma seeds a Starting Karma baseline first when the
+// history has no earned entries, so a first spend no longer zeroes Karma.
 // 2026-11-11: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // 2026-11-10: Roll visibility read via getRollMode() (core.messageMode on
 // v14; core.rollMode is deprecated and removed in v16).
@@ -496,7 +498,8 @@ export async function deductKarma(actor, amount, sourceName) {
     description: `Spent karma on ${sourceName}`
   };
   
-  const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+  const { withKarmaBaseline } = await import("../../karma-rules.js");
+  const currentHistory = withKarmaBaseline(actor, foundry.utils.deepClone(actor.system.karma?.history || []));
   const newHistory = currentHistory.concat([historyEntry]);
 
   await runAsGM({
