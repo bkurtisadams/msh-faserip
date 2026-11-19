@@ -1,3 +1,8 @@
+// power-router.js v1.17.0 - 2026-11-18
+// v1.17.0: RAW Power FEAT routes — Transferral (hero needs Red; failure KOs
+//          the hero 1-10 rounds), Animal Communication and Control (Popularity
+//          FEAT at Power rank), Weather Control (stunts roll the Power rank),
+//          Mechanical Intuition (invention roll at Unearthly, no modifiers).
 // power-router.js v1.16.0 - 2026-11-18
 // v1.16.0: Nullify route matches the power type as well as the name.
 //          Light Manipulation is not a damage attack: it opens the intensity
@@ -182,6 +187,45 @@ async function rollUltimateSkill(actor, item) {
   return picked ? rollTalent(actor, picked) : undefined;
 }
 
+const FEAT_LINE = (html, muted = false) =>
+  `<div style="padding:5px 10px;font-size:${muted ? "0.85em" : "0.95em"};text-align:center;${muted ? "color:#666;" : ""}">${html}</div>`;
+
+const POWER_FEAT_ROUTES = {
+  "transferral": (actor, item) => ({
+    power: item,
+    label: `${item.name}: Transferral`,
+    intensity: "None",
+    lockIntensity: true,
+    requiredColor: "red",
+    intensityHint: "Needs a Red Power rank FEAT. Target within one area; works on higher Psyches, Mental Powers, aliens and robots.",
+    onResult: async ({ success }) => {
+      if (success) return FEAT_LINE("Consciousness transferred. Mental abilities, mental Powers, Talents and Karma swap; physical abilities, physical Powers, Popularity, Contacts and Resources stay with the bodies.");
+      const dur = await new Roll("1d10").evaluate();
+      const { applyUnconscious } = await import("../effects/effect-engine.js");
+      await applyUnconscious(actor, { rounds: dur.total, originUuid: item.uuid });
+      return FEAT_LINE(`Transferral fails. ${actor.name} is unconscious for <strong>${dur.total}</strong> rounds and may not try again for one day.`, true);
+    }
+  }),
+  "animal communication and control": (actor, item) => ({
+    power: item,
+    label: `${item.name}: Request`,
+    intensityHint: "Popularity FEAT using the Power rank. Communication itself is automatic. Add +1/+2/+3CS for a narrowed type, family or specific companion animal.",
+    onResult: async ({ success }) => success
+      ? FEAT_LINE("The animal does as asked.")
+      : FEAT_LINE("Request refused. The animal may turn on the controller (Contacts never do).", true)
+  }),
+  "weather control": (actor, item) => ({
+    power: item,
+    label: `${item.name}: Power stunt`,
+    intensityHint: "Weather Control stunts roll the Power rank. New stunts cost 50 Karma to develop."
+  }),
+  "mechanical intuition": (actor, item) => ({
+    customRank: "Unearthly",
+    label: `${item.name}: Does the invention work?`,
+    intensityHint: "Unearthly regardless of Reason. No modifiers may be added. Resources are still required."
+  })
+};
+
 // ── Main entry point ───────────────────────────────────────
 
 /**
@@ -232,6 +276,12 @@ export async function rollPower(actor, item) {
       abilityName: saveAbility,
       opts: { itemId: item.id, item }
     });
+  }
+
+  const featRoute = POWER_FEAT_ROUTES[powerType] || POWER_FEAT_ROUTES[nameLower];
+  if (featRoute) {
+    const { showGenericFeatDialog } = await import("./generic-feat-dialog.js");
+    return showGenericFeatDialog(actor, featRoute(actor, item));
   }
 
   if (powerType === "sound manipulation" || nameLower === "sound manipulation") {

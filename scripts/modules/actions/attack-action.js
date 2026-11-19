@@ -1,4 +1,6 @@
-// attack-action.js v1.19.1 - 2026-11-17
+// attack-action.js v1.20.0 - 2026-11-18
+// v1.20.0: Continuing damage by rule is Corrosive Missile only (Power rank,
+//          -2CS, -4CS). Rotting Touch and Corrosive Touch no longer add it.
 // v1.19.1: Kernel-resolved to-hit now announces the roll
 //          (announceTableRoll) so the Universal Table highlights the cell
 //          again — lost when attacks moved onto resolveAttack.
@@ -2108,9 +2110,9 @@ export class AttackAction extends BaseAction {
         const wSys = weapon?.system || {};
         const nameLc = String(weapon?.name || "").toLowerCase();
         const dtLc = String(wSys.damageType || "").toLowerCase();
+        const isTouchPower = dtLc.startsWith("touch-") || /touch/.test(nameLc) || /touch/.test(String(wSys.type || "").toLowerCase());
         const isCorrosive = /corrosive|acid/.test(nameLc) || /corrosive|acid/.test(dtLc);
-        const isRotting = /rotting|decay/.test(nameLc);
-        const continuingByRule = isCorrosive || isRotting;
+        const continuingByRule = isCorrosive && !isTouchPower;
         const continuingByAuthor = wSys.continuingDamage === true;
         if (weapon?.type === "power" && (continuingByAuthor || continuingByRule) && afterArmor > 0) {
           const { applyContinuingDamage } = await import("../effects/ongoing-engine.js");

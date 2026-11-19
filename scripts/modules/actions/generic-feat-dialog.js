@@ -1,3 +1,6 @@
+// generic-feat-dialog.js v1.6.0 - 2026-11-18
+// v1.6.0: opts.requiredColor ("green"|"yellow"|"red") — with no intensity,
+//         success needs at least that color (Transferral needs Red).
 // generic-feat-dialog.js v1.5.4 - 2026-07-05
 // v1.5.4: Fix FEAT card crash on core 14+. applyMode() was fed the legacy
 //         core.rollMode value (a roll mode, not a message mode), so it read
@@ -323,7 +326,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
         const cs = parseInt($shift.val()) || 0;
 
         if (intensity === "None") {
-          setNeedPill($reqText, 'Any Color');
+          setNeedPill($reqText, opts.requiredColor || 'Any Color');
           return;
         }
 
@@ -394,7 +397,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
         const effectiveRank = applyCS(currentRank, columnShift);
 
-        let featRequirement = "Any Color";
+        let featRequirement = (intensity === "None" && opts.requiredColor) ? opts.requiredColor : "Any Color";
         let isImpossible = false;
         let isAutomatic = false;
         if (intensity !== "None") {
@@ -464,6 +467,7 @@ export async function showGenericFeatDialog(actor, opts = {}) {
 
         let featSuccess;
         if (intensity !== "None") featSuccess = checkFeatSuccess(resultColor, featRequirement);
+        else if (opts.requiredColor) featSuccess = checkFeatSuccess(resultColor, opts.requiredColor);
         else featSuccess = isColored(resultColor);  // RAW: colored = success, white = fail
 
         const result = { success: featSuccess, isAutomatic: false, color: resultColor, requirement: featRequirement, effectiveRank, roll: roll.total, cappedTotal, karmaUsed };

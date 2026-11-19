@@ -1,4 +1,7 @@
-// scripts/rules/mitigation.js v3.8.0 - 2026-09-09
+// scripts/rules/mitigation.js v3.9.0 - 2026-11-18
+// v3.9.0: Force fields take Force damage at full rank (RAW: "energy-type
+//         damage, including heat, force, and similar nonphysical attacks");
+//         Body Armor still treats Force as physical.
 // v3.8.0: Absorption onto the faserip-rules powers kernel (RULED 2026-09-09,
 //         RAW): applyAbsorptionFromAE asks absorption-pool.planAbsorption
 //         for the heal / pool / excess split and returns it on
@@ -196,6 +199,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   }
 
   const isEnergyDamage = dmgTypeLower.includes("energy");
+  const isFieldEnergy = isEnergyDamage || dmgTypeLower.includes("force");
   
   let currentDamage = rawDamage;
 
@@ -274,7 +278,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     // Force Field (not pre-calculated by attack-action)
     if (hasAEDefenses && aeDefenses.hasForceField && !bypassForceField) {
       const ffLayer = applyForceFieldFromAE(currentDamage, aeDefenses.forceField, {
-        isEnergyDamage, targetActorUuid: targetActor.uuid, attackIntensity
+        isEnergyDamage: isFieldEnergy, targetActorUuid: targetActor.uuid, attackIntensity
       });
       _addCap(ffLayer);
       if (ffLayer.absorbed > 0) {
@@ -356,7 +360,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     // Force Field (from AEs) — with cumulative round tracking and overload
     if (aeDefenses.hasForceField && !bypassForceField) {
       const ffLayer = applyForceFieldFromAE(currentDamage, aeDefenses.forceField, {
-        isEnergyDamage, targetActorUuid: targetActor.uuid, attackIntensity
+        isEnergyDamage: isFieldEnergy, targetActorUuid: targetActor.uuid, attackIntensity
       });
       _addCap(ffLayer);
       if (ffLayer.absorbed > 0) {
@@ -432,7 +436,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     
     // Layer 2: Force Field
     if (armorData.isForceField && !bypassForceField) {
-      const forceFieldLayer = applyForceField(currentDamage, armorData, { isEnergyDamage });
+      const forceFieldLayer = applyForceField(currentDamage, armorData, { isEnergyDamage: isFieldEnergy });
       _addCap(forceFieldLayer);
       if (forceFieldLayer.absorbed > 0) {
         currentDamage -= forceFieldLayer.absorbed;

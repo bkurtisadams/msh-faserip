@@ -1,4 +1,5 @@
-// scripts/modules/actions/paralyzing-touch-action.js v1.2.0 - 2026-05-15
+// scripts/modules/actions/paralyzing-touch-action.js v1.3.0 - 2026-11-18
+// v1.3.0: RAW outcome is knocked out (Unconscious) 1-10 rounds, not Paralyzed.
 // v1.2.0: Auto-apply target/attacker effect-state shifts to the other-target
 //         Fighting FEAT (mirrors attack-action.js:594 and Health-Drain v1.2.0).
 //         Effect shift folded into totalShift alongside manual CS; breakdown
@@ -26,7 +27,7 @@ import { showFaseripDialog } from "./dialog-shim.js";
 import { getRollMode } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
-import { applyParalyzed } from "../effects/effect-engine.js";
+import { applyUnconscious } from "../effects/effect-engine.js";
 import {
   generateKarmaControlsHTML,
   setupKarmaControlHandlers,
@@ -238,14 +239,14 @@ export async function showParalyzingTouchDialog(hero, item) {
           const dur = new Roll("1d10");
           await dur.evaluate();
           const rounds = Math.max(1, dur.total);
-          await applyParalyzed(subject, { rounds, originUuid: hero.uuid });
+          await applyUnconscious(subject, { rounds, originUuid: hero.uuid });
 
           outcomeBlock = `
             <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background-color:${req.impossible ? "#6a0000" : colorBg(resultColor)};color:${req.impossible ? "#fff" : colorFg(resultColor)};">
-              ${req.impossible ? "IMPOSSIBLE" : String(resultColor).toUpperCase()} &mdash; PARALYZED
+              ${req.impossible ? "IMPOSSIBLE" : String(resultColor).toUpperCase()} &mdash; KNOCKED OUT
             </div>
             <div style="padding:5px 10px;text-align:center;font-size:0.95em;color:#c62828;">
-              ${subject.name} paralyzed for <strong>${rounds}</strong> rounds (1d10 = ${dur.total}).
+              ${subject.name} knocked out for <strong>${rounds}</strong> rounds (1d10 = ${dur.total}).
             </div>`;
         }
 

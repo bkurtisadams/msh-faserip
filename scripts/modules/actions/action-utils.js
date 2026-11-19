@@ -1,3 +1,5 @@
+// action-utils.js v1.17.0 - 2026-11-18
+// v1.17.0: derivePowerDamage — Corrosive Touch inflicts Power rank -3CS.
 // action-utils.js v1.16.2 - 2026-11-16
 // v1.16.2: buildActionsBox ignoreDamageGate param → data-ignore-gate on the
 //          Slam/Stun chips (MA-D).
@@ -295,6 +297,9 @@ export function derivePowerDamage(system, actor) {
     return Number(ab.value)
       || Number(CONFIG.FASERIP?.rankValues?.[ab.rank])
       || Number(game.msh?.getRankValue?.(ab.rank)) || 0;
+  }
+  if (String(s.type || "").toLowerCase() === "corrosive touch") {
+    return rankValue(shiftRank(s.rank || "Typical", -3));
   }
   return Number(s.value) || rankVal || 0;
 }
