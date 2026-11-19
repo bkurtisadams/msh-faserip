@@ -1,3 +1,5 @@
+// scripts/dev/power-rules-runtime-tests.js v1.9.0 - 2026-11-19
+// v1.9.0: "Fire modes" section: Rate of fire, bursts, scatter, 1-per-2.
 // scripts/dev/power-rules-runtime-tests.js v1.8.0 - 2026-11-19
 // v1.8.0: "Range" section for the 2026-11-19 range-penalty ruling.
 // scripts/dev/power-rules-runtime-tests.js v1.7.0 - 2026-11-19
@@ -52,6 +54,7 @@ import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } 
 import { stuntKarmaCost } from "../stunt-ledger.js";
 import { startingKarmaHistory } from "../karma-rules.js";
 import { weaponRangePenalty, thrownRangePenalty } from "../modules/actions/range-helpers.js";
+import { weaponFireMode, burstTargets, scatterTokens, slowWeaponStatus, fireModeBoxHtml } from "../modules/actions/fire-modes.js";
 import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
 
 const SYSTEM_ID = "msh-faserip";
@@ -599,6 +602,36 @@ function rangeTests(recorder) {
   recorder.equal(thrownRangePenalty(2, "Excellent"), -1, "Range: thrown items take the same penalty (Excellent Strength, 2 areas: -1CS)");
 }
 
+function fireModeTests(recorder) {
+  const w = (rate, burstScatter = "none", flags = {}) => ({ name: "W", system: { rate, burstScatter }, flags: { "msh-faserip": flags } });
+  const ar = weaponFireMode(w("2"));
+  recorder.assert(ar.maxShots === 2 && !ar.burst, "Fire modes: Assault Rifle (Rate 2) fires 2 shots");
+  const sg = weaponFireMode(w("1,2", "burst"));
+  recorder.assert(sg.maxShots === 2 && sg.barrels && sg.burst, "Fire modes: Shotgun fires one or both barrels, each a burst");
+  recorder.assert(weaponFireMode(w("1 per 2")).slow, "Fire modes: Bazooka is 1 shot every 2 rounds");
+  recorder.assert(weaponFireMode(w("1", "scatter")).scatter, "Fire modes: Flamethrower scatters");
+
+  // Token stand-ins on a line of areas: area index = position.
+  const tok = (id, area) => ({ id, name: id, area, actor: {} });
+  const areas = (a, b) => Math.abs(a.area - b.area);
+  const b = burstTargets([tok("Rhino", 3), tok("A", 3), tok("Far", 5), tok("B", 3), tok("C", 3)], areas);
+  recorder.assert(b.inBurst.map(t => t.id).join() === "Rhino,A,B" && b.left.map(l => l.token.id).join() === "Far,C",
+    "Fire modes: burst takes up to 3 targets in the same area; a farther or 4th target is left out",
+    { inBurst: b.inBurst.map(t => t.id), left: b.left.map(l => `${l.token.id}: ${l.reason}`) });
+
+  const sc = scatterTokens(tok("Rhino", 3), [tok("Rhino", 3), tok("Same", 3), tok("Next", 4), tok("Two", 5), tok("Shooter", 2)], areas, { exclude: ["Shooter"] });
+  recorder.equal(sc.map(t => t.id).join(), "Same,Next", "Fire modes: scatter hits everyone within 1 area of the target, not the shooter");
+
+  const combat = { id: "c1", started: true, round: 5 };
+  const fired4 = { name: "Bazooka", system: { rate: "1 per 2" }, getFlag: () => ({ combatId: "c1", round: 4 }) };
+  const fired3 = { name: "Bazooka", system: { rate: "1 per 2" }, getFlag: () => ({ combatId: "c1", round: 3 }) };
+  const st = slowWeaponStatus(fired4, combat);
+  recorder.assert(st.blocked && st.nextRound === 6 && !slowWeaponStatus(fired3, combat).blocked,
+    "Fire modes: a 1-per-2 weapon fired in round 4 warns in round 5 (next shot round 6), not in round 5 after firing in 3", st);
+  recorder.assert(fireModeBoxHtml(fired4, { combat }).includes("Fire anyway") && fireModeBoxHtml({ name: "Pistol", system: { rate: "1", burstScatter: "none" } }) === "",
+    "Fire modes: dialog box shows the warning, and nothing for an ordinary pistol");
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -641,7 +674,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["Talents", () => talentTests(recorder)],
     ["Equipment powers", () => equipmentTests(recorder, state)],
     ["Karma ledger", () => karmaLedgerTests(recorder, state)],
-    ["Range", async () => rangeTests(recorder)]
+    ["Range", async () => rangeTests(recorder)],
+    ["Fire modes", async () => fireModeTests(recorder)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

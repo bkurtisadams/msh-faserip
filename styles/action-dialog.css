@@ -1,3 +1,4 @@
+/* action-dialog.css 2026-11-19: fire-mode box styles (rate of fire, burst, scatter) appended at the end. */
 /* action-dialog.css v3.11.0 - 2026-11-16 */
 /* v3.11.0: Karma Advancement dialog (.ka-adv-*) styles, moved out of the
            inline <style> block DialogV2 was stripping. */
@@ -1493,3 +1494,15 @@ body.system-msh-faserip .application.dialog:not(.faserip-shim-dialog) .karma-cal
 .ka-adv-avail{font-size:13px;font-weight:bold;margin-bottom:10px;color:#333;}
 .ka-adv-amount input[type=number]{width:90px;}
 .ka-adv-adjusted{font-size:11px;color:#8b0000;}
+
+/* ── Fire modes: rate of fire, burst, scatter (2026-11-19) ─────────────── */
+.frp-dlg .frp-fire-box { padding: 4px 8px; }
+.frp-dlg .frp-fire-lbl { font-family: 'Oswald', sans-serif; font-size: 10px; color: #6b5f4a; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+.frp-dlg .frp-fire-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 2px 0; }
+.frp-dlg .frp-fire-row label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.frp-dlg .frp-fire-hint { font-size: 12px; color: #555; }
+.frp-dlg .frp-fire-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid #b8a868; border-radius: 9px; padding: 0 7px; font-size: 12px; background: #fff; margin: 2px 4px 0 0; }
+.frp-dlg .frp-fire-chip.in { border-color: #2e7d32; color: #1b5e20; font-weight: 600; }
+.frp-dlg .frp-fire-chip.out { color: #999; text-decoration: line-through; }
+.frp-dlg .frp-fire-note { font-size: 11px; color: #666; font-style: italic; margin-top: 2px; }
+.frp-dlg .frp-fire-warn { font-size: 12px; color: #7a5a00; background: #fff6dc; border: 1px solid #d9a521; border-radius: 3px; padding: 3px 6px; margin-top: 3px; }

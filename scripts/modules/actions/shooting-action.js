@@ -1,3 +1,9 @@
+// shooting-action.js v3.20.0 - 2026-11-19
+// v3.20.0: Fire modes (fire-modes.js): Rate 2 / both barrels = two shots,
+//          separate rolls, no Multi FEAT; bursts apply one roll to up to 3
+//          targets in the same area; scatter hits everyone within 1 area of
+//          the target; "1 per 2" weapons warn when fired last round (GM may
+//          fire anyway).
 // shooting-action.js v3.19.0 - 2026-11-19
 // v3.19.0: Weapons with No Range Penalty ticked (Target Pistol, Sniper
 //          Rifle, Grenade Launcher) take no range penalty; the dialog says so.
@@ -189,7 +195,8 @@ import {
   buildInlineFeatDisplay,
   getEffectiveArmor as _getEffectiveArmor,
   getItemArmorPiercingCS,
-  getDeclaredMultiAttackState
+  getDeclaredMultiAttackState,
+  measureAreasBetweenTokens
 } from "./action-utils.js";
 import {
   AP_SHOT_SHIFT, RUBBER_SHOT, MERCY_SHOT, HEAT_SEEKER,
@@ -198,6 +205,7 @@ import {
 import { foundryNameFor } from "../../kernel/adapter.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { AreaTemplate } from "./area-template.js";
+import { weaponFireMode, burstTargets, scatterTokens, slowWeaponStatus, markSlowWeaponFired, fireModeBoxHtml } from "./fire-modes.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -436,6 +444,9 @@ export class ShootingAction extends RangedAttackAction {
         </div>
       </div>
 
+      <!-- Fire mode: rate of fire, burst, scatter (shown only when the weapon has them) -->
+      <div id="fire-mode-box">${fireModeBoxHtml(initialWeapon, { targets, areasBetween: measureAreasBetweenTokens, combat: game.combat })}</div>
+
       <!-- Options: Multi / Aim / Pull / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
@@ -625,6 +636,17 @@ export class ShootingAction extends RangedAttackAction {
               return;
             }
 
+            // Fire mode (Rate, burst). A "1 shot every 2 rounds" weapon fired
+            // last round needs the GM's Fire anyway.
+            const _fm = weaponFireMode(weapon);
+            const fireShots = _fm.maxShots > 1 ? (Number($dlg('[name="fireShots"]:checked').val()) || 1) : 1;
+            const fireBurst = _fm.burst && $dlg('[name="fireBurst"]').is(':checked');
+            if (slowWeaponStatus(weapon, game.combat).blocked && !$dlg('[name="fireAnyway"]').is(':checked')) {
+              const st = slowWeaponStatus(weapon, game.combat);
+              ui.notifications.warn(`${weapon.name} fires 1 shot every 2 rounds; next shot is round ${st.nextRound}. Tick Fire anyway to shoot now.`);
+              return;
+            }
+
             // Save settings — single document update
             const flagUpdate = { csNotes: cs.csNotes };
             if (rememberSettings) {
@@ -667,6 +689,8 @@ export class ShootingAction extends RangedAttackAction {
               attackCount,
               variantType,
               canisterSubType,
+              fireShots,
+              fireBurst,
               aimMode,
               resultCap,
               csNotes: cs.csNotes,
@@ -693,6 +717,7 @@ export class ShootingAction extends RangedAttackAction {
           html.find('#damage-source-select').on('change', () => {
             const wId = html.find('#damage-source-select').val();
             const w = shootingWeapons.find(i => i.id === wId);
+            html.find('#fire-mode-box').html(fireModeBoxHtml(w, { targets, areasBetween: measureAreasBetweenTokens, combat: game.combat }));
             const newVariantOpts = _buildVariantOptions(w, "");
             const $variantRow = html.find('#variant-row');
             if (newVariantOpts) {
@@ -800,6 +825,11 @@ export class ShootingAction extends RangedAttackAction {
 
     choice.shiftBreakdown = shiftBreakdown;
 
+    // Rate of fire: a weapon with Rate 2 (or a Shotgun's both barrels) fires
+    // two shots, separate rolls, no Multi FEAT. Multiple Attacks, when also
+    // declared, takes precedence.
+    if (actualAttackCount === 1 && Number(choice.fireShots) === 2) actualAttackCount = 2;
+
     // ── Ammo variant overrides ──────────────────────────────────
     const vt = choice.variantType || "standard";
     let effectiveActionType = actionType;
@@ -883,12 +913,26 @@ export class ShootingAction extends RangedAttackAction {
       });
     }
 
+    // Burst (one roll, up to 3 targets in the same area) and scatter (all
+    // within one area of the target). Explosive and Canister ammo keep their
+    // own area effects.
+    const _fireMode = weaponFireMode(weapon);
+    const _burst = choice.fireBurst && _fireMode.burst ? burstTargets(targets, measureAreasBetweenTokens) : null;
+    let fireCallback = null;
+    if (_burst && _burst.inBurst.length > 1) {
+      fireCallback = this._burstCallback({ others: _burst.inBurst.slice(1), damage: effectiveDamage, damageType: effectiveDamageType, attackForm: effectiveAttackForm });
+    } else if (_fireMode.scatter && vt !== "explosive" && vt !== "canister") {
+      fireCallback = this._scatterCallback({ damage: effectiveDamage, damageType: effectiveDamageType, attackForm: effectiveAttackForm });
+    }
+    const _chain = (a, b) => (a && b) ? async (args) => { await a(args); await b(args); } : (a || b);
+
     // Execute attack(s)
     for (let i = 1; i <= actualAttackCount; i++) {
       if (i > 1) await new Promise(resolve => setTimeout(resolve, 500));
 
       const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
-      const targetForThisAttack = actualAttackCount === 1 ? targets[0] : targets[(i-1) % targets.length];
+      // A burst always aims at its main target; other shots take targets in turn.
+      const targetForThisAttack = (actualAttackCount === 1 || _burst) ? targets[0] : targets[(i-1) % targets.length];
 
       const _baseSourceName = choice.weapon?.name || "Weapon";
       const _sourceName = (attackMode && choice.weapon?.id === passedItem?.id && attackMode.name)
@@ -911,9 +955,11 @@ export class ShootingAction extends RangedAttackAction {
         targetCount: 1,
         attackNumber: i,
         totalAttacks: actualAttackCount,
-        postHitCallback: i === 1 ? postHitCallback : null
+        postHitCallback: _chain(i === 1 ? postHitCallback : null, fireCallback)
       });
     }
+
+    await markSlowWeaponFired(weapon, game.combat);
 
     // Multi-attack completion message
     if (actualAttackCount > 1) {
@@ -1046,6 +1092,65 @@ export class ShootingAction extends RangedAttackAction {
   // handles the ripple. Skipped if the shot missed. Per RAW: "If the weapon
   // fires bursts or scatters, all in the area are affected when using
   // explosive shot."
+  // ─────────────────────────────────────────────────────────────
+  // Burst: the one roll on the main target applies to the other burst
+  // targets, each against its own armor (RULED 2026-11-19: same area).
+  // ─────────────────────────────────────────────────────────────
+  _burstCallback({ others, damage, damageType, attackForm }) {
+    return async ({ isHit, color, actor }) => {
+      const tokens = (others || []).filter(t => t?.actor);
+      if (!tokens.length) return;
+      const hit = isHit && color !== "white";
+      let results = [];
+      if (hit && damage > 0) {
+        const { applyDamageToTargets } = await import("./action-utils.js");
+        results = await applyDamageToTargets({
+          damage, attackerUuid: actor?.uuid, damageType, attackForm,
+          showNotification: false, bypassArmor: false, wasKillResult: color === "red", targets: tokens
+        }) || [];
+      }
+      const rows = tokens.map((t, idx) => {
+        const r = results.find?.(x => x?.tokenUuid === t.document?.uuid) || results[idx] || null;
+        const dealt = r?.net;
+        return `<div style="display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:2px 0;"><span>${t.name}</span><span>${hit ? (dealt !== undefined ? `<b>${dealt}</b> damage` : "hit") : "missed"}</span></div>`;
+      }).join("");
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div style="background:#fffde7;border:1px solid #c8960c;border-radius:3px;padding:6px 8px;margin:4px 0;">
+          <div style="font-weight:bold;color:#8b0000;margin-bottom:3px;">Burst: same roll for ${tokens.length + 1} targets</div>
+          <div style="font-size:.85em;">${rows}</div>
+        </div>`
+      });
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Scatter: on a hit, everyone within one area of the target takes the
+  // damage against their own armor. No template is placed; the shooter is
+  // never caught in it.
+  // ─────────────────────────────────────────────────────────────
+  _scatterCallback({ damage, damageType, attackForm }) {
+    return async ({ isHit, color, target, actor }) => {
+      if (!isHit || color === "white" || !target || !(damage > 0)) return;
+      const shooter = actor?.getActiveTokens?.()?.map(t => t.id) ?? [];
+      const caught = scatterTokens(target, canvas?.tokens?.placeables ?? [], measureAreasBetweenTokens, { exclude: shooter });
+      if (caught.length) {
+        const { applyDamageToTargets } = await import("./action-utils.js");
+        await applyDamageToTargets({
+          damage, attackerUuid: actor?.uuid, damageType, attackForm,
+          showNotification: false, bypassArmor: false, targets: caught
+        });
+      }
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div style="background:#fff3e0;border:1px solid #ef6c00;border-radius:3px;padding:6px 8px;margin:4px 0;">
+          <div style="font-weight:bold;color:#e65100;margin-bottom:3px;">Scatter: within 1 area of ${target.name}</div>
+          <div style="font-size:.85em;">${caught.length ? `${caught.map(t => t.name).join(", ")} took ${damage} damage (less armor).` : "No one else was within 1 area."}</div>
+        </div>`
+      });
+    };
+  }
+
   _explosiveAreaCallback({ damage, damageType }) {
     return async ({ targetActor, target, isHit, color, actor }) => {
       if (!isHit || color === "white" || !target) return;
