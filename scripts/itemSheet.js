@@ -1,3 +1,6 @@
+// itemSheet.js v2.6.0 - 2026-11-19
+// v2.6.0: Power sheet context gains `rankCheck` (power-validation.mjs): the
+//         minimum rank resolved against the actor, with a below-minimum warning.
 // itemSheet.js v2.5.0 - 2026-11-19
 // v2.5.0: Power sheet context gains `limit` (power-limitations.mjs) for the
 //         rebuilt Limitation section and its character-wide warnings.
@@ -52,6 +55,7 @@ import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 import { buildPowerSheetView } from "./power-sheet-view.mjs";
 import { buildLimitationView } from "./power-limitations.mjs";
+import { buildRankValidation } from "./power-validation.mjs";
 import { stuntShift, stuntUsesItem } from "./modules/actions/stunt-mechanics.js";
 import { isStuntPower, stuntPowerContext } from "./stunt-power.js";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
@@ -161,6 +165,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       };
       context.ps2 = buildPowerSheetView(context.system ?? {}, context.powerOriginFlags);
       context.limit = buildLimitationView(this.item);
+      context.rankCheck = buildRankValidation(this.item);
       context.stuntPower = stuntPowerContext(this.item, { usesItem: stuntUsesItem, shiftFor: stuntShift });
 
       // Helpful logging (kept from your original)

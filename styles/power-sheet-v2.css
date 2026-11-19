@@ -1,4 +1,4 @@
-/* power-sheet-v2.css — HQ-style power dialog (v2.2.0 2026-11-19: Limitation section per approved mockup) */
+/* power-sheet-v2.css — HQ-style power dialog (v2.3.0 2026-11-19: Description 9 lines, Special Mechanics 2; v2.2.0: Limitation section) */
 
 /* ── Sheet container ──────────────────────── */
 /* V2 (ApplicationV2) renders the <form> directly inside the window — there
@@ -533,6 +533,12 @@
   border-radius: 2px;
   resize: vertical;
   font-family: inherit;
+}
+.power-sheet-v2 .ps2-field textarea.ps2-desc-text,
+.power-sheet-v2 .ps2-field textarea.ps2-special-text {
+  line-height: 13px;
+  min-height: 0;
+  height: auto;
 }
 .power-sheet-v2 .ps2-textarea:focus {
   border-color: #8b0000;

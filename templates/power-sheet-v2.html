@@ -59,7 +59,7 @@
         </div>
         <div class="ps2-field">
           <label>Minimum rank</label>
-          <input type="text" value="{{ps2.minRank}}" readonly tabindex="-1" />
+          <input type="text" value="{{rankCheck.label}}" readonly tabindex="-1" />
         </div>
 <div class="ps2-field">
 <label>Range</label>
@@ -108,6 +108,14 @@
           </select>
         </div>
       </div>
+      {{#if rankCheck.hasWarnings}}
+      <div class="ps2-limit-warns" role="status">
+        {{#each rankCheck.warnings as |w|}}
+        <div class="ps2-limit-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{w}}</span></div>
+        {{/each}}
+        <div class="ps2-limit-foot">Warnings only. The power still saves.</div>
+      </div>
+      {{/if}}
       <div class="ps2-flags">
         <label><input type="checkbox" name="system.countsAsTwoPowers" {{checked system.countsAsTwoPowers}} data-dtype="Boolean"> Counts as 2</label>
         <label><input type="checkbox" name="system.isBonus" {{checked ps2.isBonus}} data-dtype="Boolean"> Bonus Power</label>
@@ -977,11 +985,11 @@
       <legend>Description &amp; Notes</legend>
       <div class="ps2-field">
         <label>Description</label>
-        <textarea name="system.description" rows="6" class="ps2-textarea">{{system.description}}</textarea>
+        <textarea name="system.description" rows="9" class="ps2-textarea ps2-desc-text">{{system.description}}</textarea>
       </div>
       <div class="ps2-field" style="margin-top:4px;">
         <label>Special Mechanics</label>
-        <textarea name="system.specialMechanics" rows="5" class="ps2-textarea" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
+        <textarea name="system.specialMechanics" rows="2" class="ps2-textarea ps2-special-text" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
       </div>
     </fieldset>
 
