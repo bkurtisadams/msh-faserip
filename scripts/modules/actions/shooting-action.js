@@ -1,3 +1,6 @@
+// shooting-action.js v3.19.0 - 2026-11-19
+// v3.19.0: Weapons with No Range Penalty ticked (Target Pistol, Sniper
+//          Rifle, Grenade Launcher) take no range penalty; the dialog says so.
 // shooting-action.js v3.18.0 - 2026-11-18
 // v3.18.0: Opened from a talent roll, the CS row starts at the talent's shift
 //          (Ultimate Skill override included) and that shift is not remembered.
@@ -349,7 +352,7 @@ export class ShootingAction extends RangedAttackAction {
     }).join('');
 
     // === Build CS row via shared utility (manual input + range + ? reference) ===
-    const initialRangePenalty = (initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) ? 0 : weaponRangePenalty(savedRange);
+    const initialRangePenalty = ((initialVariant === "heatSeeker" && HEAT_SEEKER.noRangePenalty) || initialWeapon?.system?.noRangePenalty === true) ? 0 : weaponRangePenalty(savedRange);
     const autoMods = detectAutoSituational({ attacker: resolveAttackerToken(actor), target: primaryTarget, context: "ranged" });
     const csRowHtml = buildCSRow({
       savedCS: talentSeed ? talentSeed.cs : savedColumnShift,
@@ -479,6 +482,8 @@ export class ShootingAction extends RangedAttackAction {
             const weapon = shootingWeapons.find(i => i.id === weaponId);
             const maxRange = weapon?.system?.range || 15;
             if (rangeVal > maxRange) return 0; // out of range — handled separately
+            // Target Pistol, Sniper Rifle, Grenade Launcher: no penalty for range.
+            if (weapon?.system?.noRangePenalty === true) return 0;
             return weaponRangePenalty(rangeVal); // -1CS per area beyond the first (RULED 2026-11-19)
           };
           _csState = wireCSPanel(html, {
@@ -543,6 +548,9 @@ export class ShootingAction extends RangedAttackAction {
               _csState.setRange(0);
             } else if (isHeatSeeker) {
               $rangePenalty.text('Heat-Seeker (no penalty)').css('color', '#1565c0');
+              _csState.setRange(0);
+            } else if (weapon?.system?.noRangePenalty === true) {
+              $rangePenalty.text('No range penalty').css('color', '#1565c0');
               _csState.setRange(0);
             } else {
               const penalty = weaponRangePenalty(rangeVal); // -1CS per area beyond the first (RULED 2026-11-19)
