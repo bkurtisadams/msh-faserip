@@ -1,3 +1,5 @@
+// power-sheet-v2-logic.js v2.2.0 - 2026-11-18
+// v2.2.0: Sonic resistance type (Sound Manipulation) reduces damage by rank#.
 // power-sheet-v2-logic.js v2.1.0 - 2026-11-13
 // v2.1.0: Tabs removed; back to the single scrolling form with Rank and
 //         Value in Rank & Identity. Field changes from v2.0.0 kept.
@@ -110,6 +112,7 @@ const RESISTANCE_TYPE_DEFAULTS = {
   electricity: { effect: "damageReduction", minRank: "" },
   radiation:   { effect: "damageReduction", minRank: "" },
   corrosive:   { effect: "damageReduction", minRank: "" },
+  sound:       { effect: "damageReduction", minRank: "" },
   toxin:       { effect: "featReplace",     minRank: "endurance+1" },
   disease:     { effect: "featReplace",     minRank: "endurance+1" },
   emotion:     { effect: "featReplace",     minRank: "intuition+1" },

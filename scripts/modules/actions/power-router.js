@@ -1,3 +1,6 @@
+// power-router.js v1.15.0 - 2026-11-18
+// v1.15.0: Sound Manipulation early-route — not an attack; opens the
+//          Dampen / Raise noise dialog regardless of any stale attack column.
 // power-router.js v1.14.0 - 2026-11-18
 // v1.14.0: Ultimate Skill early-route — the power is not an attack; it opens
 //          the roll for the talent carrying the Unearthly rank override
@@ -217,6 +220,11 @@ export async function rollPower(actor, item) {
   // Ultimate Skill: roll the talent it makes Unearthly (rankOverride on the talent).
   if (nameLower === "ultimate skill" || powerType === "ultimate skill") {
     return rollUltimateSkill(actor, item);
+  }
+
+  if (powerType === "sound manipulation" || nameLower === "sound manipulation") {
+    const { showSoundManipulationDialog } = await import("./sound-manipulation-action.js");
+    return showSoundManipulationDialog(actor, item);
   }
 
   // Psi-Screen: extend the screen over others (own dialog; passive defense otherwise)
