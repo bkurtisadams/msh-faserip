@@ -1,4 +1,4 @@
-/* power-sheet-v2.css — HQ-style power dialog */
+/* power-sheet-v2.css — HQ-style power dialog (v2.2.0 2026-11-19: Limitation section per approved mockup) */
 
 /* ── Sheet container ──────────────────────── */
 /* V2 (ApplicationV2) renders the <form> directly inside the window — there
@@ -712,3 +712,20 @@
   border: 1px solid #e0b070;
   border-radius: 3px;
 }
+
+/* ── Limitation section (v2.2.0) ──────────── */
+.power-sheet-v2 [data-section="limitation"] legend { display: flex; align-items: center; }
+.power-sheet-v2 .ps2-limit-req { font-size: 9px; font-weight: bold; color: #fff; background: #8b0000; border-radius: 8px; padding: 0 6px; margin-left: 6px; }
+.power-sheet-v2 .ps2-limit-badge { font-size: 9px; font-weight: bold; color: #7a5a00; background: #ffe9a8; border: 1px solid #d9a521; border-radius: 8px; padding: 0 5px; margin-left: 6px; }
+.power-sheet-v2 .ps2-limit-hint { margin: 3px 0 0; }
+.power-sheet-v2 [data-section="limitation"] .ps2-field { margin-top: 3px; }
+.power-sheet-v2 [data-section="limitation"] .ps2-field textarea { min-height: 44px; }
+.power-sheet-v2 .ps2-limit-charbox { margin-top: 5px; border: 1px solid #d8cdb5; background: #f3eee2; border-radius: 3px; padding: 4px 6px; font-size: 10px; color: #3d3d3d; }
+.power-sheet-v2 .ps2-limit-charbox b { color: #8b0000; }
+.power-sheet-v2 .ps2-limit-chip { display: inline-block; border: 1px solid #c0a070; border-radius: 9px; padding: 0 6px; margin: 2px 3px 0 0; font-size: 10px; background: #fff; }
+.power-sheet-v2 .ps2-limit-chip.current { border-color: #8b0000; color: #8b0000; font-weight: bold; }
+.power-sheet-v2 .ps2-limit-ok { margin-top: 5px; font-size: 10px; color: #2f5d1e; background: #eef5e8; border: 1px solid #b9d3a6; border-radius: 3px; padding: 3px 6px; }
+.power-sheet-v2 .ps2-limit-warns { margin-top: 5px; background: #fff6dc; border: 1px solid #d9a521; border-radius: 3px; padding: 4px 6px; }
+.power-sheet-v2 .ps2-limit-warn { display: flex; gap: 5px; font-size: 10px; color: #5a4300; margin: 2px 0; line-height: 1.3; }
+.power-sheet-v2 .ps2-limit-warn i { color: #9a6b00; margin-top: 2px; font-size: 9px; }
+.power-sheet-v2 .ps2-limit-foot { font-size: 9px; color: #6b5a1d; font-style: italic; margin-top: 3px; }

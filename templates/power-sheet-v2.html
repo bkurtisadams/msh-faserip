@@ -840,28 +840,105 @@
           <input type="checkbox" name="system.isLimited" {{checked system.isLimited}} data-dtype="Boolean" class="ps2-section-check" data-section="limitation">
           Limitation
         </label>
+        {{#if limit.required}}<span class="ps2-limit-req">Required</span>
+        {{else if limit.hasWarnings}}<span class="ps2-limit-badge">{{limit.warningCount}} warning{{#unless (eq limit.warningCount 1)}}s{{/unless}}</span>{{/if}}
       </legend>
       <div class="ps2-section-body" {{#unless system.isLimited}}style="display:none;"{{/unless}}>
+        {{#if limit.required}}
         <div class="ps2-grid-2col">
           <div class="ps2-field">
-            <label>Rank bonus for taking it</label>
-            <select name="system.limitation.rankBonus" data-dtype="Number">
-              <option value="0" {{#if (eq ps2.rankBonus 0)}}selected{{/if}}>None</option>
-              <option value="1" {{#if (eq ps2.rankBonus 1)}}selected{{/if}}>+1CS</option>
-              <option value="2" {{#if (eq ps2.rankBonus 2)}}selected{{/if}}>+2CS</option>
+            <label>Kind</label>
+            {{#if limit.typeLocked}}
+            <input type="text" value="Required by {{limit.typeLabel}}" readonly tabindex="-1" />
+            {{else}}
+            <select name="system.limitation.kind">
+              <option value="raise">Raises rank (optional)</option>
+              <option value="required" selected>Required by power type</option>
+            </select>
+            {{/if}}
+          </div>
+          <div class="ps2-field">
+            <label>Limitation rank</label>
+            <input type="text" value="{{limit.requiredRank}}" readonly tabindex="-1" />
+          </div>
+        </div>
+        <p class="ps2-hint ps2-limit-hint">A required limitation does not raise the rank and is not the character's one limit.</p>
+        {{else}}
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Kind</label>
+            <select name="system.limitation.kind">
+              <option value="raise" selected>Raises rank (optional)</option>
+              <option value="required">Required by power type</option>
             </select>
           </div>
-<div class="ps2-field">
-<label>Required by this type</label>
-<input type="text" value="{{ps2.limitationRequired}}" readonly tabindex="-1" />
-</div>
+          <div class="ps2-field">
+            <label>Limitation</label>
+            <select name="system.limitation.preset">
+              <option value="" {{#if limit.noPreset}}selected{{/if}}>-- Pick a limitation --</option>
+              {{#each limit.presetGroups as |g|}}
+              <optgroup label="{{g.label}}">
+                {{#each g.options as |o|}}<option value="{{o.id}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>{{/each}}
+              </optgroup>
+              {{/each}}
+              <optgroup label="Other">
+                <option value="custom" {{#if limit.isCustom}}selected{{/if}}>Custom (Judge sets maximum)</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
+        <div class="ps2-grid-3col">
+          <div class="ps2-field">
+            <label>Original rank</label>
+            <select name="system.preLimitationRank">
+              {{#each limit.originalOptions as |r|}}<option value="{{r.value}}" {{#if r.selected}}selected{{/if}}>{{r.value}}</option>{{/each}}
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Raised to</label>
+            <input type="text" value="{{limit.raisedTo}}" readonly tabindex="-1" />
+          </div>
+          <div class="ps2-field">
+            <label>Maximum</label>
+            {{#if limit.isCustom}}
+            <select name="system.limitation.maxRank">
+              <option value="">-- Set --</option>
+              {{#each limit.maxOptions as |r|}}<option value="{{r.value}}" {{#if r.selected}}selected{{/if}}>{{r.value}}</option>{{/each}}
+            </select>
+            {{else}}
+            <input type="text" value="{{limit.maxRank}}" readonly tabindex="-1" />
+            {{/if}}
+          </div>
+        </div>
+        <p class="ps2-hint ps2-limit-hint">Raised to is the power's Rank above. Maximum comes from the limitation picked (Custom: the Judge sets it).</p>
+        {{/if}}
         <div class="ps2-field">
           <label>Detail</label>
-          <textarea name="system.limitations" rows="3" placeholder="e.g., only at night">{{ps2.limitationText}}</textarea>
+          <textarea name="system.limitations" rows="2" placeholder="{{#if limit.required}}e.g., visions come only in dreams{{else}}e.g., only at night{{/if}}">{{limit.detail}}</textarea>
         </div>
+        <div class="ps2-limit-charbox">
+          <b>Character's limit:</b>
+          {{#if limit.charLimitName}}{{limit.charLimitName}} &middot; raises {{limit.raisedCount}} of 3 powers{{else}}none taken{{/if}}
+          {{#if limit.hasChips}}<div>{{#each limit.chips as |c|}}<span class="ps2-limit-chip{{#if c.current}} current{{/if}}">{{c.name}}</span>{{/each}}</div>{{/if}}
+        </div>
+        {{#if limit.hasWarnings}}
+        <div class="ps2-limit-warns" role="status">
+          {{#each limit.warnings as |w|}}
+          <div class="ps2-limit-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{w}}</span></div>
+          {{/each}}
+          <div class="ps2-limit-foot">Warnings only. The power still saves.</div>
+        </div>
+        {{else}}
+        <div class="ps2-limit-ok">No limitation problems.</div>
+        {{/if}}
       </div>
-      {{#unless system.isLimited}}<p class="ps2-hint ps2-off-note">No limitation taken.</p>{{/unless}}
+      {{#unless system.isLimited}}
+      {{#if limit.requiredOff}}
+      <div class="ps2-limit-warns ps2-off-note" role="status"><div class="ps2-limit-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{limit.typeLabel}} requires a limitation. Tick Limitation and describe it.</span></div></div>
+      {{else}}
+      <p class="ps2-hint ps2-off-note">No limitation taken.</p>
+      {{/if}}
+      {{/unless}}
     </fieldset>
 
     <fieldset class="ps2-fieldset" data-section="bonusPowers">
