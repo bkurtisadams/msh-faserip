@@ -1,4 +1,8 @@
-// scripts/modules/effects/defense-effects.js v1.11.0 - 2026-11-19
+// scripts/modules/effects/defense-effects.js v1.12.0 - 2026-11-19
+// v1.12.0: Density Manipulation Self and Plasticity get their armor from
+//          body-control-effects.js only. The generic Body Armor effect (energy
+//          at rank -20) used to be created first and block theirs as a
+//          duplicate "body-armor" status. Cleanup here never touches bc-* AEs.
 // v1.11.0: Invulnerability may cover several attack forms: the resistance
 //          AE carries flags.resistanceTypes (all forms) and matching accepts
 //          any of them. resistanceType stays the first form.
@@ -134,9 +138,21 @@ function getItemIdForEffectId(effectId = "") {
   return parts.length >= 3 && parts[0] === "defense" ? parts.slice(2).join(".") : "";
 }
 
+// Body-control effects (Density Self, Plasticity) build their own armor AE
+// with an ongoingId starting "bc-"; this module must leave those alone.
+const isBodyControlAE = (f) => String(f?.ongoingId || "").startsWith("bc-");
+const BODY_CONTROL_ARMOR = new Set(["density manipulation self", "density manipulation",
+  "density manipulation (self)", "densityself", "plasticity"]);
+function bodyControlOwnsArmor(item) {
+  const n = String(item?.name || "").toLowerCase();
+  const t = String(item?.system?.type || "").toLowerCase();
+  return BODY_CONTROL_ARMOR.has(n) || BODY_CONTROL_ARMOR.has(t);
+}
+
 function matchesDefenseAEForItem(ae, effectId, defenseType = "", itemId = "") {
   const f = getDefenseFlags(ae);
   if (f.effectCategory !== "defense") return false;
+  if (isBodyControlAE(f)) return false;
   if (defenseType && f.defenseType !== defenseType) return false;
 
   return f.ongoingId === effectId
@@ -540,6 +556,7 @@ async function pruneStaleDefenseAEs(actor, powers = null) {
   for (const ae of actor.effects) {
     const f = getDefenseFlags(ae);
     if (f.effectCategory !== "defense") continue;
+    if (isBodyControlAE(f)) continue;
 
     const itemId = f.powerItemId || getItemIdForEffectId(f.ongoingId || "");
     if (!itemId) continue;
@@ -553,7 +570,7 @@ async function pruneStaleDefenseAEs(actor, powers = null) {
     const sys = item.system || {};
     const defenseType = f.defenseType;
     const stillValid = defenseType === "bodyArmor"
-      ? (sys.isBodyArmor || isBodyArmorByName(item))
+      ? ((sys.isBodyArmor || isBodyArmorByName(item)) && !bodyControlOwnsArmor(item))
       : defenseType === "forceField"
         ? (sys.isForceField || isForceFieldByName(item))
         : defenseType === "resistance"
@@ -593,7 +610,7 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   const baId = defenseEffectId("bodyArmor", item.id);
   if (removing) {
     await removeDefenseAE(actor, baId);
-  } else if (sys.isBodyArmor || isBodyArmorByName(item)) {
+  } else if ((sys.isBodyArmor || isBodyArmorByName(item)) && !bodyControlOwnsArmor(item)) {
     const values = resolveBodyArmorValues(item);
     const aeData = buildBodyArmorAE(item, values);
     await registerDefenseAE(actor, baId, aeData, isInactive);

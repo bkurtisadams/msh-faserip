@@ -1,4 +1,6 @@
-// scripts/dev/power-rules-runtime-tests.js v2.0.0 - 2026-11-19
+// scripts/dev/power-rules-runtime-tests.js v2.0.1 - 2026-11-19
+// v2.0.1: Healing records through recordHealingHealth (dotted ids); Density
+//         Self has one armor effect; Plasticity is physical-only armor.
 // v2.0.0: "Mechanics" section: Teleportation, Mind Control, Mental Probe,
 //         Energy Reflection, Healing, Density Manipulation (Self/Others).
 // scripts/dev/power-rules-runtime-tests.js v1.9.0 - 2026-11-19
@@ -58,7 +60,7 @@ import { stuntKarmaCost } from "../stunt-ledger.js";
 import { startingKarmaHistory } from "../karma-rules.js";
 import { weaponRangePenalty, thrownRangePenalty } from "../modules/actions/range-helpers.js";
 import { mentalEffectDefaults } from "../modules/actions/mental-power-action.js";
-import { getHealingDailyCap } from "../modules/actions/healing-action.js";
+import { getHealingDailyCap, recordHealingHealth } from "../modules/actions/healing-action.js";
 import { syncBodyControlEffects } from "../modules/effects/body-control-effects.js";
 import { weaponFireMode, burstTargets, scatterTokens, slowWeaponStatus, fireModeBoxHtml } from "../modules/actions/fire-modes.js";
 import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
@@ -680,8 +682,10 @@ async function mechanicTests(recorder, state) {
   const healer = await createActor(state, "Healer", { items: [P("Healing", "Healing", "bodyAlterationsDefensive", { rank: "Excellent", value: 20 })] });
   const today = "2026-11-19";
   recorder.equal(getHealingDailyCap(healer, "Actor.x", today, 20), 20, "Healing: a fresh day allows the full rank (20)");
-  await healer.setFlag("msh-faserip", "healing.dailyCap", { "Actor.x": { date: today, amount: 15 } });
-  recorder.equal(getHealingDailyCap(healer, "Actor.x", today, 20), 5, "Healing: after 15 healed today, 5 more for that target");
+  await recordHealingHealth(healer, "Actor.x", today, 10);
+  await recordHealingHealth(healer, "Actor.x", today, 5);
+  recorder.equal(getHealingDailyCap(healer, "Actor.x", today, 20), 5, "Healing: after 10 + 5 healed today, 5 more for that target");
+  recorder.assert(!healer.getFlag("msh-faserip", "healing.dailyCap")?.Actor, "Healing: the record isn't split up by the dot in the target's id", healer.getFlag("msh-faserip", "healing.dailyCap"));
   recorder.equal(getHealingDailyCap(healer, "Actor.y", today, 20), 20, "Healing: the cap is per target");
   recorder.equal(getHealingDailyCap(healer, "Actor.x", "2026-11-20", 20), 20, "Healing: the cap resets the next day");
 
@@ -694,6 +698,16 @@ async function mechanicTests(recorder, state) {
   await sleep(200);
   recorder.equal(net(dense, 40, "physical-blunt"), 10, "Density (Self): Remarkable density is Body Armor 30 vs physical (40 net 10)");
   recorder.equal(net(dense, 40, "energy-fire"), 10, "Density (Self): and 30 vs energy (40 net 10)");
+  const denseArmor = dense.effects.filter(e => e.getFlag("msh-faserip", "defenseType") === "bodyArmor");
+  recorder.assert(denseArmor.length === 1 && String(denseArmor[0].getFlag("msh-faserip", "ongoingId")).startsWith("bc-density"),
+    "Density (Self): its only armor effect is the Density one (no generic 30/10)", denseArmor.map(e => e.name));
+  const plastic = await createActor(state, "Plastic", { items: [
+    P("Plasticity", "Plasticity", "bodyControl", { rank: "Remarkable", value: 30 })
+  ] });
+  try { await syncBodyControlEffects(plastic, item(plastic, "Plasticity"), false); } catch (_) { /* sync may already have run */ }
+  await sleep(200);
+  recorder.equal(net(plastic, 40, "physical-blunt"), 10, "Plasticity: Body Armor 30 vs physical (40 net 10)");
+  recorder.equal(net(plastic, 40, "energy-fire"), 40, "Plasticity: no protection vs energy (40 net 40)");
   const dOthers = await route(dense, item(dense, "Density Manipulation Others"));
   recorder.assert(dOthers.dispatched.includes("intensity"), "Density (Others): rolls the target's save, not an info card", dOthers);
 }

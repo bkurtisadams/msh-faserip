@@ -1,5 +1,8 @@
-// scripts/modules/actions/healing-action.js 2026-11-19: daily-cap helpers
-// exported for the runtime tests (no behaviour change).
+// scripts/modules/actions/healing-action.js v2.1.1 - 2026-11-19
+// v2.1.1: daily-cap entries are keyed by the target UUID with dots replaced.
+//         Foundry expands dotted flag keys into nested objects, so the old
+//         "Actor.abc" key was saved as {Actor:{abc:...}} and never read back:
+//         the per-target daily limit never applied. Helpers exported for tests.
 // scripts/modules/actions/healing-action.js v2.1.0 - 2026-10-01
 // v2.1.0: Health mode heals REAL Health through healPointsNow (splitHealth;
 //         fixed-bug: the raw min(max, value + amount) write wiped a held
@@ -70,24 +73,23 @@ function colorFg(c) {
   }
 }
 
+// Flag keys may not contain dots (Foundry expands them into nested objects).
+const capKey = (uuid) => String(uuid || "").replace(/\./g, "_");
+
 export function getHealingDailyCap(healer, targetUuid, today, rank) {
   const scope = SCOPE();
   const cap = healer.getFlag(scope, "healing.dailyCap") || {};
-  const entry = cap[targetUuid];
+  const entry = cap[capKey(targetUuid)];
   if (!entry || entry.date !== today) return rank;
   return Math.max(0, rank - (entry.amount || 0));
 }
 
 export async function recordHealingHealth(healer, targetUuid, today, amount) {
   const scope = SCOPE();
-  const cap = foundry.utils.deepClone(healer.getFlag(scope, "healing.dailyCap") || {});
-  const entry = cap[targetUuid];
-  if (!entry || entry.date !== today) {
-    cap[targetUuid] = { date: today, amount };
-  } else {
-    cap[targetUuid] = { date: today, amount: (entry.amount || 0) + amount };
-  }
-  await healer.setFlag(scope, "healing.dailyCap", cap);
+  const key = capKey(targetUuid);
+  const entry = (healer.getFlag(scope, "healing.dailyCap") || {})[key];
+  const total = (entry && entry.date === today) ? (entry.amount || 0) + amount : amount;
+  await healer.setFlag(scope, `healing.dailyCap.${key}`, { date: today, amount: total });
 }
 
 export async function showHealingDialog(healer, item) {

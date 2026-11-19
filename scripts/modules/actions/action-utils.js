@@ -1,4 +1,7 @@
-// action-utils.js v1.18.0 - 2026-11-19
+// action-utils.js v1.18.1 - 2026-11-19
+// v1.18.1: Density Manipulation Self is Body Armor at full rank vs energy too
+//          ("BA = current rank"); Plasticity protects vs physical only. Matches
+//          body-control-effects.js so the attack dialog agrees with mitigation.
 // v1.18.0: getBodyArmorValues skips powers whose granting equipment is
 //          broken or no longer on the target.
 // action-utils.js v1.17.1 - 2026-11-18
@@ -2675,6 +2678,16 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     if (power.system.isForceField) {
       if (!power.system.armorPhysical) physVal = Math.max(0, baseVal - 10);
       if (!power.system.armorEnergy) energyVal = baseVal;
+    }
+
+    // Density Self: full rank vs energy; Plasticity: physical only.
+    {
+      const n = String(power.name || "").toLowerCase();
+      const t = String(power.system.type || "").toLowerCase();
+      const is = (...k) => k.some(x => n === x || t === x);
+      if (is("density manipulation self", "density manipulation", "density manipulation (self)", "densityself")
+          && !power.system.armorEnergy) energyVal = baseVal;
+      if (is("plasticity") && !power.system.armorEnergy) energyVal = 0;
     }
     
     // Store ranks
