@@ -25,8 +25,8 @@
     "area": 0,
     "duration": "",
     "customDuration": "",
-    "isAttackPower": true,
-    "battleEffectsColumn": "En",
+    "isAttackPower": false,
+    "battleEffectsColumn": "",
     "damageSource": "rank",
     "damage": 0,
     "canPullPunch": false,
@@ -70,7 +70,7 @@
     "limitations": "",
     "countsAsTwoPowers": false,
     "grantedByEquipment": false,
-    "damageType": "energy-darkforce",
+    "damageType": "",
     "extraAttacks": false,
     "extraBodyParts": [],
     "specialStrengthType": "",
@@ -146,8 +146,8 @@
       "controlSpecific": "",
       "manipulateExisting": true,
       "generateNew": true,
-      "useAsShield": true,
-      "useAsWeapon": true,
+      "useAsShield": false,
+      "useAsWeapon": false,
       "createConstructs": false,
       "animateObjects": false
     },
@@ -225,7 +225,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "",
+    "specialMechanics": "One Power stunt at creation (Flight -1CS, Darkforce distance weapon -1CS, shapes of rank material strength, Teleportation -2CS, Darkness); others developed in play.",
     "description": "The hero with this Power can manipulate the extra-dimensional energy known as the Darkforce to perform specific actions. The hero may have one Power Stunt when the character is created; all other Power Stunts must be developed in the campaign.\n• Flight at Power rank -1CS Speed.\n• Darkforce Distance Weapon at -1CS range and damage.\n• Creation of specific shapes of Darkforce Ions Power Stunt per shape created) of Power rank material strength.\n• Teleportation, by moving through the Darkforce dimension, at - 2CS Power rank.\n• Create Darkness of Power rank Intensity in three areas. The hero must concentrate to manipulate the Darkforce in this fashion, and breaking that concentration results in the immediate dissipation of the effects.\nDarkforce as used by Cloak is an unknown extra-dimensional energy, and may either have a sentience of its own, be home to a hostile sentience, or both. The Judge may choose to use this potentially hostile nature of the Darkforce against those who wield the Power by applying limitations.",
     "rank": "Typical",
     "value": 6,
@@ -234,7 +234,7 @@
     "stunts": [],
     "type": "Darkforce Manipulation",
     "subtype": "Darkforce Manipulation",
-    "isEnergyAttack": true
+    "isEnergyAttack": false
   },
   "effects": [],
   "folder": null,

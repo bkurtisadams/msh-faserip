@@ -1,4 +1,8 @@
-// power-router.js v1.18.0 - 2026-11-18
+// power-router.js v1.19.0 - 2026-11-19
+// v1.19.0: Fire Control (intensify / reduce / fire shield), Electrical
+//          Manipulation (resistance card), Darkforce and Gravity Manipulation
+//          (Power stunt FEAT) no longer route to an attack. Type-based routes
+//          skip stunt powers, which route by their own attack settings.
 // v1.18.0: Claws / Rotting Touch / Corrosive Touch ask Attack or Shred armor
 //          (DESIGN-material-strength.md §5 step 6); Attack continues the
 //          normal route via rollPower(..., { skipShredChoice: true }).
@@ -217,6 +221,16 @@ const POWER_FEAT_ROUTES = {
       ? FEAT_LINE("The animal does as asked.")
       : FEAT_LINE("Request refused. The animal may turn on the controller (Contacts never do).", true)
   }),
+  "darkforce manipulation": (actor, item) => ({
+    power: item,
+    label: `${item.name}: Power stunt`,
+    intensityHint: "Darkforce Manipulation begins with one Power stunt; others are developed in play. Stunts roll the Power rank (e.g. Flight -1CS, distance weapon -1CS, Teleportation -2CS)."
+  }),
+  "gravity manipulation": (actor, item) => ({
+    power: item,
+    label: `${item.name}: Power stunt`,
+    intensityHint: "Gravity Manipulation grants one Power stunt at creation; others are developed. Levitating others: target Agility FEAT to avoid."
+  }),
   "weather control": (actor, item) => ({
     power: item,
     label: `${item.name}: Power stunt`,
@@ -260,7 +274,8 @@ export async function rollPower(actor, item, routeOpts = {}) {
 
   // Nullifying Power: always route to mental-power regardless of category/type settings
   const nameLower = (item.name || "").toLowerCase();
-  if (nameLower.includes("nullif") || powerType.includes("nullif")) {
+  const routeType = item.getFlag?.("msh-faserip", "isStuntPower") === true ? "" : powerType;
+  if (nameLower.includes("nullif") || routeType.includes("nullif")) {
     return ActionDispatcher.roll("mental-power", {
       actor,
       opts: { itemId: item.id, item }
@@ -275,11 +290,11 @@ export async function rollPower(actor, item, routeOpts = {}) {
   }
 
   // Ultimate Skill: roll the talent it makes Unearthly (rankOverride on the talent).
-  if (nameLower === "ultimate skill" || powerType === "ultimate skill") {
+  if (nameLower === "ultimate skill" || routeType === "ultimate skill") {
     return rollUltimateSkill(actor, item);
   }
 
-  if (powerType === "light manipulation" || nameLower === "light manipulation") {
+  if (routeType === "light manipulation" || nameLower === "light manipulation") {
     const saveAbility = item.system.save?.ability || "endurance";
     return ActionDispatcher.roll("intensity", {
       actor,
@@ -288,13 +303,23 @@ export async function rollPower(actor, item, routeOpts = {}) {
     });
   }
 
-  const featRoute = POWER_FEAT_ROUTES[powerType] || POWER_FEAT_ROUTES[nameLower];
+  const featRoute = POWER_FEAT_ROUTES[routeType] || POWER_FEAT_ROUTES[nameLower];
   if (featRoute) {
     const { showGenericFeatDialog } = await import("./generic-feat-dialog.js");
     return showGenericFeatDialog(actor, featRoute(actor, item));
   }
 
-  if (powerType === "sound manipulation" || nameLower === "sound manipulation") {
+  if (routeType === "fire control" || nameLower === "fire control") {
+    const { showFireControlDialog } = await import("./control-power-action.js");
+    return showFireControlDialog(actor, item);
+  }
+
+  if (routeType === "electrical manipulation" || nameLower === "electrical manipulation") {
+    const { postElectricalManipulationCard } = await import("./control-power-action.js");
+    return postElectricalManipulationCard(actor, item);
+  }
+
+  if (routeType === "sound manipulation" || nameLower === "sound manipulation") {
     const { showSoundManipulationDialog } = await import("./sound-manipulation-action.js");
     return showSoundManipulationDialog(actor, item);
   }
