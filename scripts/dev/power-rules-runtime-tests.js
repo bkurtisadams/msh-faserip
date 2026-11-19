@@ -1,3 +1,7 @@
+// scripts/dev/power-rules-runtime-tests.js v1.6.0 - 2026-11-19
+// v1.6.0: Migration tests expect the old list cleared into Notes.
+// scripts/dev/power-rules-runtime-tests.js v1.5.1 - 2026-11-19
+// v1.5.1: Protected Senses test expects the sheet order (hearing, sight).
 // scripts/dev/power-rules-runtime-tests.js v1.5.0 - 2026-11-19
 // v1.5.0: Armor equipment resistances and protection beside defense powers.
 // scripts/dev/power-rules-runtime-tests.js v1.4.0 - 2026-11-19
@@ -509,29 +513,30 @@ async function equipmentTests(recorder, state) {
     "Edit Power sheet: From equipment shows the Jet Pack and the broken warning");
   await flight.sheet.close();
 
-  // Migration of the old name-and-rank list.
+  // Migration of the old name-and-rank list: cleared into Notes, no power rows.
   const old = await createActor(state, "Old List", { items: [
-    { name: "Power Gauntlet", type: "equipment", system: { category: "device", powers: [{ name: "Gauntlet Blast", rank: "Remarkable", value: 30, grantedByEquipment: true }] } }
+    { name: "Power Gauntlet", type: "equipment", system: { category: "device", notes: "", powers: [{ name: "Gauntlet Blast", rank: "Remarkable", value: 30, grantedByEquipment: true }] } }
   ] });
   await migrateGrantedPowerLists();
   await sleep(200);
-  const gb = item(old, "Gauntlet Blast");
-  recorder.assert(!!gb && gb.system.equipmentId === item(old, "Power Gauntlet").id && gb.system.rank === "Remarkable"
-    && !(item(old, "Power Gauntlet").system.powers ?? []).length, "Migration: old granted-power entry becomes a linked power item",
-    { made: !!gb, link: gb?.system?.equipmentId, left: item(old, "Power Gauntlet").system.powers });
+  const gauntlet = item(old, "Power Gauntlet");
+  recorder.assert(!old.items.some(i => i.type === "power") && !(gauntlet.system.powers ?? []).length
+    && String(gauntlet.system.notes).includes("Old granted powers: Gauntlet Blast (Remarkable)"),
+    "Migration: old granted-power list is cleared into the item's Notes, no power added",
+    { powers: old.items.filter(i => i.type === "power").map(i => i.name), notes: gauntlet.system.notes });
 
   // Lists saved as objects ("0": {...}) with a blank name, as on older actors.
   const obj = await createActor(state, "Old Object List", { items: [
-    { name: "Helmet", type: "equipment", system: { category: "gear", powers: { "0": { name: "", rank: "Remarkable", value: 30, damageType: "sensory", grantedByEquipment: "true" } } } }
+    { name: "Helmet", type: "equipment", system: { category: "gear", notes: "", powers: { "0": { name: "", rank: "Remarkable", value: 30, damageType: "sensory", grantedByEquipment: "true" } } } }
   ] });
   await migrateGrantedPowerLists();
   await sleep(200);
-  const hp = obj.items.find(i => i.type === "power");
-  recorder.assert(hp?.name === "Helmet" && hp.system.equipmentId === item(obj, "Helmet").id,
-    "Migration: an object-shaped list with a blank name becomes a power named after its item", { name: hp?.name });
+  const helm = item(obj, "Helmet");
+  recorder.assert(!obj.items.some(i => i.type === "power") && String(helm.system.notes).includes("Old granted powers: Helmet (Remarkable)"),
+    "Migration: an object-shaped list with a blank name is noted under the item's own name", { notes: helm.system.notes });
 
   // Protected Senses: several senses; Blinding Touch only cares about sight.
-  recorder.equal(protectedSensesOf({ protectedSenses: { sight: true, hearing: true } }).join(), "sight,hearing", "Protected Senses: covers sight and hearing");
+  recorder.equal(protectedSensesOf({ protectedSenses: { sight: true, hearing: true } }).join(), "hearing,sight", "Protected Senses: covers hearing and sight");
   recorder.equal(protectedSensesOf({ protectedSense: "all" }).length, 5, "Protected Senses: legacy All covers every sense");
 
   // Armor equipment's own resistances list (no powers needed).

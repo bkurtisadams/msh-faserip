@@ -1,3 +1,6 @@
+// equipment-link.mjs v1.2.0 - 2026-11-19
+// v1.2.0: Migration no longer makes power items: it clears the old list and
+//         keeps its entries as a line in the item's Notes (version 3).
 // equipment-link.mjs v1.1.0 - 2026-11-19
 // v1.1.0: Migration reads lists saved as objects ("0", "1"...) and names a
 //         nameless entry after its equipment; rerun as migration version 2.
@@ -129,25 +132,32 @@ function oldGrantedList(eq) {
   return list.filter(p => p && typeof p === "object" && (p.name || p.rank || p.value));
 }
 
-/** One-time: the old equipment "granted powers" list (name and rank only)
- *  becomes real power items linked to the equipment. GM only. */
+/** One-time: clear the old equipment "granted powers" list (name and rank
+ *  only; no sheet showed it and nothing used it in play). Its entries are
+ *  kept as a line in the item's Notes, so nothing is lost and no power rows
+ *  are added. GM only. Returns the number of items cleared. */
 export async function migrateGrantedPowerLists() {
   if (!game.user?.isGM) return 0;
-  let made = 0;
+  let cleared = 0;
   const actors = [...game.actors, ...game.scenes.contents.flatMap(s => s.tokens.contents.filter(t => !t.actorLink && t.actor).map(t => t.actor))];
-  for (const actor of actors) {
-    for (const eq of actor.items.filter(i => i.type === "equipment" && oldGrantedList(i).length)) {
-      const docs = oldGrantedList(eq).map(p => ({
-        name: String(p.name || "").trim() || eq.name, type: "power",
-        system: {
-          rank: p.rank || "Typical", value: Number(p.value) || 0, damageType: p.damageType || "",
-          source: "equipment", grantedByEquipment: true, equipmentId: eq.id, equipmentName: eq.name, isActive: true
-        }
-      }));
-      if (docs.length) await actor.createEmbeddedDocuments("Item", docs);
-      await eq.update({ "system.powers": [] });
-      made += docs.length;
+  const clear = async (eq) => {
+    const list = oldGrantedList(eq);
+    const raw = eq.system?.powers;
+    const hasRaw = Array.isArray(raw) ? raw.length > 0 : (raw && typeof raw === "object" && Object.keys(raw).length > 0);
+    if (!hasRaw) return;
+    const update = { "system.powers": [] };
+    if (list.length) {
+      const line = "Old granted powers: " + list.map(p => {
+        const nm = String(p.name || "").trim() || eq.name;
+        return p.rank ? `${nm} (${p.rank})` : nm;
+      }).join(", ");
+      const notes = String(eq.system?.notes || "");
+      if (!notes.includes(line)) update["system.notes"] = notes ? `${notes}\n${line}` : line;
     }
-  }
-  return made;
+    await eq.update(update);
+    cleared++;
+  };
+  for (const actor of actors) for (const eq of actor.items.filter(i => i.type === "equipment")) await clear(eq);
+  for (const eq of game.items.filter(i => i.type === "equipment")) await clear(eq);
+  return cleared;
 }
