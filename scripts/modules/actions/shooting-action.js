@@ -1,3 +1,5 @@
+// shooting-action.js v3.20.1 - 2026-11-19
+// v3.20.1: Fire-mode controls are one row at the top of the options box.
 // shooting-action.js v3.20.0 - 2026-11-19
 // v3.20.0: Fire modes (fire-modes.js): Rate 2 / both barrels = two shots,
 //          separate rolls, no Multi FEAT; bursts apply one roll to up to 3
@@ -444,11 +446,9 @@ export class ShootingAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Fire mode: rate of fire, burst, scatter (shown only when the weapon has them) -->
-      <div id="fire-mode-box">${fireModeBoxHtml(initialWeapon, { targets, areasBetween: measureAreasBetweenTokens, combat: game.combat })}</div>
-
-      <!-- Options: Multi / Aim / Pull / Karma -->
+      <!-- Options: Fire mode / Multi / Aim / Pull / Karma -->
       <div class="frp-box frp-opts-box">
+        <div id="fire-mode-box">${fireModeBoxHtml(initialWeapon, { targets, areasBetween: measureAreasBetweenTokens, combat: game.combat })}</div>
         <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${multiEnabled ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${(!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>

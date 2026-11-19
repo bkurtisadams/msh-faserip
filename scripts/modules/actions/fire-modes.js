@@ -1,3 +1,6 @@
+// scripts/modules/actions/fire-modes.js v1.1.0 - 2026-11-19
+// v1.1.0: Compact: one options row (Shots/Barrels, Burst, Scatter,
+//         Reloading) styled like the Multi row; details in tooltips.
 // scripts/modules/actions/fire-modes.js v1.0.0 - 2026-11-19
 // v1.0.0: Weapon Rate, bursts and scatter (Players Book ch. 4, Shooting
 //         Weapons): "Multiple shots require separate die rolls, but are
@@ -71,42 +74,36 @@ export async function markSlowWeaponFired(weapon, combat) {
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/** The dialog's fire-mode box for the chosen weapon ("" when nothing applies). */
+/** One options row for the chosen weapon ("" when nothing applies):
+ *  Shots x1/x2, Burst (with the burst's target count), Scatter, and the
+ *  1-per-2 warning. Details sit in tooltips to keep the dialog compact. */
 export function fireModeBoxHtml(weapon, { targets = [], areasBetween = () => 0, combat = null } = {}) {
   const fm = weaponFireMode(weapon);
   const parts = [];
-  const lbl = t => `<div class="frp-fire-lbl">${t}</div>`;
   if (fm.maxShots > 1) {
-    const one = fm.barrels ? "1 barrel" : "1 shot";
-    const two = fm.barrels ? "Both barrels" : "2 shots";
-    parts.push(`${lbl("Rate of fire")}
-      <div class="frp-fire-row"><label><input type="radio" name="fireShots" value="1" checked> ${one}</label>
-      <label><input type="radio" name="fireShots" value="2"> ${two}</label></div>
-      <div class="frp-fire-note">${esc(weapon.name)} fires 2 shots a round: one roll each, at the same time, no Multi FEAT.${fm.burst ? " Each shot is a burst." : ""}</div>`);
+    const tip = fm.barrels ? "One or both barrels; separate rolls, no Multi FEAT" : "Shots this round; separate rolls, no Multi FEAT";
+    parts.push(`<span class="frp-opt-label blue" title="${tip}">${fm.barrels ? "Barrels" : "Shots"}</span>
+      <label><input type="radio" name="fireShots" value="1" checked> &times;1</label>
+      <label><input type="radio" name="fireShots" value="2"> &times;2</label>`);
+  }
+  if (fm.burst) {
+    const { inBurst, left } = burstTargets(targets, areasBetween);
+    const tip = ["One roll for up to 3 targets in the same area",
+      ...inBurst.map(t => `In: ${t.name}`), ...left.map(l => `Out: ${l.token.name} (${l.reason})`)].join("\n");
+    const n = Math.max(1, inBurst.length);
+    parts.push(`<label${parts.length ? ' style="margin-left:8px;"' : ""} title="${esc(tip)}"><input type="checkbox" name="fireBurst" checked> <span class="frp-opt-label blue">Burst</span></label>
+      <span title="${esc(tip)}">${n} target${n === 1 ? "" : "s"}${left.length ? ` (${left.length} out)` : ""}</span>`);
+  }
+  if (fm.scatter) {
+    parts.push(`<span class="frp-opt-label blue"${parts.length ? ' style="margin-left:8px;"' : ""} title="On a hit, everyone within 1 area of the target takes the damage">Scatter</span>`);
   }
   if (fm.slow) {
     const st = slowWeaponStatus(weapon, combat);
     if (st.blocked) {
-      parts.push(`${lbl("Rate of fire")}
-        <div class="frp-fire-warn">${esc(weapon.name)} fires 1 shot every 2 rounds and was fired in round ${st.lastRound}. Next shot: round ${st.nextRound}.</div>
-        <div class="frp-fire-row"><label><input type="checkbox" name="fireAnyway"> Fire anyway (GM call)</label></div>`);
+      parts.push(`<span class="frp-opt-label orange"${parts.length ? ' style="margin-left:8px;"' : ""} title="Fires 1 shot every 2 rounds; fired in round ${st.lastRound}, next shot round ${st.nextRound}">Reloading</span>
+        <label><input type="checkbox" name="fireAnyway"> Fire anyway</label>`);
     }
   }
-  if (fm.burst) {
-    const { inBurst, left } = burstTargets(targets, areasBetween);
-    const chips = inBurst.map(t => `<span class="frp-fire-chip in">&check; ${esc(t.name)}</span>`).join("")
-      + left.map(l => `<span class="frp-fire-chip out" title="${esc(l.reason)}">${esc(l.token.name)}</span>`).join("");
-    const warn = left.filter(l => !l.reason.startsWith("a burst")).map(l => `${esc(l.token.name)} is ${esc(l.reason)}: left out of the burst.`).join(" ");
-    parts.push(`${lbl("Burst")}
-      <div class="frp-fire-row"><label><input type="checkbox" name="fireBurst" checked> Fire a burst</label><span class="frp-fire-hint">one roll, up to 3 targets in the same area</span></div>
-      ${chips ? `<div>${chips}</div>` : `<div class="frp-fire-note">Target up to 3 tokens in the same area.</div>`}
-      ${warn ? `<div class="frp-fire-warn">${warn}</div>` : ""}`);
-  }
-  if (fm.scatter) {
-    const main = Array.from(targets ?? [])[0];
-    parts.push(`${lbl("Scatter")}
-      <div class="frp-fire-row" style="font-size:12px">On a hit, everyone within 1 area of ${esc(main?.name || "the target")} takes the damage.</div>`);
-  }
   if (!parts.length) return "";
-  return `<div class="frp-box frp-fire-box">${parts.join("")}</div>`;
+  return `<div class="frp-opt-row" style="border-bottom:1px solid #e8e0d0;">${parts.join("")}</div>`;
 }
