@@ -35,7 +35,7 @@
     "ignoresNaturalArmor": true,
     "ignoresArtificialArmor": false,
     "bypassForceField": false,
-    "continuingDamage": true,
+    "continuingDamage": false,
     "continuingDamageRounds": 3,
     "ensnaringStrength": "",
     "requiresSave": false,

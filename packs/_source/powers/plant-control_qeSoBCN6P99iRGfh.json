@@ -23,7 +23,7 @@
     "range": "rank",
     "customRange": "",
     "area": 0,
-    "duration": "",
+    "duration": "concentration",
     "customDuration": "",
     "isAttackPower": false,
     "battleEffectsColumn": "",
@@ -40,13 +40,13 @@
     "ensnaringStrength": "",
     "requiresSave": true,
     "save": {
-      "ability": "psyche",
+      "ability": "reason",
       "intensity": "power-rank",
       "fixedRank": "",
       "onFail": {
         "effect": "custom",
-        "duration": "custom",
-        "notes": ""
+        "duration": "concentration",
+        "notes": "Only plant-like creatures with intelligence get the Reason FEAT; plants of higher material strength than the Power rank cannot be controlled."
       },
       "rerollOnKarmaLoss": false,
       "rerollOnLifeThreat": false

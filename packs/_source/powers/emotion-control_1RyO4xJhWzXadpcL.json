@@ -45,7 +45,7 @@
       "fixedRank": "",
       "onFail": {
         "effect": "custom",
-        "duration": "custom",
+        "duration": "10-100",
         "notes": ""
       },
       "rerollOnKarmaLoss": false,
@@ -68,7 +68,7 @@
       "maxRank": ""
     },
     "limitations": "",
-    "countsAsTwoPowers": false,
+    "countsAsTwoPowers": true,
     "grantedByEquipment": false,
     "damageType": "",
     "extraAttacks": false,

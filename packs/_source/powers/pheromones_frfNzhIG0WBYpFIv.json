@@ -40,13 +40,13 @@
     "ensnaringStrength": "",
     "requiresSave": true,
     "save": {
-      "ability": "endurance",
+      "ability": "psyche",
       "intensity": "power-rank",
       "fixedRank": "",
       "onFail": {
         "effect": "custom",
-        "duration": "1-10",
-        "notes": ""
+        "duration": "custom",
+        "notes": "Considered Friendly to the hero (opposite sex only; no effect on robots, aliens or the shielded)."
       },
       "rerollOnKarmaLoss": false,
       "rerollOnLifeThreat": false

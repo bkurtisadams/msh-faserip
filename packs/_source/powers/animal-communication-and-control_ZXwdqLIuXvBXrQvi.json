@@ -38,14 +38,14 @@
     "continuingDamage": false,
     "continuingDamageRounds": 3,
     "ensnaringStrength": "",
-    "requiresSave": true,
+    "requiresSave": false,
     "save": {
-      "ability": "psyche",
+      "ability": "endurance",
       "intensity": "power-rank",
       "fixedRank": "",
       "onFail": {
-        "effect": "custom",
-        "duration": "custom",
+        "effect": "stunned",
+        "duration": "1-10",
         "notes": ""
       },
       "rerollOnKarmaLoss": false,
@@ -154,7 +154,7 @@
     "mental": {
       "telepathy": false,
       "mentalProbe": false,
-      "mindControl": true,
+      "mindControl": false,
       "emotionControl": false,
       "empathy": false,
       "psiScreen": false,
@@ -225,7 +225,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "",
+    "specialMechanics": "Communication is automatic. Requests: Popularity FEAT using the Power rank (+1CS one type, +2CS one family, +3CS one specific companion animal). Failure: the animal may turn on the controller (Contacts never do).",
     "description": "A hero with this Power can talk to animals and influence their actions. The hero gains a + 1CS if she chooses to influence only a particular type (or class), such as sea life or birds. This is increased to +2CS if she narrows it further. to a particular class or family such as bony-skeletoned fishes or falcons. Choosing to influence a specific animal (Chucky the Falcon, or Leo the Lionfish) gives the hero a +3CS. in the latter case. the animal is a companion of the hero at the start of the campaign. A character who selects one of these limitations may also converse with animals that are one step more general, but no further, with a loss of - 1CS. The character with Chucky the Falcon can also converse with falcons in general, at +2CS (the Power rank raised to +3CS minus one for generality), but not with birds that are not falcons. Communication with animals is considered automatic with these Powers, and the types which benefit from a +2CS modifier are considered Contacts (always Friendly). Otherwise animal reactions are Neutral to Hostile. Communication with Hostile animals is chancy at best. The Power rank reflects the ability of the hero to control the actions of the animal in question, Make a Popularity FEAT for any requests the hero makes of the animals, using Power rank instead of Popularity. Therefore, if a hero controls crocodiles with Amazing(50) ability the result is rolled on the Amazing column. Failure indicates the animal may turn on the controller. Animals which are Contacts (always friendly) never turn on the controller. Note on communications: Animals have no language, per se, but do communicate by a number of verbal and non-verbal signals. Communication is considered to be a super-human ability to recognize those signals and make one's own desires and wishes clear, as limited by the animals intelligence level.",
     "rank": "Typical",
     "value": 6,

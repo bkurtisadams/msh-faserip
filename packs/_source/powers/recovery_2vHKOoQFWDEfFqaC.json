@@ -208,8 +208,13 @@
       "usesCeremony": false,
       "sourceEntity": ""
     },
-    "hasBonusPowers": false,
-    "bonusPowers": [],
+    "hasBonusPowers": true,
+    "bonusPowers": [
+      {
+        "name": "Resistance (any one)",
+        "rankMod": "same"
+      }
+    ],
     "sfx": {
       "hit": "",
       "miss": "",

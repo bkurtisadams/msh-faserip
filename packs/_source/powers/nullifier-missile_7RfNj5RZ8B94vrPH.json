@@ -23,10 +23,10 @@
     "range": "rank",
     "customRange": "",
     "area": 0,
-    "duration": "",
+    "duration": "concentration",
     "customDuration": "",
-    "isAttackPower": true,
-    "battleEffectsColumn": "Fo",
+    "isAttackPower": false,
+    "battleEffectsColumn": "Me",
     "damageSource": "rank",
     "damage": 0,
     "canPullPunch": false,
@@ -45,8 +45,8 @@
       "fixedRank": "",
       "onFail": {
         "effect": "nullified",
-        "duration": "custom",
-        "notes": ""
+        "duration": "concentration",
+        "notes": "Psyche FEAT for inborn powers, Reason FEAT for hi-tech; target re-rolls each round."
       },
       "rerollOnKarmaLoss": false,
       "rerollOnLifeThreat": false
@@ -93,7 +93,7 @@
     "isAbilitySubstitution": false,
     "isMovementPower": false,
     "isControlPower": false,
-    "isMentalPower": false,
+    "isMentalPower": true,
     "isTransformPower": false,
     "detection": {
       "enhancedSense": "",

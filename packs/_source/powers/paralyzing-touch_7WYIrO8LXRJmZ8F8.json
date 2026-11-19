@@ -44,7 +44,7 @@
       "intensity": "power-rank",
       "fixedRank": "",
       "onFail": {
-        "effect": "paralyzed",
+        "effect": "unconscious",
         "duration": "1-10",
         "notes": ""
       },

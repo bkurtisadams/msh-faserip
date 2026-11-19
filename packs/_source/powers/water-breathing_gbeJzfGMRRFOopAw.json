@@ -208,8 +208,17 @@
       "usesCeremony": false,
       "sourceEntity": ""
     },
-    "hasBonusPowers": false,
-    "bonusPowers": [],
+    "hasBonusPowers": true,
+    "bonusPowers": [
+      {
+        "name": "Swimming",
+        "rankMod": "same"
+      },
+      {
+        "name": "Animal Communication and Control (sea life)",
+        "rankMod": "same"
+      }
+    ],
     "sfx": {
       "hit": "",
       "miss": "",
@@ -225,7 +234,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "Allows breathing underwater; no damage mitigation.",
+    "specialMechanics": "Next Power may be Swimming or Animal Communication and Control (sea life); taking both means the hero breathes only water.",
     "description": "This is a wimp Power. Face it. When the great hero parties take place, and Ulterior-Motive Man asks you what you do, if you say, \"I breathe water\" you end up wearing a full fishbowl. This Power allows you to breathe water (fresh or salt) as if air. No Power rank is needed for this Power. In addition, this Power allows the hero to see underwater as if on land (vision is reduced in the underwater realm), and survive at great depths. The hero's next Power may be either Swimming or Animal Communication and Control (Sea life). The hero may choose both, but then only breathes water, and will \"drown\" on dry land (reverse of characters drowning in water).",
     "rank": "Typical",
     "value": 6,

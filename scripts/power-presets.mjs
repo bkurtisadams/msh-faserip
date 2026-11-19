@@ -89,8 +89,8 @@ export const POWER_ENGINE_PRESETS = {
   "Protected Senses":    { detection: { protectedSense: "general" } },
   "Enhanced Senses":     { detection: { enhancedSense: "general" } },
   "Infravision":         { detection: { detectionType: "infravision", infravisionRange: 5 } },
-  "Cosmic Awareness":    { detection: { cosmicAwareness: true }, isAbilitySubstitution: true },
-  "Combat Sense":        { detection: { combatSense: true }, isAbilitySubstitution: true,
+  "Cosmic Awareness":    { countsAsTwoPowers: true, detection: { cosmicAwareness: true }, isAbilitySubstitution: true },
+  "Combat Sense":        { countsAsTwoPowers: true, detection: { combatSense: true }, isAbilitySubstitution: true,
     abilitySubstitution: {
       fighting: { enabled: true, context: "Blocking" },
       agility: { enabled: true, context: "Dodging" },
@@ -114,12 +114,12 @@ export const POWER_ENGINE_PRESETS = {
   "Leaping":             { movement: { type: "leaping", useRankSpeed: true }, range: "", isAbilitySubstitution: true, abilitySubstitution: { strength: { enabled: true, context: "Leaping distance" } } },
   "Wall-Crawling":       { movement: { type: "wall-crawling", useRankSpeed: true }, range: "" },
   "Lightning Speed":     { movement: { type: "super-speed", useRankSpeed: true }, range: "", isAbilitySubstitution: true, abilitySubstitution: { agility: { enabled: true, context: "High-speed maneuvers" } } },
-  "Teleportation":       { movement: { type: "teleportation", useRankSpeed: false }, range: "rank", requiresSave: true, save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "custom", duration: "1-10", notes: "Passengers may be disoriented." } } },
+  "Teleportation":       { countsAsTwoPowers: true, movement: { type: "teleportation", useRankSpeed: false }, range: "rank", requiresSave: true, save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "custom", duration: "1-10", notes: "Passengers may be disoriented." } } },
   "Levitation":          { movement: { type: "levitation", useRankSpeed: true }, range: "" },
   "Swimming":            { movement: { type: "swimming", useRankSpeed: true }, range: "", hasBonusPowers: true, bonusPowers: [{ name: "Water Breathing", rankMod: "same" }] },
   "Climbing":            { movement: { type: "climbing", useRankSpeed: true }, range: "", isAbilitySubstitution: true, abilitySubstitution: { agility: { enabled: true, context: "Climbing/tangled movement" } } },
   "Digging":             { movement: { type: "tunneling", useRankSpeed: true, leavesTunnel: false }, range: "", hasBonusPowers: true, bonusPowers: [{ name: "Claws", rankMod: "same" }] },
-  "Dimensional Travel":  { movement: { type: "dimensional", useRankSpeed: false }, range: "" },
+  "Dimensional Travel":  { countsAsTwoPowers: true, movement: { type: "dimensional", useRankSpeed: false }, range: "" },
 
   // Matter Control
   "Earth Control":       { control: { controlType: "earth", manipulateExisting: true, useAsShield: true, useAsWeapon: true, createConstructs: true }, battleEffectsColumn: "Fo", damageType: "physical-blunt" },
@@ -139,8 +139,8 @@ export const POWER_ENGINE_PRESETS = {
   "Sound Manipulation":       { control: { controlType: "sound", manipulateExisting: true }, isAttackPower: false, isDefensePower: true, isResistance: true, resistanceType: "sound", resistanceEffect: "damageReduction", hasBonusPowers: true, bonusPowers: [{ name: "Sound Generation", rankMod: "same" }], specialMechanics: "Dampen existing noise by rank# Intensity, or raise it one level on a Power rank FEAT. Sonic attacks on the hero reduced by rank#. Sound Generation may be taken as a bonus Power." },
   "Darkforce Manipulation":   { control: { controlType: "darkforce", manipulateExisting: true, generateNew: true, useAsShield: true, useAsWeapon: true }, isEnergyAttack: true, battleEffectsColumn: "En", damageType: "energy-darkforce" },
   "Gravity Manipulation":     { control: { controlType: "gravity", manipulateExisting: true, useAsWeapon: true }, battleEffectsColumn: "Fo", damageType: "energy-force", requiresSave: true, save: { ability: "strength", intensity: "power-rank", onFail: { effect: "slammed", duration: "1-10" } } },
-  "Probability Manipulation": { control: { controlType: "probability", manipulateExisting: true }, isAttackPower: false, requiresSave: false, specialMechanics: "Good/Bad Luck die-order manipulation; Judge limitation required." },
-  "Nullifying Power":         { isMentalPower: true, isAttackPower: false, requiresSave: true, range: "rank", battleEffectsColumn: "Me", damageType: "mental", save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "nullified", duration: "1-10" } } },
+  "Probability Manipulation": { countsAsTwoPowers: true, control: { controlType: "probability", manipulateExisting: true }, isAttackPower: false, requiresSave: false, specialMechanics: "Good/Bad Luck die-order manipulation; Judge limitation required." },
+  "Nullifying Power":         { countsAsTwoPowers: true, isMentalPower: true, isAttackPower: false, requiresSave: true, range: "rank", battleEffectsColumn: "Me", damageType: "mental", save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "nullified", duration: "1-10" } } },
   "Energy Reflection":        { activationType: "passive", isActive: true, isControlPower: false, isAttackPower: false, isDefensePower: true, isResistance: true, isEnergyReflection: true, range: "", energyReflectionType: "energy", energyReflectionRank: "full", resistanceType: "energy", resistanceEffect: "invulnerability", resistanceIsInvulnerability: true },
   "Time Control":             { countsAsTwoPowers: true, specialMechanics: "Counts as two powers; each time stunt should be tracked separately." },
 
@@ -154,7 +154,7 @@ export const POWER_ENGINE_PRESETS = {
   "Elongation":               { transformation: { affects: "self", transformType: "elongation" }, isAttackPower: true, battleEffectsColumn: "Gp", damageSource: "strength", range: "rank" },
   "Shape-Shifting":           { transformation: { affects: "self", transformType: "shape" } },
   "Imitation":                { transformation: { affects: "self", transformType: "imitation" } },
-  "Body Transformation":      { transformation: { affects: "self", transformType: "body" }, isDefensePower: true, isBodyArmor: true },
+  "Body Transformation":      { countsAsTwoPowers: true, transformation: { affects: "self", transformType: "body" }, isDefensePower: true, isBodyArmor: true },
   "Animal Transformation Self": { transformation: { affects: "self", transformType: "animal" } },
   "Raise Lowest Ability":     { isTransformPower: false, specialMechanics: "One lowest ability is raised by 20 points; choose next power from complete list." },
   "Blending":                 { transformation: { affects: "self", transformType: "blending" } },
@@ -176,10 +176,10 @@ export const POWER_ENGINE_PRESETS = {
 
   // Mental Powers
   "Telepathy":                         { mental: { telepathy: true }, requiresSave: false },
-  "Image Generation":                  { mental: { imageGeneration: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
+  "Image Generation":                  { countsAsTwoPowers: true, mental: { imageGeneration: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
   "Telekinesis":                       { isAttackPower: true, battleEffectsColumn: "Fo", damageSource: "rank", damageType: "energy-force", specialStrengthType: "tk" },
-  "Mind Control":                      { mental: { mindControl: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
-  "Emotion Control":                   { mental: { emotionControl: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "10-100" } } },
+  "Mind Control":                      { countsAsTwoPowers: true, mental: { mindControl: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
+  "Emotion Control":                   { countsAsTwoPowers: true, mental: { emotionControl: true }, requiresSave: true, save: { ability: "intuition", intensity: "power-rank", onFail: { effect: "custom", duration: "10-100" } } },
   "Force Field Generation":            { isDefensePower: true, isForceField: true, forceFieldType: "projected", battleEffectsColumn: "Fo", damageType: "energy-force" },
   "Animal Communication and Control":  { requiresSave: false, specialMechanics: "Communication is automatic. Requests: Popularity FEAT using the Power rank (+1CS one type, +2CS one family, +3CS one specific companion animal). Failure: the animal may turn on the controller (Contacts never do)." },
   "Mechanical Intuition":              { mental: { mechanicalIntuition: true }, requiresSave: false, specialMechanics: "Rolls to see whether an invention works are at Unearthly regardless of Reason or Power rank; no modifiers. Resources still required." },
@@ -188,11 +188,11 @@ export const POWER_ENGINE_PRESETS = {
   "Psi-Screen":                        { activationType: "passive", isActive: true, isDefensePower: true, mental: { psiScreen: true }, requiresSave: false, resistanceType: "mental", resistanceEffect: "featReplace" },
   "Mental Probe":                      { mental: { mentalProbe: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
   "Animate Drawings":                  { mental: { animateDrawings: true }, requiresSave: false },
-  "Possession":                        { mental: { possession: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
-  "Transferral":                       { mental: { transferral: true }, requiresSave: false, specialMechanics: "Red Power rank FEAT by the hero, target within one area. Failure: hero unconscious 1-10 rounds, no retry for one day." },
+  "Possession":                        { countsAsTwoPowers: true, mental: { possession: true }, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom" } } },
+  "Transferral":                       { countsAsTwoPowers: true, mental: { transferral: true }, requiresSave: false, specialMechanics: "Red Power rank FEAT by the hero, target within one area. Failure: hero unconscious 1-10 rounds, no retry for one day." },
   "Astral Projection":                 { mental: { astralProjection: true }, requiresSave: false },
   "Psionic Attack":                    { mental: { psionicAttack: true }, requiresSave: true, damageType: "mental", battleEffectsColumn: "Me", save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "unconscious", duration: "1-10" } } },
-  "Precognition":                      { mental: { precognition: true }, requiresSave: false },
+  "Precognition":                      { countsAsTwoPowers: true, mental: { precognition: true }, requiresSave: false },
   "Postcognition":                     { mental: { postcognition: true }, requiresSave: false },
   "Plant Control":                     { mental: { mindControl: true }, duration: "concentration", requiresSave: true, save: { ability: "reason", intensity: "power-rank", onFail: { effect: "custom", duration: "concentration", notes: "Only plant-like creatures with intelligence get the Reason FEAT; plants of higher material strength than the Power rank cannot be controlled." } } },
   "Ultimate Skill":                    { isAbilitySubstitution: true, requiresSave: false, specialMechanics: "Record the selected skill/field; use power rank instead of normal ability for that specialty." },
@@ -205,7 +205,7 @@ export const POWER_ENGINE_PRESETS = {
   "Claws":                  { battleEffectsColumn: "EA", damageType: "physical-edged", specialStrengthType: "claw", ignoresArtificialArmor: true, canPullPunch: false, canReduceEffect: false },
   "Rotting Touch":          { battleEffectsColumn: "En", damageType: "touch-rotting", ignoresNaturalArmor: true, canPullPunch: false, canReduceEffect: false },
   "Corrosive Touch":        { battleEffectsColumn: "En", damageType: "touch-corrosive", ignoresArtificialArmor: true, canPullPunch: false, canReduceEffect: false },
-  "Health-Drain Touch":     { battleEffectsColumn: "BA", damageType: "touch-healthdrain", isHealthDrain: true, canPullPunch: false, canReduceEffect: false },
+  "Health-Drain Touch":     { countsAsTwoPowers: true, battleEffectsColumn: "BA", damageType: "touch-healthdrain", isHealthDrain: true, canPullPunch: false, canReduceEffect: false },
   "Blinding Touch":         { battleEffectsColumn: "BA", damageType: "touch-blinding", isBlindingTouch: true, requiresSave: true, save: { ability: "endurance", intensity: "power-rank", onFail: { effect: "blinded", duration: "1-10" } } },
 
   // Body Alterations / Defensive
@@ -219,7 +219,7 @@ export const POWER_ENGINE_PRESETS = {
   "Pheromones":             { bodyDefensive: { pheromones: true }, isDefensePower: false, requiresSave: true, save: { ability: "psyche", intensity: "power-rank", onFail: { effect: "custom", duration: "custom", notes: "Considered Friendly to the hero (opposite sex only; no effect on robots, aliens or the shielded)." } } },
   "Damage Transfer":        { isDamageTransfer: true, healingType: "touch", range: "touch" },
   "Healing":                { isHealingPower: true, healingType: "touch", range: "touch" },
-  "Immortality":            { isImmortality: true, isDefensePower: false, specialMechanics: "Immortality is campaign/Judge-facing; no direct mitigation." }
+  "Immortality":            { countsAsTwoPowers: true, isImmortality: true, isDefensePower: false, specialMechanics: "Immortality is campaign/Judge-facing; no direct mitigation." }
 };
 
 // Schema defaults treated as "blank" for conservative preset application. This

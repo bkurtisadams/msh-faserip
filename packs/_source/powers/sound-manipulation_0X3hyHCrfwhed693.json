@@ -25,8 +25,8 @@
     "area": 0,
     "duration": "",
     "customDuration": "",
-    "isAttackPower": true,
-    "battleEffectsColumn": "Fo",
+    "isAttackPower": false,
+    "battleEffectsColumn": "",
     "damageSource": "rank",
     "damage": 0,
     "canPullPunch": false,
@@ -70,7 +70,7 @@
     "limitations": "",
     "countsAsTwoPowers": false,
     "grantedByEquipment": false,
-    "damageType": "energy-sound",
+    "damageType": "",
     "extraAttacks": false,
     "extraBodyParts": [],
     "specialStrengthType": "",
@@ -146,8 +146,8 @@
       "controlSpecific": "",
       "manipulateExisting": true,
       "generateNew": false,
-      "useAsShield": true,
-      "useAsWeapon": true,
+      "useAsShield": false,
+      "useAsWeapon": false,
       "createConstructs": false,
       "animateObjects": false
     },
@@ -208,8 +208,13 @@
       "usesCeremony": false,
       "sourceEntity": ""
     },
-    "hasBonusPowers": false,
-    "bonusPowers": [],
+    "hasBonusPowers": true,
+    "bonusPowers": [
+      {
+        "name": "Sound Generation",
+        "rankMod": "same"
+      }
+    ],
     "sfx": {
       "hit": "",
       "miss": "",
@@ -225,7 +230,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "",
+    "specialMechanics": "Dampen existing noise by rank# Intensity, or raise it one level on a Power rank FEAT. Sonic attacks on the hero reduced by rank#. Sound Generation may be taken as a bonus Power.",
     "description": "The hero can manipulate existing sonic energies. dampening existing noise by the Power rank number in Intensity, or increasing that noise by one level of Intensity if a successful Power rank FEAT is made. The individual with this Power may reduce all sonic-based attacks an his form by the Power rank number. A character with this Power may gain Sound Generation as a bonus Power, which would occupy the next Power slot instead of a randomly rolled Power.",
     "rank": "Typical",
     "value": 6,

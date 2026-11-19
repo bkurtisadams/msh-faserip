@@ -44,7 +44,7 @@
       "intensity": "power-rank",
       "fixedRank": "",
       "onFail": {
-        "effect": "stunned",
+        "effect": "unconscious",
         "duration": "1-10",
         "notes": ""
       },

@@ -38,14 +38,14 @@
     "continuingDamage": false,
     "continuingDamageRounds": 3,
     "ensnaringStrength": "",
-    "requiresSave": true,
+    "requiresSave": false,
     "save": {
-      "ability": "psyche",
+      "ability": "endurance",
       "intensity": "power-rank",
       "fixedRank": "",
       "onFail": {
-        "effect": "custom",
-        "duration": "custom",
+        "effect": "stunned",
+        "duration": "1-10",
         "notes": ""
       },
       "rerollOnKarmaLoss": false,
@@ -68,7 +68,7 @@
       "maxRank": ""
     },
     "limitations": "",
-    "countsAsTwoPowers": false,
+    "countsAsTwoPowers": true,
     "grantedByEquipment": false,
     "damageType": "",
     "extraAttacks": false,
@@ -225,7 +225,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "",
+    "specialMechanics": "Red Power rank FEAT by the hero, target within one area. Failure: hero unconscious 1-10 rounds, no retry for one day.",
     "description": "Transferral is the ultimate form of Possession, in that it allows the complete transferral of consciousness with a target within one area. The target's consciousness is not put away in the back of the character's mind, but rather moved into the body of the character with the Transferral Power. Transferral always needs a red Power rank FEAT to succeed. and may be performed against creatures with higher Psyches, those with Mental Powers, and alien beings or robots. If the transfer fails. the attacker is unconscious for 1-10 rounds. and may not attempt again for one day. When characters transfer consciousness, they also trade the mental abilities, Powers, and Talents. They do not trade physical abilities or Powers, nor do they trade Popularity, Contacts, or Resources. The character performing the transferral also trades Karma amounts with the target. For example, if Doctor Doom conducts a transferral with Reed Richards, Doom enters Reed's body and vice versa. Doom/Richards gains Richards' appearance, Contacts, Popularity, Resources, Karma, physical abilities (Fighting, Agility, Strength, and Endurance), and Powers (stretching). Doom retains his own Talents, knowledge, and mental abilities (Reason, Intuition, and Psyche) and Mental Powers (including this Transferral Power). Richards/Doom is similarly switched.",
     "rank": "Typical",
     "value": 6,

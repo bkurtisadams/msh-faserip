@@ -68,7 +68,7 @@
       "maxRank": ""
     },
     "limitations": "",
-    "countsAsTwoPowers": false,
+    "countsAsTwoPowers": true,
     "grantedByEquipment": false,
     "damageType": "touch-healthdrain",
     "extraAttacks": false,

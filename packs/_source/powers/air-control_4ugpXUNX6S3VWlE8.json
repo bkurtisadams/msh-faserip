@@ -208,13 +208,8 @@
       "usesCeremony": false,
       "sourceEntity": ""
     },
-    "hasBonusPowers": true,
-    "bonusPowers": [
-      {
-        "name": "Flight",
-        "rankMod": "same"
-      }
-    ],
+    "hasBonusPowers": false,
+    "bonusPowers": [],
     "sfx": {
       "hit": "",
       "miss": "",
@@ -230,7 +225,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "",
+    "specialMechanics": "Begins with one Power stunt: Flight, a Limited Weather Control stunt, Lightning, or reducing weather conditions.",
     "description": "The hero with this Power has the ability to manipulate air, winds, and (potentially) weather. The hero can create shields of wind up to Power rank damage that are effective against all physical missile attacks of that rank or lower. The hero can also use air as a distance weapon, inflicting up to the Power rank of damage, but repelled by any form of Force Field, including shields made of air. The hero can also generate winds of Power rank Intensity. The hero with Air Control may also develop Power stunts for this Power. A character with Air Control begins with one Power stunt. which may be:\n• Flight: at Power rank speed.\n• Limited Weather Control: Tornadoes of Power rank Intensity and damage, controlled by Power rank FEAT.\n• Limited Weather Control: Summon Storm.\n• Limited Weather Control: Summon Fog.\n• Lightning of Power rank range and damage.\n• Reduce existing Weather Conditions with Power rank ability, as for each type of weather.",
     "rank": "Typical",
     "value": 6,

@@ -90,7 +90,7 @@
     "energyReflectionType": "",
     "energyReflectionRank": "full",
     "isSensePower": false,
-    "isAbilitySubstitution": true,
+    "isAbilitySubstitution": false,
     "isMovementPower": false,
     "isControlPower": false,
     "isMentalPower": true,
@@ -123,8 +123,8 @@
         "context": ""
       },
       "reason": {
-        "enabled": true,
-        "context": "Machine/computer intuition"
+        "enabled": false,
+        "context": ""
       },
       "intuition": {
         "enabled": false,
@@ -225,7 +225,7 @@
       "scale": 1,
       "duration": 1000
     },
-    "specialMechanics": "",
+    "specialMechanics": "Rolls to see whether an invention works are at Unearthly regardless of Reason or Power rank; no modifiers. Resources still required.",
     "description": "This is a specific form of Ultimate Skill that affects repairs. inventing, and building things. The character with this Power has a strong intuitive knowledge of machinery. Regardless of Reason, any rolls for determining whether an invention works or not are at Unearthly Rank. No modifiers may be added to this roll. The character with this Power must still provide Resources for these inventions in the standard fashion.",
     "rank": "Typical",
     "value": 6,
