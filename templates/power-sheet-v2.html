@@ -282,7 +282,7 @@
   <option value="mental" {{#if (eq system.resistanceType "mental")}}selected{{/if}}>Mental Attacks</option>
   <option value="magical" {{#if (eq system.resistanceType "magical")}}selected{{/if}}>Magical Attacks</option>
   <option value="disease" {{#if (eq system.resistanceType "disease")}}selected{{/if}}>Disease</option>
-  <option value="sound" {{#if (eq system.resistanceType "sound")}}selected{{/if}}>Sonic</option>
+  {{#if (or (eq system.type "Sound Manipulation") (eq system.resistanceType "sound"))}}<option value="sound" {{#if (eq system.resistanceType "sound")}}selected{{/if}}>Sonic (Sound Manipulation)</option>{{/if}}
 </select>
 </div>
 <div class="ps2-field">
@@ -309,7 +309,6 @@
   <option value="mental" {{#if (eq system.resistanceType "mental")}}selected{{/if}}>Mental Attacks</option>
   <option value="magical" {{#if (eq system.resistanceType "magical")}}selected{{/if}}>Magical Attacks</option>
   <option value="disease" {{#if (eq system.resistanceType "disease")}}selected{{/if}}>Disease</option>
-  <option value="sound" {{#if (eq system.resistanceType "sound")}}selected{{/if}}>Sonic</option>
 </select>
 </div>
 <div class="ps2-field">
