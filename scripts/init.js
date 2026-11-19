@@ -1,4 +1,8 @@
-﻿// init.js v1.22.2 - 2026-11-17
+﻿// init.js v1.23.0 - 2026-11-18
+// v1.23.0: "Armor Shredded" status in the FASERIP palette. Creating, toggling
+//          or deleting a Shred armor effect re-syncs the shredded Body Armor
+//          power's defense AE (GM side).
+// init.js v1.22.2 - 2026-11-17
 // v1.22.2: game.msh.rollUniversalTable is the plain table function; the
 //          universalTableRoll hook now fires inside it (no double-fire).
 // v1.22.1: autoHealingEnabled renamed/hinted as Automatic Recovery &
@@ -2694,6 +2698,7 @@ Hooks.once("setup", () => {
     { id: "paralysis",   name: "Paralyzed",   img: "icons/svg/paralysis.svg" },
     { id: "impaired-endurance", name: "Impaired Endurance", img: "icons/svg/downgrade.svg", flags: { [MSH]: { isImpairedEndurance: true } } },
     { id: "regenerating", name: "Regenerating", img: "icons/svg/regen.svg" },
+    { id: "armor-shredded", name: "Armor Shredded", img: "icons/svg/acid.svg" },
     // Movement / perception (kept for CONFIG.specialStatusEffects: INVISIBLE/FLY/HOVER/BURROW)
     { id: "invisible",   name: "Invisible",   img: "icons/svg/invisible.svg" },
     { id: "fly",         name: "Flying",      img: "icons/svg/wing.svg" },
@@ -3477,6 +3482,24 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
 
   await syncPowerOngoingEffects(actor, item);
 });
+
+async function resyncShreddedArmor(effect) {
+  if (!game.user.isGM) return;
+  const itemId = effect?.flags?.["msh-faserip"]?.shredsArmorItemId;
+  const actor = effect?.parent;
+  if (!itemId || !actor || actor.documentName !== "Actor") return;
+  const item = actor.items.get(itemId);
+  if (!item) return;
+  try {
+    const { syncDefenseEffects } = await import("./modules/effects/defense-effects.js");
+    await syncDefenseEffects(actor, item, false);
+  } catch (e) {
+    console.error("[FASERIP ERROR] Shredded armor re-sync failed:", e);
+  }
+}
+Hooks.on("createActiveEffect", effect => resyncShreddedArmor(effect));
+Hooks.on("updateActiveEffect", effect => resyncShreddedArmor(effect));
+Hooks.on("deleteActiveEffect", effect => resyncShreddedArmor(effect));
 
 Hooks.on("deleteItem", async (item, options, userId) => {
   if (!game.user.isGM) return;

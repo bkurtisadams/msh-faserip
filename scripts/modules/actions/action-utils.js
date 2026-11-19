@@ -1,4 +1,6 @@
-// action-utils.js v1.17.0 - 2026-11-18
+// action-utils.js v1.17.1 - 2026-11-18
+// v1.17.1: getBodyArmorValues skips Body Armor powers named by an active
+//          Armor Shredded effect on the target.
 // v1.17.0: derivePowerDamage — Corrosive Touch inflicts Power rank -3CS.
 // action-utils.js v1.16.2 - 2026-11-16
 // v1.16.2: buildActionsBox ignoreDamageGate param → data-ignore-gate on the
@@ -2615,6 +2617,7 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
   const bodyArmorPowers = targetActor.items.filter(i => {
     if (i.type !== "power") return false;
     if (i.system?.isActive === false) return false;
+    if (i.system?.isForceField !== true && targetActor.effects?.some(e => !e.disabled && e.flags?.["msh-faserip"]?.shredsArmorItemId === i.id)) return false;
     if (i.system.isBodyArmor === true) return true;
     if (i.system.isForceField === true) return true;
     
