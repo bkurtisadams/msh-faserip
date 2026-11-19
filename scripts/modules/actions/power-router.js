@@ -1,4 +1,7 @@
-// power-router.js v1.17.0 - 2026-11-18
+// power-router.js v1.18.0 - 2026-11-18
+// v1.18.0: Claws / Rotting Touch / Corrosive Touch ask Attack or Shred armor
+//          (DESIGN-material-strength.md §5 step 6); Attack continues the
+//          normal route via rollPower(..., { skipShredChoice: true }).
 // v1.17.0: RAW Power FEAT routes — Transferral (hero needs Red; failure KOs
 //          the hero 1-10 rounds), Animal Communication and Control (Popularity
 //          FEAT at Power rank), Weather Control (stunts roll the Power rank),
@@ -234,7 +237,7 @@ const POWER_FEAT_ROUTES = {
  * @param {Item} item   - The power item
  * @returns {Promise}   - Result from ActionDispatcher.roll() or undefined
  */
-export async function rollPower(actor, item) {
+export async function rollPower(actor, item, routeOpts = {}) {
   if (!actor || !item) {
     ui.notifications.error("Actor or power not found");
     return;
@@ -262,6 +265,13 @@ export async function rollPower(actor, item) {
       actor,
       opts: { itemId: item.id, item }
     });
+  }
+
+  if (!routeOpts.skipShredChoice) {
+    const { shredKind, showAttackOrShredChoice } = await import("./shred-armor-action.js");
+    if (shredKind(item)) {
+      return showAttackOrShredChoice(actor, item, () => rollPower(actor, item, { ...routeOpts, skipShredChoice: true }));
+    }
   }
 
   // Ultimate Skill: roll the talent it makes Unearthly (rankOverride on the talent).
