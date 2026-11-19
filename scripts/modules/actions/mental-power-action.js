@@ -1,3 +1,8 @@
+// scripts/modules/actions/mental-power-action.js v2.7.0 - 2026-11-19
+// v2.7.0: Telepathy, Psionic Attack and the failed-save effects match on the
+//         power's type as well as its name, so a renamed power (e.g. type
+//         Mind Control named "Puppet Strings") keeps its rules.
+//         mentalEffectDefaults() exported for tests.
 // scripts/modules/actions/mental-power-action.js v2.6.0 - 2026-11-18
 // v2.6.0: Nullifying Power / Nullifier Missile detection reads the power type as
 //         well as the name, and the aura toggle button is no longer shown on a
@@ -45,6 +50,18 @@ import { getRollMode } from "../dice/roll-mode.js";
  * Mental Power Action - for powers that skip to-hit roll and go straight to saves
  * Examples: Psionic Attack, Mind Control, Emotion Control, Mental Probe
  */
+/** Failed-save effect for a mental power, by name or type ("" when none).
+ *  Matching on "name type" lets a renamed power (type Mind Control) keep it. */
+export function mentalEffectDefaults(key) {
+  const k = String(key || "").toLowerCase();
+  if (k.includes("psionic attack"))  return { effectName: "Unconscious", failMessage: "is knocked unconscious", abilityLabel: "psyche" };
+  if (k.includes("mind control"))    return { effectName: "Controlled", failMessage: "falls under psychic control", abilityLabel: "psyche" };
+  if (k.includes("possession"))      return { effectName: "Possessed", failMessage: "is mentally possessed", abilityLabel: "psyche" };
+  if (k.includes("emotion control")) return { effectName: "Emotion Controlled", failMessage: "is overwhelmed by emotion", abilityLabel: "intuition" };
+  if (k.includes("mental probe"))    return { effectName: "Mentally Fatigued", failMessage: "suffers mental strain", abilityLabel: "psyche" };
+  return null;
+}
+
 export class MentalPowerAction extends BaseAction {
   constructor(config) {
     const actor = config.actor;
@@ -313,7 +330,7 @@ export class MentalPowerAction extends BaseAction {
     }
 
     // ── Telepathy: contested Power rank FEAT (not a save vs intensity) ──
-    if (nameLc.includes("telepathy") && !stuntPreset) {
+    if (nullKey.includes("telepathy") && !stuntPreset) {
       const stuntPresets = presetsForItem(item);
       const targets = Array.from(game.user.targets);
       if (targets.length === 0) {
@@ -573,7 +590,7 @@ export class MentalPowerAction extends BaseAction {
     const targetName = targetActor?.name || "Unknown";
 
     // ── Psionic Attack: check for Force Field intensity reduction ──
-    const isPsionicAttack = nameLc.includes("psionic attack");
+    const isPsionicAttack = nullKey.includes("psionic attack");
     let effectiveIntensityRank = powerRank;
     let effectiveIntensityValue = powerValue;
     let ffInfo = null;
@@ -829,26 +846,9 @@ export class MentalPowerAction extends BaseAction {
       abilityLabel = stuntPreset.saveAbility || abilityLabel;
     }
     if (!effectName) {
-      if (nameLc.includes("psionic attack")) {
-        effectName   = "Unconscious";
-        failMessage  = "is knocked unconscious";
-        abilityLabel = "psyche";
-      } else if (nameLc.includes("mind control")) {
-        effectName   = "Controlled";
-        failMessage  = "falls under psychic control";
-        abilityLabel = "psyche";
-      } else if (nameLc.includes("possession")) {
-        effectName   = "Possessed";
-        failMessage  = "is mentally possessed";
-        abilityLabel = "psyche";
-      } else if (nameLc.includes("emotion control")) {
-        effectName   = "Emotion Controlled";
-        failMessage  = "is overwhelmed by emotion";
-        abilityLabel = "intuition";
-      } else if (nameLc.includes("mental probe")) {
-        effectName   = "Mentally Fatigued";
-        failMessage  = "suffers mental strain";
-        abilityLabel = "psyche";
+      const def = mentalEffectDefaults(nullKey);
+      if (def) {
+        ({ effectName, failMessage, abilityLabel } = def);
       } else if (isNullifierMissile) {
         effectName   = "Nullified";
         failMessage  = "is nullified";

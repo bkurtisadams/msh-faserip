@@ -1,3 +1,6 @@
+// scripts/dev/power-rules-runtime-tests.js v2.0.0 - 2026-11-19
+// v2.0.0: "Mechanics" section: Teleportation, Mind Control, Mental Probe,
+//         Energy Reflection, Healing, Density Manipulation (Self/Others).
 // scripts/dev/power-rules-runtime-tests.js v1.9.0 - 2026-11-19
 // v1.9.0: "Fire modes" section: Rate of fire, bursts, scatter, 1-per-2.
 // scripts/dev/power-rules-runtime-tests.js v1.8.0 - 2026-11-19
@@ -54,6 +57,9 @@ import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } 
 import { stuntKarmaCost } from "../stunt-ledger.js";
 import { startingKarmaHistory } from "../karma-rules.js";
 import { weaponRangePenalty, thrownRangePenalty } from "../modules/actions/range-helpers.js";
+import { mentalEffectDefaults } from "../modules/actions/mental-power-action.js";
+import { getHealingDailyCap } from "../modules/actions/healing-action.js";
+import { syncBodyControlEffects } from "../modules/effects/body-control-effects.js";
 import { weaponFireMode, burstTargets, scatterTokens, slowWeaponStatus, fireModeBoxHtml } from "../modules/actions/fire-modes.js";
 import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
 
@@ -632,6 +638,66 @@ function fireModeTests(recorder) {
     "Fire modes: dialog box shows the warning, and nothing for an ordinary pistol");
 }
 
+async function mechanicTests(recorder, state) {
+  const net = (actor, dmg, damageType) => { resetFFRoundTracker(); return calculateMitigation(dmg, actor, { damageType })?.netDamage; };
+  const P = (name, type, category, extra = {}) => power(name, { ...(POWER_ENGINE_PRESETS[type] || {}), category, type, ...extra });
+
+  // Teleportation: a Power FEAT; passengers' Good Endurance FEAT is on the card.
+  const mover = await createActor(state, "Teleporter", { items: [
+    P("Teleportation", "Teleportation", "movement", { rank: "Remarkable", value: 30, isMovementPower: true }),
+    P("Blink", "Teleportation", "movement", { rank: "Remarkable", value: 30, isMovementPower: true })
+  ] });
+  const tp = await route(mover, item(mover, "Teleportation"));
+  recorder.assert(tp.window.startsWith("Generic FEAT") && !tp.dispatched.length, "Teleportation: opens its Power FEAT", tp);
+  const blink = await route(mover, item(mover, "Blink"));
+  recorder.assert(blink.window.startsWith("Generic FEAT") && !blink.chat.length, "Teleportation: a renamed power (Blink) still gets the FEAT, not an info card", blink);
+
+  // Mind Control / Mental Probe: mental-power dialog; failed-save effects by name or type.
+  const mind = await createActor(state, "Mentalist", { system: { attributes: { karma: { value: 100 } } }, items: [
+    P("Mind Control", "Mind Control", "mentalPowers", { rank: "Amazing", value: 50 }),
+    P("Puppet Strings", "Mind Control", "mentalPowers", { rank: "Amazing", value: 50 }),
+    P("Mental Probe", "Mental Probe", "mentalPowers", { rank: "Remarkable", value: 30 })
+  ] });
+  for (const n of ["Mind Control", "Puppet Strings", "Mental Probe"]) {
+    const r = await route(mind, item(mind, n));
+    recorder.assert(r.dispatched.includes("mental-power"), `Mental: ${n} opens the mental-power dialog`, r);
+  }
+  recorder.equal(mentalEffectDefaults("puppet strings mind control")?.effectName, "Controlled", "Mental: a renamed Mind Control still controls on a failed save");
+  recorder.equal(mentalEffectDefaults("mental probe mental probe")?.abilityLabel, "psyche", "Mental: Mental Probe is resisted with Psyche");
+  recorder.equal(Number(item(mind, "Mind Control").system.karmaCost), 10, "Mental: Mind Control costs 10 Karma per use");
+
+  // Energy Reflection: one energy type up to Unearthly; above that, take the remainder.
+  const refl = await createActor(state, "Reflector", { items: [
+    P("Energy Reflection", "Energy Reflection", "energyControl", { rank: "Remarkable", value: 30, energyReflectionType: "fire" })
+  ] });
+  await waitFor(() => getActiveDefenseEffects(refl).length, { timeout: 3000 });
+  recorder.equal(net(refl, 80, "energy-fire"), 0, "Energy Reflection: fire 80 reflected, no damage");
+  recorder.equal(net(refl, 130, "energy-fire"), 30, "Energy Reflection: fire 130 reflects 100, takes the remaining 30");
+  recorder.equal(net(refl, 30, "energy-electricity"), 30, "Energy Reflection: another energy type isn't reflected");
+  recorder.equal(net(refl, 30, "physical-blunt"), 30, "Energy Reflection: physical attacks aren't reflected");
+
+  // Healing: power rank is the most Health per target per day.
+  const healer = await createActor(state, "Healer", { items: [P("Healing", "Healing", "bodyAlterationsDefensive", { rank: "Excellent", value: 20 })] });
+  const today = "2026-11-19";
+  recorder.equal(getHealingDailyCap(healer, "Actor.x", today, 20), 20, "Healing: a fresh day allows the full rank (20)");
+  await healer.setFlag("msh-faserip", "healing.dailyCap", { "Actor.x": { date: today, amount: 15 } });
+  recorder.equal(getHealingDailyCap(healer, "Actor.x", today, 20), 5, "Healing: after 15 healed today, 5 more for that target");
+  recorder.equal(getHealingDailyCap(healer, "Actor.y", today, 20), 20, "Healing: the cap is per target");
+  recorder.equal(getHealingDailyCap(healer, "Actor.x", "2026-11-20", 20), 20, "Healing: the cap resets the next day");
+
+  // Density Manipulation: Self = Body Armor at the rank; Others = touch and save.
+  const dense = await createActor(state, "Dense", { items: [
+    P("Density Manipulation Self", "Density Manipulation Self", "bodyControl", { rank: "Remarkable", value: 30 }),
+    P("Density Manipulation Others", "Density Manipulation Others", "matterControl", { rank: "Incredible", value: 40 })
+  ] });
+  try { await syncBodyControlEffects(dense, item(dense, "Density Manipulation Self"), false); } catch (_) { /* sync may already have run */ }
+  await sleep(200);
+  recorder.equal(net(dense, 40, "physical-blunt"), 10, "Density (Self): Remarkable density is Body Armor 30 vs physical (40 net 10)");
+  recorder.equal(net(dense, 40, "energy-fire"), 10, "Density (Self): and 30 vs energy (40 net 10)");
+  const dOthers = await route(dense, item(dense, "Density Manipulation Others"));
+  recorder.assert(dOthers.dispatched.includes("intensity"), "Density (Others): rolls the target's save, not an info card", dOthers);
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -675,7 +741,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["Equipment powers", () => equipmentTests(recorder, state)],
     ["Karma ledger", () => karmaLedgerTests(recorder, state)],
     ["Range", async () => rangeTests(recorder)],
-    ["Fire modes", async () => fireModeTests(recorder)]
+    ["Fire modes", async () => fireModeTests(recorder)],
+    ["Mechanics", () => mechanicTests(recorder, state)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

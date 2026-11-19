@@ -1,3 +1,5 @@
+// scripts/modules/actions/body-control-action.js 2026-11-19: looks the power
+// up by its type before its name (renamed powers).
 // scripts/modules/actions/body-control-action.js v1.0.0 - 2026-07-05
 // Body-control group (powers audit Step #8, slice 8b). Same data-driven shape
 // as movement-action.js / sense-action.js: BODY_CONTROL_CONFIG has one entry
@@ -117,7 +119,8 @@ export async function showBodyControlFeat(actor, item) {
     ui.notifications.warn("Body-control power requires an actor.");
     return;
   }
-  const cfg = BODY_CONTROL_CONFIG[cfgKey(item.name)];
+  // The power's type first, so a renamed power keeps its rules.
+  const cfg = BODY_CONTROL_CONFIG[cfgKey(item.system?.type)] || BODY_CONTROL_CONFIG[cfgKey(item.name)];
 
   // Unknown body-control power: treat as a passive info card from its own text.
   if (!cfg) {

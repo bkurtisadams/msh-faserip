@@ -1,3 +1,5 @@
+// scripts/modules/actions/healing-action.js 2026-11-19: daily-cap helpers
+// exported for the runtime tests (no behaviour change).
 // scripts/modules/actions/healing-action.js v2.1.0 - 2026-10-01
 // v2.1.0: Health mode heals REAL Health through healPointsNow (splitHealth;
 //         fixed-bug: the raw min(max, value + amount) write wiped a held
@@ -68,7 +70,7 @@ function colorFg(c) {
   }
 }
 
-function getHealingDailyCap(healer, targetUuid, today, rank) {
+export function getHealingDailyCap(healer, targetUuid, today, rank) {
   const scope = SCOPE();
   const cap = healer.getFlag(scope, "healing.dailyCap") || {};
   const entry = cap[targetUuid];
@@ -76,7 +78,7 @@ function getHealingDailyCap(healer, targetUuid, today, rank) {
   return Math.max(0, rank - (entry.amount || 0));
 }
 
-async function recordHealingHealth(healer, targetUuid, today, amount) {
+export async function recordHealingHealth(healer, targetUuid, today, amount) {
   const scope = SCOPE();
   const cap = foundry.utils.deepClone(healer.getFlag(scope, "healing.dailyCap") || {});
   const entry = cap[targetUuid];

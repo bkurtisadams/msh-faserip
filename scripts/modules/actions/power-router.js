@@ -1,3 +1,6 @@
+// power-router.js v1.22.0 - 2026-11-19
+// v1.22.0: Transformations done to others (affects "others" + save) go to
+//          the save dialog instead of the self-transformation card.
 // power-router.js v1.21.0 - 2026-11-19
 // v1.21.0: A power whose granting equipment is broken or gone shows a
 //          notice instead of rolling (equipment-link.mjs).
@@ -421,6 +424,18 @@ export async function rollPower(actor, item, routeOpts = {}) {
   if (catLower === "movement" || item.system?.isMovementPower === true) {
     const { showMovementFeat } = await import("./movement-action.js");
     return showMovementFeat(actor, item);
+  }
+
+  // Transformations done TO someone else (Density Manipulation, Body and
+  // Animal Transformation - Others): a touch, then the target's save against
+  // the Power rank, through the save (intensity) dialog. They used to reach
+  // the self-transformation card and never rolled the save.
+  if (item.system?.transformation?.affects === "others" && requiresSave) {
+    return ActionDispatcher.roll("intensity", {
+      actor,
+      abilityName: item.system?.save?.ability || "endurance",
+      opts: { itemId: item.id, item }
+    });
   }
 
   // Body Control: self-transformation powers post an activation card — a Power
