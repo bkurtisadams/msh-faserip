@@ -1,3 +1,5 @@
+// scripts/dev/power-rules-runtime-tests.js v1.5.0 - 2026-11-19
+// v1.5.0: Armor equipment resistances and protection beside defense powers.
 // scripts/dev/power-rules-runtime-tests.js v1.4.0 - 2026-11-19
 // v1.4.0: Migration of object-shaped lists with blank names; Protected
 //         Senses covering several senses.
@@ -531,6 +533,27 @@ async function equipmentTests(recorder, state) {
   // Protected Senses: several senses; Blinding Touch only cares about sight.
   recorder.equal(protectedSensesOf({ protectedSenses: { sight: true, hearing: true } }).join(), "sight,hearing", "Protected Senses: covers sight and hearing");
   recorder.equal(protectedSensesOf({ protectedSense: "all" }).length, 5, "Protected Senses: legacy All covers every sense");
+
+  // Armor equipment's own resistances list (no powers needed).
+  const suitSys = { category: "armor", protection: "Typical", broken: false, resistances: [
+    { type: "fireHeat", rank: "Excellent", value: 20, customLabel: "" },
+    { type: "electricity", rank: "Incredible", value: 40, customLabel: "" }
+  ] };
+  const geared = await createActor(state, "Suit Only", { items: [{ name: "Body-Suit", type: "equipment", system: suitSys }] });
+  recorder.equal(net(geared, 30, "energy-fire"), 10, "Armor equipment: Excellent fire/heat resistance on the suit stops 20 (fire 30 net 10)");
+  recorder.equal(net(geared, 50, "energy-electricity"), 10, "Armor equipment: Incredible electricity resistance stops 40 (net 10)");
+  recorder.equal(net(geared, 30, "physical-blunt"), 24, "Armor equipment: the suit's Typical protection still stops 6 (Blunt 30 net 24)");
+  recorder.equal(net(geared, 30, "energy-cold"), 30, "Armor equipment: cold isn't listed, no reduction");
+  await item(geared, "Body-Suit").update({ "system.broken": true });
+  await sleep(150);
+  recorder.equal(net(geared, 30, "energy-fire"), 30, "Armor equipment: a broken suit's resistances give nothing");
+  const mixed = await createActor(state, "Suit Plus Power", { items: [
+    { name: "Body-Suit", type: "equipment", system: { ...suitSys, broken: false } },
+    power("Resistance to Cold", { rank: "Good", value: 10, category: "resistances", type: "Resistance to Cold", isDefensePower: true, isResistance: true, resistanceType: "cold", resistanceEffect: "damageReduction" })
+  ] });
+  await waitFor(() => getActiveDefenseEffects(mixed).length, { timeout: 3000 });
+  recorder.equal(net(mixed, 30, "physical-blunt"), 24, "Armor equipment: still counts when the character also has a defense power (Blunt 30 net 24)");
+  recorder.equal(net(mixed, 30, "energy-cold"), 20, "Armor equipment: a cold resistance power still works beside it (net 20)");
 }
 
 async function cleanupState(state, keepArtifacts) {

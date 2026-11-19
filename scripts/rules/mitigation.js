@@ -1,3 +1,9 @@
+// scripts/rules/mitigation.js v3.12.0 - 2026-11-19
+// v3.12.0: Resistances listed on armor and protective gear (equipment
+//          sheet) reduce matching damage by their rank, like resistance
+//          powers; broken items give none. The defense-effect path also
+//          counts armor equipment (best source applies), which it used to
+//          drop whenever the character had any defense effect.
 // scripts/rules/mitigation.js v3.11.0 - 2026-11-19
 // v3.11.0: Resistance AEs listing several forms (multi-form Invulnerability)
 //          match an attack on any of them.
@@ -509,6 +515,44 @@ export function resetFFRoundTracker() {
 
 // ─── Defense AE reader (synchronous — AEs are in memory) ─────────────────────
 
+// Equipment resistance types -> the names resistance matching uses.
+const EQUIP_RES_TYPE = { fireHeat: "fire", toxins: "toxin", corrosives: "corrosive", sonic: "sound" };
+
+/** Resistances from the actor's working armor and protective gear:
+ *  [{ type, value, item }]. Custom entries are left out. */
+/** Best non-force-field armor equipment: { physical, energy, rank }.
+ *  Same values getBodyArmorValues gives (full vs Physical, -20 vs Energy,
+ *  unless the item sets its own). */
+export function equipmentArmorValues(actor) {
+  let best = { physical: 0, energy: 0, rank: "" };
+  for (const item of actor?.items ?? []) {
+    const sys = item.system || {};
+    if (item.type !== "equipment" || sys.category !== "armor" || !sys.protection || sys.broken === true || sys.isForceField === true) continue;
+    const v = typeof sys.protection === "number" ? sys.protection : (Number(CONFIG.FASERIP?.rankValues?.[sys.protection]) || 0);
+    const physical = sys.armorPhysical ? Number(sys.armorPhysical) : v;
+    const energy = sys.armorEnergy ? Number(sys.armorEnergy) : Math.max(0, v - 20);
+    if (physical > best.physical) best = { physical, energy: Math.max(best.energy, energy), rank: typeof sys.protection === "string" ? sys.protection : "" };
+    else if (energy > best.energy) best.energy = energy;
+  }
+  return best;
+}
+
+export function equipmentResistances(actor) {
+  const out = [];
+  for (const item of actor?.items ?? []) {
+    if (item.type !== "equipment" || item.system?.broken === true) continue;
+    const sys = item.system || {};
+    if (!(sys.category === "armor" || (sys.category === "gear" && sys.gearType === "protective"))) continue;
+    const list = Array.isArray(sys.resistances) ? sys.resistances : Object.values(sys.resistances || {});
+    for (const r of list) {
+      if (!r?.type || r.type === "custom") continue;
+      const value = Number(r.value) || Number(CONFIG.FASERIP?.rankValues?.[r.rank]) || 0;
+      if (value > 0) out.push({ type: EQUIP_RES_TYPE[r.type] || r.type, value, item });
+    }
+  }
+  return out;
+}
+
 function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
   if (!actor?.effects) return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
@@ -521,7 +565,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     && e.flags?.[scope]?.effectCategory === "defense"
     && isDefenseAEBackedByCurrentPower(actor, e, scope)
   );
-  if (activeDefenses.length === 0) {
+  if (activeDefenses.length === 0 && !equipmentResistances(actor).length) {
     return { hasArmor: false, hasForceField: false, hasResistance: false, hasAbsorption: false };
   }
 
@@ -542,6 +586,14 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     const e = Number(f.energy) || 0;
     if (p > armorPhys) { armorPhys = p; armorPR = f.physicalRank || ""; }
     if (e > armorEner) { armorEner = e; armorER = f.energyRank || ""; }
+  }
+  // Armor equipment counts too (artificial; the best source applies, they
+  // don't stack). Without this, a character with any defense effect lost
+  // the protection of armor they carry.
+  if (!ignoresArtificialArmor) {
+    const eq = equipmentArmorValues(actor);
+    if (eq.physical > armorPhys) { armorPhys = eq.physical; armorPR = eq.rank; }
+    if (eq.energy > armorEner) { armorEner = eq.energy; armorER = eq.rank; }
   }
 
   // Aggregate force field (take highest)
@@ -593,6 +645,13 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     } else if (eff === "columnShift") {
       resCS += (Number(f.rankValue) || 2);
     }
+  }
+
+  // Resistances listed on armor and protective gear the actor carries
+  // (equipment sheet > Resistances). Damage reduction by the listed rank.
+  for (const r of equipmentResistances(actor)) {
+    if (!(isResMatch(baseType, r.type, dmgTypeLower) || (isMagic && r.type === "magical"))) continue;
+    if (r.value > resDR) { resDR = r.value; resType = r.type; }
   }
 
   // Aggregate absorption (take highest matching rank). Match rules:
