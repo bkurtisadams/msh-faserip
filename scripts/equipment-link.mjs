@@ -1,3 +1,6 @@
+// equipment-link.mjs v1.0.1 - 2026-11-19
+// v1.0.1: Fixed-bug: migration called flatMap on the scenes collection
+//         (not an array); now uses .contents.
 // equipment-link.mjs v1.0.0 - 2026-11-19
 // v1.0.0: Powers granted by equipment. A power whose Source is Equipment
 //         stores the granting item's id (system.equipmentId) and name
@@ -120,7 +123,7 @@ export function registerEquipmentLinkHooks() {
 export async function migrateGrantedPowerLists() {
   if (!game.user?.isGM) return 0;
   let made = 0;
-  const actors = [...game.actors, ...game.scenes.flatMap(s => s.tokens.filter(t => !t.actorLink && t.actor).map(t => t.actor))];
+  const actors = [...game.actors, ...game.scenes.contents.flatMap(s => s.tokens.contents.filter(t => !t.actorLink && t.actor).map(t => t.actor))];
   for (const actor of actors) {
     for (const eq of actor.items.filter(i => i.type === "equipment" && Array.isArray(i.system?.powers) && i.system.powers.length)) {
       const docs = eq.system.powers.filter(p => p?.name).map(p => ({
