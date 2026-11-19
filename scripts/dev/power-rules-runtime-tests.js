@@ -1,4 +1,7 @@
-// scripts/dev/power-rules-runtime-tests.js v1.0.0 - 2026-11-19
+// scripts/dev/power-rules-runtime-tests.js v1.0.1 - 2026-11-19
+// v1.0.1: route() keeps watching for a window for 1.5s after rollPower
+//         returns: the Generic FEAT dialog opens without being awaited, so
+//         v1.0.0 missed it (and left it open) on the FEAT routes.
 // Foundry VTT runtime suite for the Nov 18-19 power-rules work (2.55.0x-2.55.11):
 // presets and the type reset, the rebuilt powers compendium, click routing
 // (Ultimate Skill, Sound/Light/Fire/Electrical/Darkforce/Weather/Transferral,
@@ -86,11 +89,14 @@ async function route(actor, it) {
   const originalCreate = chatClass.create;
   chatClass.create = async (data) => { out.chat.push(String(data?.content ?? "")); return {}; };
   const before = new Set(foundry.applications.instances.keys());
-  let settled = false;
-  const call = Promise.resolve().then(() => rollPower(actor, it)).catch(e => { out.error = e; }).finally(() => { settled = true; });
+  let settledAt = 0;
+  const call = Promise.resolve().then(() => rollPower(actor, it)).catch(e => { out.error = e; }).finally(() => { settledAt = Date.now(); });
   try {
-    const app = await waitFor(() => settled ? "settled"
-      : [...foundry.applications.instances.values()].find(a => !before.has(a.id) && a.element), { timeout: 3000 });
+    const app = await waitFor(() => {
+      const found = [...foundry.applications.instances.values()].find(a => !before.has(a.id) && a.element);
+      if (found) return found;
+      return settledAt && (Date.now() - settledAt) > 1500 ? "settled" : false;
+    }, { timeout: 4000 });
     if (app && app !== "settled") {
       out.window = appTitle(app);
       await sleep(100);
