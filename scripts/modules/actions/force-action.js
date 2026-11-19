@@ -1,3 +1,7 @@
+// force-action.js v3.9.0 - 2026-11-18
+// v3.9.0: Sonic powers (damage type containing sound/sonic) hit as
+//         physical-force-sound: full Body Armor (Force column) and matched by
+//         sonic resistance (Sound Manipulation).
 // force-action.js v3.8.0 - 2026-11-10
 // v3.8.0: Dialog flow moved to the shared PowerBlastAction base
 //         (power-blast-action.js) over attack-dialog-kit.js. This file keeps
@@ -176,7 +180,7 @@ export class ForceAction extends PowerBlastAction {
     return {
       choice: { ...choice, weapon: powerItem },
       rawDamage: choice.pulledDamage > 0 ? choice.pulledDamage : Number(choice.powerDamage) || 0,
-      damageType: "physical-force"
+      damageType: /sound|sonic/i.test(String(powerItem?.system?.damageType || "")) ? "physical-force-sound" : "physical-force"
     };
   }
 }
