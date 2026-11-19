@@ -233,7 +233,8 @@
     "limitationColumnShift": 0,
     "stunts": [],
     "type": "Mind Control",
-    "subtype": "Mind Control"
+    "subtype": "Mind Control",
+    "karmaCost": 10
   },
   "effects": [],
   "folder": null,

@@ -1,3 +1,7 @@
+// scripts/modules/effects/defense-effects.js v1.11.0 - 2026-11-19
+// v1.11.0: Invulnerability may cover several attack forms: the resistance
+//          AE carries flags.resistanceTypes (all forms) and matching accepts
+//          any of them. resistanceType stays the first form.
 // scripts/modules/effects/defense-effects.js v1.10.0 - 2026-11-18
 // v1.10.0: getActiveDefenseEffects skips suppressed AEs (FaseripActiveEffect:
 //          shredded Body Armor is suppressed, not disabled or renamed).
@@ -90,6 +94,7 @@
 import { applyEffect } from "./effect-engine.js";
 import { rankValue as getRankValue, valueToRank, stepRank } from "../../rules/rules-reference.js";
 import { defenseValue } from "../../lib/faserip-rules/faserip-damage.js";
+import { resistanceTypesOf } from "../../power-sheet-view.mjs";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -212,7 +217,8 @@ function resolveResistanceValues(item) {
     || resistanceEffect === "immunity";
 
   return {
-    resistanceType: sys.resistanceType || "",
+    resistanceType: resistanceTypesOf(sys)[0] || sys.resistanceType || "",
+    resistanceTypes: resistanceTypesOf(sys),
     resistanceSpecific: sys.resistanceSpecific || "",
     resistanceEffect: isInvuln ? "invulnerability" : resistanceEffect,
     resistanceValue: isInvuln ? 1000 : value,
@@ -356,9 +362,9 @@ function buildForceFieldAE(item, values) {
 
 function buildResistanceAE(item, values) {
   const scope = SCOPE();
-  const rt = String(values.resistanceType || "");
-  const typeLabel = rt
-    ? rt.charAt(0).toUpperCase() + rt.slice(1)
+  const types = values.resistanceTypes?.length ? values.resistanceTypes : [String(values.resistanceType || "")].filter(Boolean);
+  const typeLabel = types.length
+    ? types.map(rt => rt.charAt(0).toUpperCase() + rt.slice(1)).join(", ")
     : "Unknown";
   const invulnLabel = values.isInvulnerability ? "Invulnerability" : "Resistance";
   const label = `${invulnLabel}: ${typeLabel} (${values.rank}: ${values.resistanceValue})`;
@@ -368,7 +374,7 @@ function buildResistanceAE(item, values) {
     img: "",  // no token badge - passive defense tracked in effects list only
     disabled: false,
     changes: [],
-    statuses: [`resistance-${values.resistanceType}`],
+    statuses: (types.length ? types : [values.resistanceType]).map(t => `resistance-${t}`),
     flags: {
       [scope]: {
         effectCategory: "defense",
@@ -377,6 +383,7 @@ function buildResistanceAE(item, values) {
         powerItemId: item.id,
         powerName: item.name,
         resistanceType: values.resistanceType,
+        resistanceTypes: types,
         resistanceSpecific: values.resistanceSpecific,
         resistanceEffect: values.resistanceEffect,
         resistanceValue: values.resistanceValue,
@@ -753,10 +760,12 @@ export function getResistanceFromEffects(actor, damageType = "physical-blunt") {
     const f = ae.flags?.[scope];
     if (f?.defenseType !== "resistance") continue;
 
-    const resType = (f.resistanceType || "").toLowerCase();
-    if (!isResistanceMatch(baseType, resType, dmgLower)) continue;
+    const forms = (Array.isArray(f.resistanceTypes) && f.resistanceTypes.length ? f.resistanceTypes : [f.resistanceType || ""])
+      .map(t => String(t).toLowerCase());
+    const hit = forms.find(rt => isResistanceMatch(baseType, rt, dmgLower));
+    if (hit === undefined) continue;
 
-    matchedType = f.resistanceType;
+    matchedType = hit;
     const value = Number(f.resistanceValue) || 0;
     const effect = f.resistanceEffect || "damageReduction";
 

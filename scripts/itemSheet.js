@@ -1,3 +1,10 @@
+// itemSheet.js v2.7.0 - 2026-11-19
+// v2.7.0: Context for the new Edit Power fields (power-sheet-actor-view.mjs):
+//         Ultimate Skill talent picker, Raise Lowest Ability, Karma costs and
+//         the Active Effects list. Submit maps the Emotion Control radio to
+//         singleEmotionBonus and keeps resistanceType = first Invulnerability
+//         form. After save: the chosen talent's Rank Override is set (the
+//         previous one cleared) and the Raise Lowest +20 effect is kept in step.
 // itemSheet.js v2.6.0 - 2026-11-19
 // v2.6.0: Power sheet context gains `rankCheck` (power-validation.mjs): the
 //         minimum rank resolved against the actor, with a below-minimum warning.
@@ -56,6 +63,8 @@ import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 import { buildPowerSheetView } from "./power-sheet-view.mjs";
 import { buildLimitationView } from "./power-limitations.mjs";
 import { buildRankValidation } from "./power-validation.mjs";
+import { buildUltimateSkillView, buildRaiseLowestView, buildKarmaCostView, buildLinkedEffectsView, lowestAbilities } from "./power-sheet-actor-view.mjs";
+import { valueToRank } from "./rules/rules-reference.js";
 import { stuntShift, stuntUsesItem } from "./modules/actions/stunt-mechanics.js";
 import { isStuntPower, stuntPowerContext } from "./stunt-power.js";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
@@ -166,6 +175,10 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       context.ps2 = buildPowerSheetView(context.system ?? {}, context.powerOriginFlags);
       context.limit = buildLimitationView(this.item);
       context.rankCheck = buildRankValidation(this.item);
+      context.ultimate = buildUltimateSkillView(this.item);
+      context.raiseLowest = buildRaiseLowestView(this.item);
+      context.karmaCosts = buildKarmaCostView(this.item);
+      context.linkedEffects = buildLinkedEffectsView(this.item);
       context.stuntPower = stuntPowerContext(this.item, { usesItem: stuntUsesItem, shiftFor: stuntShift });
 
       // Helpful logging (kept from your original)
@@ -219,8 +232,78 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         rankMod: b?.rankMod ?? "same"
       }));
     }
+    // Emotion Control: the One/Several radio drives the +2CS flag.
+    const mental = data.system.mental;
+    if (mental && typeof mental.emotionScope === "string") {
+      mental.singleEmotionBonus = mental.emotionScope === "single";
+      delete mental.emotionScope;
+    }
+    // Invulnerability: the first checked attack form stays in resistanceType
+    // for code that reads a single type.
+    const forms = data.system.resistanceTypes;
+    if (forms && typeof forms === "object") {
+      const first = Object.keys(forms).find(k => forms[k] === true);
+      data.system.resistanceType = first || "";
+    }
+
     if (updateData) foundry.utils.mergeObject(data, updateData);
     return data;
+  }
+
+  /** After the power saves, apply the field side effects that touch other
+   *  documents: Ultimate Skill's talent Rank Override and Raise Lowest
+   *  Ability's +20 Active Effect. */
+  async _processSubmitData(event, form, submitData, options) {
+    const before = this.item.type === "power" ? { talentId: this.item.system?.ultimateSkillTalentId || "" } : null;
+    const result = await super._processSubmitData(event, form, submitData, options);
+    if (before && this.item.actor) {
+      try { await this._syncUltimateSkillTalent(before.talentId); } catch (err) { console.error("[FASERIP] Ultimate Skill sync failed:", err); }
+      try { await this._syncRaiseLowestEffect(); } catch (err) { console.error("[FASERIP] Raise Lowest sync failed:", err); }
+    }
+    return result;
+  }
+
+  async _syncUltimateSkillTalent(previousId) {
+    const item = this.item;
+    if (item.system?.type !== "Ultimate Skill") return;
+    const actor = item.actor;
+    const nextId = item.system?.ultimateSkillTalentId || "";
+    const rank = item.system?.rank || "Unearthly";
+    const updates = [];
+    if (previousId && previousId !== nextId) {
+      const prev = actor.items.get(previousId);
+      if (prev && prev.system?.rankOverride === rank) updates.push({ _id: prev.id, "system.rankOverride": "" });
+    }
+    const next = actor.items.get(nextId);
+    if (next && next.system?.rankOverride !== rank) updates.push({ _id: next.id, "system.rankOverride": rank });
+    if (updates.length) await actor.updateEmbeddedDocuments("Item", updates);
+  }
+
+  async _syncRaiseLowestEffect() {
+    const item = this.item;
+    const scope = "msh-faserip";
+    const existing = item.effects.find(e => e.getFlag(scope, "raiseLowest"));
+    const rl = item.system?.raiseLowest || {};
+    const want = item.system?.type === "Raise Lowest Ability" && rl.applied === true;
+    if (!want) { if (existing) await existing.delete(); return; }
+    const lowest = lowestAbilities(item.actor);
+    const ability = lowest.includes(rl.ability) ? rl.ability : lowest[0];
+    const base = Number(item.actor._source?.system?.abilities?.[ability]?.value) || 0;
+    const label = ability.charAt(0).toUpperCase() + ability.slice(1);
+    const rank = valueToRank(base + 20);
+    const data = this._v14NormalizeAE({
+      name: `Raise Lowest Ability: ${label} +20`,
+      img: "icons/svg/upgrade.svg",
+      origin: item.uuid, transfer: true, disabled: false,
+      flags: { [scope]: { raiseLowest: true, ability, rank } },
+      changes: [
+        { key: `system.abilities.${ability}.value`, mode: "add", value: "20" },
+        { key: `system.abilities.${ability}.rank`, mode: "override", value: rank }
+      ]
+    });
+    if (existing && existing.getFlag(scope, "ability") === ability && existing.getFlag(scope, "rank") === rank) return;
+    if (existing) await existing.delete();
+    await item.createEmbeddedDocuments("ActiveEffect", [data]);
   }
 
   // v14: AE changes live at system.changes, and change.mode is now change.type.

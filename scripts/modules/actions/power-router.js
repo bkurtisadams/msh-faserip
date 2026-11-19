@@ -1,3 +1,7 @@
+// power-router.js v1.20.0 - 2026-11-19
+// v1.20.0: Karma per use (system.karmaCost) is checked and spent before the
+//          power routes. Ultimate Skill rolls the talent picked on the Edit
+//          Power sheet (ultimateSkillTalentId) before any Rank Override search.
 // power-router.js v1.19.0 - 2026-11-19
 // v1.19.0: Fire Control (intensify / reduce / fire shield), Electrical
 //          Manipulation (resistance card), Darkforce and Gravity Manipulation
@@ -172,6 +176,12 @@ function detectFromList(powerTypeLower, list) {
 }
 
 async function rollUltimateSkill(actor, item) {
+  // The talent picked on the Edit Power sheet wins.
+  const linked = actor.items.get(item.system?.ultimateSkillTalentId || "");
+  if (linked?.type === "talent") {
+    const { rollTalent } = await import("./talent-action.js");
+    return rollTalent(actor, linked);
+  }
   const talents = actor.items.filter(i => i.type === "talent" && i.system?.rankOverride);
   if (!talents.length) {
     ui.notifications.warn(`${item.name}: no talent on ${actor.name} has a Rank Override set. Set the chosen talent's Rank Override to ${item.system?.rank || "Unearthly"}.`);
@@ -255,6 +265,20 @@ export async function rollPower(actor, item, routeOpts = {}) {
   if (!actor || !item) {
     ui.notifications.error("Actor or power not found");
     return;
+  }
+
+  // Karma per use (Edit Power > Costs; Mind Control 10 by the book). Paid
+  // once per use: re-entries from the shred choice carry karmaPaid.
+  const karmaPerUse = Number(item.system?.karmaCost) || 0;
+  if (karmaPerUse > 0 && !routeOpts.karmaPaid) {
+    const { getAvailableKarma, deductKarma } = await import("../dice/dice-roller.js");
+    const have = Number(getAvailableKarma(actor)) || 0;
+    if (have < karmaPerUse) {
+      ui.notifications.warn(`${actor.name}: ${item.name} costs ${karmaPerUse} Karma per use; only ${have} available.`);
+      return;
+    }
+    await deductKarma(actor, karmaPerUse, `${item.name} (Karma per use)`);
+    routeOpts = { ...routeOpts, karmaPaid: true };
   }
 
   try {

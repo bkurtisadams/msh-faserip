@@ -1,3 +1,7 @@
+// scripts/dev/power-rules-runtime-tests.js v1.1.0 - 2026-11-19
+// v1.1.0: "New power fields" section (2.55.14): multi-form Invulnerability,
+//         Ultimate Skill talent link, Raise Lowest Ability +20 effect, Karma
+//         per use, stunt cost, the linked-effects list and the new sheet rows.
 // scripts/dev/power-rules-runtime-tests.js v1.0.1 - 2026-11-19
 // v1.0.1: route() keeps watching for a window for 1.5s after rollPower
 //         returns: the Generic FEAT dialog opens without being awaited, so
@@ -21,6 +25,9 @@ import { POWER_ENGINE_PRESETS, buildPowerTypeResetUpdates } from "../power-prese
 import { buildLimitationView } from "../power-limitations.mjs";
 import { buildRankValidation } from "../power-validation.mjs";
 import { prepareActiveEffectCategories } from "../../helpers/effects.mjs";
+import { buildPowerSheetView } from "../power-sheet-view.mjs";
+import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } from "../power-sheet-actor-view.mjs";
+import { stuntKarmaCost } from "../stunt-ledger.js";
 
 const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Power Rules Runtime";
@@ -269,6 +276,126 @@ async function sheetTests(recorder, state) {
   await tox.sheet.close();
 }
 
+async function newFieldTests(recorder, state) {
+  const net = (actor, dmg, damageType) => { resetFFRoundTracker(); return calculateMitigation(dmg, actor, { damageType })?.netDamage; };
+
+  // Invulnerability: several attack forms on one power.
+  const invSys = { rank: "Class 1000", value: 1000, category: "resistances", type: "Invulnerability", isDefensePower: true, isResistance: true,
+    resistanceEffect: "invulnerability", resistanceIsInvulnerability: true, resistanceType: "fire",
+    resistanceTypes: { fire: true, cold: true, electricity: false } };
+  const inv = await createActor(state, "Invulnerable", { items: [power("Invulnerability", invSys)] });
+  await waitFor(() => getActiveDefenseEffects(inv).length, { timeout: 3000 });
+  const invAe = getActiveDefenseEffects(inv)[0];
+  recorder.assert(Array.isArray(invAe?.flags?.[SYSTEM_ID]?.resistanceTypes) && invAe.flags[SYSTEM_ID].resistanceTypes.length === 2,
+    "Invulnerability: defense effect carries both attack forms", { types: invAe?.flags?.[SYSTEM_ID]?.resistanceTypes, name: invAe?.name });
+  recorder.equal(net(inv, 50, "energy-fire"), 0, "Invulnerability: fire 50 stopped");
+  recorder.equal(net(inv, 50, "energy-cold"), 0, "Invulnerability: cold 50 stopped (second form)");
+  recorder.equal(net(inv, 50, "energy-electricity"), 50, "Invulnerability: electricity 50 not covered");
+  recorder.equal(buildPowerSheetView(invSys).invulnForms.filter(f => f.checked).length, 2, "Invulnerability: sheet shows two forms checked");
+  recorder.equal(buildPowerSheetView({ ...invSys, resistanceTypes: undefined }).invulnForms.filter(f => f.checked).map(f => f.key).join(), "fire",
+    "Invulnerability: legacy single resistanceType shows as one checked form");
+
+  // Ultimate Skill: talent picker and Rank Override link.
+  const talent = (name, category) => ({ name, type: "talent", system: { category } });
+  const us = await createActor(state, "Ultimate", { items: [
+    power("Ultimate Skill", { rank: "Unearthly", value: 100, category: "mentalPowers", type: "Ultimate Skill" }),
+    talent("Martial Arts B", "Fighting Skills"), talent("Physics", "Scientific Skills"),
+    talent("Law", "Professional Skills"), talent("Student", "Other Talents")
+  ] });
+  const usItem = item(us, "Ultimate Skill");
+  const usView = buildUltimateSkillView(usItem);
+  const opt = n => usView.options.find(o => o.label.startsWith(n));
+  recorder.assert(!opt("Martial Arts B").disabled && !opt("Physics").disabled && opt("Law").disabled && opt("Student").disabled,
+    "Ultimate Skill: Fighting/Scientific allowed; Professional and Student greyed", { options: usView.options });
+  const ma = item(us, "Martial Arts B"), phys = item(us, "Physics");
+  await usItem.update({ "system.ultimateSkillTalentId": ma.id });
+  await usItem.sheet._syncUltimateSkillTalent("");
+  recorder.equal(item(us, "Martial Arts B").system.rankOverride, "Unearthly", "Ultimate Skill: picking Martial Arts B sets its Rank Override to Unearthly");
+  await usItem.update({ "system.ultimateSkillTalentId": phys.id });
+  await usItem.sheet._syncUltimateSkillTalent(ma.id);
+  recorder.assert(item(us, "Physics").system.rankOverride === "Unearthly" && !item(us, "Martial Arts B").system.rankOverride,
+    "Ultimate Skill: switching to Physics moves the Rank Override and clears Martial Arts B",
+    { physics: item(us, "Physics").system.rankOverride, ma: item(us, "Martial Arts B").system.rankOverride });
+  const r = await route(us, usItem);
+  recorder.assert(r.window.includes("Physics") && !r.error, "Ultimate Skill: clicking the power rolls the linked talent (Physics)",
+    { window: r.window, dispatched: r.dispatched, error: r.error?.message });
+
+  // Raise Lowest Ability: picker and +20 Active Effect.
+  const abil = (rank, value) => ({ rank, value });
+  const rl = await createActor(state, "Raise Lowest", {
+    system: { abilities: { fighting: abil("Excellent", 20), agility: abil("Good", 10), strength: abil("Feeble", 2), endurance: abil("Remarkable", 30),
+      reason: abil("Typical", 6), intuition: abil("Good", 10), psyche: abil("Typical", 6) } },
+    items: [power("Raise Lowest Ability", { rank: "", value: 0, category: "bodyControl", type: "Raise Lowest Ability" })]
+  });
+  const rlItem = item(rl, "Raise Lowest Ability");
+  const rlView = buildRaiseLowestView(rlItem);
+  recorder.assert(rlView.ability === "strength" && rlView.options.filter(o => !o.disabled).length === 1 && rlView.result.includes("2 \u2192 22 (Excellent)"),
+    "Raise Lowest: only Strength (lowest) is selectable; result 2 to 22 Excellent", rlView);
+  await rlItem.update({ "system.raiseLowest": { ability: "strength", applied: true } });
+  await rlItem.sheet._syncRaiseLowestEffect();
+  await sleep(150);
+  recorder.assert(rl.system.abilities.strength.value === 22 && rl.system.abilities.strength.rank === "Excellent",
+    "Raise Lowest: applying adds +20 Strength through an Active Effect (22, Excellent)", rl.system.abilities.strength);
+  await rlItem.update({ "system.raiseLowest.applied": false });
+  await rlItem.sheet._syncRaiseLowestEffect();
+  await sleep(150);
+  recorder.assert(rl.system.abilities.strength.value === 2 && !rlItem.effects.size, "Raise Lowest: unticking removes the effect (back to 2)",
+    { value: rl.system.abilities.strength.value, effects: rlItem.effects.size });
+
+  // Karma per use and stunt cost.
+  const kc = await createActor(state, "Karma", {
+    system: { attributes: { karma: { value: 50 } } },
+    items: [power("Mind Control", { ...POWER_ENGINE_PRESETS["Mind Control"], rank: "Amazing", value: 50, category: "mentalPowers", type: "Mind Control" }),
+      power("Pricey", { rank: "Good", value: 10, category: "mentalPowers", type: "Telepathy", karmaCost: 999 })]
+  });
+  recorder.equal(Number(item(kc, "Mind Control").system.karmaCost), 10, "Karma: Mind Control preset costs 10 Karma per use");
+  const spentBefore = (kc.system.karma?.history ?? []).length;
+  await route(kc, item(kc, "Mind Control"));
+  const hist = kc.system.karma?.history ?? [];
+  recorder.assert(hist.length === spentBefore + 1 && hist.at(-1)?.amount === -10, "Karma: using Mind Control spends 10 Karma", { last: hist.at(-1) });
+  const pricey = await route(kc, item(kc, "Pricey"));
+  recorder.assert(!pricey.dispatched.length && !pricey.window && (kc.system.karma?.history ?? []).length === hist.length,
+    "Karma: a power costing more than the character has does not fire or charge", pricey);
+  recorder.equal(stuntKarmaCost({ name: "Weather Control", system: { type: "Weather Control" } }), 50, "Stunt cost: Weather Control 50");
+  recorder.equal(stuntKarmaCost({ name: "X", system: { type: "Telepathy", stuntKarmaCost: 75 } }), 75, "Stunt cost: the power's own field wins");
+
+  // Linked effects list.
+  const ba = await createActor(state, "Linked", { items: [
+    power("Body Armor", { rank: "Good", value: 10, category: "bodyAlterationsDefensive", type: "Body Armor", isBodyArmor: true, bodyArmorType: "both", isDefensePower: true })
+  ] });
+  await waitFor(() => getActiveDefenseEffects(ba).length, { timeout: 3000 });
+  const armor = item(ba, "Body Armor");
+  recorder.assert(buildLinkedEffectsView(armor).linked.some(l => l.status === "Active"), "Linked effects: armor's defense effect listed as Active");
+  await ba.createEmbeddedDocuments("ActiveEffect", [{ name: `Armor Shredded: ${armor.name}`, img: "icons/svg/acid.svg",
+    flags: { [SYSTEM_ID]: { effectType: "armorShredded", shredsArmorItemId: armor.id, shreddingPower: "Rotting Touch" } } }]);
+  await sleep(150);
+  const lv = buildLinkedEffectsView(armor).linked[0];
+  recorder.assert(lv?.status === "Suppressed" && lv?.by?.power === "Rotting Touch", "Linked effects: shredded armor shows Suppressed by Rotting Touch", lv);
+
+  // Sheet rows.
+  const sheetActor = await createActor(state, "New Rows", { items: [
+    power("Invulnerability", invSys),
+    power("Enhanced Senses", { rank: "Incredible", value: 40, category: "senses", type: "Enhanced Senses", isSensePower: true, detection: { senses: { hearing: true, sight: true } } }),
+    power("Emotion Control", { rank: "Remarkable", value: 30, category: "mentalPowers", type: "Emotion Control", mental: { emotionType: "fear", emotionType2: "love" } })
+  ] });
+  const checkSheet = async (name, selector, test, label) => {
+    const it = item(sheetActor, name);
+    await it.sheet.render(true);
+    const el = await waitFor(() => it.sheet.element?.querySelector?.(selector) && it.sheet.element);
+    recorder.assert(!!el && test(el), label);
+    await it.sheet.close();
+  };
+  await checkSheet("Invulnerability", 'input[name^="system.resistanceTypes."]',
+    el => el.querySelectorAll('input[name^="system.resistanceTypes."]').length === 10 && el.querySelectorAll('input[name^="system.resistanceTypes."]:checked').length === 2,
+    "Edit Power sheet: Invulnerability shows 10 attack forms, 2 checked");
+  await checkSheet("Enhanced Senses", 'input[name^="system.detection.senses."]',
+    el => el.querySelectorAll('input[name^="system.detection.senses."]').length === 5 && el.querySelectorAll('input[name^="system.detection.senses."]:checked').length === 2,
+    "Edit Power sheet: Enhanced Senses shows 5 senses, 2 checked");
+  await checkSheet("Emotion Control", 'select[name="system.mental.emotionType2"]',
+    el => !!el.querySelector('input[name="system.karmaCost"]') && !!el.querySelector(".ps2-efx-head"),
+    "Edit Power sheet: Emotion 2, Costs and Active Effects render");
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -306,7 +433,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["Compendium", () => compendiumTests(recorder)],
     ["Routing", () => routingTests(recorder, state)],
     ["Damage and Shred", () => damageTests(recorder, state)],
-    ["Limitations and sheet", () => sheetTests(recorder, state)]
+    ["Limitations and sheet", () => sheetTests(recorder, state)],
+    ["New power fields", () => newFieldTests(recorder, state)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

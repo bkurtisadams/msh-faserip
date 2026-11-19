@@ -303,25 +303,14 @@
           {{/if}}
 
           {{#if ps2.kindIs.invulnerability}}
-<div class="ps2-field">
-<label>Against</label>
-<select name="system.resistanceType" id="ps2-resistance-type">
-  <option value="" {{#unless system.resistanceType}}selected{{/unless}}>-- Select --</option>
-  <option value="fire" {{#if (eq system.resistanceType "fire")}}selected{{/if}}>Fire / Heat</option>
-  <option value="cold" {{#if (eq system.resistanceType "cold")}}selected{{/if}}>Cold</option>
-  <option value="electricity" {{#if (eq system.resistanceType "electricity")}}selected{{/if}}>Electricity</option>
-  <option value="radiation" {{#if (eq system.resistanceType "radiation")}}selected{{/if}}>Radiation</option>
-  <option value="toxin" {{#if (eq system.resistanceType "toxin")}}selected{{/if}}>Toxins</option>
-  <option value="corrosive" {{#if (eq system.resistanceType "corrosive")}}selected{{/if}}>Corrosives</option>
-  <option value="emotion" {{#if (eq system.resistanceType "emotion")}}selected{{/if}}>Emotion Attacks</option>
-  <option value="mental" {{#if (eq system.resistanceType "mental")}}selected{{/if}}>Mental Attacks</option>
-  <option value="magical" {{#if (eq system.resistanceType "magical")}}selected{{/if}}>Magical Attacks</option>
-  <option value="disease" {{#if (eq system.resistanceType "disease")}}selected{{/if}}>Disease</option>
-</select>
+<div class="ps2-field ps2-span-full">
+<label>Against (one or more)</label>
+<div class="ps2-chk" role="group" aria-label="Attack forms">
+  {{#each ps2.invulnForms}}
+  <label><input type="checkbox" name="system.resistanceTypes.{{key}}" {{checked checked}} data-dtype="Boolean">{{label}}</label>
+  {{/each}}
 </div>
-<div class="ps2-field">
-<label>Resistance</label>
-<input type="text" value="Class 1000" readonly tabindex="-1" />
+<p class="ps2-hint">The first attack form counts as two Powers; later Resistances may become Invulnerability at no extra cost.</p>
 </div>
           {{/if}}
 
@@ -504,27 +493,99 @@
       {{/if}}
 
       {{#if ps2.isEmotion}}
-      <div class="ps2-grid-2col">
-<div class="ps2-field">
-<label>Emotion</label>
-<select name="system.mental.emotionType">
-  <option value="" {{#unless system.mental.emotionType}}selected{{/unless}}>Any</option>
-  <option value="respect" {{#if (eq system.mental.emotionType "respect")}}selected{{/if}}>Respect</option>
-  <option value="love" {{#if (eq system.mental.emotionType "love")}}selected{{/if}}>Love</option>
-  <option value="fear" {{#if (eq system.mental.emotionType "fear")}}selected{{/if}}>Fear</option>
-  <option value="hatred" {{#if (eq system.mental.emotionType "hatred")}}selected{{/if}}>Hatred</option>
-  <option value="loyalty" {{#if (eq system.mental.emotionType "loyalty")}}selected{{/if}}>Loyalty</option>
-  <option value="doubt" {{#if (eq system.mental.emotionType "doubt")}}selected{{/if}}>Doubt</option>
-  <option value="pleasure" {{#if (eq system.mental.emotionType "pleasure")}}selected{{/if}}>Pleasure</option>
-</select>
-</div>
-        <div class="ps2-flag-group ps2-align-end">
-          <label><input type="checkbox" name="system.mental.singleEmotionBonus" {{checked system.mental.singleEmotionBonus}} data-dtype="Boolean"> One emotion only (+2CS)</label>
-        </div>
+      <div class="ps2-radio" role="radiogroup" aria-label="Emotion scope">
+        <label><input type="radio" name="system.mental.emotionScope" value="single" {{#if ps2.emotionSingle}}checked{{/if}}><span><b>One emotion only</b> (+2CS; no other emotions as stunts)</span></label>
+        <label><input type="radio" name="system.mental.emotionScope" value="several" {{#unless ps2.emotionSingle}}checked{{/unless}}><span><b>Several emotions</b> (begins with two; more as Power stunts)</span></label>
       </div>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Emotion 1</label>
+          <select name="system.mental.emotionType">
+            {{#each ps2.emotionOptions1}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </div>
+        {{#unless ps2.emotionSingle}}
+        <div class="ps2-field">
+          <label>Emotion 2</label>
+          <select name="system.mental.emotionType2">
+            {{#each ps2.emotionOptions2}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </div>
+        {{/unless}}
+      </div>
+      <p class="ps2-hint">Targets in the same area; Intuition FEAT avoids; lasts 10-100 turns. Robots and non-human aliens are immune.</p>
       {{/if}}
 
-      <p class="ps2-hint">Grey fields are worked out from the rank.</p>
+      {{#if ps2.isDensityOthers}}
+      <div class="ps2-radio" role="radiogroup" aria-label="Density mode">
+        <label><input type="radio" name="system.densityMode" value="reduction" {{#if (eq ps2.densityMode "reduction")}}checked{{/if}}><span><b>Reduction:</b> physical attacks on and by the target reduced by Power rank ({{ps2.rankNumber}}); target can be moved by winds of Good Intensity. Lasts 1-10 rounds.</span></label>
+        <label><input type="radio" name="system.densityMode" value="increase" {{#if (eq ps2.densityMode "increase")}}checked{{/if}}><span><b>Increase:</b> target makes an Endurance FEAT each round (Power rank Intensity) or falls unconscious, then loses Endurance ranks until a FEAT halts it; physical actions need an Endurance FEAT. Lasts 1-10 rounds.</span></label>
+      </div>
+      <p class="ps2-hint">Touch. Unwilling target: Psyche or Endurance FEAT (target's choice) vs Power rank.</p>
+      {{/if}}
+
+      {{#if ps2.isAnimalSelf}}
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Animal</label>
+          <input type="text" name="system.transformation.animal" value="{{ps2.animal.name}}" placeholder="e.g., Wolf" />
+        </div>
+        <div class="ps2-field ps2-align-end">
+          <label class="ps2-toggle"><input type="checkbox" name="system.transformation.singleAnimalType" {{checked ps2.animal.singleType}} data-dtype="Boolean"> Single animal type only</label>
+        </div>
+      </div>
+      <div class="ps2-grid-3col">
+        {{#each ps2.animal.mental}}
+        <div class="ps2-field">
+          <label>{{label}}</label>
+          <select name="system.transformation.mentalFrom.{{key}}">
+            <option value="hero" {{#unless animal}}selected{{/unless}}>Hero's</option>
+            <option value="animal" {{#if animal}}selected{{/if}}>Animal's</option>
+          </select>
+        </div>
+        {{/each}}
+      </div>
+      <p class="ps2-hint">Single type: no Power rank FEAT to change. Using any of the animal's mental abilities needs a Power rank FEAT. Other super-human Powers are lost in animal form.</p>
+      {{/if}}
+
+      {{#if ps2.isUltimateSkill}}
+      {{#if ultimate.hasActor}}
+      <div class="ps2-field">
+        <label>Talent made {{system.rank}}</label>
+        <select name="system.ultimateSkillTalentId">
+          <option value="" {{#unless system.ultimateSkillTalentId}}selected{{/unless}}>-- Select --</option>
+          {{#each ultimate.options}}<option value="{{id}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}}>{{label}}</option>{{/each}}
+        </select>
+      </div>
+      {{else}}
+      <p class="ps2-hint">Add this power to a character to pick the talent.</p>
+      {{/if}}
+      <p class="ps2-hint">Only the character's Weapon, Fighting, Scientific and Other talents (not Student, Heir to Fortune or Leadership). The talent is used at Unearthly instead of its +1/+2CS; saving sets its Rank Override.</p>
+      {{#if ultimate.chosen}}<div class="ps2-ok">{{ultimate.chosen.name}} rolls at {{ultimate.chosen.rank}}.</div>{{/if}}
+      {{/if}}
+
+      {{#if ps2.isRaiseLowest}}
+      {{#if raiseLowest.hasActor}}
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Ability raised</label>
+          <select name="system.raiseLowest.ability">
+            {{#each raiseLowest.options}}<option value="{{key}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Result</label>
+          <input type="text" value="{{raiseLowest.result}}" readonly tabindex="-1" />
+        </div>
+      </div>
+      <label class="ps2-toggle" style="margin-top:5px;"><input type="checkbox" name="system.raiseLowest.applied" {{checked raiseLowest.applied}} data-dtype="Boolean"> Apply +20 to the character (Active Effect)</label>
+      {{else}}
+      <p class="ps2-hint">Add this power to a character to pick the ability.</p>
+      {{/if}}
+      <p class="ps2-hint">Only the lowest ability; if two tie, the player picks between them. Then the next Power may be chosen from the complete list.</p>
+      {{/if}}
+
+      {{#if ps2.showGreyHint}}<p class="ps2-hint">Grey fields are worked out from the rank.</p>{{/if}}
     </fieldset>
     {{/if}}
 
@@ -536,18 +597,16 @@
         </label>
       </legend>
       <div class="ps2-section-body" {{#unless system.isSensePower}}style="display:none;"{{/unless}}>
-        <div class="ps2-grid-2col">
-          <div class="ps2-field">
-            <label>Enhanced Sense</label>
-            <select name="system.detection.enhancedSense">
-              <option value="">None</option>
-              <option value="sight"   {{#if (eq system.detection.enhancedSense "sight")}}selected{{/if}}>Sight</option>
-              <option value="hearing" {{#if (eq system.detection.enhancedSense "hearing")}}selected{{/if}}>Hearing</option>
-              <option value="smell"   {{#if (eq system.detection.enhancedSense "smell")}}selected{{/if}}>Smell</option>
-              <option value="touch"   {{#if (eq system.detection.enhancedSense "touch")}}selected{{/if}}>Touch</option>
-              <option value="taste"   {{#if (eq system.detection.enhancedSense "taste")}}selected{{/if}}>Taste</option>
-            </select>
+        <div class="ps2-field">
+          <label>Enhanced (one or more)</label>
+          <div class="ps2-chk" role="group" aria-label="Senses">
+            {{#each ps2.senses}}
+            <label><input type="checkbox" name="system.detection.senses.{{key}}" {{checked checked}} data-dtype="Boolean">{{label}}</label>
+            {{/each}}
           </div>
+          {{#if ps2.isEnhancedSenses}}<p class="ps2-hint">Power rank replaces Intuition for clues and spotting (Hearing: initiative too). Attacks on an enhanced sense are at +1CS.</p>{{/if}}
+        </div>
+        <div class="ps2-grid-2col" style="margin-top:4px;">
           <div class="ps2-field">
             <label>Protected Sense</label>
             <select name="system.detection.protectedSense">
@@ -645,6 +704,26 @@
           <label><input type="checkbox" name="system.movement.useRankSpeed" {{checked system.movement.useRankSpeed}} data-dtype="Boolean"> Use Rank for Speed</label>
           <label><input type="checkbox" name="system.movement.leavesTunnel" {{checked system.movement.leavesTunnel}} data-dtype="Boolean"> Leaves Tunnel</label>
         </div>
+        {{#if ps2.isFlight}}
+        <div class="ps2-grid-2col" style="margin-top:4px;">
+          <div class="ps2-field">
+            <label>Method</label>
+            <select name="system.movement.method">
+              <option value="" {{#unless system.movement.method}}selected{{/unless}}>-- Select --</option>
+              <option value="wings"      {{#if (eq system.movement.method "wings")}}selected{{/if}}>Wings</option>
+              <option value="rockets"    {{#if (eq system.movement.method "rockets")}}selected{{/if}}>Rockets / jets</option>
+              <option value="gravity"    {{#if (eq system.movement.method "gravity")}}selected{{/if}}>Gravity manipulation</option>
+              <option value="levitation" {{#if (eq system.movement.method "levitation")}}selected{{/if}}>Levitation field</option>
+              <option value="other"      {{#if (eq system.movement.method "other")}}selected{{/if}}>Other</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Method detail</label>
+            <input type="text" name="system.movement.methodDetail" value="{{system.movement.methodDetail}}" placeholder="e.g., Feathered wings, 12 ft span" />
+          </div>
+        </div>
+        <p class="ps2-hint">The book wants the method defined before play. Agility governs maneuvers; winds above the Power rank push the flyer.</p>
+        {{/if}}
       </div>
     </fieldset>
 
@@ -742,6 +821,10 @@
           <label><input type="checkbox" name="system.transformation.retainsMental" {{checked system.transformation.retainsMental}}> Retains Mental</label>
           <label><input type="checkbox" name="system.transformation.retainsPowers" {{checked system.transformation.retainsPowers}}> Retains Powers</label>
         </div>
+        {{#if ps2.isBodyTransformOthers}}
+        <label class="ps2-toggle" style="margin-top:4px;"><input type="checkbox" name="system.transformation.nonLiving" {{checked system.transformation.nonLiving}} data-dtype="Boolean"> Also affects non-living material (&minus;2CS to the rolled rank: Remarkable &rarr; Good)</label>
+        <p class="ps2-hint">Flesh-to-flesh touch; Psyche or Endurance FEAT (target's choice). With non-living, a body suit is converted instead. Materials stronger than the Power rank are unaffected.</p>
+        {{/if}}
       </div>
     </fieldset>
 
@@ -977,6 +1060,41 @@
         <label class="ps2-inline-label" for="ps2-add-section">Show another section</label>
         <select id="ps2-add-section"><option value="">-- Select --</option></select>
       </div>
+    </fieldset>
+
+    <fieldset class="ps2-fieldset">
+      <legend>Costs</legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Karma per use</label>
+          <input type="number" name="system.karmaCost" value="{{karmaCosts.perUse}}" min="0" data-dtype="Number" />
+        </div>
+        <div class="ps2-field">
+          <label>Karma to develop a stunt</label>
+          <input type="number" name="system.stuntKarmaCost" value="{{karmaCosts.stunt}}" min="0" data-dtype="Number" />
+        </div>
+      </div>
+      <p class="ps2-hint">Preset from the book: Mind Control costs 10 Karma per use; Weather Control stunts cost 50 instead of 100. Spent automatically when the power is used or a stunt is bought.</p>
+    </fieldset>
+
+    <fieldset class="ps2-fieldset">
+      <legend>Active Effects</legend>
+      <div class="ps2-efx-head"><span>On this power</span><span>Source</span></div>
+      {{#each linkedEffects.own}}
+      <div class="ps2-efx-row"><span class="ps2-efx-ico" aria-hidden="true"></span><span style="flex:1">{{name}}</span><span class="ps2-efx-src">{{source}}</span></div>
+      {{else}}
+      <p class="ps2-efx-empty">None.</p>
+      {{/each}}
+      {{#if linkedEffects.hasActor}}
+      <div class="ps2-efx-head"><span>On the character (from this power)</span><span>Status</span></div>
+      {{#each linkedEffects.linked}}
+      <div class="ps2-efx-row"><span class="ps2-efx-ico" aria-hidden="true"></span><span style="flex:1">{{name}}</span><span class="{{#if suppressed}}ps2-efx-suppressed{{else}}ps2-efx-src{{/if}}">{{status}}</span></div>
+      {{#if by}}<div class="ps2-efx-row ps2-efx-why"><span>Suppressed by <b>{{by.name}}</b>{{#if by.power}} ({{by.power}}){{/if}}. Delete that effect to restore.</span></div>{{/if}}
+      {{else}}
+      <p class="ps2-efx-empty">None.</p>
+      {{/each}}
+      {{/if}}
+      <p class="ps2-hint">Read-only list of the character's effects tied to this power (defense effects, and any shred suppressing them).</p>
     </fieldset>
 
     {{> "systems/msh-faserip/templates/parts/power-fx.hbs"}}

@@ -1,3 +1,6 @@
+// scripts/stunt-ledger.js v1.1.0 - 2026-11-19
+// v1.1.0: stuntKarmaCost honours the power's own Karma-to-develop-a-stunt
+//         field (system.stuntKarmaCost) before the book default.
 // scripts/stunt-ledger.js v1.0.0 - 2026-11-13
 // v1.0.0: Shared Power Stunt helpers for the Stunts tab, the Edit Power
 //         sheet and the stunt roller: attempt cost by parent power (Weather
@@ -10,6 +13,8 @@ export const STUNT_KARMA_COST = 100;
 const HALF_COST = ["weather control"];
 
 export function stuntKarmaCost(power) {
+  const set = Number(power?.system?.stuntKarmaCost);
+  if (set > 0) return set;
   const type = String(power?.system?.type || "").toLowerCase();
   const name = String(power?.name || "").toLowerCase();
   return HALF_COST.some(k => type === k || name.includes(k)) ? 50 : STUNT_KARMA_COST;

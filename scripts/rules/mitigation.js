@@ -1,3 +1,6 @@
+// scripts/rules/mitigation.js v3.11.0 - 2026-11-19
+// v3.11.0: Resistance AEs listing several forms (multi-form Invulnerability)
+//          match an attack on any of them.
 // scripts/rules/mitigation.js v3.10.0 - 2026-11-19
 // v3.10.0: Suppressed defense AEs (shredded Body Armor) give no protection.
 // v3.9.0: Force fields take Force damage at full rank (RAW: "energy-type
@@ -567,13 +570,15 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   for (const ae of activeDefenses) {
     const f = ae.flags?.[scope];
     if (f?.defenseType !== "resistance") continue;
-    const rt = (f.resistanceType || "").toLowerCase();
+    // Invulnerability may list several attack forms (resistanceTypes).
+    const forms = (Array.isArray(f.resistanceTypes) && f.resistanceTypes.length ? f.resistanceTypes : [f.resistanceType || ""])
+      .map(t => String(t).toLowerCase());
     // Magical resistance matches magical damage regardless of the attack's
     // elemental type (a magical fire bolt is both fire and magical).
-    const magicalMatch = isMagic && rt === "magical";
-    if (!isResMatch(baseType, rt, dmgTypeLower) && !magicalMatch) continue;
+    const rt = forms.find(t => isResMatch(baseType, t, dmgTypeLower) || (isMagic && t === "magical"));
+    if (rt === undefined) continue;
 
-    resType = f.resistanceType;
+    resType = rt;
     const val = Number(f.resistanceValue) || 0;
     const eff = f.resistanceEffect || "damageReduction";
 

@@ -1,3 +1,9 @@
+// power-sheet-view.mjs v1.1.0 - 2026-11-19
+// v1.1.0: New per-type fields: Density Manipulation Others mode, Body
+//         Transformation Others non-living, Animal Transformation Self form,
+//         Emotion Control scope + two emotions, Flight method, Enhanced Senses
+//         multi-sense, Invulnerability attack forms, Ultimate Skill and Raise
+//         Lowest Ability blocks, Karma costs.
 // power-sheet-view.mjs v1.0.0 - 2026-11-13
 // v1.0.0: Pure view model for the tabbed power sheet (Details-tab type
 //         blocks, Defense kind, rank-derived read-only values).
@@ -81,6 +87,40 @@ export function forceFieldRows(rank, value, maxRows = 10) {
   return { coverage, rows, truncated: coverage > rows.length };
 }
 
+export const INVULN_FORMS = [
+  ["fire", "Fire and Heat"], ["cold", "Cold"], ["electricity", "Electricity"],
+  ["radiation", "Radiation"], ["toxin", "Toxins"], ["corrosive", "Corrosives"],
+  ["emotion", "Emotion Attacks"], ["mental", "Mental Attacks"],
+  ["magical", "Magical Attacks"], ["disease", "Disease"]
+];
+
+export const SENSES = [["hearing", "Hearing"], ["sight", "Sight"], ["smell", "Smell"], ["touch", "Touch"], ["taste", "Taste"]];
+
+export const EMOTIONS = [
+  ["fear", "Fear"], ["love", "Love"], ["hatred", "Hate"], ["despair", "Despair"], ["joy", "Joy"],
+  ["calm", "Calm"], ["respect", "Respect"], ["loyalty", "Loyalty"], ["doubt", "Doubt"], ["pleasure", "Pleasure"]
+];
+
+/** Attack forms an Invulnerability power covers: the checkbox map, else the
+ *  legacy single resistanceType. Other resistances keep their one type. */
+export function resistanceTypesOf(sys = {}) {
+  const invuln = sys.resistanceIsInvulnerability === true || sys.resistanceEffect === "invulnerability"
+    || sys.type === "Invulnerability";
+  const map = sys.resistanceTypes;
+  if (invuln && map && typeof map === "object") {
+    const list = INVULN_FORMS.map(([k]) => k).filter(k => map[k] === true);
+    if (list.length) return list;
+    if (Object.values(map).some(v => v === false)) return [];
+  }
+  return sys.resistanceType ? [sys.resistanceType] : [];
+}
+
+function enhancedSensesOf(det = {}) {
+  const map = det.senses;
+  if (map && typeof map === "object" && Object.keys(map).length) return SENSES.map(([k]) => k).filter(k => map[k] === true);
+  return SENSES.some(([k]) => k === det.enhancedSense) ? [det.enhancedSense] : [];
+}
+
 function numberOptions(values, current, label) {
   const list = values.includes(current) ? values : [...values, current];
   return list.map(v => ({ value: v, label: label(v), selected: v === current }));
@@ -107,8 +147,13 @@ export function buildPowerSheetView(sys = {}, flags = {}) {
     isProbability: is("Probability Manipulation"),
     isBodyTransform: is("Body Transformation"),
     isBodyArmorType: is("Body Armor"),
-    isEmotion
+    isEmotion,
+    isDensityOthers: is("Density Manipulation Others"),
+    isAnimalSelf: is("Animal Transformation Self"),
+    isUltimateSkill: is("Ultimate Skill"),
+    isRaiseLowest: is("Raise Lowest Ability")
   };
+  const TYPE_LEGENDS = { "Density Manipulation Others": "Density effect", "Animal Transformation Self": "Animal form" };
   const hasTypeBlock = Object.values(blocks).some(Boolean);
   const area = Number(sys.area) || 0;
   const multi = Number(sys.save?.multiTargetCS) || 0;
@@ -117,7 +162,26 @@ export function buildPowerSheetView(sys = {}, flags = {}) {
   return {
     ...blocks,
     hasTypeBlock,
-    typeLabel: type || "This power",
+    typeLabel: TYPE_LEGENDS[type] || type || "This power",
+    rankNumber: value,
+    showGreyHint: !!(blocks.isFFG || blocks.isTeleport || blocks.isGrowth || blocks.isShrinking || blocks.isDarkforce || blocks.isLightningSpeed),
+    densityMode: sys.densityMode === "increase" ? "increase" : "reduction",
+    isBodyTransformOthers: is("Body Transformation Others"),
+    isFlight: is("Flight") || sys.movement?.type === "flight",
+    invulnForms: (() => { const on = resistanceTypesOf(sys); return INVULN_FORMS.map(([key, label]) => ({ key, label, checked: on.includes(key) })); })(),
+    senses: (() => { const on = enhancedSensesOf(sys.detection); return SENSES.map(([key, label]) => ({ key, label, checked: on.includes(key) })); })(),
+    isEnhancedSenses: is("Enhanced Senses"),
+    emotionSingle: sys.mental?.singleEmotionBonus === true,
+    emotionOptions1: EMOTIONS.map(([value, label]) => ({ value, label, selected: value === (sys.mental?.emotionType || "fear") })),
+    emotionOptions2: EMOTIONS.map(([value, label]) => ({ value, label, selected: value === (sys.mental?.emotionType2 || "love") })),
+    animal: {
+      name: sys.transformation?.animal || "",
+      singleType: sys.transformation?.singleAnimalType === true,
+      mental: ["reason", "intuition", "psyche"].map(k => ({
+        key: k, label: k.charAt(0).toUpperCase() + k.slice(1),
+        animal: sys.transformation?.mentalFrom?.[k] === "animal"
+      }))
+    },
     kind,
     kindIs: {
       bodyArmor: kind === "bodyArmor", forceField: kind === "forceField", resistance: kind === "resistance",

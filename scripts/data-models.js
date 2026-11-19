@@ -1,3 +1,6 @@
+// scripts/data-models.js v2.4.7 - 2026-11-19
+// v2.4.7: Power KEYS densityMode, raiseLowest, resistanceTypes,
+//         stuntKarmaCost, ultimateSkillTalentId (Edit Power new fields).
 // scripts/data-models.js v2.4.6 - 2026-09-09
 // v2.4.6: absorptionConvertsToHealth / absorptionCanRedirect keys removed
 //         from the power model (retired with RAW Absorption, 2026-09-09).
@@ -106,7 +109,7 @@ class FaseripPowerData extends PermissiveDataModel {
     "canReduceEffect", "category", "categoryRoll", "clawMaterialStrength",
     "columnShiftBonus", "continuingDamage", "continuingDamageRounds", "control",
     "controlQuantity", "controlStrength", "countsAsTwoPowers", "customDuration",
-    "customRange", "damage", "damageSource", "damageType", "defenseType", "depoweredRank",
+    "customRange", "damage", "densityMode", "damageSource", "damageType", "defenseType", "depoweredRank",
     "description", "detection", "duration", "durationRounds", "effectAnimation",
     "effectColor", "effectNotes", "effectVariant", "energyReflectionRank",
     "energyReflectionType", "ensnaringStrength", "extraAttacks", "extraBodyParts",
@@ -128,15 +131,15 @@ class FaseripPowerData extends PermissiveDataModel {
     "limitationColumnShift", "limitationDetail", "limitationRequired", "limitations",
     "limitedReset", "magic", "mental", "mentalEffect", "movement", "notes",
     "overridePullPunch", "preLimitationRank", "primaryEffect", "protectionValue", "range",
-    "rangeAreas", "rank", "rankRule", "rankRuleAbility", "rankValue", "reactive",
+    "raiseLowest", "rangeAreas", "rank", "rankRule", "rankRuleAbility", "rankValue", "reactive",
     "recoveryRate", "regenerationRate", "regenerationType", "replacesAbility",
     "requiresConcentration", "requiresSave", "resistanceEffect", "resistanceIsConductive",
     "resistanceIsInvulnerability", "resistanceMinRank", "resistanceNotes",
-    "resistanceSpecific", "resistanceType", "resistanceValue", "save", "sfx", "source",
+    "resistanceSpecific", "resistanceType", "resistanceTypes", "resistanceValue", "save", "sfx", "source",
     "sourceBook", "sourcePage", "specialMechanics", "specialStrengthType", "speed",
-    "stunningIntensity", "stunts", "subtype", "summary", "targetResistsWith",
+    "stunningIntensity", "stuntKarmaCost", "stunts", "subtype", "summary", "targetResistsWith",
     "telekinesiStrength", "telekinesisStrength", "teleportAccuracy", "transformation",
-    "type", "usesPerScene", "value", "vfx"
+    "type", "ultimateSkillTalentId", "usesPerScene", "value", "vfx"
   ];
 }
 

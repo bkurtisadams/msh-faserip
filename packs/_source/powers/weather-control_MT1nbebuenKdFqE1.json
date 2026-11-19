@@ -233,7 +233,8 @@
     "limitationColumnShift": 0,
     "stunts": [],
     "type": "Weather Control",
-    "subtype": "Weather Control"
+    "subtype": "Weather Control",
+    "stuntKarmaCost": 50
   },
   "effects": [],
   "folder": null,
