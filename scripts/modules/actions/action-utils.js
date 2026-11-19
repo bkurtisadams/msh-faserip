@@ -1,3 +1,6 @@
+// action-utils.js v1.18.0 - 2026-11-19
+// v1.18.0: getBodyArmorValues skips powers whose granting equipment is
+//          broken or no longer on the target.
 // action-utils.js v1.17.1 - 2026-11-18
 // v1.17.1: getBodyArmorValues skips Body Armor powers named by an active
 //          Armor Shredded effect on the target.
@@ -201,6 +204,7 @@ import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { absorptionFlagData, afterAbsorptionEvent, getAbsorptionPool } from "../effects/absorption-pool.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { powerGearState } from "../../equipment-link.mjs";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { getRollMode } from "../dice/roll-mode.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
@@ -2618,6 +2622,7 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt", o
     if (i.type !== "power") return false;
     if (i.system?.isActive === false) return false;
     if (i.system?.isForceField !== true && targetActor.effects?.some(e => !e.disabled && e.flags?.["msh-faserip"]?.shredsArmorItemId === i.id)) return false;
+    if (powerGearState(i).status !== "ok") return false;
     if (i.system.isBodyArmor === true) return true;
     if (i.system.isForceField === true) return true;
     

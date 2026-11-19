@@ -1,4 +1,7 @@
-﻿// init.js v1.24.0 - 2026-11-19
+﻿// init.js v1.25.0 - 2026-11-19
+// v1.25.0: Equipment-granted powers: registers the equipment-link refresh
+//          hooks and runs the one-time granted-power-list migration.
+// init.js v1.24.0 - 2026-11-19
 // v1.24.0: Registers FaseripActiveEffect (active-effect.js): a shredded Body
 //          Armor defense AE is suppressed, not disabled, so the shred-effect
 //          re-sync hooks from v1.23.0 are gone.
@@ -725,6 +728,19 @@ Hooks.once("init", async () => {
     type: Number,
     default: 0
   });
+
+  game.settings.register("msh-faserip", "grantedPowersMigrationVersion", {
+    name: "Granted Powers Migration Version",
+    hint: "Internal migration marker: equipment granted-power lists became linked power items.",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
+  {
+    const { registerEquipmentLinkHooks } = await import("./equipment-link.mjs");
+    registerEquipmentLinkHooks();
+  }
 
   game.settings.register("msh-faserip", "karmaHistorySeedVersion", {
     name: "Karma History Seed Version",
@@ -2792,6 +2808,17 @@ Hooks.once("ready", async () => {
     }
   } catch (e) {
     console.warn("[FASERIP WARN] Karma ledger migration failed:", e);
+  }
+  // One-time migration: equipment granted-power lists -> linked power items.
+  try {
+    if (game.user?.isGM && Number(game.settings.get("msh-faserip", "grantedPowersMigrationVersion") ?? 0) < 1) {
+      const { migrateGrantedPowerLists } = await import("./equipment-link.mjs");
+      const made = await migrateGrantedPowerLists();
+      await game.settings.set("msh-faserip", "grantedPowersMigrationVersion", 1);
+      if (made) console.log(`[FASERIP] Granted powers migration made ${made} linked power(s)`);
+    }
+  } catch (e) {
+    console.warn("[FASERIP WARN] Granted powers migration failed:", e);
   }
   game.msh ??= {};
 

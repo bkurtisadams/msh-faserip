@@ -1,3 +1,7 @@
+// equipment.js v2.5.0 - 2026-11-19
+// v2.5.0: Granted Powers section: the character's powers linked to this item
+//         (Open / Unlink / Link). Replaces the unused name-and-rank list and
+//         its dead add/remove listeners.
 // equipment.js v2.4.0 - 2026-11-11
 // v2.4.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.3.0: v14 crash fixes + dead code removal. Bare duplicate() → foundry.utils.duplicate
@@ -28,6 +32,7 @@
 // v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
+import { buildGrantedPowersView, linkPowerToEquipment, unlinkPower } from "./equipment-link.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -128,6 +133,9 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         return r;
       });
     }
+
+    // Granted Powers (character's powers linked to this item)
+    context.granted = buildGrantedPowersView(this.item);
 
     // Active Effects on this equipment item
     context.effects = prepareActiveEffectCategories(this.item.effects);
@@ -502,26 +510,21 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       }
     });
 
-    html.find(".add-granted-power").on("click", ev => {
+    // Granted Powers: the character's powers linked to this item.
+    html.find(".frp-gp-open").on("click", ev => {
       ev.preventDefault();
-      const powers = foundry.utils.duplicate(this.item.system.powers || []);
-      powers.push({
-        name: "",
-        rank: "Typical",
-        value: 6,
-        damageType: "",
-        isPassiveArmor: false,
-        grantedByEquipment: true
-      });
-      this.item.update({ "system.powers": powers });
+      this.item.actor?.items.get(ev.currentTarget.dataset.powerId)?.sheet?.render(true);
     });
-
-    html.find(".remove-granted-power").on("click", ev => {
+    html.find(".frp-gp-unlink").on("click", async ev => {
       ev.preventDefault();
-      const index = Number(ev.currentTarget.dataset.index);
-      const powers = foundry.utils.duplicate(this.item.system.powers || []);
-      powers.splice(index, 1);
-      this.item.update({ "system.powers": powers });
+      const power = this.item.actor?.items.get(ev.currentTarget.dataset.powerId);
+      if (power) { await unlinkPower(power); this.render(); }
+    });
+    html.find(".frp-gp-link").on("click", async ev => {
+      ev.preventDefault();
+      const id = this.element.querySelector(".frp-gp-select")?.value;
+      const power = id ? this.item.actor?.items.get(id) : null;
+      if (power) { await linkPowerToEquipment(power, this.item); this.render(); }
     });
 
     // grenade listeners

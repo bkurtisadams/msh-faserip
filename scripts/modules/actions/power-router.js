@@ -1,3 +1,6 @@
+// power-router.js v1.21.0 - 2026-11-19
+// v1.21.0: A power whose granting equipment is broken or gone shows a
+//          notice instead of rolling (equipment-link.mjs).
 // power-router.js v1.20.0 - 2026-11-19
 // v1.20.0: Karma per use (system.karmaCost) is checked and spent before the
 //          power routes. Ultimate Skill rolls the talent picked on the Edit
@@ -265,6 +268,13 @@ export async function rollPower(actor, item, routeOpts = {}) {
   if (!actor || !item) {
     ui.notifications.error("Actor or power not found");
     return;
+  }
+
+  // Powers from broken or missing equipment can't be used.
+  {
+    const { gearBlockMessage } = await import("../../equipment-link.mjs");
+    const blocked = gearBlockMessage(item);
+    if (blocked) { ui.notifications.warn(blocked); return; }
   }
 
   // Karma per use (Edit Power > Costs; Mind Control 10 by the book). Paid

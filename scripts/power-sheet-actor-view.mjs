@@ -1,3 +1,5 @@
+// power-sheet-actor-view.mjs v1.1.0 - 2026-11-19
+// v1.1.0: Linked effects carry gear (broken / missing granting item).
 // power-sheet-actor-view.mjs v1.0.0 - 2026-11-19
 // v1.0.0: Edit Power fields that read the owning character: Ultimate Skill
 //         talent picker, Raise Lowest Ability picker + result, Karma costs,
@@ -104,7 +106,8 @@ export function buildLinkedEffectsView(item) {
         name: e.name,
         status: e.disabled ? "Off" : e.isSuppressed ? "Suppressed" : "Active",
         suppressed: !e.disabled && e.isSuppressed,
-        by: by ? { name: by.name, power: byPower } : null
+        by: by ? { name: by.name, power: byPower } : null,
+        gear: !by && !e.disabled ? (e.gearBlock || null) : null
       });
     }
   }

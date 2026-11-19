@@ -108,6 +108,27 @@
           </select>
         </div>
       </div>
+      {{#if equipLink.show}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>From equipment</label>
+        {{#if equipLink.hasActor}}
+        <select name="system.equipmentId">
+          <option value="" {{#unless system.equipmentId}}selected{{/unless}}>-- Not linked --</option>
+          {{#each equipLink.options}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+        </select>
+        {{else}}
+        <input type="text" value="{{#if system.equipmentName}}{{system.equipmentName}}{{else}}Add this power to a character to pick the item{{/if}}" readonly tabindex="-1" />
+        {{/if}}
+      </div>
+      {{#if equipLink.ok}}<div class="ps2-limit-ok">Works while the {{equipLink.name}} is on the character and not broken.</div>{{/if}}
+      {{#if equipLink.broken}}
+      <div class="ps2-limit-warns" role="status"><div class="ps2-limit-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span><b>{{equipLink.name}} is broken.</b> This power can't be used and its effects are off until it is repaired.</span></div></div>
+      {{/if}}
+      {{#if equipLink.missing}}
+      <div class="ps2-limit-warns" role="status"><div class="ps2-limit-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span><b>{{equipLink.name}} is no longer on this character.</b> This power can't be used until the item is back. Pick another item, or choose "Not linked" to let it work on its own.</span></div></div>
+      {{/if}}
+      {{#if equipLink.ok}}<p class="ps2-hint">Lists this character's equipment. Taking the item away or breaking it takes the power away too; its effects switch off until the item is back or repaired.</p>{{/if}}
+      {{/if}}
       {{#if rankCheck.hasWarnings}}
       <div class="ps2-limit-warns" role="status">
         {{#each rankCheck.warnings as |w|}}
@@ -1090,6 +1111,7 @@
       {{#each linkedEffects.linked}}
       <div class="ps2-efx-row"><span class="ps2-efx-ico" aria-hidden="true"></span><span style="flex:1">{{name}}</span><span class="{{#if suppressed}}ps2-efx-suppressed{{else}}ps2-efx-src{{/if}}">{{status}}</span></div>
       {{#if by}}<div class="ps2-efx-row ps2-efx-why"><span>Suppressed by <b>{{by.name}}</b>{{#if by.power}} ({{by.power}}){{/if}}. Delete that effect to restore.</span></div>{{/if}}
+      {{#if gear}}<div class="ps2-efx-row ps2-efx-why"><span>Suppressed: <b>{{gear.name}}</b> {{#if (eq gear.status "broken")}}is broken. Repair it on the equipment sheet to restore.{{else}}is no longer on this character.{{/if}}</span></div>{{/if}}
       {{else}}
       <p class="ps2-efx-empty">None.</p>
       {{/each}}

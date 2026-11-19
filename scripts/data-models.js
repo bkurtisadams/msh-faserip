@@ -1,3 +1,5 @@
+// scripts/data-models.js v2.4.8 - 2026-11-19
+// v2.4.8: Power KEYS equipmentId, equipmentName (equipment-granted powers).
 // scripts/data-models.js v2.4.7 - 2026-11-19
 // v2.4.7: Power KEYS densityMode, raiseLowest, resistanceTypes,
 //         stuntKarmaCost, ultimateSkillTalentId (Edit Power new fields).
@@ -112,7 +114,7 @@ class FaseripPowerData extends PermissiveDataModel {
     "customRange", "damage", "densityMode", "damageSource", "damageType", "defenseType", "depoweredRank",
     "description", "detection", "duration", "durationRounds", "effectAnimation",
     "effectColor", "effectNotes", "effectVariant", "energyReflectionRank",
-    "energyReflectionType", "ensnaringStrength", "extraAttacks", "extraBodyParts",
+    "energyReflectionType", "ensnaringStrength", "equipmentId", "equipmentName", "extraAttacks", "extraBodyParts",
     "forceFieldCoverage", "forceFieldPersonal", "forceFieldType", "gmNotes",
     "grantedByEquipment", "hardware", "hasBonusPowers", "hasRecoveryPower", "healingMaxPerDay",
     "healingType", "ignoresArtificialArmor", "ignoresNaturalArmor", "initialRank",

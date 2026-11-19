@@ -1,3 +1,7 @@
+// scripts/dev/power-rules-runtime-tests.js v1.3.0 - 2026-11-19
+// v1.3.0: "Equipment powers" section: link, broken / missing item turns the
+//         power and its effects off, repair and unlink restore it, the sheets
+//         show it, and the granted-power-list migration.
 // scripts/dev/power-rules-runtime-tests.js v1.2.0 - 2026-11-19
 // v1.2.0: Karma per use now checks the balance (50 -> 40, Starting Karma
 //         baseline seeded). New "Talents" section checks the rebuilt talents
@@ -32,6 +36,7 @@ import { prepareActiveEffectCategories } from "../../helpers/effects.mjs";
 import { buildPowerSheetView } from "../power-sheet-view.mjs";
 import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } from "../power-sheet-actor-view.mjs";
 import { stuntKarmaCost } from "../stunt-ledger.js";
+import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
 
 const SYSTEM_ID = "msh-faserip";
 const TEST_PREFIX = "ZZZ Power Rules Runtime";
@@ -425,6 +430,92 @@ async function talentTests(recorder) {
     "Talents: Weapon and Scientific Talents don't stack; Fighting Talents do", { weaponsCum, sciCum, fightNot });
 }
 
+async function equipmentTests(recorder, state) {
+  const net = (actor, dmg, damageType) => { resetFFRoundTracker(); return calculateMitigation(dmg, actor, { damageType })?.netDamage; };
+  const actor = await createActor(state, "Gear", { items: [
+    { name: "Cyber-Suit", type: "equipment", system: { category: "armor", broken: false } },
+    power("Body Armor", { rank: "Excellent", value: 20, category: "bodyAlterationsDefensive", type: "Body Armor", isBodyArmor: true, bodyArmorType: "both", isDefensePower: true, armorNature: "artificial" }),
+    power("Flight", { rank: "Good", value: 10, category: "movement", type: "Flight", isMovementPower: true, movement: { type: "flight" } })
+  ] });
+  const suit = item(actor, "Cyber-Suit");
+  const armor = item(actor, "Body Armor");
+  await linkPowerToEquipment(armor, suit);
+  await linkPowerToEquipment(item(actor, "Flight"), suit);
+  await syncDefenseEffects(actor, item(actor, "Body Armor"), false);
+  await waitFor(() => getActiveDefenseEffects(actor).length, { timeout: 3000 });
+  const baAe = () => actor.effects.find(e => e.flags?.[SYSTEM_ID]?.defenseType === "bodyArmor");
+
+  recorder.assert(item(actor, "Body Armor").system.source === "equipment" && item(actor, "Body Armor").system.equipmentId === suit.id
+    && item(actor, "Body Armor").system.equipmentName === "Cyber-Suit", "Equipment: linking sets Source Equipment, the item id and name");
+  recorder.equal(powerGearState(item(actor, "Body Armor")).status, "ok", "Equipment: working item, power ok");
+  recorder.equal(net(actor, 30, "physical-blunt"), 10, "Equipment: linked Excellent armor stops 20 (Blunt 30 net 10)");
+  const gv = buildGrantedPowersView(item(actor, "Cyber-Suit"));
+  recorder.assert(gv.rows.length === 2 && !gv.offCount, "Equipment sheet: Granted Powers lists both linked powers", gv);
+
+  await item(actor, "Cyber-Suit").update({ "system.broken": true });
+  await sleep(200);
+  recorder.equal(powerGearState(item(actor, "Body Armor")).status, "broken", "Broken item: power reports broken");
+  recorder.assert(baAe()?.isSuppressed === true && baAe()?.disabled === false, "Broken item: armor's defense effect is suppressed, not disabled",
+    { suppressed: baAe()?.isSuppressed, disabled: baAe()?.disabled });
+  recorder.equal(net(actor, 30, "physical-blunt"), 30, "Broken item: armor stops nothing (net 30)");
+  recorder.equal(getBodyArmorValues(actor, "physical-blunt")?.physical ?? 0, 0, "Broken item: attack-dialog armor pre-calculation ignores it");
+  const r = await route(actor, item(actor, "Flight"));
+  recorder.assert(!r.dispatched.length && !r.window && !r.error, "Broken item: clicking Flight shows a notice instead of rolling", r);
+  const gvb = buildGrantedPowersView(item(actor, "Cyber-Suit"));
+  recorder.assert(gvb.offCount === 2 && gvb.offText.includes("Body Armor"), "Broken item: banner says 2 granted powers are off", gvb);
+  const lv = buildLinkedEffectsView(item(actor, "Body Armor")).linked[0];
+  recorder.assert(lv?.status === "Suppressed" && lv?.gear?.status === "broken" && lv?.gear?.name === "Cyber-Suit", "Broken item: Active Effects list says the Cyber-Suit is broken", lv);
+
+  await item(actor, "Cyber-Suit").update({ "system.broken": false });
+  await sleep(200);
+  recorder.equal(net(actor, 30, "physical-blunt"), 10, "Repaired item: armor stops 20 again");
+
+  await item(actor, "Cyber-Suit").delete();
+  await sleep(200);
+  const ev = buildEquipmentLinkView(item(actor, "Body Armor"));
+  recorder.assert(ev.missing && ev.name === "Cyber-Suit" && ev.options[0]?.label === "Cyber-Suit (missing)", "Missing item: power warns and keeps the item's name", ev);
+  recorder.equal(net(actor, 30, "physical-blunt"), 30, "Missing item: armor stops nothing");
+
+  await unlinkPower(item(actor, "Body Armor"));
+  await sleep(200);
+  recorder.assert(powerGearState(item(actor, "Body Armor")).status === "ok" && net(actor, 30, "physical-blunt") === 10,
+    "Not linked: the power works on its own again");
+
+  // Sheets
+  const [suit2] = await actor.createEmbeddedDocuments("Item", [{ name: "Jet Pack", type: "equipment", system: { category: "gear" } }]);
+  await linkPowerToEquipment(item(actor, "Flight"), suit2);
+  await suit2.sheet.render(true);
+  const eqEl = await waitFor(() => suit2.sheet.element?.querySelector?.(".frp-granted") && suit2.sheet.element);
+  recorder.assert(!!eqEl && eqEl.querySelectorAll(".frp-gp-row").length === 1 && !!eqEl.querySelector(".frp-gp-link"),
+    "Equipment sheet: Granted Powers shows Flight with a Link control");
+  await suit2.sheet.close();
+  await actor.sheet.render(true);
+  const asEl = await waitFor(() => actor.sheet.element?.querySelector?.(".power-origin-badge.gear") && actor.sheet.element);
+  recorder.assert(!!asEl, "Character sheet: Flight shows the GEAR badge");
+  await suit2.update({ "system.broken": true });
+  await sleep(300);
+  recorder.assert(!!actor.sheet.element?.querySelector?.(".power-row.power-gear-off .power-origin-badge.gear-off"),
+    "Character sheet: broken Jet Pack dims Flight with GEAR: BROKEN");
+  await actor.sheet.close();
+  const flight = item(actor, "Flight");
+  await flight.sheet.render(true);
+  const psEl = await waitFor(() => flight.sheet.element?.querySelector?.('select[name="system.equipmentId"]') && flight.sheet.element);
+  recorder.assert(!!psEl && psEl.querySelector('select[name="system.equipmentId"]').value === suit2.id && !!psEl.querySelector(".ps2-limit-warns"),
+    "Edit Power sheet: From equipment shows the Jet Pack and the broken warning");
+  await flight.sheet.close();
+
+  // Migration of the old name-and-rank list.
+  const old = await createActor(state, "Old List", { items: [
+    { name: "Power Gauntlet", type: "equipment", system: { category: "device", powers: [{ name: "Gauntlet Blast", rank: "Remarkable", value: 30, grantedByEquipment: true }] } }
+  ] });
+  await migrateGrantedPowerLists();
+  await sleep(200);
+  const gb = item(old, "Gauntlet Blast");
+  recorder.assert(!!gb && gb.system.equipmentId === item(old, "Power Gauntlet").id && gb.system.rank === "Remarkable"
+    && !(item(old, "Power Gauntlet").system.powers ?? []).length, "Migration: old granted-power entry becomes a linked power item",
+    { made: !!gb, link: gb?.system?.equipmentId, left: item(old, "Power Gauntlet").system.powers });
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -464,7 +555,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["Damage and Shred", () => damageTests(recorder, state)],
     ["Limitations and sheet", () => sheetTests(recorder, state)],
     ["New power fields", () => newFieldTests(recorder, state)],
-    ["Talents", () => talentTests(recorder)]
+    ["Talents", () => talentTests(recorder)],
+    ["Equipment powers", () => equipmentTests(recorder, state)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

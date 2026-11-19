@@ -1,3 +1,7 @@
+// actorSheet.js v2.21.0 - 2026-11-19
+// v2.21.0: Powers tab context powerGear: GEAR badge on equipment-granted
+//          powers, dimmed with GEAR: BROKEN / GEAR: MISSING while the item
+//          is out.
 // actorSheet.js v2.20.2 - 2026-11-17
 // v2.20.2: _showActionInfo delegates to postActionInfoCard in
 //          universal-table-tab.js (shared with the HUD's Table window).
@@ -283,6 +287,7 @@
 // v1.1.0: Add visual indicators for Endurance impairment and reduced health max (dying state)
 // v1.0.2: Fix column shift persistence in blunt attack dialog
 // v1.0.1: Remove verbose debug logging on sheet render
+import { powerGearState } from "./equipment-link.mjs";
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
@@ -532,6 +537,14 @@ export class FaseripActorSheet {
     context.powers = this.actor.items
     .filter(item => item.type === "power")
     .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    // Equipment-granted powers: GEAR badge, dimmed while the item is out.
+    context.powerGear = Object.fromEntries(context.powers.map(p => {
+      const g = powerGearState(p);
+      if (!g.linked) return [p.id, null];
+      const label = g.status === "broken" ? "GEAR: BROKEN" : g.status === "missing" ? "GEAR: MISSING" : "GEAR";
+      const title = g.status === "broken" ? `${g.name} is broken` : g.status === "missing" ? `${g.name} is no longer on this character` : `From ${g.name}`;
+      return [p.id, { off: g.status !== "ok", label, title }];
+    }));
 
     // make talents sortable within the talents tab
     context.talents = this.actor.items

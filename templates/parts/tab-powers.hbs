@@ -20,7 +20,7 @@
             </thead>
             <tbody>
               {{#each powers as |power|}}
-              <tr class="power-row item {{#unless power.system.isActive}}power-inactive{{/unless}}" data-item-id="{{power._id}}" draggable="true">
+              <tr class="power-row item {{#unless power.system.isActive}}power-inactive{{/unless}} {{#with (lookup @root.powerGear power._id) as |gear|}}{{#if gear.off}}power-gear-off{{/if}}{{/with}}" data-item-id="{{power._id}}" draggable="true">
                 <td class="power-name">
                   <a class="item-control power-roll" title="Roll" data-item-id="{{power._id}}">
                     <i class="fas fa-dice-d20"></i>
@@ -45,6 +45,9 @@
                     {{#if (or power.system.isBonus (getFlag power 'msh-faserip' 'isBonusPower'))}}
                     <span class="power-origin-badge bonus" title="Bonus power">BONUS</span>
                     {{/if}}
+                    {{#with (lookup @root.powerGear power._id) as |gear|}}
+                    <span class="power-origin-badge {{#if gear.off}}gear-off{{else}}gear{{/if}}" title="{{gear.title}}">{{gear.label}}</span>
+                    {{/with}}
                   </span>
                 </td>
 

@@ -1,4 +1,4 @@
-/* equipment-sheet-redesign.css
+/* equipment-sheet-redesign.css (2026-11-19: Granted Powers section)
  *
  * Layout-only redesign of the FASERIP equipment edit sheet. Original
  * pastel-coded section colors are preserved; this file only adds:
@@ -356,3 +356,19 @@
   color: #333;
   border-bottom: 1px solid #ddd;
 }
+
+/* ── Granted Powers (v2.55.16) ───────────────────────────────────────── */
+.equipment-sheet .frp-granted { margin: 0 0 12px; }
+.equipment-sheet .frp-gp-label { font-size: 10px; font-weight: bold; letter-spacing: .5px; color: #fff; background: #6b5f4a; padding: 2px 6px; border-radius: 2px; }
+.equipment-sheet .frp-gp-row { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px; border: 1px solid #e3dccb; border-top: none; background: #fff; }
+.equipment-sheet .frp-gp-row .frp-gp-name { flex: 1; font-weight: bold; }
+.equipment-sheet .frp-gp-row .frp-gp-rank { color: #555; font-size: 11px; width: 100px; }
+.equipment-sheet .frp-gp-row.off { background: #f6f3ec; }
+.equipment-sheet .frp-gp-row.off .frp-gp-name, .equipment-sheet .frp-gp-row.off .frp-gp-rank { opacity: .5; }
+.equipment-sheet .frp-gp-offtag { font-size: 9px; font-weight: 800; color: #c62828; border: 1px solid #c62828; border-radius: 3px; padding: 0 4px; background: #ffebee; }
+.equipment-sheet .frp-gp-btn { flex: 0 0 auto; width: auto; font-size: 10px; line-height: 16px; border: 1px solid #8b0000; color: #8b0000; background: #fff; border-radius: 3px; padding: 0 7px; cursor: pointer; }
+.equipment-sheet .frp-gp-empty { font-size: 11px; font-style: italic; color: #6b6b6b; padding: 4px 6px; border: 1px solid #e3dccb; border-top: none; background: #fff; }
+.equipment-sheet .frp-gp-add { display: flex; gap: 6px; align-items: center; margin-top: 5px; }
+.equipment-sheet .frp-gp-add select { flex: 1; min-height: 24px; font-size: 12px; border: 1px solid #ccc; background: #fff; }
+.equipment-sheet .frp-gp-hint { font-size: 10px; color: #6b6b6b; font-style: italic; margin: 3px 0 0; }
+.faserip-broken-banner .frp-gp-offline { font-size: 11px; font-weight: normal; color: #8a2a2a; margin-top: 2px; }

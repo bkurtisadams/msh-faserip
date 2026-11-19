@@ -1,3 +1,6 @@
+// itemSheet.js v2.8.0 - 2026-11-19
+// v2.8.0: Power context equipLink (From equipment dropdown and status);
+//         submit stores the linked item's name beside its id.
 // itemSheet.js v2.7.0 - 2026-11-19
 // v2.7.0: Context for the new Edit Power fields (power-sheet-actor-view.mjs):
 //         Ultimate Skill talent picker, Raise Lowest Ability, Karma costs and
@@ -65,6 +68,7 @@ import { buildLimitationView } from "./power-limitations.mjs";
 import { buildRankValidation } from "./power-validation.mjs";
 import { buildUltimateSkillView, buildRaiseLowestView, buildKarmaCostView, buildLinkedEffectsView, lowestAbilities } from "./power-sheet-actor-view.mjs";
 import { valueToRank } from "./rules/rules-reference.js";
+import { buildEquipmentLinkView } from "./equipment-link.mjs";
 import { stuntShift, stuntUsesItem } from "./modules/actions/stunt-mechanics.js";
 import { isStuntPower, stuntPowerContext } from "./stunt-power.js";
 import { RANKS_ORDERED, POWER_RANGE } from "./rules/rules-reference.js";
@@ -179,6 +183,7 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       context.raiseLowest = buildRaiseLowestView(this.item);
       context.karmaCosts = buildKarmaCostView(this.item);
       context.linkedEffects = buildLinkedEffectsView(this.item);
+      context.equipLink = buildEquipmentLinkView(this.item);
       context.stuntPower = stuntPowerContext(this.item, { usesItem: stuntUsesItem, shiftFor: stuntShift });
 
       // Helpful logging (kept from your original)
@@ -237,6 +242,12 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     if (mental && typeof mental.emotionScope === "string") {
       mental.singleEmotionBonus = mental.emotionScope === "single";
       delete mental.emotionScope;
+    }
+    // Equipment link: keep the item's name for when it is gone.
+    if (typeof data.system.equipmentId === "string") {
+      const eq = this.item.actor?.items?.get(data.system.equipmentId);
+      if (eq) data.system.equipmentName = eq.name;
+      else if (!data.system.equipmentId) data.system.equipmentName = "";
     }
     // Invulnerability: the first checked attack form stays in resistanceType
     // for code that reads a single type.

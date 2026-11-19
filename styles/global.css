@@ -4217,3 +4217,20 @@ form.faserip-sheet .sheet-tab-content {
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
+
+ /* Equipment-granted powers (2026-11-19) */
+ .faserip-sheet .power-origin-badge.gear {
+  color: #28507a;
+  background: #e6eef8;
+ }
+
+ .faserip-sheet .power-origin-badge.gear-off {
+  color: #c62828;
+  background: #ffebee;
+ }
+
+ .faserip-sheet .power-row.power-gear-off td:not(.power-name),
+ .faserip-sheet .power-row.power-gear-off .power-name-text,
+ .faserip-sheet .power-row.power-gear-off .power-icon {
+  opacity: 0.45;
+ }
