@@ -1,9 +1,11 @@
-// faserip-rules range v0.1.0
+// faserip-rules range v0.2.0
+// v0.2.0: RULED 2026-11-19 weapon/thrown penalty is -1CS per area beyond
+//         the first (book example: five areas away = -4CS).
 // Range Modifiers and the Power Rank Range Table, certified against the
 // Advanced Set text. Ranges are in areas; the attacker's own area is 0.
 import { rankByKey, rankDistance, shiftRank, RANKS } from './faserip-kernel.js';
 
-export const RANGE_VERSION = '0.1.0';
+export const RANGE_VERSION = '0.2.0';
 export const RANGE_CERTIFIED = true;
 
 // Power Rank Range Table. Powers without a stated range use their rank.
@@ -51,15 +53,19 @@ export function throwRange(strengthKey) {
   return r;
 }
 
-// Weapons: -1CS to hit for each area to the target (a Rifle at 4 areas is
-// -4CS); the listed range is a hard limit. RULED 2026-09-05: thrown items take
-// the same penalty, the Strength table only caps how far they travel.
+// Weapons: -1CS to hit for each area beyond the first. RULED 2026-11-19:
+// follow the book's example (a target five areas away is -4CS), so the
+// attacker's own area and the first area out carry no penalty. The listed
+// range is a hard limit. RULED 2026-09-05: thrown items take the same
+// penalty, the Strength table only caps how far they travel.
 export const RANGE_SHIFT_PER_AREA = -1;
+export const RANGE_FREE_AREAS = 1;
 
 export function weaponRangeShift({ distance, maxRange }) {
   const d = Math.max(0, Math.floor(distance));
   if (Number.isFinite(maxRange) && d > maxRange) return { inRange: false, shift: 0, distance: d, maxRange };
-  return { inRange: true, shift: RANGE_SHIFT_PER_AREA * d, distance: d, maxRange };
+  const shift = RANGE_SHIFT_PER_AREA * Math.max(0, d - RANGE_FREE_AREAS);
+  return { inRange: true, shift: shift === 0 ? 0 : shift, distance: d, maxRange };
 }
 
 export function thrownRangeShift({ distance, strengthKey }) {

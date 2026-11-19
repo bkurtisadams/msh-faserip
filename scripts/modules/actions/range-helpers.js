@@ -23,7 +23,7 @@ export function rangeLabel(areas) {
   return Number.isFinite(areas) ? String(areas) : "LOS";
 }
 
-/** Weapon: -1CS per area to the target (own area 0); 0 when out of range (caller refuses). */
+/** Weapon: -1CS per area beyond the first (RULED 2026-11-19; own and first area 0); 0 when out of range (caller refuses). */
 export function weaponRangePenalty(distance, maxRange = Infinity) {
   const r = weaponRangeShift({ distance: Number(distance) || 0, maxRange });
   return r.inRange ? r.shift : 0;

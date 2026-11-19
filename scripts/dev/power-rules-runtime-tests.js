@@ -1,3 +1,5 @@
+// scripts/dev/power-rules-runtime-tests.js v1.8.0 - 2026-11-19
+// v1.8.0: "Range" section for the 2026-11-19 range-penalty ruling.
 // scripts/dev/power-rules-runtime-tests.js v1.7.0 - 2026-11-19
 // v1.7.0: "Karma ledger" section: Starting Karma on creation, existing
 //         ledgers untouched, direct spends no longer wipe Karma.
@@ -49,6 +51,7 @@ import { buildPowerSheetView, protectedSensesOf } from "../power-sheet-view.mjs"
 import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } from "../power-sheet-actor-view.mjs";
 import { stuntKarmaCost } from "../stunt-ledger.js";
 import { startingKarmaHistory } from "../karma-rules.js";
+import { weaponRangePenalty, thrownRangePenalty } from "../modules/actions/range-helpers.js";
 import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
 
 const SYSTEM_ID = "msh-faserip";
@@ -589,6 +592,13 @@ async function karmaLedgerTests(recorder, state) {
   recorder.assert(fromEmpty?.[0]?.amount === 50 && fromEmpty.length === 2, "Karma ledger: log-only entries still count as an empty ledger", { fromEmpty });
 }
 
+function rangeTests(recorder) {
+  // RULED 2026-11-19: -1CS per area beyond the first (book: five areas away = -4CS).
+  recorder.equal([0, 1, 2, 5].map(d => weaponRangePenalty(d, 10)).join(), "0,0,-1,-4", "Range: weapon penalty 0/0/-1/-4 at 0/1/2/5 areas");
+  recorder.equal(weaponRangePenalty(11, 10), 0, "Range: beyond the listed range gives no shift (the dialog refuses)");
+  recorder.equal(thrownRangePenalty(2, "Excellent"), -1, "Range: thrown items take the same penalty (Excellent Strength, 2 areas: -1CS)");
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -630,7 +640,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["New power fields", () => newFieldTests(recorder, state)],
     ["Talents", () => talentTests(recorder)],
     ["Equipment powers", () => equipmentTests(recorder, state)],
-    ["Karma ledger", () => karmaLedgerTests(recorder, state)]
+    ["Karma ledger", () => karmaLedgerTests(recorder, state)],
+    ["Range", async () => rangeTests(recorder)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

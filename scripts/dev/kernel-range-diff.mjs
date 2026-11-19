@@ -39,7 +39,7 @@ M('every rank key has a power and throwing range', RANKS.every(r => POWER_RANGE[
 
 console.log('\n== Penalties');
 FIXED('weapon penalty: -1CS per area to the target (Rifle at 4 areas)', legacy.weaponPenalty(4), weaponRangePenalty(4, 15));
-M('weapon penalty: own area 0, adjacent -1', [weaponRangePenalty(0), weaponRangePenalty(1)], [0, -1]);
+M('weapon penalty (RULED 2026-11-19): own area and first area 0, five areas -4', [weaponRangePenalty(0), weaponRangePenalty(1), weaponRangePenalty(5)], [0, 0, -4]);
 M('weapon beyond listed range: no shift, caller refuses', weaponRangeShift({ distance: 16, maxRange: 15 }).inRange, false);
 FIXED('thrown penalty (RULED 2026-09-05): -1CS per area, Strength range caps (Excellent, 2 areas)', legacy.thrownPenalty(2), thrownRangePenalty(2, 'Excellent'));
 FIXED('grenade penalty: same rule (3 areas)', legacy.grenadePenalty(3), thrownRangePenalty(3, 'Remarkable'));
