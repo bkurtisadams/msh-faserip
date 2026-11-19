@@ -1,4 +1,8 @@
-﻿// init.js v1.25.2 - 2026-11-19
+﻿// init.js v1.26.0 - 2026-11-19
+// v1.26.0: Karma ledger: a character created with Karma and an empty ledger
+//          gets a Starting Karma entry; every startup does the same for
+//          empty ledgers (ledgers with spends are only reported).
+// init.js v1.25.2 - 2026-11-19
 // v1.25.2: Granted-powers migration version 3 (clears old lists into Notes).
 // init.js v1.25.1 - 2026-11-19
 // v1.25.1: Granted-powers migration version 2 (reruns for object-shaped lists).
@@ -2380,6 +2384,11 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
+// Loaded once at init for the synchronous preCreateActor hook.
+let _faseripStartingKarmaHistory = null;
+import("./karma-rules.js").then(m => { _faseripStartingKarmaHistory = m.startingKarmaHistory; })
+  .catch(e => console.warn("[FASERIP WARN] karma-rules load failed:", e));
+
 Hooks.on("preCreateActor", (document, data, options, userId) => {
   console.log("[FASERIP] preCreateActor - Type:", document.type);
 
@@ -2387,6 +2396,17 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 
   if (FASERIP_CHARACTER_ACTOR_TYPES.has(document.type)) {
     Object.assign(updates, _faseripCharacterPrototypeTokenDefaults());
+  }
+
+  // Karma ledger: a character created with Karma but no ledger (by hand,
+  // imported, from a compendium) gets its Starting Karma entry now, so the
+  // first spend can't wipe the balance.
+  if (FASERIP_CHARACTER_ACTOR_TYPES.has(document.type)) {
+    const seeded = _faseripStartingKarmaHistory?.(document._source?.system);
+    if (seeded) {
+      updates["system.karma.history"] = seeded;
+      updates["system.karma.lifetime"] = seeded[0].amount;
+    }
   }
 
   switch (document.type) {
@@ -2808,6 +2828,27 @@ Hooks.once("ready", async () => {
         }
         await game.settings.set("msh-faserip", "karmaHistorySeedVersion", 1);
         if (seeded) console.log(`[FASERIP] Karma ledger migration seeded ${seeded} actor(s)`);
+      }
+      // Every startup: characters with Karma and an empty ledger (created or
+      // edited since) get a Starting Karma entry. Ledgers with any spend are
+      // left alone and listed in the console for the GM to check.
+      {
+        const { startingKarmaHistory, computeKarmaTotals: totals } = await import("./karma-rules.js");
+        let seededNow = 0;
+        const check = [];
+        for (const actor of game.actors.filter(a => FASERIP_CHARACTER_ACTOR_TYPES.has(a.type))) {
+          const src = actor._source?.system;
+          const history = startingKarmaHistory(src, "Baseline seeded at startup for a character without a Karma ledger");
+          if (history) {
+            await actor.update({ "system.karma.history": history, "system.karma.lifetime": history[0].amount });
+            seededNow++;
+          } else {
+            const { earned, spent } = totals(src?.karma?.history);
+            if (earned === 0 && spent > 0) check.push(actor.name);
+          }
+        }
+        if (seededNow) console.log(`[FASERIP] Karma ledger: seeded Starting Karma for ${seededNow} character(s)`);
+        if (check.length) console.warn(`[FASERIP] Karma ledger: spends but no earned entry, check by hand: ${check.join(", ")}`);
       }
     }
   } catch (e) {

@@ -1,3 +1,6 @@
+// scripts/dev/power-rules-runtime-tests.js v1.7.0 - 2026-11-19
+// v1.7.0: "Karma ledger" section: Starting Karma on creation, existing
+//         ledgers untouched, direct spends no longer wipe Karma.
 // scripts/dev/power-rules-runtime-tests.js v1.6.0 - 2026-11-19
 // v1.6.0: Migration tests expect the old list cleared into Notes.
 // scripts/dev/power-rules-runtime-tests.js v1.5.1 - 2026-11-19
@@ -45,6 +48,7 @@ import { prepareActiveEffectCategories } from "../../helpers/effects.mjs";
 import { buildPowerSheetView, protectedSensesOf } from "../power-sheet-view.mjs";
 import { buildUltimateSkillView, buildRaiseLowestView, buildLinkedEffectsView } from "../power-sheet-actor-view.mjs";
 import { stuntKarmaCost } from "../stunt-ledger.js";
+import { startingKarmaHistory } from "../karma-rules.js";
 import { powerGearState, buildEquipmentLinkView, buildGrantedPowersView, linkPowerToEquipment, unlinkPower, migrateGrantedPowerLists } from "../equipment-link.mjs";
 
 const SYSTEM_ID = "msh-faserip";
@@ -561,6 +565,30 @@ async function equipmentTests(recorder, state) {
   recorder.equal(net(mixed, 30, "energy-cold"), 20, "Armor equipment: a cold resistance power still works beside it (net 20)");
 }
 
+async function karmaLedgerTests(recorder, state) {
+  const fresh = await createActor(state, "Ledger New", { system: { attributes: { karma: { value: 50 } } } });
+  const h = fresh.system.karma?.history ?? [];
+  recorder.assert(h.length === 1 && h[0].type === "Starting Karma" && h[0].amount === 50 && fresh.system.attributes.karma.value === 50,
+    "Karma ledger: a character created with 50 Karma and no ledger gets Starting Karma 50", { history: h });
+
+  const had = await createActor(state, "Ledger Existing", { system: {
+    attributes: { karma: { value: 70 } },
+    karma: { history: [{ timestamp: "", realDate: "", gameDate: "", amount: 70, type: "Award", description: "Existing" }] } } });
+  const hh = had.system.karma?.history ?? [];
+  recorder.assert(hh.length === 1 && hh[0].type === "Award", "Karma ledger: a character that already has a ledger is left alone", { history: hh });
+
+  // A spend written straight to the history (as stunts and equipment do).
+  await fresh.update({ "system.karma.history": [...h, { timestamp: "", realDate: "", gameDate: "", amount: -20, type: "Stunt", description: "Test spend" }] });
+  await sleep(150);
+  recorder.equal(fresh.system.attributes.karma.value, 30, "Karma ledger: a direct 20-Karma spend leaves 30, not 0");
+
+  recorder.equal(startingKarmaHistory(fresh._source.system), null, "Karma ledger: startup check does nothing to a seeded ledger (no double entry)");
+  recorder.equal(startingKarmaHistory({ attributes: { karma: { value: 50 } }, karma: { history: [{ amount: -10 }] } }), null,
+    "Karma ledger: a ledger with spends but nothing earned is not changed (only reported)");
+  const fromEmpty = startingKarmaHistory({ attributes: { karma: { value: 50 } }, karma: { history: [{ amount: 0, type: "Resources FEAT" }] } });
+  recorder.assert(fromEmpty?.[0]?.amount === 50 && fromEmpty.length === 2, "Karma ledger: log-only entries still count as an empty ledger", { fromEmpty });
+}
+
 async function cleanupState(state, keepArtifacts) {
   if (keepArtifacts) return;
   for (const actor of state.actors.reverse()) { try { await actor.delete(); } catch (e) { console.warn("[FASERIP TEST] Actor cleanup failed", e); } }
@@ -601,7 +629,8 @@ export async function runPowerRulesRuntimeTests({ keepArtifacts = false, postCha
     ["Limitations and sheet", () => sheetTests(recorder, state)],
     ["New power fields", () => newFieldTests(recorder, state)],
     ["Talents", () => talentTests(recorder)],
-    ["Equipment powers", () => equipmentTests(recorder, state)]
+    ["Equipment powers", () => equipmentTests(recorder, state)],
+    ["Karma ledger", () => karmaLedgerTests(recorder, state)]
   ];
   for (const [label, run] of sections) {
     try { await run(); }

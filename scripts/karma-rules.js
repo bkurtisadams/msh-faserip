@@ -1,3 +1,6 @@
+// karma-rules.js v1.3.0 - 2026-11-19
+// v1.3.0: startingKarmaHistory(src) for characters created, or found at
+//         startup, with Karma but an empty ledger (no spends).
 // karma-rules.js v1.2.0 - 2026-11-19
 // v1.2.0: withKarmaBaseline(actor, history) seeds a Starting Karma entry
 //         before the first spend on a ledger with no earned entries.
@@ -30,6 +33,27 @@ export function computeKarmaTotals(history, { advancement = 0 } = {}) {
   }
   const adv = Number(advancement) || 0;
   return { earned, spent, value: Math.max(0, earned - spent - adv) };
+}
+
+/**
+ * Starting Karma entry for a ledger that has nothing in it yet: no earned
+ * and no spent entries (log-only zero entries are allowed). Returns the new
+ * history, or null when the ledger already has entries that count or there
+ * is no Karma to record. Ledgers that already hold spends are never touched
+ * here: their right baseline can't be known.
+ * @param {object} src  actor source system data ({ karma, attributes })
+ */
+export function startingKarmaHistory(src, description = "Baseline seeded for a character without a Karma ledger") {
+  const history = Array.isArray(src?.karma?.history) ? [...src.karma.history] : [];
+  const { earned, spent } = computeKarmaTotals(history);
+  if (earned > 0 || spent > 0) return null;
+  const amount = (Number(src?.attributes?.karma?.value) || 0) + (Number(src?.karma?.advancement) || 0);
+  if (amount <= 0) return null;
+  history.unshift({
+    timestamp: new Date().toISOString(), realDate: new Date().toLocaleDateString(), gameDate: "",
+    amount, type: "Starting Karma", description
+  });
+  return history;
 }
 
 /**
