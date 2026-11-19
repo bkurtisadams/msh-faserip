@@ -1,10 +1,11 @@
-// scripts/modules/actions/shred-armor-action.js v1.1.0 - 2026-11-18
+// scripts/modules/actions/shred-armor-action.js v1.2.0 - 2026-11-19
 // Shred Armor choice for Claws, Rotting Touch and Corrosive Touch
 // (DESIGN-material-strength.md rev 2 §5 step 6). Clicking one of these powers
 // asks Attack or Shred armor. Shredding spends the round on the armor: no damage,
 // Power rank FEAT vs the armor's material strength via executeShredFeat.
 //   Claws / Corrosive Touch: artificial Body Armor only.
 //   Rotting Touch:           natural (organic) Body Armor only.
+// v1.2.0: Already-shredded (suppressed) armor is not offered for shredding.
 // v1.1.0: A successful shred puts an "Armor Shredded" Active Effect on the
 //         target naming the Body Armor power (flag shredsArmorItemId). While it
 //         is active, damage ignores that armor and its defense AE stays off;
@@ -37,7 +38,7 @@ function findArmorAe(targetActor, wantNature) {
   const scope = SCOPE();
   return targetActor?.effects?.find(e => {
     const f = e.flags?.[scope];
-    return !e.disabled && f?.effectCategory === "defense" && f?.defenseType === "bodyArmor"
+    return !e.disabled && !e.isSuppressed && f?.effectCategory === "defense" && f?.defenseType === "bodyArmor"
       && (f.armorNature || "natural") === wantNature;
   }) || null;
 }

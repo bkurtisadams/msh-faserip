@@ -1,6 +1,6 @@
 // scripts/modules/effects/defense-effects.js v1.10.0 - 2026-11-18
-// v1.10.0: Shredded Body Armor (an active Armor Shredded effect naming the
-//          power) keeps its defense AE disabled and renamed "(Shredded)".
+// v1.10.0: getActiveDefenseEffects skips suppressed AEs (FaseripActiveEffect:
+//          shredded Body Armor is suppressed, not disabled or renamed).
 // v1.9.2: Fixed-bug — the "Rank @-1 CS" preset writes energyReflectionRank
 //         = "minus1" (confirmed from a live item export), not "rank-1" as
 //         v1.9.1 guessed.
@@ -296,11 +296,6 @@ function looksLikeDefensivePower(item) {
 
 // ─── AE builders ─────────────────────────────────────────────────────────────
 
-export function isArmorShredded(actor, item) {
-  const scope = SCOPE();
-  return !!actor?.effects?.some(e => !e.disabled && e.flags?.[scope]?.shredsArmorItemId === item?.id);
-}
-
 export function buildBodyArmorAE(item, values) {
   const scope = SCOPE();
   const label = `Body Armor: ${item.name} (${values.physicalRank}: ${values.physical}/${values.energy})`;
@@ -594,12 +589,7 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   } else if (sys.isBodyArmor || isBodyArmorByName(item)) {
     const values = resolveBodyArmorValues(item);
     const aeData = buildBodyArmorAE(item, values);
-    const shredded = isArmorShredded(actor, item);
-    if (shredded) {
-      aeData.name = `${aeData.name} (Shredded)`;
-      aeData.statuses = [];
-    }
-    await registerDefenseAE(actor, baId, aeData, isInactive || shredded);
+    await registerDefenseAE(actor, baId, aeData, isInactive);
   } else {
     await removeDefenseAE(actor, baId);
   }
@@ -680,7 +670,7 @@ export function getActiveDefenseEffects(actor) {
   if (!actor?.effects) return [];
   const scope = SCOPE();
   return actor.effects.filter(e =>
-    !e.disabled && e.flags?.[scope]?.effectCategory === "defense"
+    !e.disabled && !e.isSuppressed && e.flags?.[scope]?.effectCategory === "defense"
   );
 }
 

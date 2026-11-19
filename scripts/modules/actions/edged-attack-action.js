@@ -1,4 +1,5 @@
-// edged-attack-action.js v3.9.0 - 2026-11-18
+// edged-attack-action.js v3.9.1 - 2026-11-19
+// v3.9.1: Claws penetration check skips suppressed (shredded) natural armor.
 // v3.9.0: Opened from a talent roll, the CS row starts at the talent's shift
 //         (Ultimate Skill override included) and that shift is not remembered.
 // v3.8.0: Dialog scaffolding (header, Karma / Effect / Blindside rows, effect
@@ -650,7 +651,7 @@ export class EdgedAttackAction extends AttackAction {
       const _primaryTarget = [...(game.user?.targets ?? [])][0]?.actor ?? null;
       const _scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
       const _naturalBaAe = _primaryTarget?.effects?.find(e =>
-        !e.disabled &&
+        !e.disabled && !e.isSuppressed &&
         e.flags?.[_scope]?.effectCategory === "defense" &&
         e.flags?.[_scope]?.defenseType === "bodyArmor" &&
         (e.flags?.[_scope]?.armorNature || "natural") === "natural"

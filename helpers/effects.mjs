@@ -58,7 +58,7 @@ export function prepareActiveEffectCategories(effects) {
   };
 
   for (let e of effects) {
-    const suppressed = e.getFlag(globalThis.MSH_FLAG_SCOPE || "msh-faserip", "suppressed");
+    const suppressed = e.isSuppressed || e.getFlag(globalThis.MSH_FLAG_SCOPE || "msh-faserip", "suppressed");
     if (suppressed) categories.suppressed.effects.push(e);
     else if (e.disabled) categories.inactive.effects.push(e);
     else if (e.isTemporary) categories.temporary.effects.push(e);

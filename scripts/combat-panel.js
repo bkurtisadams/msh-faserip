@@ -1,4 +1,5 @@
-// combat-panel.js v1.8.0 - 2026-11-11
+// combat-panel.js v1.8.1 - 2026-11-19
+// v1.8.1: Suppressed effects (e.g. shredded Body Armor) are not listed.
 // v1.8.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.7.3: Strip side comes from FaseripInitiative._getCombatantSide (override ??
 //         automatic rule), not the cached flag / raw disposition.
@@ -102,7 +103,7 @@ function getStatuses(actor) {
   if (!actor?.effects?.size) return [];
   const statuses = [];
   for (const ef of actor.effects) {
-    if (ef.disabled) continue;
+    if (ef.disabled || ef.isSuppressed) continue;
     const flags = ef.flags?.[SCOPE] || {};
     const name = ef.name || "";
     let cls = "generic";

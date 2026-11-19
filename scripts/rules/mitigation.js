@@ -1,4 +1,5 @@
-// scripts/rules/mitigation.js v3.9.0 - 2026-11-18
+// scripts/rules/mitigation.js v3.10.0 - 2026-11-19
+// v3.10.0: Suppressed defense AEs (shredded Body Armor) give no protection.
 // v3.9.0: Force fields take Force damage at full rank (RAW: "energy-type
 //         damage, including heat, force, and similar nonphysical attacks");
 //         Body Armor still treats Force as physical.
@@ -513,6 +514,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
 
   const activeDefenses = actor.effects.filter(e =>
     !e.disabled
+    && !e.isSuppressed
     && e.flags?.[scope]?.effectCategory === "defense"
     && isDefenseAEBackedByCurrentPower(actor, e, scope)
   );
