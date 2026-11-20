@@ -1,4 +1,7 @@
-// scripts/modules/ui/dark-colour.mjs v1.0.0 - 2026-11-20
+// scripts/modules/ui/dark-colour.mjs v1.1.0 - 2026-11-20
+// v1.1.0: Amber, orange and yellow washes become a raised navy panel instead
+//         of a dark wash of their own hue, which came out brown. Their
+//         border and label keep the colour.
 // v1.0.0: Pure colour arithmetic for the dark dialog palette. Turns a colour
 //         written for the light dialogs into its navy / crimson / yellow
 //         counterpart: light surfaces become navy panels, tinted washes keep
@@ -152,6 +155,8 @@ export function mapSurface(c) {
     else if (hsl.l >= 0.35) l = 0.34;
     else l = _clamp(hsl.l * 0.5, 0.045, 0.12);
     out = hslToRgb(NAVY_HUE, hsl.l >= 0.35 ? 0.42 : 0.4, l);
+  } else if (hsl.l >= 0.8 && hsl.h >= 15 && hsl.h <= 75) {
+    out = hslToRgb(NAVY_HUE, 0.42, 0.2 + (1 - hsl.l) * 0.3);
   } else if (hsl.l >= 0.8) {
     out = hslToRgb(hsl.h, _clamp(hsl.s, 0.3, 0.5), 0.11 + (1 - hsl.l) * 0.4);
   } else {

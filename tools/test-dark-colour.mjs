@@ -26,11 +26,17 @@ for (const light of ['#fff', '#fafafa', '#f5f5f0', '#fcf8eb', '#faf8f2', '#eee',
 }
 assert.ok(luminance(mapSurface(P('#ddd'))) > luminance(mapSurface(P('#fff'))), 'a grey fill stays distinct from a white one');
 
-for (const [wash, channel] of [['#e8f5e9', 'g'], ['#ffebee', 'r'], ['#e3f2fd', 'b'], ['#fff3e0', 'r']]) {
+for (const [wash, channel] of [['#e8f5e9', 'g'], ['#ffebee', 'r'], ['#e3f2fd', 'b']]) {
   const out = mapSurface(P(wash));
   assert.ok(luminance(out) < 0.06, `${wash} becomes a dark wash`);
   const others = ['r', 'g', 'b'].filter(k => k !== channel);
   assert.ok(others.every(k => out[channel] >= out[k]), `${wash} keeps its hue, got ${hex(out)}`);
+}
+
+for (const amber of ['#fff3e0', '#fff8e1', '#fff9c4', '#fff3cd']) {
+  const out = mapSurface(P(amber));
+  assert.ok(out.b > out.g && out.g > out.r, `${amber} becomes navy, not brown, got ${hex(out)}`);
+  assert.ok(luminance(out) > luminance(mapSurface(P('#fff'))), `${amber} sits raised above a plain panel`);
 }
 
 for (const signal of ['#00a94e', '#fef102', '#ee1e25', '#4caf50', '#f9a825', '#c62828', '#8b0000']) {

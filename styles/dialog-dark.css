@@ -1,4 +1,10 @@
-/* styles/dialog-dark.css v1.0.0 - 2026-11-20
+/* styles/dialog-dark.css v1.1.0 - 2026-11-20
+ * v1.1.0: Tick boxes and radio buttons are light on the navy (core drew them
+ *         near-black). Idle option rows and idle Manual / Semi / Full buttons
+ *         are dimmed by colour, not by fading, so they stay readable. Amber
+ *         and orange panels (Areas, Pull, weapon source, lock bar, Resource
+ *         header) are raised navy with the colour on the border, not brown.
+ *
  * Dark palette for the FASERIP dialogs, Foundry v14: the attack, FEAT, Karma
  * and sheet pop-up dialogs, plain confirms and prompts. Same navy, crimson
  * and yellow as the character sheet (styles/actor-sheet-dark.css).
@@ -124,10 +130,10 @@
 .faserip-dark-palette .frp-dlg .frp-sit-add:hover { background: #1c3d1d; }
 .faserip-dark-palette .frp-dlg .frp-sit-tag { background: #112533; border: 1px solid #27679b; color: #4f98ec; }
 .faserip-dark-palette .frp-dlg .frp-sit-tag .tag-x { color: #4693eb; }
-.faserip-dark-palette .frp-dlg .frp-sit-tag.penalty { background: #332611; border-color: #9b6c27; color: #fa732a; }
+.faserip-dark-palette .frp-dlg .frp-sit-tag.penalty { background: #20364f; border-color: #9b6c27; color: #fb8d51; }
 .faserip-dark-palette .frp-dlg .frp-target-status { color: #ba72e6; }
 .faserip-dark-palette .frp-dlg .frp-select { background: #172638; border: 1px solid #3f5976; }
-.faserip-dark-palette .frp-dlg .frp-box.src-active { background: #332b11; }
+.faserip-dark-palette .frp-dlg .frp-box.src-active { background: #20364f; }
 .faserip-dark-palette .frp-dlg .weapon-row select,
 .faserip-dark-palette .frp-dlg .object-row select { border: 1px solid #3f5976; }
 .faserip-dark-palette .frp-dlg .object-row input[type="text"],
@@ -136,7 +142,7 @@
 .faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.blue { color: #4693eb; }
 .faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.red { color: #e16969; }
 .faserip-dark-palette .frp-dlg .frp-pull-input { border: 1px solid #3f5976; }
-.faserip-dark-palette .frp-dlg .frp-pull-box.pull-active { background: #332611; }
+.faserip-dark-palette .frp-dlg .frp-pull-box.pull-active { background: #20364f; }
 .faserip-dark-palette .frp-dlg .frp-pull-dmg { background: #172638; border: 1px solid #3f5976; }
 .faserip-dark-palette .frp-dlg .frp-pull-cap-select { border: 1px solid #3f5976; }
 .faserip-dark-palette .frp-dlg .frp-multi-box.multi-active { background: #153017; }
@@ -176,7 +182,7 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 .faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-stat-label { color: #c18805; }
 .faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-stat-rank { color: #fa5938; }
 .faserip-dark-palette .frp-dlg.frp-res .rankval { color: #fa5938; }
-.faserip-dark-palette .frp-dlg .frp-lockbar.locked { background: #342811; color: #c89524; }
+.faserip-dark-palette .frp-dlg .frp-lockbar.locked { background: #20364f; color: #d8a228; }
 .faserip-dark-palette .frp-dlg .frp-lockbar.open { background: #152d15; border: 1px solid #427f42; color: #5bac5b; }
 .faserip-dark-palette .frp-dlg .frp-gm-row { background: #21132f; color: #a184c2; }
 .faserip-dark-palette .frp-dlg.frp-pop .frp-header-v3 { border-bottom: 2px solid #c22975; }
@@ -317,8 +323,14 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 .application.faserip-dark-palette:not(.sheet) .window-content input::placeholder,
 .application.faserip-dark-palette:not(.sheet) .window-content textarea::placeholder { color: #8391a3 !important; opacity: 1; }
 .application.faserip-dark-palette:not(.sheet) .window-content select :is(option, optgroup) { background: var(--fd-well) !important; color: var(--fd-text) !important; }
+/* Core draws a tick box as a Font Awesome glyph in --checkbox-background-color,
+   which its dark theme sets on the input itself to a near-black. */
 .application.faserip-dark-palette:not(.sheet) input[type="radio"],
-.application.faserip-dark-palette:not(.sheet) input[type="checkbox"] { accent-color: var(--fd-gold); }
+.application.faserip-dark-palette:not(.sheet) input[type="checkbox"] {
+  accent-color: var(--fd-gold);
+  --checkbox-background-color: #8ea4c0;
+  --checkbox-checked-color: var(--fd-gold);
+}
 .application.faserip-dark-palette:not(.sheet) .window-content :is(input, select, textarea):focus {
   border-color: var(--fd-gold) !important;
   box-shadow: 0 0 0 1px rgba(245,207,69,.45), inset 0 1px 3px rgba(0,0,0,.6) !important;
@@ -378,6 +390,15 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 .faserip-dark-palette .frp-dlg .mbtn.active-yellow { background: #f9a825; color: #000; border-color: #f57f17; }
 .faserip-dark-palette .frp-dlg .mbtn.active-red { background: #c62828; color: #fff; }
 .faserip-dark-palette .frp-dlg .mbtn.active-green { background: #2e7d32; color: #fff; }
+.application.faserip-dark-palette:not(.sheet) .faserip-mode:not(:has(input:checked)) {
+  background: #0c1827 !important;
+  color: var(--fd-text) !important;
+  border-color: var(--fd-frame) !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+.application.faserip-dark-palette:not(.sheet) .faserip-mode:not(:has(input:checked)):has(input:disabled) { color: var(--fd-text-muted) !important; }
+.application.faserip-dark-palette:not(.sheet) .faserip-mode:has(input:checked) { opacity: 1 !important; filter: none !important; }
 
 /* ---- attack / FEAT header strip ---- */
 .faserip-dark-palette .frp-dlg .frp-header {
@@ -402,7 +423,7 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 
 /* Resource (gold) and Popularity (magenta) keep their section colours, deepened */
 .faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 {
-  background: linear-gradient(90deg, #6b4a08 0%, #3d2a05 100%);
+  background: linear-gradient(160deg, #1d314b 0%, var(--fd-panel-2) 70%);
   color: var(--fd-gold-lit);
   border-color: var(--fd-gold-dim);
   border-bottom-color: var(--fd-gold);
@@ -433,8 +454,8 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 .faserip-dark-palette .frp-dlg .frp-cs-label { color: var(--fd-red-text); }
 .faserip-dark-palette .frp-dlg.frp-feat .frp-cs-label,
 .faserip-dark-palette .frp-dlg .frp-box-label.green { color: var(--fd-green-text); }
-.faserip-dark-palette .frp-dlg .frp-box.src-active { background: #332b11; border-color: #ffc107; }
-.faserip-dark-palette .frp-dlg .frp-pull-box.pull-active { background: #332611; border-color: #ff9800; }
+.faserip-dark-palette .frp-dlg .frp-box.src-active { background: #1f354d; border-color: #ffc107; }
+.faserip-dark-palette .frp-dlg .frp-pull-box.pull-active { background: #1f354d; border-color: #ff9800; }
 .faserip-dark-palette .frp-dlg .frp-multi-box.multi-active { background: #153017; border-color: #3ca241; }
 .faserip-dark-palette .frp-dlg .frp-karma-box.karma-active { background: #112533; border-color: #4f98ec; }
 .faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.orange,
@@ -448,6 +469,7 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 .faserip-dark-palette .frp-dlg .frp-cs-result.negative { color: var(--fd-red-text); }
 .faserip-dark-palette .frp-dlg .frp-cs-result.positive,
 .faserip-dark-palette .frp-dlg .frp-cs-talents { color: var(--fd-green-text); }
+.faserip-dark-palette .frp-dlg .frp-opt-row.inactive { opacity: 0.85; }
 .faserip-dark-palette .frp-dlg .frp-opt-row.inactive .frp-opt-label:is(.orange, .green, .blue, .red) { color: var(--fd-text-muted); }
 .faserip-dark-palette .frp-dlg :is(.frp-target-status, .frp-target-compact .t-status) { color: #cf9af0; }
 .faserip-dark-palette .frp-dlg .frp-target-compact .t-none { color: var(--fd-text-muted); }
@@ -461,7 +483,7 @@ body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-sh
 .faserip-dark-palette .frp-dlg .frp-ref-note { color: var(--fd-text-soft); }
 
 /* ---- status strips ---- */
-.faserip-dark-palette .frp-dlg .frp-lockbar.locked { background: #332611; border-color: #9b6c27; color: #f3c56b; }
+.faserip-dark-palette .frp-dlg .frp-lockbar.locked { background: #1f354d; border-color: #d79a3a; color: #f3c56b; }
 .faserip-dark-palette .frp-dlg .frp-lockbar.open { background: #153017; border-color: #2f6b33; color: #9fdba5; }
 .faserip-dark-palette .frp-dlg .frp-gm-row { background: #241a33; border-color: #7d62a3; color: #d5bdf0; }
 .faserip-dark-palette .frp-dlg .frp-gm-row .tag { background: #7d52ab; color: #fff; }
