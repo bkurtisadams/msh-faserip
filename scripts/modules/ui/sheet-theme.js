@@ -1,4 +1,10 @@
-// scripts/modules/ui/sheet-theme.js v1.0.0 - 2026-11-19
+// scripts/modules/ui/sheet-theme.js v1.1.0 - 2026-11-20
+// v1.1.0: Dialogs follow Foundry too (modules/ui/dialog-theme.js): every shim
+//         dialog, every DialogV2 and the system's own "-dialog" windows take
+//         Foundry's Applications colour scheme, then the browser preference.
+//         Sheets other than the character sheet, and the tool windows, stay
+//         light. resolveFoundryTheme() is the part of the resolution that
+//         needs no document.
 // v1.0.0: Light or dark for the character sheet follows Foundry's own choice,
 //         replacing the "Character Sheet Colors" system setting. In order:
 //         a theme set for this one sheet in Foundry's Sheet Configuration,
@@ -8,6 +14,8 @@
 //         FASERIP window, the vehicle sheet included, stays on the light
 //         palette as before. game.msh.explainSheetTheme() prints what was
 //         resolved and why.
+
+import { isThemedDialog, applyDialogTheme, releaseDialogTheme, refreshDialogThemes, explainDialogTheme } from "./dialog-theme.js";
 
 const PALETTE_CLASS = "faserip-dark-palette";
 
@@ -47,6 +55,14 @@ export function resolveSheetTheme(app) {
   const typeDefault = sheetThemes?.defaults?.[doc?.documentName]?.[doc?.type];
   if (_valid(typeDefault)) return { theme: typeDefault, source: "sheet configuration (default for this type)" };
 
+  return resolveFoundryTheme();
+}
+
+/**
+ * Foundry's theme for application windows, with no sheet in the picture.
+ * @returns {{theme: "light"|"dark", source: string}}
+ */
+export function resolveFoundryTheme() {
   // 2. Foundry's colour scheme for application windows.
   const scheme = _setting("uiConfig")?.colorScheme?.applications;
   if (_valid(scheme)) return { theme: scheme, source: "Foundry UI setting (Applications)" };
@@ -111,10 +127,12 @@ export function registerSheetTheme() {
   if (_registered) return;
   _registered = true;
 
-  // Every FASERIP window is themed on each render. Character sheets follow
-  // Foundry; all other system windows are a fixed light design and are pinned
-  // to light so a dark Foundry does not bleed dark text colours into them.
+  // Every FASERIP window is themed on each render. Character sheets and
+  // dialogs follow Foundry; the other system windows are a fixed light design
+  // and are pinned to light so a dark Foundry does not bleed dark text
+  // colours into them.
   Hooks.on("renderApplicationV2", (app, element) => {
+    if (isThemedDialog(app)) { applyDialogTheme(app, element); return; }
     const classes = app.options?.classes ?? [];
     if (!classes.some(c => c.startsWith("faserip") || c.startsWith("msh"))) return;
     applySheetTheme(element, isCharacterSheet(app) ? resolveSheetTheme(app).theme : "light");
@@ -122,20 +140,25 @@ export function registerSheetTheme() {
 
   // Foundry's theme changed while sheets are open. Deferred one tick so
   // Foundry's own class changes land first.
+  const refreshAll = () => { refreshSheetThemes(); refreshDialogThemes(); };
   const onSetting = key => {
-    if (/(^|\.)(uiConfig|sheetThemes)$/.test(String(key ?? ""))) setTimeout(refreshSheetThemes, 0);
+    if (/(^|\.)(uiConfig|sheetThemes)$/.test(String(key ?? ""))) setTimeout(refreshAll, 0);
   };
   Hooks.on("clientSettingChanged", onSetting);
   Hooks.on("updateSetting", setting => onSetting(setting?.key));
 
   // The OS switched between light and dark while Foundry is on its default.
   try {
-    globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", refreshSheetThemes);
+    globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", refreshAll);
   } catch (_) { /* older engines: the next render picks it up */ }
+
+  Hooks.on("closeApplicationV2", app => releaseDialogTheme(app));
 
   Hooks.once("ready", () => {
     game.msh ??= {};
     game.msh.explainSheetTheme = explainSheetTheme;
     game.msh.refreshSheetThemes = refreshSheetThemes;
+    game.msh.explainDialogTheme = explainDialogTheme;
+    game.msh.refreshDialogThemes = refreshDialogThemes;
   });
 }

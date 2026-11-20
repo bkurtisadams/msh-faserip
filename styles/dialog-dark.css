@@ -1,0 +1,481 @@
+/* styles/dialog-dark.css v1.0.0 - 2026-11-20
+ * Dark palette for the FASERIP dialogs, Foundry v14: the attack, FEAT, Karma
+ * and sheet pop-up dialogs, plain confirms and prompts. Same navy, crimson
+ * and yellow as the character sheet (styles/actor-sheet-dark.css).
+ *
+ * Everything here is scoped to .faserip-dark-palette, which
+ * scripts/modules/ui/dialog-theme.js puts on a dialog when Foundry is dark,
+ * so the light dialogs are untouched: remove the class and none of these
+ * rules apply. Colour, border colour, shadows and letter slant only. No
+ * sizes or layout.
+ *
+ * 1. PALETTE        the dark colours, and the dialogs' own variables re-pointed
+ * 2. COUNTERPARTS   one dark rule for each light rule that hard-codes a colour,
+ *                   grouped by the stylesheet it answers. When a light rule
+ *                   gains a new hard-coded colour, add its counterpart here.
+ * 3. THE LOOK       navy panels, crimson halftone bars, yellow lettering
+ *
+ * Colours written into style="" by the dialog scripts are not answered here:
+ * dialog-theme.js re-colours those in place. The FEAT result colours (pills
+ * and effect cells: white, green, yellow, red) are the same in both palettes.
+ *
+ * Loaded after the light stylesheets in system.json so it can answer their
+ * declarations. Sheets carry .sheet and are excluded from the frame rules.
+ */
+
+/* ==== 1. PALETTE ==== */
+.application.faserip-dark-palette:not(.sheet) {
+  color-scheme: dark;
+  --fd-bg: #0a1220;
+  --fd-panel: #0f1b2b;
+  --fd-panel-2: #162638;
+  --fd-raise: #213550;
+  --fd-well: #08111c;
+  --fd-line: #33475d;
+  --fd-frame: #6b82a0;
+  --fd-text: #f4ecdd;
+  --fd-text-soft: #d3cab9;
+  --fd-text-muted: #a3adba;
+  --fd-gold: #f5cf45;
+  --fd-gold-lit: #f8f070;
+  --fd-gold-dim: #a8892c;
+  --fd-crimson: #a31f2d;
+  --fd-crimson-dk: #5a0d17;
+  --fd-crimson-lit: #b72a39;
+  --fd-red-text: #ff9989;
+  --fd-green-text: #7fd487;
+  --fd-halftone: radial-gradient(circle, rgba(255,205,130,.13) .8px, transparent 1px);
+
+  /* Foundry's form variables */
+  --input-text-color: var(--fd-text);
+  --input-background-color: var(--fd-well);
+  --input-border-color: var(--fd-frame);
+  --input-placeholder-color: var(--fd-text-muted);
+  --color-form-label: var(--fd-text);
+  --color-form-hint: var(--fd-text-soft);
+  --color-select-option-bg: var(--fd-well);
+  --color-text-primary: var(--fd-text);
+  --color-text-secondary: var(--fd-text-soft);
+
+  color: var(--fd-text);
+}
+
+/* the attack / FEAT dialogs' own variables, re-pointed */
+.faserip-dark-palette .frp-dlg {
+  --mred: var(--fd-red-text); --mred-dk: var(--fd-crimson-dk); --mred-lit: var(--fd-red-text);
+  --gold: var(--fd-gold); --gold-lit: var(--fd-gold-lit);
+  --feat: #3ca241; --feat-dk: #1c3d1d; --feat-deep: var(--fd-green-text);
+  --cream: var(--fd-panel-2); --cream-dk: var(--fd-panel);
+  --ink: var(--fd-text);
+  --txt: var(--fd-text); --txt-s: var(--fd-text-soft); --txt-m: var(--fd-text-muted);
+}
+
+/* ==== 2. COUNTERPARTS ==== */
+/* ---- from styles/action-dialog.css ---- */
+.faserip-dark-palette .frp-dlg { background-color: #1a2c40; }
+.faserip-dark-palette .frp-dlg .frp-header-v3 { background: #172638; }
+.faserip-dark-palette .frp-dlg.frp-feat .frp-header-v3 { background: #172638; }
+.faserip-dark-palette .frp-dlg.frp-feat select,
+.faserip-dark-palette .frp-dlg.frp-res select,
+.faserip-dark-palette .frp-dlg.frp-pop select { background: #172638; border: 1px solid #486587; }
+.faserip-dark-palette .frp-dlg.frp-res input[type="text"],
+.faserip-dark-palette .frp-dlg.frp-pop input[type="text"] { background: #172638; border: 1px solid #486587; }
+.faserip-dark-palette .frp-dlg.frp-feat select option,
+.faserip-dark-palette .frp-dlg.frp-res select option,
+.faserip-dark-palette .frp-dlg.frp-pop select option { background: #172638; color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg.frp-feat select optgroup { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-target-compact .t-status { color: #ba72e6; }
+.faserip-dark-palette .frp-dlg .frp-cs-label { color: #fb5050; }
+.faserip-dark-palette .frp-dlg .chip-sep { background: #263f5c; }
+.faserip-dark-palette .frp-dlg .frp-dmg-inline select { background: #172638; border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-dmg-box { background: #172638; border: 1.5px solid #c22929; }
+.faserip-dark-palette .frp-dlg .frp-opt-row.inactive .frp-opt-label.orange,
+.faserip-dark-palette .frp-dlg .frp-opt-row.inactive .frp-opt-label.green,
+.faserip-dark-palette .frp-dlg .frp-opt-row.inactive .frp-opt-label.blue,
+.faserip-dark-palette .frp-dlg .frp-opt-row.inactive .frp-opt-label.red { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-mode-btn,
+.faserip-dark-palette .frp-dlg .mbtn { background: #1d3148; border: 1px solid #3f5875; }
+.faserip-dark-palette .frp-dlg .mbtn.active-red { border-color: #c22929; }
+.faserip-dark-palette .frp-dlg .mbtn.active-green { border-color: #34b63e; }
+.faserip-dark-palette .frp-dlg .frp-summary { border-bottom: 1px solid #7c6a46; }
+.faserip-dark-palette .frp-dlg .frp-box-label.green { color: #3ca241; }
+.faserip-dark-palette .frp-dlg .frp-cs-input { background: #172638; border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-cs-input.pos,
+.faserip-dark-palette .frp-dlg .frp-cs-input.cs-pos { background: #153017; color: #44b94a; }
+.faserip-dark-palette .frp-dlg .frp-cs-input.neg,
+.faserip-dark-palette .frp-dlg .frp-cs-input.cs-neg { background: #301015; color: #e16969; }
+.faserip-dark-palette .frp-dlg .frp-cs-result.positive { color: #3ca241; }
+.faserip-dark-palette .frp-dlg .frp-cs-result.negative { color: #e16969; }
+.faserip-dark-palette .frp-dlg .frp-cs-reset { background: #1c2e44; border: 1px solid #425c7b; }
+.faserip-dark-palette .frp-dlg .frp-cs-notes { background: #172638; border: 1px solid #75674d; }
+.faserip-dark-palette .frp-dlg .frp-cs-talents { color: #3ca241; }
+.faserip-dark-palette .frp-dlg .frp-cs-help { background: #1b2d41; }
+.faserip-dark-palette .frp-dlg .frp-cs-help:hover { background: #1e334b; color: #d3cab9; }
+.faserip-dark-palette .frp-dlg .frp-cs-base { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-cs-range { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-cs-range.neg { color: #e16969; }
+.faserip-dark-palette .frp-dlg .frp-ref-panel { background: #172638; }
+.faserip-dark-palette .frp-dlg .frp-ref-group-label { color: #fb5050; border-bottom: 1.5px solid #c22929; }
+.faserip-dark-palette .frp-dlg .frp-ref-cs { color: #fb5050; }
+.faserip-dark-palette .frp-dlg .frp-ref-name { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-ref-note { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-sit-select { background: #172638; border: 1px solid #75674d; }
+.faserip-dark-palette .frp-dlg .frp-sit-add { background: #153017; color: #44b94a; }
+.faserip-dark-palette .frp-dlg .frp-sit-add:hover { background: #1c3d1d; }
+.faserip-dark-palette .frp-dlg .frp-sit-tag { background: #112533; border: 1px solid #27679b; color: #4f98ec; }
+.faserip-dark-palette .frp-dlg .frp-sit-tag .tag-x { color: #4693eb; }
+.faserip-dark-palette .frp-dlg .frp-sit-tag.penalty { background: #332611; border-color: #9b6c27; color: #fa732a; }
+.faserip-dark-palette .frp-dlg .frp-target-status { color: #ba72e6; }
+.faserip-dark-palette .frp-dlg .frp-select { background: #172638; border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-box.src-active { background: #332b11; }
+.faserip-dark-palette .frp-dlg .weapon-row select,
+.faserip-dark-palette .frp-dlg .object-row select { border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .object-row input[type="text"],
+.faserip-dark-palette .frp-dlg .object-row input[type="number"] { border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.green { color: #3ca241; }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.blue { color: #4693eb; }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.red { color: #e16969; }
+.faserip-dark-palette .frp-dlg .frp-pull-input { border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-pull-box.pull-active { background: #332611; }
+.faserip-dark-palette .frp-dlg .frp-pull-dmg { background: #172638; border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-pull-cap-select { border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-multi-box.multi-active { background: #153017; }
+.faserip-dark-palette .frp-dlg .frp-multi-label { color: #3ca241; }
+.faserip-dark-palette .frp-dlg .frp-karma-box.karma-active { background: #112533; border-color: #27679b; }
+.faserip-dark-palette .frp-dlg .frp-range-input { border: 1px solid #3f5976; }
+.faserip-dark-palette .frp-dlg .frp-range-penalty { color: #e16969; }
+.faserip-dark-palette .frp-dlg .frp-btn-roll { background: #253e5b; color: #f4ecdd; border: 1px solid #486587; }
+.faserip-dark-palette .frp-dlg .frp-btn-cancel { border: 1px solid #527398; }
+.faserip-dark-palette .frp-dlg .frp-dmg-box { background: #172638; border: 1.5px solid #c22929; }
+.application.faserip-shim-dialog.faserip-dark-palette .window-content { background: #1a2c40; color: #f4ecdd; }
+.application.faserip-shim-dialog.faserip-dark-palette input[type="text"],
+.application.faserip-shim-dialog.faserip-dark-palette input[type="number"],
+.application.faserip-shim-dialog.faserip-dark-palette input[type="search"],
+.application.faserip-shim-dialog.faserip-dark-palette select,
+.application.faserip-shim-dialog.faserip-dark-palette textarea { background: #172638; border: 1px solid #3f5976; }
+.application.faserip-shim-dialog.faserip-dark-palette input[type="text"][readonly],
+.application.faserip-shim-dialog.faserip-dark-palette input[type="number"][readonly] { background: #1b2d41; color: #d3cab9; }
+.application.faserip-shim-dialog.faserip-dark-palette select:focus,
+.application.faserip-shim-dialog.faserip-dark-palette input:focus { border-color: #c22929; }
+.application.faserip-shim-dialog.faserip-dark-palette .form-footer,
+.application.faserip-shim-dialog.faserip-dark-palette footer.form-footer { background: #192b3e; }
+.application.faserip-shim-dialog.faserip-dark-palette .form-footer button { background: #253e5b; color: #f4ecdd; border: 1px solid #486587; }
+.application.faserip-shim-dialog.faserip-dark-palette .form-footer button:focus,
+.application.faserip-shim-dialog.faserip-dark-palette .form-footer button:focus-visible { outline: 1px solid #c22929; }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .window-content { background: #1a2c40; color: #f4ecdd; }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .form-group > label { color: #f4ecdd; }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .hint,
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .notes,
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .form-group small { color: #f4ecdd; }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .window-content p[style*="#666"],
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .window-content p[style*="#777"] { color: #d3cab9 !important; }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .karma-calculation { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 { border-bottom: 2px solid #c29029; }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-action { color: #c58105; }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-actor { color: #c48205; }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-stat-label { color: #c18805; }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-stat-rank { color: #fa5938; }
+.faserip-dark-palette .frp-dlg.frp-res .rankval { color: #fa5938; }
+.faserip-dark-palette .frp-dlg .frp-lockbar.locked { background: #342811; color: #c89524; }
+.faserip-dark-palette .frp-dlg .frp-lockbar.open { background: #152d15; border: 1px solid #427f42; color: #5bac5b; }
+.faserip-dark-palette .frp-dlg .frp-gm-row { background: #21132f; color: #a184c2; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-header-v3 { border-bottom: 2px solid #c22975; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-need-label { color: #ed55a6; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-cs-rank { color: #f4ecdd; }
+.faserip-dark-palette .frp-dlg .frp-warnbar { background: #33111c; border: 1px solid #9b274e; color: #ee5ba5; }
+.faserip-dark-palette .frp-dlg .frp-warnbar b { color: #ed59a3; }
+.faserip-dark-palette .ka-adv-wrap { color: #f4ecdd; }
+.faserip-dark-palette .ka-adv-wrap select,
+.faserip-dark-palette .ka-adv-wrap input[type=number],
+.faserip-dark-palette .ka-adv-wrap input[type=text] { background: #172638; color: #f4ecdd; border: 1px solid #3f5875; }
+.faserip-dark-palette .ka-adv-wrap label { color: #d3cab9; }
+.faserip-dark-palette .ka-adv-calc { background: #192b3e; }
+.faserip-dark-palette .ka-adv-calc-line { color: #d3cab9; }
+.faserip-dark-palette .ka-adv-calc-line.cresting { color: #fb5252; }
+.faserip-dark-palette .ka-adv-calc-total { color: #f4ecdd; }
+.faserip-dark-palette .ka-adv-insuf { color: #e16969; }
+.faserip-dark-palette .ka-adv-avail { color: #f4ecdd; }
+.faserip-dark-palette .ka-adv-adjusted { color: #fb5252; }
+
+/* ---- from styles/global.css (dialog rules) ---- */
+.faserip-dark-palette.resources-dialog .dialog-content h2 { color: #fb5252; border-bottom: 1px solid #3c536f; }
+.faserip-dark-palette.resources-dialog .dialog-content th,
+.faserip-dark-palette.resources-dialog .dialog-content td { border: 1px solid #3c536f; }
+.faserip-dark-palette.popularity-dialog .dialog-content h2 { color: #fb5252; border-bottom: 1px solid #3c536f; }
+.faserip-dark-palette.popularity-dialog .dialog-content .pop-awards th,
+.faserip-dark-palette.popularity-dialog .dialog-content .pop-awards td { border: 1px solid #3c536f; }
+.faserip-dark-palette.popularity-dialog .note-box { background-color: #192a3d; border-left: 3px solid #c22929; }
+.faserip-dark-palette.power-info-dialog h2 { color: #fb5252; border-bottom: 1px solid #3c536f; }
+.faserip-dark-palette.power-info-dialog .description { border-top: 1px solid #3c536f; }
+.faserip-dark-palette.contact-information-dialog .window-content { background: #1c2e43; color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content { color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content h2 { border-bottom: 1px solid #597ca4; color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content .contact-details { color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content .contact-details .label { color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content .contact-notes { background: #1a2b3f; color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content .contact-notes h3,
+.faserip-dark-palette .contact-information-content .contact-description h3 { border-bottom: 1px solid #597ca4; color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content .contact-notes > div,
+.faserip-dark-palette .contact-information-content .contact-description > div { color: #f4ecdd; }
+.faserip-dark-palette .contact-information-content .contact-description { border-top: 1px solid #435e7d; }
+.faserip-dark-palette.contact-information-dialog .dialog-buttons button { color: #f4ecdd; }
+.faserip-dark-palette.headquarters-dialog input[type="text"],
+.faserip-dark-palette.headquarters-dialog textarea { border: 1px solid #3c536f; }
+
+/* ---- from styles/team-tracker.css (Award Karma dialog) ---- */
+.faserip-dark-palette .faserip-quick-karma .qk-label { color: #d3cab9; }
+.faserip-dark-palette .faserip-quick-karma .qk-chip { background: #172638; border: 1px solid #3f5875; }
+.faserip-dark-palette .faserip-quick-karma .qk-dim { color: #d3cab9; }
+.faserip-dark-palette .faserip-quick-karma .qk-amt { color: #2fa538; }
+.faserip-dark-palette .faserip-quick-karma .qk-preview { background: #1d3147; }
+
+/* ==== 3. THE LOOK ====
+ * Navy panels, crimson bars with halftone dots, yellow lettering.
+ * Paint, borders' colour, shadows and letter style only: no sizes, padding or layout.
+ */
+
+/* the palette swaps in one step: dialog-theme.js holds these classes while it works */
+.faserip-theming, .faserip-theming *,
+.faserip-recolouring, .faserip-recolouring * { transition: none !important; }
+
+/* ---- window: crimson title bar, navy page ---- */
+.application.faserip-dark-palette:not(.sheet) {
+  background-color: var(--fd-bg) !important;
+  border-color: var(--fd-frame) !important;
+  box-shadow: 0 0 0 1px #02060c, 0 6px 22px rgba(0,0,0,.65);
+}
+.application.faserip-dark-palette:not(.sheet) .window-header {
+  background-color: var(--fd-crimson) !important;
+  background-image: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%) !important;
+  background-size: 5px 5px, 100% 100% !important;
+  border-bottom: 1px solid var(--fd-gold-dim) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+}
+.application.faserip-dark-palette:not(.sheet) .window-header .window-title {
+  color: var(--fd-gold-lit) !important;
+  font-style: italic;
+  text-shadow: 1px 1px 0 #2a040a;
+}
+.application.faserip-dark-palette:not(.sheet) .window-header button,
+.application.faserip-dark-palette:not(.sheet) .window-header .header-control { color: #f3dfb4 !important; }
+.application.faserip-dark-palette:not(.sheet) .window-header button:hover,
+.application.faserip-dark-palette:not(.sheet) .window-header .header-control:hover { color: #fff !important; }
+.application.faserip-dark-palette:not(.sheet) .window-content,
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .window-content {
+  background-color: var(--fd-panel) !important;
+  background-image:
+    radial-gradient(circle, rgba(120,160,210,.06) .7px, transparent .9px),
+    linear-gradient(170deg, #14233a 0%, var(--fd-panel) 55%) !important;
+  background-size: 4px 4px, 100% 100% !important;
+  color: var(--fd-text) !important;
+}
+.faserip-dark-palette:not(.sheet) .frp-dlg {
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--fd-text);
+}
+
+/* ---- plain text furniture ---- */
+.application.faserip-dark-palette:not(.sheet) .window-content :is(h1, h2, h3, h4) {
+  color: var(--fd-gold-lit);
+  border-bottom-color: var(--fd-line);
+}
+.application.faserip-dark-palette:not(.sheet) .window-content hr { border-color: var(--fd-line); background: var(--fd-line); }
+.application.faserip-dark-palette:not(.sheet) .window-content a:not([class]) { color: #89bbff; }
+.application.faserip-dark-palette:not(.sheet) .window-content a:not([class]):hover { color: var(--fd-red-text); }
+.application.faserip-dark-palette:not(.sheet) .window-content :is(.hint, .notes, small) { color: var(--fd-text-soft); }
+.application.faserip-dark-palette:not(.sheet) .window-content label,
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .form-group > label { color: var(--fd-text); }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) :is(.hint, .notes, .form-group small) { color: var(--fd-text-soft); }
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .window-content p[style*="#666"],
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) .window-content p[style*="#777"] { color: var(--fd-text-soft) !important; }
+.application.faserip-dark-palette:not(.sheet) .window-content table { color: var(--fd-text); }
+.application.faserip-dark-palette:not(.sheet) .window-content fieldset { border-color: var(--fd-line); }
+.application.faserip-dark-palette:not(.sheet) .window-content legend { color: var(--fd-gold-lit); }
+
+/* ---- input wells ---- */
+.application.faserip-dark-palette:not(.sheet) .window-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.application.faserip-dark-palette:not(.sheet) .window-content select,
+.application.faserip-dark-palette:not(.sheet) .window-content textarea,
+body.system-msh-faserip .application.dialog.faserip-dark-palette:not(.faserip-shim-dialog) :is(input[type="text"], input[type="number"], select, textarea) {
+  background: var(--fd-well) !important;
+  color: var(--fd-text) !important;
+  -webkit-text-fill-color: currentColor;
+  border-color: #7289a6 !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.6) !important;
+}
+.application.faserip-dark-palette:not(.sheet) .window-content input:disabled,
+.application.faserip-dark-palette:not(.sheet) .window-content select:disabled,
+.application.faserip-dark-palette:not(.sheet) .window-content textarea:disabled,
+.application.faserip-dark-palette:not(.sheet) .window-content input[readonly] {
+  background: #15233a !important;
+  color: var(--fd-text-muted) !important;
+  -webkit-text-fill-color: var(--fd-text-muted);
+  border-color: var(--fd-line) !important;
+  opacity: 1;
+}
+.application.faserip-dark-palette:not(.sheet) .window-content input::placeholder,
+.application.faserip-dark-palette:not(.sheet) .window-content textarea::placeholder { color: #8391a3 !important; opacity: 1; }
+.application.faserip-dark-palette:not(.sheet) .window-content select :is(option, optgroup) { background: var(--fd-well) !important; color: var(--fd-text) !important; }
+.application.faserip-dark-palette:not(.sheet) input[type="radio"],
+.application.faserip-dark-palette:not(.sheet) input[type="checkbox"] { accent-color: var(--fd-gold); }
+.application.faserip-dark-palette:not(.sheet) .window-content :is(input, select, textarea):focus {
+  border-color: var(--fd-gold) !important;
+  box-shadow: 0 0 0 1px rgba(245,207,69,.45), inset 0 1px 3px rgba(0,0,0,.6) !important;
+}
+.application.faserip-dark-palette:not(.sheet) .window-content :is(input, select, textarea, button, a):focus-visible { outline-color: var(--fd-gold-lit) !important; }
+.faserip-dark-palette .frp-dlg .frp-cs-input.pos,
+.faserip-dark-palette .frp-dlg .frp-cs-input.cs-pos { background: #153017 !important; color: #7fd487 !important; border-color: #3ca241 !important; }
+.faserip-dark-palette .frp-dlg .frp-cs-input.neg,
+.faserip-dark-palette .frp-dlg .frp-cs-input.cs-neg { background: #301015 !important; color: #ff9989 !important; border-color: #c22929 !important; }
+
+/* ---- buttons: yellow outline on navy. Buttons a script paints itself keep their colour. ---- */
+.application.faserip-dark-palette:not(.sheet) .form-footer,
+.application.faserip-dark-palette:not(.sheet) footer.form-footer {
+  background: var(--fd-bg) !important;
+  border-top-color: var(--fd-gold-dim) !important;
+}
+.application.faserip-dark-palette:not(.sheet) .form-footer button,
+.application.faserip-dark-palette:not(.sheet) .window-content button:not([style*="background"]):not(.frp-cs-help):not(.mbtn):not(.frp-mode-btn):not(.faserip-mode),
+.faserip-dark-palette .frp-dlg .frp-btn-roll,
+.faserip-dark-palette .frp-dlg .frp-cs-reset {
+  background: linear-gradient(180deg, #1c3049 0%, #0c1827 100%);
+  color: var(--fd-gold-lit);
+  border-color: var(--fd-gold);
+  text-shadow: 1px 1px 0 #000;
+}
+.application.faserip-dark-palette:not(.sheet) .form-footer button:hover:not(:disabled),
+.application.faserip-dark-palette:not(.sheet) .window-content button:not([style*="background"]):not(.frp-cs-help):not(.mbtn):not(.frp-mode-btn):not(.faserip-mode):hover:not(:disabled),
+.faserip-dark-palette .frp-dlg .frp-btn-roll:hover,
+.faserip-dark-palette .frp-dlg .frp-cs-reset:hover {
+  background: linear-gradient(180deg, #5a4420 0%, #2c200c 100%);
+  color: #fff3cf;
+  border-color: var(--fd-gold-lit);
+  filter: none;
+}
+.application.faserip-dark-palette:not(.sheet) .form-footer button:disabled,
+.application.faserip-dark-palette:not(.sheet) .window-content button:not([style*="background"]):disabled {
+  background: #121e2f;
+  color: #7f8da0;
+  border-color: #3a4c63;
+  text-shadow: none;
+}
+.application.faserip-dark-palette:not(.sheet) .form-footer button:is(:focus, :focus-visible) { outline-color: var(--fd-gold-lit); }
+.faserip-dark-palette .frp-dlg .frp-btn-cancel {
+  background: linear-gradient(180deg, #2a3d55 0%, #1a2a3f 100%);
+  color: var(--fd-text);
+  border-color: var(--fd-frame);
+  text-shadow: none;
+}
+.faserip-dark-palette .frp-dlg .frp-btn-cancel:hover { background: linear-gradient(180deg, #364c68 0%, #22364f 100%); color: #fff; filter: none; }
+.faserip-dark-palette .frp-dlg .frp-cs-help { background: var(--fd-panel-2); color: var(--fd-gold); border-color: var(--fd-gold-dim); }
+.faserip-dark-palette .frp-dlg .frp-cs-help:hover { background: var(--fd-raise); color: var(--fd-gold-lit); }
+
+/* ---- mode buttons (title bar and mode rows): idle ones recede, the active one keeps its signal colour ---- */
+.faserip-dark-palette .frp-dlg .frp-mode-btn,
+.faserip-dark-palette .frp-dlg .mbtn { background: #14233a; color: var(--fd-text-muted); border-color: var(--fd-line); }
+.faserip-dark-palette .frp-dlg .frp-mode-btn.active,
+.faserip-dark-palette .frp-dlg .mbtn.active-yellow { background: #f9a825; color: #000; border-color: #f57f17; }
+.faserip-dark-palette .frp-dlg .mbtn.active-red { background: #c62828; color: #fff; }
+.faserip-dark-palette .frp-dlg .mbtn.active-green { background: #2e7d32; color: #fff; }
+
+/* ---- attack / FEAT header strip ---- */
+.faserip-dark-palette .frp-dlg .frp-header {
+  background-color: var(--fd-crimson);
+  background-image: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%);
+  background-size: 5px 5px, 100% 100%;
+  color: var(--fd-gold-lit);
+  text-shadow: 1px 1px 0 #2a040a;
+}
+.faserip-dark-palette .frp-dlg .frp-header-v3 {
+  background: linear-gradient(160deg, #1d314b 0%, var(--fd-panel-2) 70%);
+  border-color: var(--fd-crimson-lit);
+  color: var(--fd-text);
+  box-shadow: inset 0 0 0 1px rgba(231,186,91,.16), 2px 2px 0 #02060c;
+}
+.faserip-dark-palette .frp-dlg .frp-header-v3 .h-actor,
+.faserip-dark-palette .frp-dlg .frp-header-v3 .h-action { color: var(--fd-gold-lit); font-style: italic; text-shadow: 1px 1px 0 #000; }
+.faserip-dark-palette .frp-dlg .frp-header-v3 .h-target { color: var(--fd-red-text); text-shadow: 1px 1px 0 #000; }
+.faserip-dark-palette .frp-dlg .frp-header-v3 .h-stat-rank,
+.faserip-dark-palette .frp-dlg .frp-header-v3 .h-arrow { color: var(--fd-gold); }
+.faserip-dark-palette .frp-dlg.frp-feat .frp-header-v3 { background: linear-gradient(160deg, #1d314b 0%, var(--fd-panel-2) 70%); border-color: #3ca241; }
+
+/* Resource (gold) and Popularity (magenta) keep their section colours, deepened */
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 {
+  background: linear-gradient(90deg, #6b4a08 0%, #3d2a05 100%);
+  color: var(--fd-gold-lit);
+  border-color: var(--fd-gold-dim);
+  border-bottom-color: var(--fd-gold);
+  text-shadow: 1px 1px 0 #000;
+}
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 :is(.h-action, .h-actor) { color: var(--fd-gold-lit); }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-stat-label { color: #f3dfb4; }
+.faserip-dark-palette .frp-dlg.frp-res .frp-header-v3 .h-stat-rank,
+.faserip-dark-palette .frp-dlg.frp-res .rankval { color: var(--fd-red-text); }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-header-v3 { background: linear-gradient(90deg, #a3155a 0%, #5e0a35 100%); border-color: #d81b76; color: #fff; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-header-v3 :is(.h-action, .h-actor) { color: #fff; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-header-v3 .h-stat-rank { color: #ffd0e4; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-need-label { color: #ff8cc0; }
+.faserip-dark-palette .frp-dlg.frp-pop .frp-cs-rank { color: var(--fd-text); }
+
+/* ---- boxed sections: navy panels, yellow small-caps titles ---- */
+.faserip-dark-palette .frp-dlg .frp-box {
+  background: var(--fd-panel-2);
+  border-color: var(--fd-line);
+  box-shadow: inset 0 0 0 1px rgba(231,186,91,.08);
+}
+.faserip-dark-palette .frp-dlg .frp-box.frp-cs-box { border-color: var(--fd-gold-dim); }
+.faserip-dark-palette .frp-dlg .frp-box.frp-dmg-box { background: var(--fd-panel-2); border-color: var(--fd-crimson-lit); }
+.faserip-dark-palette .frp-dlg .frp-box-label,
+.faserip-dark-palette .frp-dlg .frp-box-label.muted { color: var(--fd-gold-lit); }
+.faserip-dark-palette .frp-dlg .frp-box-label.gold { color: var(--fd-gold); }
+.faserip-dark-palette .frp-dlg .frp-box-label.red,
+.faserip-dark-palette .frp-dlg .frp-cs-label { color: var(--fd-red-text); }
+.faserip-dark-palette .frp-dlg.frp-feat .frp-cs-label,
+.faserip-dark-palette .frp-dlg .frp-box-label.green { color: var(--fd-green-text); }
+.faserip-dark-palette .frp-dlg .frp-box.src-active { background: #332b11; border-color: #ffc107; }
+.faserip-dark-palette .frp-dlg .frp-pull-box.pull-active { background: #332611; border-color: #ff9800; }
+.faserip-dark-palette .frp-dlg .frp-multi-box.multi-active { background: #153017; border-color: #3ca241; }
+.faserip-dark-palette .frp-dlg .frp-karma-box.karma-active { background: #112533; border-color: #4f98ec; }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.orange,
+.faserip-dark-palette .frp-dlg .frp-pull-label { color: #ffa24d; }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.green,
+.faserip-dark-palette .frp-dlg .frp-multi-label { color: var(--fd-green-text); }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.blue { color: #81bdff; }
+.faserip-dark-palette .frp-dlg .frp-opt-row .frp-opt-label.red,
+.faserip-dark-palette .frp-dlg .frp-range-penalty,
+.faserip-dark-palette .frp-dlg .frp-cs-range.neg,
+.faserip-dark-palette .frp-dlg .frp-cs-result.negative { color: var(--fd-red-text); }
+.faserip-dark-palette .frp-dlg .frp-cs-result.positive,
+.faserip-dark-palette .frp-dlg .frp-cs-talents { color: var(--fd-green-text); }
+.faserip-dark-palette .frp-dlg .frp-opt-row.inactive .frp-opt-label:is(.orange, .green, .blue, .red) { color: var(--fd-text-muted); }
+.faserip-dark-palette .frp-dlg :is(.frp-target-status, .frp-target-compact .t-status) { color: #cf9af0; }
+.faserip-dark-palette .frp-dlg .frp-target-compact .t-none { color: var(--fd-text-muted); }
+.faserip-dark-palette .frp-dlg .frp-info-dot { background: var(--fd-gold); color: var(--fd-ink, #14110c); }
+.faserip-dark-palette .frp-dlg .frp-foot { border-top-color: var(--fd-gold-dim); }
+.faserip-dark-palette .frp-dlg .frp-summary { border-bottom-color: var(--fd-line); }
+.faserip-dark-palette .frp-dlg .chip-sep { background: var(--fd-line); }
+.faserip-dark-palette .frp-dlg .frp-ref-panel { background: var(--fd-well); border-color: var(--fd-gold-dim); }
+.faserip-dark-palette .frp-dlg .frp-ref-group-label { color: var(--fd-gold-lit); border-bottom-color: var(--fd-crimson-lit); }
+.faserip-dark-palette .frp-dlg .frp-ref-cs { color: var(--fd-red-text); }
+.faserip-dark-palette .frp-dlg .frp-ref-note { color: var(--fd-text-soft); }
+
+/* ---- status strips ---- */
+.faserip-dark-palette .frp-dlg .frp-lockbar.locked { background: #332611; border-color: #9b6c27; color: #f3c56b; }
+.faserip-dark-palette .frp-dlg .frp-lockbar.open { background: #153017; border-color: #2f6b33; color: #9fdba5; }
+.faserip-dark-palette .frp-dlg .frp-gm-row { background: #241a33; border-color: #7d62a3; color: #d5bdf0; }
+.faserip-dark-palette .frp-dlg .frp-gm-row .tag { background: #7d52ab; color: #fff; }
+.faserip-dark-palette .frp-dlg .frp-warnbar { background: #33111c; border-color: #9b275a; color: #ffb3d1; }
+.faserip-dark-palette .frp-dlg .frp-warnbar b { color: #ffd0e4; }
+
+/* ---- Karma Advancement ---- */
+.faserip-dark-palette .ka-adv-wrap,
+.faserip-dark-palette .ka-adv-avail,
+.faserip-dark-palette .ka-adv-calc-total { color: var(--fd-text); }
+.faserip-dark-palette .ka-adv-wrap label { color: var(--fd-gold-lit); }
+.faserip-dark-palette .ka-adv-calc { background: var(--fd-panel-2); border-color: var(--fd-gold-dim); }
+.faserip-dark-palette .ka-adv-calc-line { color: var(--fd-text-soft); }
+.faserip-dark-palette .ka-adv-calc-total { border-top-color: var(--fd-gold-dim); }
+.faserip-dark-palette .ka-adv-calc-line.cresting,
+.faserip-dark-palette .ka-adv-adjusted,
+.faserip-dark-palette .ka-adv-insuf { color: var(--fd-red-text); }
