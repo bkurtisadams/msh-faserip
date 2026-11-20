@@ -1,4 +1,8 @@
-// actorSheet.js v2.24.0 - 2026-11-20
+// actorSheet.js v2.25.0 - 2026-11-20
+// v2.25.0: _applyImpairmentIndicators marks impaired / dying Endurance and
+//          reduced Health with classes instead of inline !important styles,
+//          so the dark palette can colour them (pale pink hid the light
+//          figures). Light values unchanged, now in styles/actor-sheet.css.
 // v2.24.0: _rollVehicleControl hands off to openVehicleControl in
 //          modules/actions/vehicle-control.js (shared with the vehicle
 //          sheet); the dialog, Out of Control and Crash code moved there.
@@ -885,8 +889,10 @@ export class FaseripActorSheet {
     const isImpaired = originalEndurance && originalEndurance !== currentEndurance;
     
     // Style for impaired/dying state
-    const impairedStyle = "background: #ffebee !important; border-color: #ef5350 !important;";
-    const dyingStyle = "background: #ffcdd2 !important; border-color: #c62828 !important;";
+    // Classes, not inline styles: the light and dark palettes each colour
+    // them (styles/actor-sheet.css, styles/actor-sheet-dark.css).
+    const impairedStyle = "msh-impaired-field";
+    const dyingStyle = "msh-dying-field";
     
     // Apply to Endurance row (the E row in the abilities table)
     const enduranceRow = html.find('tr').filter(function() {
@@ -895,8 +901,8 @@ export class FaseripActorSheet {
     
     if (dyingEffect) {
       // Dying state - more severe styling
-      enduranceRow.find('select, input').css('cssText', dyingStyle);
-      enduranceRow.find('.ability-key').css('cssText', 'background: #c62828 !important; color: white !important;');
+      enduranceRow.find('select, input').addClass(dyingStyle);
+      enduranceRow.find('.ability-key').addClass('msh-dying-mark');
       
       // Add tooltip showing original value
       if (originalEndurance) {
@@ -905,8 +911,8 @@ export class FaseripActorSheet {
       }
     } else if (isImpaired) {
       // Impaired state - warning styling
-      enduranceRow.find('select, input').css('cssText', impairedStyle);
-      enduranceRow.find('.ability-key').css('cssText', 'background: #ef5350 !important; color: white !important;');
+      enduranceRow.find('select, input').addClass(impairedStyle);
+      enduranceRow.find('.ability-key').addClass('msh-impaired-mark');
       
       // Add tooltip showing original value
       enduranceRow.find('select[name="system.abilities.endurance.rank"]')
@@ -927,11 +933,11 @@ export class FaseripActorSheet {
       
       if (originalEnduranceValue > currentEnduranceValue) {
         if (dyingEffect) {
-          healthMaxInput.css('cssText', dyingStyle);
-          healthSection.find('.sec-head').css('cssText', 'background: #c62828 !important; color: white !important;');
+          healthMaxInput.addClass(dyingStyle);
+          healthSection.find('.sec-head').addClass('msh-dying-mark');
         } else {
-          healthMaxInput.css('cssText', impairedStyle);
-          healthSection.find('.sec-head').css('cssText', 'background: #ef5350 !important; color: white !important;');
+          healthMaxInput.addClass(impairedStyle);
+          healthSection.find('.sec-head').addClass('msh-impaired-mark');
         }
         healthMaxInput.attr('title', `Reduced from ${originalHealthMax} due to Endurance loss`);
       }
@@ -940,7 +946,7 @@ export class FaseripActorSheet {
       const currentHealth = this.actor.system?.attributes?.health?.value || 0;
       if (currentHealth > currentHealthMax) {
         const healthValueInput = healthSection.find('input[name="system.attributes.health.value"]');
-        healthValueInput.css('cssText', 'background: #fff3e0 !important; border-color: #ff9800 !important;');
+        healthValueInput.addClass('msh-over-max-field');
         healthValueInput.attr('title', `Health (${currentHealth}) exceeds max (${currentHealthMax})`);
       }
     }

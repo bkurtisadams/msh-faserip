@@ -618,3 +618,15 @@ form.faserip-sheet .action-btn[data-action="kill"] .action-abbr {
   color: #fff !important;
   border-color: #8b0000 !important;
 }
+
+/* Impaired / dying Endurance and reduced Health (actorSheet.js
+   _applyImpairmentIndicators). Light palette; the dark sheet answers these
+   in actor-sheet-dark.css. The repeated class outranks the sheet's own
+   !important field and bar colours, as the inline styles these replace did. */
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content .msh-impaired-field.msh-impaired-field.msh-impaired-field.msh-impaired-field.msh-impaired-field { background: #ffebee !important; border-color: #ef5350 !important; }
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content .msh-dying-field.msh-dying-field.msh-dying-field.msh-dying-field.msh-dying-field { background: #ffcdd2 !important; border-color: #c62828 !important; }
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content .msh-over-max-field.msh-over-max-field.msh-over-max-field.msh-over-max-field.msh-over-max-field { background: #fff3e0 !important; border-color: #ff9800 !important; }
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content .sec-head.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark { background: #ef5350 !important; color: white !important; }
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content .sec-head.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark { background: #c62828 !important; color: white !important; }
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content td.ability-key.msh-impaired-mark { --cx-tile: #ef5350; --cx-tile-edge: #ffb0aa; --cx-tile-text: #fff; }
+.application.faserip-sheet:not(.faserip-dark-palette) .window-content td.ability-key.msh-dying-mark { --cx-tile: #c62828; --cx-tile-edge: #ff8a80; --cx-tile-text: #fff; }

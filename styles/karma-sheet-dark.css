@@ -1,0 +1,228 @@
+/* styles/karma-sheet-dark.css v1.0.0 - 2026-11-20
+ * Dark palette for the Karma sheet and the Team Karma Pool window, Foundry
+ * v14. Same navy, crimson and yellow as the sheets and the dialogs.
+ *
+ * Everything here is scoped to
+ * .application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool),
+ * which scripts/modules/ui/sheet-theme.js sets from Foundry's own light/dark
+ * choice (the character's Sheet Configuration, then Core > UI > Applications,
+ * then the browser), so the light windows are untouched. Colour, border
+ * colour, shadows and letter slant only. No sizes or layout.
+ *
+ * 1. PALETTE        the dark colours and Foundry's form variables
+ * 2. COUNTERPARTS   one dark rule for each light rule that hard-codes a colour,
+ *                   grouped by where the light rule lives. When a light rule
+ *                   gains a new hard-coded colour, add its counterpart here.
+ * 3. THE LOOK       navy panels, crimson halftone bars, yellow lettering
+ *
+ * Loaded after the light stylesheets in system.json so it can answer them.
+ */
+
+/* ==== 1. PALETTE ==== */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) {
+  color-scheme: dark;
+  --fd-bg: #0a1220;
+  --fd-panel: #0f1b2b;
+  --fd-panel-2: #162638;
+  --fd-raise: #213550;
+  --fd-well: #08111c;
+  --fd-line: #33475d;
+  --fd-frame: #6b82a0;
+  --fd-text: #f4ecdd;
+  --fd-text-soft: #d3cab9;
+  --fd-text-muted: #a3adba;
+  --fd-gold: #f5cf45;
+  --fd-gold-lit: #f8f070;
+  --fd-gold-dim: #a8892c;
+  --fd-crimson: #a31f2d;
+  --fd-crimson-dk: #5a0d17;
+  --fd-crimson-lit: #b72a39;
+  --fd-red-text: #ff9989;
+  --fd-green-text: #7fd487;
+  --fd-halftone: radial-gradient(circle, rgba(255,205,130,.13) .8px, transparent 1px);
+
+  --input-text-color: var(--fd-text);
+  --input-background-color: var(--fd-well);
+  --input-border-color: var(--fd-frame);
+  --input-placeholder-color: var(--fd-text-muted);
+  --color-form-label: var(--fd-text);
+  --color-form-hint: var(--fd-text-soft);
+  --color-select-option-bg: var(--fd-well);
+  --color-text-primary: var(--fd-text);
+  --color-text-secondary: var(--fd-text-soft);
+
+  color: var(--fd-text);
+}
+
+/* ==== 2. COUNTERPARTS ==== */
+/* ---- from the style block in templates/karma-sheet.html ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-drag-handle:hover { color: #f4ecdd; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-event-pill { color: #d3cab9; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-die-roll .karma-event-pill { color: #df6c6c; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-power-stunt .karma-event-pill { color: #b775d3; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-session-award .karma-event-pill { color: #39a64d; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-resource-feat .karma-event-pill { color: #3991ec; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-popularity-feat .karma-event-pill { color: #3991ec; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-pool-event .karma-event-pill { color: #c27f19; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-gain .karma-event-pill { color: #39a64d; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet tr.karma-loss .karma-event-pill { color: #df6c6c; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-desc-text { color: #f4ecdd; }
+
+/* ---- from styles/global.css (rules that reach the Karma windows) ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet { background: #1a2b3f; color: #f4ecdd; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-summary { background: #192a3d; border: 1px solid #384f69; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .summary-item { background: #172638; border: 1px solid #3c536f; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-summary div:nth-child(4) { background-color: #112533; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-summary div:nth-child(5) { background-color: #20354e; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .summary-item label { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-history-table { border: 1px solid #384f69; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet table td { border-bottom: 1px solid #354a63; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-actions a { color: #d3cab9; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-actions a:hover { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .sort-toggle:hover { color: #2e90fa; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .empty-message { color: #d3cab9; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-controls button:disabled { background-color: #345880; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-controls button:disabled:hover { background-color: #345880; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-search-wrapper { background: #172638; border: 1px solid #c22929; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-search-wrapper > i { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-sheet .karma-search-clear:hover { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-summary { background: #1a2b3f; border: 1px solid #3c536f; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-header { border-bottom: 2px solid #c22929; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-header h2 { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-total label { color: #d3cab9; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-stat label { color: #d3cab9; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-stat .value { color: #f4ecdd; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .section-header h3 { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .team-members-table td { border-bottom: 1px solid #384f69; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .member-row.current-actor { background: #112533; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-gm-section { border-top: 2px solid #3c536f; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .pool-gm-section h3 { color: #fb5252; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .empty-message { color: #d3cab9; }
+
+/* ==== 3. THE LOOK ==== */
+
+/* ---- window: crimson title bar, navy page ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) {
+  background-color: var(--fd-bg) !important;
+  border-color: var(--fd-frame) !important;
+  box-shadow: 0 0 0 1px #02060c, 0 6px 22px rgba(0,0,0,.65);
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-header {
+  background-color: var(--fd-crimson) !important;
+  background-image: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%) !important;
+  background-size: 5px 5px, 100% 100% !important;
+  border-bottom: 1px solid var(--fd-gold-dim) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-header .window-title {
+  color: var(--fd-gold-lit) !important;
+  font-style: italic;
+  text-shadow: 1px 1px 0 #2a040a;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-header :is(button, .header-control) { color: #f3dfb4 !important; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-header :is(button, .header-control):hover { color: #fff !important; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content {
+  background-color: var(--fd-bg) !important;
+  background-image:
+    radial-gradient(circle, rgba(120,160,210,.07) .7px, transparent .9px),
+    linear-gradient(180deg, #0d1728 0%, var(--fd-bg) 100%) !important;
+  background-size: 4px 4px, 100% 100% !important;
+  color: var(--fd-text) !important;
+}
+
+/* ---- input wells ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content select,
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content textarea {
+  background: var(--fd-well) !important;
+  color: var(--fd-text) !important;
+  -webkit-text-fill-color: currentColor;
+  border-color: #7289a6 !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.6) !important;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(input, select, textarea):disabled,
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(input, textarea)[readonly] {
+  background: #15233a !important;
+  color: var(--fd-text-muted) !important;
+  -webkit-text-fill-color: var(--fd-text-muted);
+  border-color: var(--fd-line) !important;
+  opacity: 1;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(input, textarea)::placeholder { color: #8391a3 !important; opacity: 1; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content select :is(option, optgroup) { background: var(--fd-well) !important; color: var(--fd-text) !important; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(input, select, textarea):focus {
+  border-color: var(--fd-gold) !important;
+  box-shadow: 0 0 0 1px rgba(245,207,69,.45), inset 0 1px 3px rgba(0,0,0,.6) !important;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(input, select, textarea, button, a):focus-visible { outline-color: var(--fd-gold-lit) !important; }
+/* Core draws a tick box as a Font Awesome glyph in --checkbox-background-color,
+   which its dark theme sets on the input itself to a near-black. */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) input:is([type="checkbox"], [type="radio"]) {
+  accent-color: var(--fd-gold);
+  --checkbox-background-color: #8ea4c0;
+  --checkbox-checked-color: var(--fd-gold);
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content .editor,
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content prose-mirror,
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content .editor-content {
+  background: var(--fd-well);
+  color: var(--fd-text);
+  border-color: var(--fd-line);
+}
+
+/* ---- buttons: yellow outline on navy. Buttons a script paints itself keep their colour. ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content button:not([style*="background"]) {
+  background: linear-gradient(180deg, #1c3049 0%, #0c1827 100%) !important;
+  color: var(--fd-gold-lit) !important;
+  border-color: var(--fd-gold) !important;
+  text-shadow: 1px 1px 0 #000;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content button:not([style*="background"]):hover:not(:disabled) {
+  background: linear-gradient(180deg, #5a4420 0%, #2c200c 100%) !important;
+  color: #fff3cf !important;
+  border-color: var(--fd-gold-lit) !important;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content button:not([style*="background"]):disabled {
+  background: #121e2f !important;
+  color: #7f8da0 !important;
+  border-color: #3a4c63 !important;
+  text-shadow: none;
+}
+
+/* ---- plain text furniture ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(h1, h2, h3, h4) { color: var(--fd-gold-lit); border-bottom-color: var(--fd-line); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content hr { border-color: var(--fd-line); background: var(--fd-line); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content a:not([class]) { color: #89bbff; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content :is(.hint, .notes, small) { color: var(--fd-text-soft); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table { color: var(--fd-text); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content img { background-color: var(--fd-well); border-color: var(--fd-frame); }
+
+/* ---- summary boxes: yellow titles over cream numbers ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-summary { background: var(--fd-panel); border-color: var(--fd-frame); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-summary .summary-item { background: var(--fd-panel-2); border-color: var(--fd-line); box-shadow: inset 0 0 0 1px rgba(231,186,91,.08); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-summary .summary-item label { color: var(--fd-gold-lit); font-style: italic; text-shadow: 1px 1px 0 #000; }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .karma-summary .summary-item .value { color: var(--fd-text); }
+
+/* ---- tables: navy rows under crimson heads ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table thead th,
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table thead td {
+  background-color: var(--fd-crimson);
+  background-image: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%);
+  background-size: 5px 5px, 100% 100%;
+  color: var(--fd-gold-lit);
+  font-style: italic;
+  text-shadow: 1px 1px 0 #2a040a;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table tbody tr { border-bottom-color: var(--fd-line); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table tbody tr:nth-child(odd) { background: var(--fd-panel); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table tbody tr:nth-child(even) { background: var(--fd-panel-2); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table tbody tr:hover { background: var(--fd-raise); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content table td { border-color: var(--fd-line); }
+
+/* ---- section heads and the action row ---- */
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .section-header {
+  background: var(--fd-panel) !important;
+  border-color: var(--fd-line) !important;
+}
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content button:not([style*="background"]) { box-shadow: inset 0 0 0 1px var(--fd-gold); }
+.application.faserip.sheet.faserip-dark-palette:is(.karma, .karma-pool) .window-content button:not([style*="background"]):disabled { box-shadow: inset 0 0 0 1px #3a4c63; }

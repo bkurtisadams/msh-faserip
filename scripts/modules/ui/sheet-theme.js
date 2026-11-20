@@ -1,4 +1,7 @@
-// scripts/modules/ui/sheet-theme.js v1.3.0 - 2026-11-20
+// scripts/modules/ui/sheet-theme.js v1.4.0 - 2026-11-20
+// v1.4.0: The Karma sheet and the Team Karma Pool window follow Foundry as
+//         well (styles/karma-sheet-dark.css), reading the theme of the
+//         character they belong to.
 // v1.3.0: The vehicle actor sheet follows Foundry as well
 //         (styles/vehicle-sheet-dark.css). Only the tool windows stay light.
 // v1.2.0: The item sheets (power, stunt power, talent, equipment, contact,
@@ -44,6 +47,16 @@ export function isItemSheet(app) {
 export function isVehicleSheet(app) {
   const classes = app?.options?.classes ?? [];
   return classes.includes("faserip-vehicle-window");
+}
+
+/** The Karma sheet and the Team Karma Pool window. */
+export function isKarmaSheet(app) {
+  const classes = app?.options?.classes ?? [];
+  return classes.includes("faserip") && classes.includes("sheet") && (classes.includes("karma") || classes.includes("karma-pool"));
+}
+
+function _paletted(app) {
+  return isItemSheet(app) || isVehicleSheet(app) || isKarmaSheet(app);
 }
 
 function _valid(value) {
@@ -104,14 +117,14 @@ export function applySheetTheme(element, theme) {
 function _openCharacterSheets() {
   const apps = [];
   for (const app of foundry.applications?.instances?.values?.() ?? []) {
-    if (app?.element && (isCharacterSheet(app) || isItemSheet(app) || isVehicleSheet(app))) apps.push(app);
+    if (app?.element && (isCharacterSheet(app) || _paletted(app))) apps.push(app);
   }
   return apps;
 }
 
 function _themeSheet(app, element = app.element) {
   const { theme } = resolveSheetTheme(app);
-  if (isItemSheet(app) || isVehicleSheet(app)) applyPalette(app, element, theme);
+  if (_paletted(app)) applyPalette(app, element, theme);
   else applySheetTheme(element, theme);
 }
 
@@ -156,7 +169,7 @@ export function registerSheetTheme() {
   // colours into them.
   Hooks.on("renderApplicationV2", (app, element) => {
     if (isThemedDialog(app)) { applyDialogTheme(app, element); return; }
-    if (isItemSheet(app) || isVehicleSheet(app)) { _themeSheet(app, element); return; }
+    if (_paletted(app)) { _themeSheet(app, element); return; }
     const classes = app.options?.classes ?? [];
     if (!classes.some(c => c.startsWith("faserip") || c.startsWith("msh"))) return;
     applySheetTheme(element, isCharacterSheet(app) ? resolveSheetTheme(app).theme : "light");

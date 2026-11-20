@@ -1,4 +1,7 @@
-/* styles/actor-sheet-dark.css v2.2.0 - 2026-11-20
+/* styles/actor-sheet-dark.css v2.3.0 - 2026-11-20
+ * v2.3.0: Impaired / dying Endurance and reduced Health read on the navy: a
+ *         dark red field with light figures in place of pale pink, which the
+ *         sheet used to paint inline and which hid the light text.
  * v2.2.0: Tick boxes and radio buttons are light on the navy (core drew them
  *         near-black), as in the dialogs.
  * Dark palette for the V2 character sheet (hero / villain / npc), Foundry v14.
@@ -689,3 +692,34 @@ form.faserip-sheet.faserip-dark-palette.compact-mode .rp-tracker { border-right:
 .application.faserip-sheet.faserip-dark-palette .ut-tab-root .ut-grid .ut-roll { background: #15253a; color: var(--fd-text); border-color: #1c2a3c; }
 .application.faserip-sheet.faserip-dark-palette .ut-tab-root .ut-grid .ut-roll.row-hl { background: var(--fd-raise); }
 .application.faserip-sheet.faserip-dark-palette .ut-tab-root .ut-detach-btn { background: var(--fd-well) !important; color: var(--fd-gold-lit) !important; border-color: var(--fd-gold) !important; }
+
+/* ---- impaired / dying Endurance, reduced Health (classes set by actorSheet.js) ---- */
+.application.faserip-sheet.faserip-dark-palette .window-content .msh-impaired-field.msh-impaired-field.msh-impaired-field.msh-impaired-field.msh-impaired-field {
+  background: #3a1418 !important;
+  border-color: #ff6b6b !important;
+  color: #ffe1dc !important;
+  -webkit-text-fill-color: #ffe1dc;
+}
+.application.faserip-sheet.faserip-dark-palette .window-content .msh-dying-field.msh-dying-field.msh-dying-field.msh-dying-field.msh-dying-field {
+  background: #520d14 !important;
+  border-color: #ff4d4d !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+}
+.application.faserip-sheet.faserip-dark-palette .window-content .msh-over-max-field.msh-over-max-field.msh-over-max-field.msh-over-max-field.msh-over-max-field {
+  background: #1f354d !important;
+  border-color: #ff9800 !important;
+  color: var(--fd-text) !important;
+}
+.application.faserip-sheet.faserip-dark-palette .window-content .sec-head.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark,
+.application.faserip-sheet.faserip-dark-palette .window-content .sec-head.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark {
+  background: #ef5350 !important;
+  background-image: none !important;
+  color: #fff !important;
+  text-shadow: 1px 1px 0 #5a0d17 !important;
+}
+.application.faserip-sheet.faserip-dark-palette .window-content .sec-head.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark { background: #c62828 !important; }
+.application.faserip-sheet.faserip-dark-palette .window-content .sec-head.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark.msh-impaired-mark > :is(span, button),
+.application.faserip-sheet.faserip-dark-palette .window-content .sec-head.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark.msh-dying-mark > :is(span, button) { color: #fff !important; }
+.application.faserip-sheet.faserip-dark-palette .window-content td.ability-key.msh-impaired-mark { --cx-tile: #ef5350; --cx-tile-edge: #ffb0aa; --cx-tile-text: #fff; }
+.application.faserip-sheet.faserip-dark-palette .window-content td.ability-key.msh-dying-mark { --cx-tile: #c62828; --cx-tile-edge: #ff8a80; --cx-tile-text: #fff; }
