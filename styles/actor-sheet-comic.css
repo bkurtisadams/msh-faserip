@@ -1,4 +1,12 @@
-/* styles/actor-sheet-comic.css v1.1.0 - 2026-11-19
+/* styles/actor-sheet-comic.css v1.2.0 - 2026-11-20
+ * v1.2.0: Dark palette, "ruled and outlined" pass (approved mockup v6), at
+ *         the same 720 width: a rule under every ability row and between
+ *         columns, bold white figures in the Initial columns, gold-outlined
+ *         upright letter tiles, light outlines on fields and dropdowns, gold
+ *         panel frames, darker panels, every tab boxed with a full yellow
+ *         border on the active one, ruled item tables. The last block of
+ *         this file. The light palette is unchanged.
+ *
  * v1.1.0: Each stat is its own rounded card; the movement ribbon and the
  *         Primary Abilities panel get matching corners. Dark lettering yellow
  *         follows actor-sheet-dark.css v2.1.0.
@@ -248,3 +256,100 @@
 }
 .application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .movement-inline { margin-top: 6px; border-radius: 9px; border-width: 1.5px; }
 .application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .abilities-container.primary-abilities { border-radius: 9px; overflow: hidden; }
+
+/* ==== Dark palette: ruled and outlined (v1.2.0) ====
+ * Colours and lines apply in both sheet sizes; type sizes and the tile
+ * shape only on the full sheet, so compact mode keeps its own metrics.
+ */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette {
+  --fd-bg: #060a12; --fd-panel: #0a121f; --fd-panel-2: #0e1929; --fd-well: #050a12;
+  --fd-text: #ffffff; --fd-text-soft: #e6e9ee;
+  --rx-line: #4d6482; --rx-box: #9fb3cf; --rx-frame: #c2a03a;
+}
+
+/* darker page and panels, gold frames */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette,
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .window-content {
+  background-color: #060a12 !important;
+  background-image: radial-gradient(circle, rgba(120,160,210,.05) .7px, transparent .9px) !important;
+  background-size: 4px 4px !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette :is(.msh-compact-header, .msh-bio, .abilities-section, .sheet-tabs) {
+  background-color: #0a121f !important;
+  background-image: none !important;
+  border-color: var(--rx-frame) !important;
+  box-shadow: 0 0 0 1px #000, 2px 2px 0 #000 !important;
+}
+
+/* fields and dropdowns: light outline, bold white text */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette :is(.msh-compact-header, .msh-bio, .sec-grid, .movement-inline) :is(input[type="text"], input[type="number"], select),
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .abilities-table tbody select {
+  border: 1px solid var(--rx-box) !important;
+  background: #050a12 !important;
+  color: #fff !important; -webkit-text-fill-color: #fff;
+  font-weight: 600 !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .msh-compact-header :is(input[type="text"], select) { font-size: 14px !important; }
+
+/* Primary Abilities: ruled grid, bold white figures */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table thead th {
+  border-right: 1px solid var(--rx-line) !important; border-bottom: 1px solid var(--rx-frame) !important; color: #fff !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody tr td {
+  background: #0a121f !important;
+  border-bottom: 1px solid var(--rx-line) !important;
+  border-right: 1px solid var(--rx-line) !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody tr:nth-child(even) td { background: #0e1929 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody tr:last-child td { border-bottom: none !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody td:last-child { border-right: none !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody td input {
+  color: #fff !important; -webkit-text-fill-color: #fff; opacity: 1 !important; font-weight: 700 !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .primary-abilities .abilities-table tbody td input {
+  font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif !important; font-size: 15px !important;
+  padding: 0 !important; text-align: center;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .primary-abilities .abilities-table tbody td:last-child input { font-family: 'Oswald', 'Arial Narrow', sans-serif !important; font-size: 18px !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .primary-abilities .abilities-table tbody select { font-size: 13px !important; }
+
+/* letter tiles: gold outline, dark edge, stroked upright letter */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody tr td.ability-key {
+  font-style: normal !important; color: #ffe94d !important;
+  -webkit-text-stroke: 3px #2a040a; paint-order: stroke fill;
+  text-shadow: none !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .primary-abilities .abilities-table tbody tr td.ability-key::before {
+  border: 2px solid var(--fd-gold) !important;
+  box-shadow: 0 0 0 1.5px #1a0206, inset 0 2px 0 rgba(255,255,255,.28), inset 0 -3px 0 rgba(0,0,0,.25) !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .primary-abilities .abilities-table tbody tr td.ability-key::before { inset: 3px 3px !important; border-radius: 4px !important; }
+
+/* Health / Karma / Resources / Popularity: gold frames, boxed readouts */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .secondary-abilities .sec-grid > .sec-col { border: 1px solid var(--rx-frame) !important; background: #0a121f !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .secondary-abilities .stacked-values.slash-values { border: 1px solid var(--rx-box) !important; background: #050a12 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .secondary-abilities .stacked-values.slash-values input { border: none !important; background: transparent !important; box-shadow: none !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .secondary-abilities .stacked-values.slash-values { width: calc(100% - 8px) !important; justify-content: center; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .secondary-abilities .stacked-values.slash-values input { font-size: 18px !important; font-weight: 700 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .secondary-abilities .sec-body :is(input, select) { font-size: 17px !important; font-weight: 700 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .movement-inline { border-color: var(--rx-frame) !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .movement-inline-item input { font-size: 15px !important; font-weight: 700 !important; }
+
+/* tabs: every tab boxed, a full yellow border on the active one */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tabs-navigation .item:not(.active) { border: 1px solid #5d7694 !important; background: #0e1929 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tabs-navigation .item.active {
+  border: 2px solid #f8f070 !important;
+  box-shadow: 0 0 0 1px #1a0206, inset 0 1px 0 rgba(255,255,255,.25) !important;
+}
+
+/* item tables on the tabs: ruled, bolder names, heavier action buttons */
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) tbody tr { border-bottom: 1px solid var(--rx-line) !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) tbody tr:nth-child(odd) { background: #0a121f !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) tbody tr:nth-child(even) { background: #0e1929 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) :is(th, td) { border-right: 1px solid var(--rx-line) !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) :is(th, td):last-child { border-right: none !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) thead th { color: #fff !important; border-bottom: 1px solid var(--rx-frame) !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tab-content table:not(.ut-tab-root table) td { color: #fff !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .power-name-text { color: #fff !important; font-weight: 600 !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette:not(.compact-mode) .power-name-text { font-size: 15px !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .power-controls .item-control { border: 1.5px solid var(--fd-gold) !important; box-shadow: 0 0 0 1px #000; }
