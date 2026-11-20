@@ -1,4 +1,10 @@
-// scripts/modules/ui/dialog-theme.js v1.1.0 - 2026-11-20
+// scripts/modules/ui/dialog-theme.js v1.2.0 - 2026-11-20
+// v1.2.0: startRecolour / stopRecolour expose the in-place re-colouring on
+//         its own, keyed by anything, for chat cards (chat-theme.js). A root
+//         that is not in the page yet (a chat card is built before it is
+//         added to the log) has its fills and lines done at once and its
+//         text judged as soon as it lands. releaseDisconnected() drops roots
+//         that have left the page.
 // v1.1.0: applyPalette() is the same machinery for any window given a theme;
 //         the item sheets use it (sheet-theme.js decides their theme, since a
 //         sheet can have its own in Sheet Configuration).
@@ -126,9 +132,13 @@ function _mapOne(value, fn) {
 
 function _recolour(state) {
   const root = state.root;
-  if (!root?.isConnected) return;
-  for (const el of state.entries.keys()) if (!el.isConnected) state.entries.delete(el);
-  for (const el of state.attrs.keys()) if (!el.isConnected) state.attrs.delete(el);
+  if (!root) return;
+  const connected = root.isConnected;
+  if (connected) {
+    state.everConnected = true;
+    for (const el of state.entries.keys()) if (!el.isConnected) state.entries.delete(el);
+    for (const el of state.attrs.keys()) if (!el.isConnected) state.attrs.delete(el);
+  }
 
   const styled = new Set();
   for (const el of root.querySelectorAll("[style]")) {
@@ -155,6 +165,9 @@ function _recolour(state) {
       if (line.value) _write(state, el, prop, line, _mapOne(line.value, mapLine));
     }
   }
+
+  // Text needs computed styles, which only exist once the root is in the page.
+  if (!connected) return;
 
   // Text the dialog coloured itself, against whatever is now behind it.
   const own = new Set();
@@ -234,10 +247,17 @@ function _restore(state) {
 
 function _run(state) {
   state.queued = false;
-  if (!state.root?.isConnected) return;
+  if (!state.root || state.stopped) return;
   try { _recolour(state); }
-  catch (e) { console.warn("[FASERIP] dialog recolour failed:", e); }
+  catch (e) { console.warn("[FASERIP] recolour failed:", e); }
   state.observer?.takeRecords();
+  // Not in the page yet: look again shortly, for a couple of seconds at most.
+  if (!state.root.isConnected && !state.everConnected && state.tries < 40) {
+    state.tries++;
+    const view = _view(state.root);
+    view.clearTimeout(state.settle);
+    state.settle = view.setTimeout(() => _run(state), 50);
+  }
 }
 
 // Once on the next frame, and once more after the dialogs' own colour
@@ -256,7 +276,7 @@ function _start(app, root) {
   let state = _live.get(app);
   if (state && state.root !== root) { _stop(app); state = null; }
   if (!state) {
-    state = { root, entries: new Map(), attrs: new Map(), queued: false, settle: 0, observer: null };
+    state = { root, entries: new Map(), attrs: new Map(), queued: false, settle: 0, observer: null, tries: 0, everConnected: false, stopped: false };
     const Observer = _view(root).MutationObserver ?? globalThis.MutationObserver;
     if (Observer) {
       state.observer = new Observer(() => _schedule(state));
@@ -270,10 +290,37 @@ function _start(app, root) {
 function _stop(app) {
   const state = _live.get(app);
   if (!state) return;
+  state.stopped = true;
   state.observer?.disconnect();
   _view(state.root).clearTimeout(state.settle);
   try { _restore(state); } catch (_) { /* window already gone */ }
   _live.delete(app);
+}
+
+/** Re-colour the inline colours under `root` and keep them so while it changes. `key` identifies it. */
+export function startRecolour(key, root) {
+  if (root?.classList) _start(key, root);
+}
+
+/** Put back what startRecolour changed. */
+export function stopRecolour(key) {
+  _stop(key);
+}
+
+/** Two frames with colour transitions held, for a palette class about to change. */
+export function holdTransitions(element) {
+  if (element?.classList) _holdTransitions(element);
+}
+
+/** Forget roots that were in the page and have left it (chat cards scrolled out of the log, say). */
+export function releaseDisconnected() {
+  for (const [key, state] of _live) {
+    if (!state.everConnected || state.root?.isConnected) continue;
+    state.stopped = true;
+    state.observer?.disconnect();
+    _view(state.root)?.clearTimeout?.(state.settle);
+    _live.delete(key);
+  }
 }
 
 /** Put Foundry's theme on one dialog. Safe to call on every render. */
@@ -304,6 +351,7 @@ function _holdTransitions(element) {
 export function releaseDialogTheme(app) {
   const state = _live.get(app);
   if (!state) return;
+  state.stopped = true;
   state.observer?.disconnect();
   _view(state.root)?.clearTimeout?.(state.settle);
   _live.delete(app);
@@ -325,7 +373,7 @@ export function refreshDialogThemes() {
 /** Console diagnostic: what each open dialog resolved to, and how much was re-coloured. */
 export function explainDialogTheme() {
   const { theme, source } = resolveFoundryTheme();
-  const apps = new Set([..._openDialogs(), ..._live.keys()]);
+  const apps = new Set([..._openDialogs(), ...[..._live.keys()].filter(key => key?.element)]);
   const rows = [...apps].filter(app => app?.element).map(app => {
     const state = _live.get(app);
     let recoloured = 0;

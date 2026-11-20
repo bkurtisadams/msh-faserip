@@ -86,7 +86,12 @@ for (const light of ['item-sheet.css', 'power-sheet-v2.css', 'talent-sheet.css',
 assert.ok(order('vehicle-sheet-dark.css') > order('vehicle-sheet.css') && order('vehicle-sheet-dark.css') > order('global.css'));
 assert.ok(order('karma-sheet-dark.css') > order('global.css') && order('karma-sheet-dark.css') > order('team-tracker.css'));
 assert.match(theme, /if \(_paletted\(app\)\) \{ _themeSheet\(app, element\); return; \}/, 'item, vehicle and Karma sheets are themed before the light pin');
-for (const file of ['dialog-dark.css', 'item-sheet-dark.css', 'vehicle-sheet-dark.css', 'karma-sheet-dark.css']) {
+assert.ok(order('chat-dark.css') > order('power-chat-card.css') && order('chat-dark.css') > order('global.css') && order('chat-dark.css') > order('faserip-initiative.css'));
+assert.match(theme, /registerChatTheme\(\);/, 'the chat theme is registered with the sheet theme');
+const chat = readFileSync(new URL('../scripts/modules/ui/chat-theme.js', import.meta.url), 'utf8');
+assert.match(chat, /Hooks\.on\("renderChatMessageHTML"/, 'chat cards are themed as they render');
+assert.match(chat, /scheme\?\.interface/, 'chat cards follow the Interface colour scheme');
+for (const file of ['dialog-dark.css', 'item-sheet-dark.css', 'vehicle-sheet-dark.css', 'karma-sheet-dark.css', 'chat-dark.css']) {
   const css = readFileSync(new URL(`../styles/${file}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   for (const rule of css.split('}')) {
     const selector = rule.split('{')[0].trim();

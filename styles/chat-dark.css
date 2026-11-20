@@ -1,0 +1,198 @@
+/* styles/chat-dark.css v1.0.0 - 2026-11-20
+ * Dark palette for chat cards, Foundry v14. Same navy, crimson and yellow
+ * as the sheets and the dialogs.
+ *
+ * Everything here is scoped to .chat-message.faserip-dark-palette, which
+ * scripts/modules/ui/chat-theme.js puts on a chat message when Foundry's
+ * Interface colour scheme is dark (Configure Settings > Core > UI), so
+ * light cards are untouched. Colour, border colour and shadows only. No
+ * sizes or layout.
+ *
+ * 1. PALETTE        the dark colours and Foundry's text variables
+ * 2. COUNTERPARTS   one dark rule for each light rule that hard-codes a colour,
+ *                   grouped by the stylesheet it answers. When a light rule
+ *                   gains a new hard-coded colour, add its counterpart here.
+ * 3. THE LOOK       the message frame, buttons, fields
+ *
+ * Most card colours are written into style="" by the scripts that build the
+ * cards; scripts/modules/ui/dialog-theme.js re-colours those in place. The
+ * FEAT result colours (white, green, yellow, red pills and banners) are the
+ * same in both palettes.
+ *
+ * Loaded after the light stylesheets in system.json so it can answer them.
+ */
+
+/* ==== 1. PALETTE ==== */
+.chat-message.faserip-dark-palette {
+  color-scheme: dark;
+  --fd-bg: #0a1220;
+  --fd-panel: #0f1b2b;
+  --fd-panel-2: #162638;
+  --fd-raise: #213550;
+  --fd-well: #08111c;
+  --fd-line: #33475d;
+  --fd-frame: #6b82a0;
+  --fd-text: #f4ecdd;
+  --fd-text-soft: #d3cab9;
+  --fd-text-muted: #a3adba;
+  --fd-gold: #f5cf45;
+  --fd-gold-lit: #f8f070;
+  --fd-gold-dim: #a8892c;
+  --fd-crimson: #a31f2d;
+  --fd-crimson-dk: #5a0d17;
+  --fd-crimson-lit: #b72a39;
+  --fd-red-text: #ff9989;
+  --fd-green-text: #7fd487;
+
+  --color-text-primary: var(--fd-text);
+  --color-text-secondary: var(--fd-text-soft);
+  --input-text-color: var(--fd-text);
+  --input-background-color: var(--fd-well);
+  --input-border-color: var(--fd-frame);
+}
+
+/* ==== 2. COUNTERPARTS ==== */
+/* ---- from styles/power-chat-card.css (rules that reach chat cards) ---- */
+.chat-message.faserip-dark-palette .fpc-card { background: #192b3e; color: #f4ecdd; }
+.chat-message.faserip-dark-palette .fpc-power-icon { background: #1d3147; }
+.chat-message.faserip-dark-palette .fpc-power-name { color: #fb5252; }
+.chat-message.faserip-dark-palette .fpc-pill-dormant { background: #32547b; }
+.chat-message.faserip-dark-palette .fpc-dot { background: #304417; }
+.chat-message.faserip-dark-palette .fpc-pill-dormant .fpc-dot { background: #243c58; }
+.chat-message.faserip-dark-palette .fpc-dormant-note { border-top: 1px solid #806e41; color: #998e80; }
+.chat-message.faserip-dark-palette .fpc-stat { background: #1d3147; }
+.chat-message.faserip-dark-palette .fpc-k { color: #d3cab9; }
+.chat-message.faserip-dark-palette .fpc-v { color: #f4ecdd; }
+
+/* ---- from styles/global.css (rules that reach chat cards) ---- */
+.chat-message.faserip-dark-palette .stunt-info { color: #d3cab9; }
+.chat-message.faserip-dark-palette .talent-details + .description { border-top: 1px solid #3c536f; }
+.chat-message.faserip-dark-palette .contact-information-content { color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content h2 { border-bottom: 1px solid #597ca4; color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content .contact-details { color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content .contact-details .label { color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content .contact-notes { background: #1a2b3f; color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content .contact-notes h3,
+.chat-message.faserip-dark-palette .contact-information-content .contact-description h3 { border-bottom: 1px solid #597ca4; color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content .contact-notes > div,
+.chat-message.faserip-dark-palette .contact-information-content .contact-description > div { color: #f4ecdd; }
+.chat-message.faserip-dark-palette .contact-information-content .contact-description { border-top: 1px solid #435e7d; }
+
+/* ---- from styles/actor-sheet-enhanced.css (rules that reach chat cards) ---- */
+.chat-message.faserip-dark-palette .faserip-recovery-dialog .recovery-btn { background: #1a2b3f; color: #f4ecdd; border: 1px solid #3e5773; }
+.chat-message.faserip-dark-palette .faserip-recovery-dialog .recovery-btn:hover { background: #1f344c; border-color: #445f7e; }
+.chat-message.faserip-dark-palette .faserip-recovery-dialog .recovery-btn:active { background: #243c57; }
+.chat-message.faserip-dark-palette .faserip-recovery-dialog .recovery-btn:disabled { background: #1b2d42; }
+.chat-message.faserip-dark-palette .faserip-recovery-dialog .recovery-btn:disabled:hover { background: #1b2d42; border-color: #3e5773; }
+
+/* ---- from styles/faserip-initiative.css (rules that reach chat cards) ---- */
+.chat-message.faserip-dark-palette .faserip-initiative-result { border: 1px solid #425c7b; }
+.chat-message.faserip-dark-palette .faserip-init-header { color: #fb5252; border-bottom: 1px solid #384f69; }
+.chat-message.faserip-dark-palette .faserip-steps-section { border-top: 1px solid #384f69; }
+.chat-message.faserip-dark-palette .faserip-steps-toggle { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-steps-toggle:hover { color: #fb5252; }
+.chat-message.faserip-dark-palette .faserip-steps-list { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-tracker-ctrl:hover { color: #04a704; }
+.chat-message.faserip-dark-palette .faserip-declaration-chip { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-declaration-chip.private { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-declaration-chip.ineligible { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-declaration-chip.faserip-decl-attack { color: #e95e75; }
+.chat-message.faserip-dark-palette .faserip-declare-grid > label small { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-action-used { border: 1px solid rgba(42, 193, 79, 0.35); color: #24a644; }
+.chat-message.faserip-dark-palette .faserip-npc-plan-dialog .hint { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-npc-plan-list { border: 1px solid #425c7b; }
+.chat-message.faserip-dark-palette .faserip-npc-plan-row small { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-ready-chip.ready { color: #24a644; border-color: rgba(42, 193, 79, 0.35); }
+.chat-message.faserip-dark-palette .faserip-ready-chip.waiting { color: #bd8c05; }
+.chat-message.faserip-dark-palette .faserip-tracker-ctrl.faserip-ready-btn { color: #24a644; }
+.chat-message.faserip-dark-palette .faserip-judge-event { background: #20364f; }
+.chat-message.faserip-dark-palette .faserip-judge-event strong { color: #bd8c05; }
+
+/* ---- from styles/team-tracker.css (rules that reach chat cards) ---- */
+.chat-message.faserip-dark-palette .faserip-battle-report { background: #1a2c41; border: 1px solid #c22929; }
+.chat-message.faserip-dark-palette .faserip-battle-report .br-label { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-battle-report .br-extras { color: #f4ecdd; }
+.chat-message.faserip-dark-palette .faserip-battle-report .br-summary { border-top: 1px solid #384f69; }
+.chat-message.faserip-dark-palette .faserip-battle-report .br-status { color: #3ca241; }
+.chat-message.faserip-dark-palette .faserip-battle-report .br-buttons { border-top: 1px solid #384f69; }
+.chat-message.faserip-dark-palette .faserip-quick-karma .qk-label { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-quick-karma .qk-chip { background: #172638; border: 1px solid #3f5875; }
+.chat-message.faserip-dark-palette .faserip-quick-karma .qk-dim { color: #d3cab9; }
+.chat-message.faserip-dark-palette .faserip-quick-karma .qk-amt { color: #2fa538; }
+.chat-message.faserip-dark-palette .faserip-quick-karma .qk-preview { background: #1d3147; }
+
+/* ==== 3. THE LOOK ==== */
+
+/* the palette swaps in one step: dialog-theme.js holds these classes while it works */
+.faserip-theming, .faserip-theming *,
+.faserip-recolouring, .faserip-recolouring * { transition: none !important; }
+
+/* ---- the message itself: navy, with the sender in yellow ---- */
+/* !important: the frame must not depend on what core paints behind a message in either scheme */
+.chat-message.faserip-dark-palette {
+  background-color: var(--fd-panel) !important;
+  background-image: none !important;
+  border-color: var(--fd-frame) !important;
+  color: var(--fd-text) !important;
+}
+.chat-message.faserip-dark-palette.whisper { background-color: #141c3a !important; border-color: #5b6bb5 !important; }
+.chat-message.faserip-dark-palette.blind { background-color: #221a36 !important; border-color: #8563b5 !important; }
+.chat-message.faserip-dark-palette .message-header { color: var(--fd-text-muted); }
+.chat-message.faserip-dark-palette .message-header .message-sender { color: var(--fd-gold-lit); text-shadow: 1px 1px 0 #000; }
+.chat-message.faserip-dark-palette .message-header :is(.message-metadata, .message-timestamp, .whisper-to, a) { color: var(--fd-text-muted); }
+.chat-message.faserip-dark-palette .message-header a:hover { color: var(--fd-red-text); }
+.chat-message.faserip-dark-palette .message-content { color: var(--fd-text); }
+.chat-message.faserip-dark-palette .message-content :is(h1, h2, h3, h4) { color: var(--fd-gold-lit); border-bottom-color: var(--fd-line); }
+.chat-message.faserip-dark-palette .message-content hr { border-color: var(--fd-line); background: var(--fd-line); }
+.chat-message.faserip-dark-palette .message-content a:not([class]) { color: #89bbff; }
+.chat-message.faserip-dark-palette .message-content table { color: var(--fd-text); }
+.chat-message.faserip-dark-palette .message-content :is(details, summary) { border-color: var(--fd-line); }
+
+/* ---- fields and tick boxes on cards ---- */
+.chat-message.faserip-dark-palette .message-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.chat-message.faserip-dark-palette .message-content select,
+.chat-message.faserip-dark-palette .message-content textarea {
+  background: var(--fd-well) !important;
+  color: var(--fd-text) !important;
+  -webkit-text-fill-color: currentColor;
+  border-color: #7289a6 !important;
+}
+.chat-message.faserip-dark-palette .message-content select :is(option, optgroup) { background: var(--fd-well) !important; color: var(--fd-text) !important; }
+.chat-message.faserip-dark-palette input:is([type="checkbox"], [type="radio"]) {
+  accent-color: var(--fd-gold);
+  --checkbox-background-color: #8ea4c0;
+  --checkbox-checked-color: var(--fd-gold);
+}
+
+/* ---- buttons: yellow outline on navy. Buttons a script paints itself keep their colour. ---- */
+.chat-message.faserip-dark-palette .message-content button:not([style*="background"]) {
+  background: linear-gradient(180deg, #1c3049 0%, #0c1827 100%);
+  color: var(--fd-gold-lit);
+  border-color: var(--fd-gold);
+  text-shadow: 1px 1px 0 #000;
+}
+.chat-message.faserip-dark-palette .message-content button:not([style*="background"]):hover:not(:disabled) {
+  background: linear-gradient(180deg, #5a4420 0%, #2c200c 100%);
+  color: #fff3cf;
+  border-color: var(--fd-gold-lit);
+}
+.chat-message.faserip-dark-palette .message-content button:not([style*="background"]):disabled {
+  background: #121e2f;
+  color: #7f8da0;
+  border-color: #3a4c63;
+  text-shadow: none;
+}
+
+/* ---- power card ---- */
+.chat-message.faserip-dark-palette .fpc-card { background: var(--fd-panel-2); border-color: var(--fd-line); }
+.chat-message.faserip-dark-palette .fpc-power-name { color: var(--fd-gold-lit); }
+.chat-message.faserip-dark-palette .fpc-stat { background: var(--fd-panel); border-color: var(--fd-line); }
+.chat-message.faserip-dark-palette .fpc-k { color: var(--fd-text-muted); }
+
+/* ---- power, equipment and custom roll cards (they carry their own style block) ---- */
+.chat-message.faserip-dark-palette :is(.faserip-power-roll, .faserip-custom-roll) {
+  background: var(--fd-panel-2);
+  border-color: var(--fd-line);
+  color: var(--fd-text);
+}
+.chat-message.faserip-dark-palette :is(.faserip-power-roll, .faserip-custom-roll) h3 { color: var(--fd-gold-lit); border-bottom-color: var(--fd-line); }

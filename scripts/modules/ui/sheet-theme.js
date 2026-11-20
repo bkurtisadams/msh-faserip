@@ -1,4 +1,6 @@
-// scripts/modules/ui/sheet-theme.js v1.4.0 - 2026-11-20
+// scripts/modules/ui/sheet-theme.js v1.5.0 - 2026-11-20
+// v1.5.0: Registers the chat card theme (modules/ui/chat-theme.js) and
+//         refreshes chat cards with everything else when a setting changes.
 // v1.4.0: The Karma sheet and the Team Karma Pool window follow Foundry as
 //         well (styles/karma-sheet-dark.css), reading the theme of the
 //         character they belong to.
@@ -26,6 +28,8 @@
 //         resolved and why.
 
 import { isThemedDialog, applyDialogTheme, applyPalette, releaseDialogTheme, refreshDialogThemes, explainDialogTheme } from "./dialog-theme.js";
+
+import { registerChatTheme, refreshChatThemes } from "./chat-theme.js";
 
 const PALETTE_CLASS = "faserip-dark-palette";
 
@@ -177,7 +181,7 @@ export function registerSheetTheme() {
 
   // Foundry's theme changed while sheets are open. Deferred one tick so
   // Foundry's own class changes land first.
-  const refreshAll = () => { refreshSheetThemes(); refreshDialogThemes(); };
+  const refreshAll = () => { refreshSheetThemes(); refreshDialogThemes(); refreshChatThemes(); };
   const onSetting = key => {
     if (/(^|\.)(uiConfig|sheetThemes)$/.test(String(key ?? ""))) setTimeout(refreshAll, 0);
   };
@@ -190,6 +194,7 @@ export function registerSheetTheme() {
   } catch (_) { /* older engines: the next render picks it up */ }
 
   Hooks.on("closeApplicationV2", app => releaseDialogTheme(app));
+  registerChatTheme();
 
   Hooks.once("ready", () => {
     game.msh ??= {};
