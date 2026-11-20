@@ -1,4 +1,6 @@
-/* styles/actor-sheet-dark.css v2.1.0 - 2026-11-19
+/* styles/actor-sheet-dark.css v2.2.0 - 2026-11-20
+ * v2.2.0: Tick boxes and radio buttons are light on the navy (core drew them
+ *         near-black), as in the dialogs.
  * Dark palette for the V2 character sheet (hero / villain / npc), Foundry v14.
  *
  * v2.1.0: Brighter yellow: lettering #f8f070, icons and outlines #f5cf45.
@@ -475,7 +477,11 @@ form.faserip-sheet.faserip-dark-palette.compact-mode .rp-tracker { border-right:
 .application.faserip-sheet.faserip-dark-palette .window-content textarea::placeholder { color: #8391a3 !important; opacity: 1; }
 .application.faserip-sheet.faserip-dark-palette .window-content select option { background: var(--fd-well); color: var(--fd-text); }
 .application.faserip-sheet.faserip-dark-palette input[type="radio"],
-.application.faserip-sheet.faserip-dark-palette input[type="checkbox"] { accent-color: var(--fd-gold); }
+.application.faserip-sheet.faserip-dark-palette input[type="checkbox"] {
+  accent-color: var(--fd-gold);
+  --checkbox-background-color: #8ea4c0;
+  --checkbox-checked-color: var(--fd-gold);
+}
 .application.faserip-sheet.faserip-dark-palette .window-content :is(input, select, textarea, button, a):focus-visible { outline-color: var(--fd-gold-lit) !important; }
 
 /* ---- buttons: gold outline on navy ---- */

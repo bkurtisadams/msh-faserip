@@ -1,3 +1,5 @@
+// init.js v1.27.2 - 2026-11-20
+// v1.27.2: Comment only. The item sheets follow Foundry's light/dark as well.
 // init.js v1.27.1 - 2026-11-20
 // v1.27.1: Comment only. The dialogs follow Foundry's light/dark as well
 //          (modules/ui/dialog-theme.js, registered from sheet-theme.js).
@@ -665,8 +667,9 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
 /* Light or dark. The character sheet follows Foundry's own choice (the sheet's
  * Sheet Configuration, then Configure Settings > Core > UI > Applications,
  * then the browser preference). The dialogs follow the Applications setting
- * and the browser preference (modules/ui/dialog-theme.js). The other sheets
- * and the tool windows are a fixed light design and are pinned to light.
+ * and the browser preference (modules/ui/dialog-theme.js). The item sheets
+ * follow the same order as the character sheet. The vehicle actor sheet and
+ * the tool windows are a fixed light design and are pinned to light.
  * See modules/ui/sheet-theme.js. */
 registerSheetTheme();
 

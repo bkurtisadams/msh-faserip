@@ -1,4 +1,8 @@
-// scripts/modules/ui/dialog-theme.js v1.0.0 - 2026-11-20
+// scripts/modules/ui/dialog-theme.js v1.1.0 - 2026-11-20
+// v1.1.0: applyPalette() is the same machinery for any window given a theme;
+//         the item sheets use it (sheet-theme.js decides their theme, since a
+//         sheet can have its own in Sheet Configuration).
+//         explainDialogTheme() lists those too.
 // v1.0.0: Light or dark for the FASERIP dialogs, following Foundry's own
 //         choice (Configure Settings > Core > UI > Applications, then the
 //         browser / OS preference). Two halves:
@@ -274,8 +278,12 @@ function _stop(app) {
 
 /** Put Foundry's theme on one dialog. Safe to call on every render. */
 export function applyDialogTheme(app, element = app?.element) {
+  applyPalette(app, element, resolveFoundryTheme().theme);
+}
+
+/** Put a given theme on a window and re-colour (or restore) its inline colours. */
+export function applyPalette(app, element = app?.element, theme = "light") {
   if (!element?.classList) return;
-  const { theme } = resolveFoundryTheme();
   const dark = theme === "dark";
   if (element.classList.contains(PALETTE_CLASS) !== dark) _holdTransitions(element);
   applySheetTheme(element, theme);
@@ -317,17 +325,18 @@ export function refreshDialogThemes() {
 /** Console diagnostic: what each open dialog resolved to, and how much was re-coloured. */
 export function explainDialogTheme() {
   const { theme, source } = resolveFoundryTheme();
-  const rows = _openDialogs().map(app => {
+  const apps = new Set([..._openDialogs(), ..._live.keys()]);
+  const rows = [...apps].filter(app => app?.element).map(app => {
     const state = _live.get(app);
     let recoloured = 0;
     for (const props of state?.entries.values() ?? []) recoloured += props.size;
     return {
-      dialog: app.title ?? app.options?.window?.title ?? app.id,
+      window: app.title ?? app.options?.window?.title ?? app.id,
       paletteClass: app.element.classList.contains(PALETTE_CLASS),
       recoloured
     };
   });
-  console.log("[FASERIP] Dialog theme", { theme, source, openDialogs: rows.length });
+  console.log("[FASERIP] Dialog theme", { theme, source, openWindows: rows.length });
   if (rows.length) console.table(rows);
   else console.log("[FASERIP] No dialog is open. Open one and run this again.");
   return rows;

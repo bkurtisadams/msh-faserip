@@ -80,12 +80,18 @@ const system = JSON.parse(readFileSync(new URL('../system.json', import.meta.url
 const order = name => system.styles.indexOf(`styles/${name}`);
 assert.ok(order('dialog-dark.css') > order('action-dialog.css'), 'dialog-dark.css loads after the light dialog styles');
 assert.ok(order('dialog-dark.css') > order('team-tracker.css') && order('dialog-dark.css') > order('global.css'));
-const css = readFileSync(new URL('../styles/dialog-dark.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-for (const rule of css.split('}')) {
-  const selector = rule.split('{')[0].trim();
-  if (!selector) continue;
-  for (const part of selector.split(/,(?![^()]*\))/)) {
-    assert.match(part, /faserip-dark-palette|faserip-theming|faserip-recolouring/, `every rule is scoped to the dark palette: ${part.trim()}`);
+for (const light of ['item-sheet.css', 'power-sheet-v2.css', 'talent-sheet.css', 'contact-sheet.css', 'hq-sheet.css', 'equipment-sheet-redesign.css', 'vehicle-sheet.css', 'global.css']) {
+  assert.ok(order('item-sheet-dark.css') > order(light), `item-sheet-dark.css loads after ${light}`);
+}
+assert.match(theme, /if \(isItemSheet\(app\)\) \{ _themeSheet\(app, element\); return; \}/, 'item sheets are themed before the light pin');
+for (const file of ['dialog-dark.css', 'item-sheet-dark.css']) {
+  const css = readFileSync(new URL(`../styles/${file}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const rule of css.split('}')) {
+    const selector = rule.split('{')[0].trim();
+    if (!selector) continue;
+    for (const part of selector.split(/,(?![^()]*\))/)) {
+      assert.match(part, /faserip-dark-palette|faserip-theming|faserip-recolouring/, `${file}: every rule is scoped to the dark palette: ${part.trim()}`);
+    }
   }
 }
 
