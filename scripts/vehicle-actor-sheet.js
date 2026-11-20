@@ -1,3 +1,8 @@
+// scripts/vehicle-actor-sheet.js v3.5.0 - 2026-11-20
+// v3.5.0: Control FEAT button in the condition strip. It opens the shared
+//         Vehicle Control dialog (modules/actions/vehicle-control.js) with
+//         the crew's driver; Out of Control and Current Speed on the sheet
+//         follow the result.
 // scripts/vehicle-actor-sheet.js v3.4.0 - 2026-11-11
 // v3.4.0: MSHVehicleActorSheet is no longer a V1 sheet (its base class
 //         FaseripActorSheet left the V1 framework). It holds the vehicle
@@ -25,6 +30,7 @@
 
 import { FaseripActorSheet } from "./actorSheet.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
+import { openVehicleControl } from "./modules/actions/vehicle-control.js";
 import {
   RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
   stepRank, rankValue as rankVal
@@ -128,6 +134,11 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
     if (!this.isEditable) return;
+
+    html.find(".veh-control-roll").on("click", (ev) => {
+      ev.preventDefault();
+      openVehicleControl(this.actor);
+    });
 
     // Quick damage buttons
     html.find(".vehicle-damage-quick").on("click", async (ev) => {

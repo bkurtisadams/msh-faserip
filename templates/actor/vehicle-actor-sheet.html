@@ -80,6 +80,7 @@
       <input type="checkbox" name="system.outOfControl" {{#if system.outOfControl}}checked{{/if}}>
       OOC
     </label>
+    <button type="button" class="veh-control-roll" title="Roll the driver's Control FEAT, regain control, or resolve a crash"><i class="fas fa-dice-d20"></i> Control FEAT</button>
     {{#if effectiveControlFEAT}}
     <span class="veh-feat-rank" title="Control FEAT rank = lesser of driver Agility and effective Control">FEAT: {{effectiveControlFEAT}}</span>
     {{/if}}

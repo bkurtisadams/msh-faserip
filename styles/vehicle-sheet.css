@@ -169,6 +169,22 @@
   border-color: #c62828;
   color: #c62828;
 }
+.vehicle-sheet .veh-control-roll {
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  line-height: 1.2;
+  padding: 2px 8px;
+  font-size: .8em;
+  font-weight: bold;
+  white-space: nowrap;
+  border: 1px solid #8b0000;
+  border-radius: 3px;
+  background: #f5f0e8;
+  color: #8b0000;
+  cursor: pointer;
+}
+.vehicle-sheet .veh-control-roll:hover { background: #8b0000; color: #fff; }
 .vehicle-sheet .veh-feat-rank,
 .vehicle-sheet .veh-charge-rank {
   font-size: .8em;
