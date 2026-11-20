@@ -1,3 +1,7 @@
+// scripts/modules/actions/vehicle-control.js v1.1.0 - 2026-11-20
+// v1.1.0: Speeding. A Current Speed one rank over the vehicle's safe Speed
+//         makes the Control FEAT one colour harder (green to yellow, yellow
+//         to red); more than one rank over is refused.
 // scripts/modules/actions/vehicle-control.js v1.0.0 - 2026-11-20
 // v1.0.0: Vehicle Control FEAT, Out of Control and Crashes in one place, for
 //         a vehicle item on a character (Vehicles tab) and for a vehicle
@@ -20,6 +24,7 @@ const SELECTABLE = RANK_TABLE.slice(0, 17);
 const FALL_FLOORS = [3, 6, 10, 20];
 const COLOR_ORDER = { white: 0, green: 1, yellow: 2, red: 3 };
 const SLOWING_TYPES = ["Road", "Off-Road", "Railed", "GEV"];
+const HARDER = { green: "yellow", yellow: "red", red: "red" };
 
 const rankIdx = (rank) => Math.max(0, RANK_TABLE.indexOf(rank));
 const stepDown = (rank, steps) => RANK_TABLE[Math.max(0, rankIdx(rank) - steps)];
@@ -257,6 +262,15 @@ export function openVehicleControl(vehicle, driver = null) {
           const stunt = !oocState && !!html.find("#stunt-check")[0]?.checked;
           const stuntName = oocState ? "" : (html.find("#stunt-name").val() || "");
 
+          const speedNow = oocState ? oocState.speed : currentSpeed;
+          const overBy = rankIdx(speedNow) - rankIdx(effectiveSpeedRank);
+          if (overBy > 1) {
+            ui.notifications.warn(`${vehicle.name} can exceed its safe Speed (${effectiveSpeedRank}) by one rank only.`);
+            openVehicleControl(vehicle, driver);
+            return;
+          }
+          const speeding = overBy === 1;
+
           const shiftedRank = RANK_TABLE[Math.min(Math.max(baseRankIndex + cs, 0), RANK_TABLE.length - 1)];
           const controlRoll = new Roll("1d100");
           await controlRoll.evaluate();
@@ -277,7 +291,8 @@ export function openVehicleControl(vehicle, driver = null) {
           }
 
           const color = featColor(shiftedRank, cappedTotal);
-          const needed = oocState ? regainNeeded : "green";
+          const baseNeeded = oocState ? regainNeeded : "green";
+          const needed = speeding ? HARDER[baseNeeded] : baseNeeded;
           const success = COLOR_ORDER[color] >= COLOR_ORDER[needed];
 
           let resultText, note = "";
@@ -330,6 +345,7 @@ export function openVehicleControl(vehicle, driver = null) {
             `Used Rank: ${baseUsedRank} <span style="color:#777;">(lesser of Agility and Control)</span>`,
             cs !== 0 ? `Column Shift: ${cs > 0 ? "+" : ""}${cs} → ${shiftedRank}` : "",
             stunt ? `Stunt: ${stuntName || "(unnamed)"}` : "",
+            speeding ? `Speeding: ${speedNow} is one rank over the safe Speed (${effectiveSpeedRank}) — FEAT one colour higher` : "",
             `Required: ${colorPill(needed)}`,
             `Roll: ${karma ? `${rollBox(controlRoll.total)} + Karma: ${karma} = ${cappedTotal}` : rollBox(controlRoll.total)}`
           ], `${resultBanner(color)}${outcomeLine(resultText, success)}${noteBox(note, success ? "good" : "bad")}`, [controlRoll]);
