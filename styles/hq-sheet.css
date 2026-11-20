@@ -1,7 +1,17 @@
-/* hq-sheet.css v1.2.0 - 2026-03-02 */
+/* hq-sheet.css v1.3.0 - 2026-11-20 */
+/* v1.3.0: the sheet fills its window and .hq-body scrolls (content past the
+           window's height was cut off with no scrollbar). */
 
-.headquarters-dialog { max-height: 90vh; }
-.headquarters-dialog .hq-body { padding: 4px 8px; overflow-y: auto; }
+.application.headquarters .window-content {
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.headquarters-dialog {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+}
+.headquarters-dialog .hq-header { flex: 0 0 auto; }
+.headquarters-dialog .hq-body {
+  flex: 1 1 auto; min-height: 0; padding: 4px 8px; overflow-y: auto;
+}
 
 /* ── Header ──────────────────────────── */
 .headquarters-dialog .hq-header {
