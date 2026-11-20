@@ -1,0 +1,292 @@
+/* styles/vehicle-sheet-dark.css v1.0.0 - 2026-11-20
+ * Dark palette for the vehicle actor sheet, Foundry v14. Same navy, crimson
+ * and yellow as the character sheet, the item sheets and the dialogs.
+ *
+ * Everything here is scoped to .application.faserip-vehicle-window.faserip-dark-palette,
+ * which scripts/modules/ui/sheet-theme.js sets from Foundry's own light/dark
+ * choice (the sheet's Sheet Configuration, then Core > UI > Applications,
+ * then the browser), so the light sheet is untouched. Colour, border colour,
+ * shadows and letter slant only. No sizes or layout.
+ *
+ * 1. PALETTE        the dark colours and Foundry's form variables
+ * 2. COUNTERPARTS   one dark rule for each light rule that hard-codes a colour,
+ *                   grouped by the stylesheet it answers. When a light rule
+ *                   gains a new hard-coded colour, add its counterpart here.
+ * 3. THE LOOK       navy panels, crimson halftone bars, yellow lettering
+ *
+ * Colours written into style="" by the template and scripts are re-coloured
+ * in place by scripts/modules/ui/dialog-theme.js.
+ *
+ * Loaded after the light stylesheets in system.json so it can answer them.
+ */
+
+/* ==== 1. PALETTE ==== */
+.application.faserip-vehicle-window.faserip-dark-palette {
+  color-scheme: dark;
+  --fd-bg: #0a1220;
+  --fd-panel: #0f1b2b;
+  --fd-panel-2: #162638;
+  --fd-raise: #213550;
+  --fd-well: #08111c;
+  --fd-line: #33475d;
+  --fd-frame: #6b82a0;
+  --fd-text: #f4ecdd;
+  --fd-text-soft: #d3cab9;
+  --fd-text-muted: #a3adba;
+  --fd-gold: #f5cf45;
+  --fd-gold-lit: #f8f070;
+  --fd-gold-dim: #a8892c;
+  --fd-crimson: #a31f2d;
+  --fd-crimson-dk: #5a0d17;
+  --fd-crimson-lit: #b72a39;
+  --fd-red-text: #ff9989;
+  --fd-green-text: #7fd487;
+  --fd-halftone: radial-gradient(circle, rgba(255,205,130,.13) .8px, transparent 1px);
+
+  --input-text-color: var(--fd-text);
+  --input-background-color: var(--fd-well);
+  --input-border-color: var(--fd-frame);
+  --input-placeholder-color: var(--fd-text-muted);
+  --color-form-label: var(--fd-text);
+  --color-form-hint: var(--fd-text-soft);
+  --color-select-option-bg: var(--fd-well);
+  --color-text-primary: var(--fd-text);
+  --color-text-secondary: var(--fd-text-soft);
+
+  color: var(--fd-text);
+}
+
+/* ==== 2. COUNTERPARTS ==== */
+/* ---- from styles/vehicle-sheet.css ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs { background: #1d3047; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item:hover { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item.active { color: #fb5252; border-bottom-color: #c22929; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-header { background: #1c2e43; border-bottom: 2px solid #c22929; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-header .profile-img { border: 1px solid #456181; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-name { border-bottom: 1px solid #3c536f; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-comp { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-stat-bar { background: #1f344c; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-stat label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-eff { color: #e16969; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-condition-strip { background: #1a2b3f; border-bottom: 1px solid #384f69; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-hp-group label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-cspeed-group label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-ooc { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-ooc-active { background: #391317; color: #e27272; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-control-roll { background: #1c2e43; border: 1px solid #c22929; color: #fc7a7a; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-feat-rank,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-charge-rank { background: #243c57; color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-fieldset { background: #192b3e; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-fieldset legend { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-crew-label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .crew-slot { background: #1d3047; border: 1px solid #7a6d48; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .crew-slot img { border: 1px solid #456181; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .crew-link { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .crew-link:hover { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-crew-agi { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .crew-remove { color: #e16969; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-seats-row label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-seats-info { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-detail-row label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-cs-cell label { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-cs-eff { color: #e16969; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .vehicle-damage-quick { background: #20364f !important; color: #e99494 !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .vehicle-damage-quick:hover { background: #243d59 !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .vehicle-repair-quick { background: #153017 !important; color: #44b94a !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .vehicle-repair-quick:hover { background: #1c3d1d !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-header { background: #1c2e43; border-bottom: 2px solid #c22929; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-header .profile-img { border: 1px solid #456181; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-name { border-bottom: 1px solid #3c536f; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-comp { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-fieldset { background: #192b3e; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-fieldset legend { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-item-sheet .veh-item-stats label { color: #d3cab9; }
+
+/* ---- from styles/global.css (rules that reach the vehicle sheet) ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet { background: #1a2b3f; color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .sheet-header { background: #172638; border: 2px solid #c22929; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .sheet-tabs { background: #172638; border: 1px solid #c22929; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .item-control { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .item-control:hover { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .equip-group-label { color: #fb5252; border-bottom: 1px solid #3e5773; }
+.application.faserip-vehicle-window.faserip-dark-palette .equipment-table td { border-bottom: 1px solid #384f69; }
+.application.faserip-vehicle-window.faserip-dark-palette .equipment-row:hover { background-color: #1a2b3f; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .equipment-roll { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .equipment-roll:hover { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet .equipment-icon { border: 1px solid #3c536f; }
+.application.faserip-vehicle-window.faserip-dark-palette .reload-weapon { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .reload-weapon:hover { color: #fb5656; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet input[type="text"],
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet input[type="number"],
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet select { border: 1px solid #3c536f; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-section { border: 1px solid #4c6a8d; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-header .btn-add:hover { border-color: rgba(50, 70, 93, 0.5); }
+.application.faserip-vehicle-window.faserip-dark-palette .effects-list { background: #172638; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-row { background: #172638; border-bottom: 1px solid #3a516c; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-row:hover { background: #1a2b3f; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-icon { background: #1d3148; border: 1px solid #456181; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-name { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-source { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-duration { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-row .effect-control { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-row .effect-control:hover { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-control[data-action="delete"]:hover { color: #fb5656; }
+.application.faserip-vehicle-window.faserip-dark-palette .effect-control[data-action="toggle"]:hover { color: #fb5252; }
+.application.faserip-vehicle-window.faserip-dark-palette .no-effects { background: #172638; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet table { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet table tbody tr { border-bottom: 1px solid #786c4a; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet input[type="text"],
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet input[type="number"],
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet select { border: 1.5px solid #507094; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet input[type="text"],
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet input[type="number"],
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet select,
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet textarea { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .faserip-sheet select option { background: #172638; color: #f4ecdd; }
+
+/* ---- from styles/actor-sheet-enhanced.css (rules that reach the vehicle sheet) ---- */
+
+
+/* ==== 3. THE LOOK ==== */
+
+/* ---- window: crimson title bar, navy page ---- */
+.application.faserip-vehicle-window.faserip-dark-palette {
+  background-color: var(--fd-bg) !important;
+  border-color: var(--fd-frame) !important;
+  box-shadow: 0 0 0 1px #02060c, 0 6px 22px rgba(0,0,0,.65);
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-header {
+  background-color: var(--fd-crimson) !important;
+  background-image: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%) !important;
+  background-size: 5px 5px, 100% 100% !important;
+  border-bottom: 1px solid var(--fd-gold-dim) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-header .window-title {
+  color: var(--fd-gold-lit) !important;
+  font-style: italic;
+  text-shadow: 1px 1px 0 #2a040a;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-header :is(button, .header-control) { color: #f3dfb4 !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .window-header :is(button, .header-control):hover { color: #fff !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content {
+  background-color: var(--fd-bg) !important;
+  background-image:
+    radial-gradient(circle, rgba(120,160,210,.07) .7px, transparent .9px),
+    linear-gradient(180deg, #0d1728 0%, var(--fd-bg) 100%) !important;
+  background-size: 4px 4px, 100% 100% !important;
+  color: var(--fd-text) !important;
+}
+
+/* ---- input wells ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .window-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.application.faserip-vehicle-window.faserip-dark-palette .window-content select,
+.application.faserip-vehicle-window.faserip-dark-palette .window-content textarea {
+  background: var(--fd-well) !important;
+  color: var(--fd-text) !important;
+  -webkit-text-fill-color: currentColor;
+  border-color: #7289a6 !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.6) !important;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(input, select, textarea):disabled,
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(input, textarea)[readonly] {
+  background: #15233a !important;
+  color: var(--fd-text-muted) !important;
+  -webkit-text-fill-color: var(--fd-text-muted);
+  border-color: var(--fd-line) !important;
+  opacity: 1;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(input, textarea)::placeholder { color: #8391a3 !important; opacity: 1; }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content select :is(option, optgroup) { background: var(--fd-well) !important; color: var(--fd-text) !important; }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(input, select, textarea):focus {
+  border-color: var(--fd-gold) !important;
+  box-shadow: 0 0 0 1px rgba(245,207,69,.45), inset 0 1px 3px rgba(0,0,0,.6) !important;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(input, select, textarea, button, a):focus-visible { outline-color: var(--fd-gold-lit) !important; }
+/* Core draws a tick box as a Font Awesome glyph in --checkbox-background-color,
+   which its dark theme sets on the input itself to a near-black. */
+.application.faserip-vehicle-window.faserip-dark-palette input:is([type="checkbox"], [type="radio"]) {
+  accent-color: var(--fd-gold);
+  --checkbox-background-color: #8ea4c0;
+  --checkbox-checked-color: var(--fd-gold);
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content .editor,
+.application.faserip-vehicle-window.faserip-dark-palette .window-content prose-mirror,
+.application.faserip-vehicle-window.faserip-dark-palette .window-content .editor-content {
+  background: var(--fd-well);
+  color: var(--fd-text);
+  border-color: var(--fd-line);
+}
+
+/* ---- buttons: yellow outline on navy. Buttons a script paints itself keep their colour. ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .window-content button:not([style*="background"]) {
+  background: linear-gradient(180deg, #1c3049 0%, #0c1827 100%) !important;
+  color: var(--fd-gold-lit) !important;
+  border-color: var(--fd-gold) !important;
+  text-shadow: 1px 1px 0 #000;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content button:not([style*="background"]):hover:not(:disabled) {
+  background: linear-gradient(180deg, #5a4420 0%, #2c200c 100%) !important;
+  color: #fff3cf !important;
+  border-color: var(--fd-gold-lit) !important;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content button:not([style*="background"]):disabled {
+  background: #121e2f !important;
+  color: #7f8da0 !important;
+  border-color: #3a4c63 !important;
+  text-shadow: none;
+}
+
+/* ---- plain text furniture ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(h1, h2, h3, h4) { color: var(--fd-gold-lit); border-bottom-color: var(--fd-line); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content hr { border-color: var(--fd-line); background: var(--fd-line); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content a:not([class]) { color: #89bbff; }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content :is(.hint, .notes, small) { color: var(--fd-text-soft); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table { color: var(--fd-text); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content img { background-color: var(--fd-well); border-color: var(--fd-frame); }
+
+/* ---- section titles: yellow, slanted ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .window-content fieldset > legend {
+  color: var(--fd-gold-lit) !important;
+  font-style: italic;
+  text-shadow: 1px 1px 0 #000;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content fieldset {
+  background-color: var(--fd-panel);
+  box-shadow: inset 0 0 0 1px rgba(231,186,91,.08);
+}
+
+/* ---- stat heads in yellow, crimson bars on the table heads ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .veh-stat-bar { background: var(--fd-panel); border-color: var(--fd-frame); }
+.application.faserip-vehicle-window.faserip-dark-palette .veh-stat > label {
+  color: var(--fd-gold-lit);
+  font-style: italic;
+  text-shadow: 1px 1px 0 #000;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table:not(.ut-tab-root table) { color: var(--fd-text); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table:not(.ut-tab-root table) thead th {
+  background-color: var(--fd-crimson);
+  background-image: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%);
+  background-size: 5px 5px, 100% 100%;
+  color: var(--fd-gold-lit);
+  font-style: italic;
+  text-shadow: 1px 1px 0 #2a040a;
+}
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table:not(.ut-tab-root table) tbody tr { border-bottom-color: var(--fd-line); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table:not(.ut-tab-root table) tbody tr:nth-child(odd) { background: var(--fd-panel); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table:not(.ut-tab-root table) tbody tr:nth-child(even) { background: var(--fd-panel-2); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table:not(.ut-tab-root table) tbody tr:hover { background: var(--fd-raise); }
+.application.faserip-vehicle-window.faserip-dark-palette .window-content table td { border-color: var(--fd-line); }
+.application.faserip-vehicle-window.faserip-dark-palette .veh-header { background: var(--fd-panel); border-color: var(--fd-crimson-lit); box-shadow: inset 0 0 0 1px rgba(231,186,91,.16), 2px 2px 0 #02060c; }
+
+/* ---- tabs: navy, yellow bar on the active one ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs { background: #121f31; border-color: var(--fd-gold-dim); }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item { color: var(--fd-text-soft); }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item:hover { background: var(--fd-raise); color: var(--fd-text); }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item.active {
+  background: var(--fd-panel);
+  color: var(--fd-gold-lit);
+  box-shadow: inset 0 3px 0 var(--fd-gold);
+  text-shadow: 1px 1px 0 #000;
+}

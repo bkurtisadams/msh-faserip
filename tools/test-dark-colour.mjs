@@ -83,8 +83,9 @@ assert.ok(order('dialog-dark.css') > order('team-tracker.css') && order('dialog-
 for (const light of ['item-sheet.css', 'power-sheet-v2.css', 'talent-sheet.css', 'contact-sheet.css', 'hq-sheet.css', 'equipment-sheet-redesign.css', 'vehicle-sheet.css', 'global.css']) {
   assert.ok(order('item-sheet-dark.css') > order(light), `item-sheet-dark.css loads after ${light}`);
 }
-assert.match(theme, /if \(isItemSheet\(app\)\) \{ _themeSheet\(app, element\); return; \}/, 'item sheets are themed before the light pin');
-for (const file of ['dialog-dark.css', 'item-sheet-dark.css']) {
+assert.ok(order('vehicle-sheet-dark.css') > order('vehicle-sheet.css') && order('vehicle-sheet-dark.css') > order('global.css'));
+assert.match(theme, /if \(isItemSheet\(app\) \|\| isVehicleSheet\(app\)\) \{ _themeSheet\(app, element\); return; \}/, 'item and vehicle sheets are themed before the light pin');
+for (const file of ['dialog-dark.css', 'item-sheet-dark.css', 'vehicle-sheet-dark.css']) {
   const css = readFileSync(new URL(`../styles/${file}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   for (const rule of css.split('}')) {
     const selector = rule.split('{')[0].trim();
