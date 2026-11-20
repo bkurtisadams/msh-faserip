@@ -83,6 +83,8 @@
 
   <!-- Row 2 right: Character Type + Lock -->
   <div class="msh-player-bottom">
+    <label>Character Type</label>
+    <div class="msh-player-bottom-row">
     <select name="system.characterType">
       <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
       <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
@@ -93,6 +95,7 @@
             title="{{#if flags.msh-faserip.sheetLocked}}Unlock Sheet{{else}}Lock Sheet{{/if}}">
       <i class="fas {{#if flags.msh-faserip.sheetLocked}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
     </button>
+    </div>
   </div>
 </div>
 
@@ -128,6 +131,9 @@
     <div class="abilities-section">
       <!-- Primary Abilities Container (FASERIP) -->
       <div class="abilities-container primary-abilities">
+        <div class="panel-title">
+          <span class="panel-title-text">Primary Abilities</span>
+        </div>
         <table class="abilities-table">
           <thead>
             <tr>
@@ -254,13 +260,13 @@
   <div class="sec-grid">
     <!-- HEALTH -->
     <div class="sec-col health">
-      <div class="sec-head health-recovery-link" title="Click to open Recovery & Rest">
-        <span>Health</span>
-        <small>F + A + S + E</small>
+      <div class="sec-head health-recovery-link" title="Health = F + A + S + E. Click to open Recovery &amp; Rest.">
+        <span><i class="fas fa-heart-pulse sec-icon"></i>Health</span>
       </div>
       <div class="sec-body">
-        <div class="stacked-values">
+        <div class="stacked-values slash-values">
           <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" />
+          <span class="slash">/</span>
           <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}" disabled />
         </div>
       </div>
@@ -270,12 +276,12 @@
                 data-action="sheet-recovery"
                 {{#if recoveryDisabledReason}}disabled{{/if}}
                 title="{{#if recoveryDisabledReason}}{{recoveryDisabledReason}}{{else}}Take Recovery: +{{recoveryHealAmount}} HP (once per day, RAW p.31){{/if}}">
-          Recovery +{{recoveryHealAmount}}
+          <i class="fas fa-plus"></i> Recovery +{{recoveryHealAmount}}
         </button>
         {{#if healingEligible}}
         <button type="button" class="health-healing-inline-btn" data-action="sheet-healing"
                 title="Take Healing: +{{healingHealAmount}} HP (per hour since last damage{{#if healingMedicalCare}}, with medical care{{/if}}, RAW p.32)">
-          Heal +{{healingHealAmount}}
+          <i class="fas fa-plus"></i> Heal +{{healingHealAmount}}
         </button>
         {{/if}}
         {{#if wakeUpEligible}}
@@ -295,13 +301,13 @@
 
     <!-- KARMA -->
     <div class="sec-col karma">
-      <div class="sec-head karma-history-link" title="Click to open Karma History">
-        <span>Karma</span>
-        <small>R + I + P</small>
+      <div class="sec-head karma-history-link" title="Karma = R + I + P. Click to open Karma History.">
+        <span><i class="fas fa-yin-yang sec-icon"></i>Karma</span>
       </div>
       <div class="sec-body">
-        <div class="stacked-values">
+        <div class="stacked-values slash-values">
           <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" title="Current Karma" />
+          <span class="slash">/</span>
           <input type="number" value="{{system.attributes.karma.max}}" disabled data-field="karma-max" title="Base Karma (R+I+P)" />
         </div>
       </div>
@@ -310,9 +316,8 @@
 
     <!-- RESOURCES -->
     <div class="sec-col resources">
-      <div class="sec-head resources-header-link" title="Click to roll Resources. Hold CTRL for info.">
-        <span>Resources</span>
-        <small>FEAT</small>
+      <div class="sec-head resources-header-link" title="Resources FEAT. Click to roll. Hold CTRL for info.">
+        <span><i class="fas fa-coins sec-icon"></i>Resources</span>
       </div>
       <div class="sec-body resources-row">
         <select name="system.attributes.resources.rank" title="Resources rank">
@@ -338,7 +343,7 @@
                class="rp-current"
                title="Resource Points: {{system.attributes.resources.points}} / {{rpMaxLabel}} (Max)&#10;Click Resources header to buy items" />
         <button type="button" class="rp-collect-btn" title="Collect weekly income (+{{rpWeekly}} RP)">
-          +{{rpWeekly}}
+          <i class="fas fa-coins"></i> +{{rpWeekly}}
         </button>
       </div>
       {{/if}}
@@ -349,9 +354,8 @@
 
 <!-- POPULARITY -->
     <div class="sec-col popularity">
-      <div class="sec-head popularity-header-link" title="Click to roll Popularity.">
-        <span>Popularity</span>
-        <small>FEAT</small>
+      <div class="sec-head popularity-header-link" title="Popularity FEAT. Click to roll.">
+        <span><i class="fas fa-users sec-icon"></i>Popularity</span>
       </div>
       <div class="sec-body">
         <div class="stacked-values popularity-values">
@@ -373,6 +377,7 @@
 
       <!-- Movement (inline, replaces Recovery & Rest) -->
       <div class="movement-inline">
+        <div class="movement-lead" title="Movement, in areas per turn"><i class="fas fa-person-running"></i></div>
         <div class="movement-inline-item">
           <label class="movement-label clickable" data-movement="run" title="Click to roll Run FEAT">RUN</label>
           <input type="number" name="system.movement.run" value="{{system.movement.run}}" 

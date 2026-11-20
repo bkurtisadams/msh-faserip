@@ -1,11 +1,8 @@
 {{!-- tab-equipment.hbs — v2.2.9: Gear group is now the catch-all bucket for any category not in weapon/other/armor/power-item, so dropped compendium items with empty/unknown categories render instead of vanishing. --}}
         <div class="tab" data-tab="equipment">
-          <div class="tab-list-header labeled">
-            <span class="th-label">Equipment</span>
-            <div class="th-actions">
-              <a class="th-action-link add-equipment" title="Add Equipment">+ add</a>
-              <a class="th-action-link browse-compendium" data-type="equipment" title="Browse Equipment Compendium">browse</a>
-            </div>
+          <div class="tab-banner">
+            <i class="fas fa-toolbox"></i><span class="tab-banner-title">Equipment</span>
+            <span class="tab-banner-actions"><a class="th-action-link add-equipment" title="Add Equipment">+ add</a> <a class="th-action-link browse-compendium" data-type="equipment" title="Browse Equipment Compendium">browse</a></span>
           </div>
 
           {{! ── WEAPONS ── }}

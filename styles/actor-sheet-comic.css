@@ -1,0 +1,250 @@
+/* styles/actor-sheet-comic.css v1.1.0 - 2026-11-19
+ * v1.1.0: Each stat is its own rounded card; the movement ribbon and the
+ *         Primary Abilities panel get matching corners. Dark lettering yellow
+ *         follows actor-sheet-dark.css v2.1.0.
+ *
+ * Comic-panel layout for the V2 character sheet (hero / villain / npc), both
+ * palettes. Goes with the template changes of the same date: title bars,
+ * tab banners, stat heads with icons, one-line Health and Karma, the movement
+ * ribbon, the Character Type label.
+ *
+ * Scoped to .application.faserip-sheet.sheet:not(.vehicle): the vehicle sheet
+ * shares the shell but keeps its own layout.
+ *
+ * The first block holds the light colours; the second re-points them for the
+ * dark palette (the --fd-* values come from actor-sheet-dark.css).
+ * Loaded after actor-sheet-dark.css in system.json.
+ */
+.application.faserip-sheet {
+  --cx-bar: linear-gradient(180deg, #a80000 0%, #660000 100%);
+  --cx-bar-text: #fff; --cx-bar-icon: #ffd76a;
+  --cx-colhead-bg: #ece6d6; --cx-colhead-text: #5a1414; --cx-sep: #cfc8b6;
+  --cx-btn-bg: #fffdf6; --cx-btn-line: #8b0000; --cx-btn-text: #8b0000;
+  --cx-num: #1a1a1a; --cx-num-soft: #6b665c; --cx-slash: #8b0000; --cx-well: #fff; --cx-well-line: #b9b3a4;
+  --cx-tile: linear-gradient(180deg, #b01212 0%, #7a0606 100%); --cx-tile-text: #fff; --cx-tile-edge: #4d0000;
+  --cx-card-line: #1a1a1a; --cx-card-bg: #fffdf7;
+}
+.application.faserip-sheet.faserip-dark-palette {
+  --cx-bar: var(--fd-halftone), linear-gradient(180deg, var(--fd-crimson-lit) 0%, var(--fd-crimson) 45%, var(--fd-crimson-dk) 100%);
+  --cx-bar-text: #fff8dc; --cx-bar-icon: var(--fd-gold-lit);
+  --cx-colhead-bg: #0b1626; --cx-colhead-text: #e9dfc9; --cx-sep: #2c3f57;
+  --cx-btn-bg: linear-gradient(180deg, #1c3049 0%, #0c1827 100%); --cx-btn-line: var(--fd-gold); --cx-btn-text: var(--fd-gold-lit);
+  --cx-num: #fff6e6; --cx-num-soft: #cfc6b4; --cx-slash: var(--fd-gold); --cx-well: var(--fd-well); --cx-well-line: #7289a6;
+  --cx-tile: linear-gradient(180deg, #c22e3d 0%, #9a1a28 55%, #6d0f1a 100%); --cx-tile-text: #f8ec66; --cx-tile-edge: var(--fd-gold-dim);
+  --cx-card-line: #8298b4; --cx-card-bg: var(--fd-panel);
+}
+
+/* header labels read "NAME:" */
+.application.faserip-sheet.sheet:not(.vehicle) .msh-compact-header label:not(.msh-radio)::after,
+.application.faserip-sheet.sheet:not(.vehicle) .msh-player-top > label::after { content: ":"; }
+
+/* title bars */
+.application.faserip-sheet.sheet:not(.vehicle) .panel-title,
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--cx-bar) !important; background-size: 5px 5px, 100% 100% !important;
+  color: var(--cx-bar-text); font-family: 'Oswald', 'Arial Narrow', sans-serif; font-weight: 700; font-style: italic;
+  text-transform: uppercase; letter-spacing: .6px; text-shadow: 1px 1px 0 rgba(30,0,4,.9);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(231,186,91,.6);
+}
+.application.faserip-sheet.sheet:not(.vehicle) .panel-title { justify-content: space-between; height: 26px; padding: 0 6px 0 9px; font-size: 13px; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table thead .initial-columns-toggle {
+  position: absolute; top: 4px; right: 6px; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 18px; border-radius: 3px;
+  border: 1px solid var(--cx-bar-icon); color: var(--cx-bar-icon); background: rgba(0,0,0,.28); font-size: 10px; font-style: normal;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner { height: 30px; padding: 0 10px; font-size: 18px; margin-bottom: 0; }
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner i { color: var(--cx-bar-icon); font-size: 16px; font-style: normal; }
+
+/* column heads under a title bar: quiet caps, not a second red bar */
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table thead th,
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) table thead th {
+  background: var(--cx-colhead-bg) !important; background-image: none !important;
+  color: var(--cx-colhead-text) !important; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif !important;
+  font-style: normal !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: .5px;
+  text-shadow: none !important; box-shadow: none !important; border-color: var(--cx-sep) !important;
+  border-right: 1px solid var(--cx-sep) !important; border-bottom: 1px solid var(--cx-sep) !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table thead th {
+  height: 28px !important; min-height: 28px !important; max-height: 28px !important; padding: 2px 3px !important; font-size: 9.5px !important; line-height: 1.05 !important; white-space: nowrap;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) table thead th { font-size: 11.5px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) table tbody td { border-right: 1px solid var(--cx-sep) !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) table tbody td:last-child,
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) table thead th:last-child { border-right: 0 !important; }
+
+/* F A S E R I P: rounded tiles */
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody tr td.ability-key {
+  position: relative; z-index: 0; background: none !important; box-shadow: none !important; border-right-color: transparent !important;
+  color: var(--cx-tile-text) !important; font-style: italic; text-shadow: 1px 1px 0 rgba(30,0,4,.95), 2px 2px 0 rgba(0,0,0,.4);
+}
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody tr td.ability-key::before {
+  content: ""; position: absolute; inset: 2px 3px; z-index: -1; border-radius: 5px;
+  background: var(--cx-tile); border: 1px solid var(--cx-tile-edge);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.2), 1px 1px 0 rgba(0,0,0,.55);
+}
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody tr td.ability-key:hover::before { filter: brightness(1.25); }
+
+/* initial roll, initial rank and rank number read as lettering until touched */
+.application.faserip-sheet.sheet:not(.vehicle) .window-content .primary-abilities .abilities-table tbody td:not(:nth-child(4)) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--cx-num) !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .window-content .primary-abilities .abilities-table tbody td:not(:nth-child(4)) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):hover,
+.application.faserip-sheet.sheet:not(.vehicle) .window-content .primary-abilities .abilities-table tbody td:not(:nth-child(4)) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus {
+  background: var(--cx-well) !important; border-color: var(--cx-well-line) !important;
+}
+
+/* stat cards */
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-head > span { text-transform: uppercase; letter-spacing: 0; white-space: nowrap; font-size: 11px; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-head .sec-icon { color: var(--cx-bar-icon); margin-right: 3px; font-size: 10px; font-style: normal; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .stacked-values.slash-values {
+  flex-direction: row; gap: 0; width: auto; padding: 1px 3px; border-radius: 4px;
+  background: var(--cx-well); border: 1px solid var(--cx-well-line); box-shadow: inset 0 1px 3px rgba(0,0,0,.35);
+}
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .stacked-values.slash-values input[type="number"] {
+  width: 31px !important; min-width: 31px !important; max-width: 31px !important; height: 26px !important; padding: 0 !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important;
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 16px !important; font-weight: 700 !important; color: var(--cx-num) !important; -webkit-text-fill-color: var(--cx-num) !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .stacked-values.slash-values input[type="number"]:disabled { color: var(--cx-num-soft) !important; -webkit-text-fill-color: var(--cx-num-soft) !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .stacked-values.slash-values .slash { color: var(--cx-slash); font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 400; padding: 0 1px; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-msg { flex-direction: column; align-items: stretch; gap: 3px; padding: 2px 5px 5px; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-msg button,
+.application.faserip-sheet.sheet:not(.vehicle) .rp-collect-btn {
+  display: flex; align-items: center; justify-content: center; gap: 4px; height: 20px !important; padding: 0 4px !important; border-radius: 4px !important;
+  background: var(--cx-btn-bg) !important; border: 1px solid var(--cx-btn-line) !important; color: var(--cx-btn-text) !important;
+  font-family: 'Oswald', 'Arial Narrow', sans-serif !important; font-size: 9px !important; font-weight: 600 !important; font-style: italic; text-transform: uppercase; letter-spacing: 0; white-space: nowrap; width: 100%; min-width: 0;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-msg button i,
+.application.faserip-sheet.sheet:not(.vehicle) .rp-collect-btn i { font-size: 9px; font-style: normal; }
+
+/* movement: one ribbon, label beside each box */
+.application.faserip-sheet.sheet:not(.vehicle) .movement-inline { gap: 5px; padding: 4px 6px; }
+.application.faserip-sheet.sheet:not(.vehicle) .movement-lead { flex: 0 0 auto; color: var(--cx-bar-icon); font-size: 15px; padding-right: 1px; }
+.application.faserip-sheet.sheet:not(.vehicle) .movement-inline-item:not(.movement-info-btn) { flex-direction: row; align-items: center; gap: 3px; }
+.application.faserip-sheet.sheet:not(.vehicle) .movement-inline-item label.movement-label.clickable { margin: 0; font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 10.5px; text-decoration: none; white-space: nowrap; }
+.application.faserip-sheet.sheet:not(.vehicle) .movement-inline-item label.movement-label.clickable::after { content: ":"; }
+.application.faserip-sheet.sheet:not(.vehicle) .movement-inline-item input[type="number"] { flex: 1 1 0; min-width: 0; height: 22px; font-size: 13px; }
+.application.faserip-sheet.sheet:not(.vehicle) .movement-inline-item.movement-info-btn a {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 22px; border-radius: 4px;
+  border: 1px solid var(--cx-bar-icon); background: rgba(0,0,0,.28); font-size: 12px;
+}
+
+/* row buttons */
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) .item-control:not(.power-roll),
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .effect-control:not(.btn-add) {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin: 0 1px; border-radius: 4px;
+  border: 1px solid var(--cx-btn-line); background: var(--cx-btn-bg); font-size: 11px;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .th-action-link {
+  display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 3px; text-transform: uppercase !important;
+  border: 1px solid var(--cx-btn-line); background: var(--cx-btn-bg) !important; color: var(--cx-btn-text) !important; box-shadow: none; font-style: normal; text-shadow: none;
+}
+
+/* tabs as separate keys */
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tabs-navigation { gap: 3px; padding: 4px 4px 0; }
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tabs-navigation .item { border-radius: 5px 5px 0 0; }
+
+/* values sit directly under the head, buttons directly under the values */
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col.health > .sec-body,
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col.karma > .sec-body { flex: 0 0 auto; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .rp-tracker { display: flex; align-items: center; justify-content: center; gap: 3px; padding: 0 5px; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .rp-tracker .rp-current { width: 34px !important; min-width: 0 !important; flex: 0 0 34px; height: 20px !important; padding: 0 !important; font-size: 12px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .rp-tracker .rp-collect-btn { flex: 1 1 0; width: auto; }
+
+/* stacked column heads let the primary panel narrow; the stat cards take the room */
+.application.faserip-sheet.sheet:not(.vehicle) .abilities-section { --colP: 0.8fr; --colS: 1.2fr; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th,
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td { padding-left: 3px; padding-right: 3px; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th:nth-child(4),
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td:nth-child(4) { width: 94px; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody td:nth-child(2) input,
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody td:nth-child(3) input { padding: 0 1px !important; font-size: 12px; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody td:nth-child(4) select { padding-left: 4px; padding-right: 0; }
+
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table { table-layout: fixed; width: 100%; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table thead th:first-child,
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table tbody td.ability-key { width: 38px !important; min-width: 38px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th:nth-child(2),
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td:nth-child(2) { width: 36px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th:nth-child(4),
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td:nth-child(4) { width: 92px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th:nth-child(5),
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td:nth-child(5) { width: 42px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .window-content .primary-abilities .abilities-table tbody td:not(:nth-child(4)) input { padding: 0 !important; text-align: center !important; }
+
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th:nth-child(3),
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td:nth-child(3) { width: 38px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table th:nth-child(4),
+.application.faserip-sheet.sheet:not(.vehicle) .primary-abilities .abilities-table td:nth-child(4) { width: auto !important; }
+
+/* stat heads: one line, one colour of lettering; the icon carries the stat's colour */
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col .sec-head,
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col .sec-head > span,
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col .sec-head > button { color: var(--cx-bar-text) !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col .sec-head { flex-direction: row !important; justify-content: center; align-items: center; padding: 0 2px !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col .sec-head > span { font-size: 12.5px; letter-spacing: 0; display: inline-flex; align-items: center; gap: 3px; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col .sec-head .sec-icon { font-size: 11px; margin: 0; filter: drop-shadow(1px 1px 0 rgba(30,0,4,.9)); }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col.health .sec-head .sec-icon { color: #7fe08a !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col.karma .sec-head .sec-icon { color: #86c0ff !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col.resources .sec-head .sec-icon { color: #ffd76a !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .secondary-abilities .sec-col.popularity .sec-head .sec-icon { color: #ff9cc4 !important; }
+
+/* Character Type gets a label like every other header field */
+.application.faserip-sheet.sheet:not(.vehicle) .msh-player-bottom { display: block; align-self: end; }
+.application.faserip-sheet.sheet:not(.vehicle) .msh-player-bottom > label { display: block; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .8px; line-height: 1.1; text-transform: uppercase; color: #8b4444; margin: 0 0 2px 0; white-space: nowrap; }
+.application.faserip-sheet.sheet:not(.vehicle) .msh-player-bottom > label::after { content: ":"; }
+.application.faserip-sheet.sheet:not(.vehicle) .msh-player-bottom-row { display: flex; gap: 4px; align-items: center; }
+/* dark: field labels in a deeper gold, bar titles stay cream */
+.application.faserip-sheet.faserip-dark-palette { --fd-label: var(--fd-gold-lit); }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .msh-compact-header label:not(.msh-radio),
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .msh-player-top > label,
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .msh-player-bottom > label,
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .msh-biofield > label,
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .movement-inline-item label.movement-label.clickable { color: var(--fd-label) !important; font-style: italic; text-shadow: 1px 1px 0 #000; }
+
+/* ---- tab banners carry the tab's links on the right ---- */
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner .tab-banner-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-style: normal; text-shadow: none; letter-spacing: .3px; }
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner .tab-banner-actions .th-action-link { margin-left: 0; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-size: 10.5px; font-weight: 700; line-height: 1; white-space: nowrap; }
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner .tab-banner-note,
+.application.faserip-sheet.sheet:not(.vehicle) .tab-banner .hw-version { color: var(--cx-bar-text); opacity: .75; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-size: 10px !important; font-weight: 600; text-transform: uppercase; margin: 0 !important; }
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab > .tab-banner { margin-bottom: 4px; }
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab > .tab-banner + table { margin-top: -4px; }
+
+/* ---- initial columns hidden: the primary panel narrows further ---- */
+.application.faserip-sheet.sheet:not(.vehicle) .abilities-section.initial-hidden { --colP: 0.56fr; --colS: 1.44fr; }
+
+/* ---- compact mode keeps its own minimal layout ---- */
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .panel-title,
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .movement-lead,
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .sec-head .sec-icon { display: none; }
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .primary-abilities .abilities-table thead .initial-columns-toggle { position: static; }
+
+/* ---- the columns toggle sits on the Primary Abilities title bar ---- */
+.application.faserip-sheet.sheet:not(.vehicle) .abilities-container.primary-abilities { position: relative; }
+
+/* ---- "Actions" column heads are table cells here, not link rows ---- */
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .tab:not([data-tab="universal-table"]) table thead th.th-actions { display: table-cell; position: static; }
+
+/* ---- one red bar per tab: section heads under a banner go quiet ---- */
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .effect-header {
+  background: var(--cx-colhead-bg) !important; background-image: none !important; color: var(--cx-colhead-text) !important;
+  font-style: normal; text-shadow: none !important; box-shadow: none; border-color: var(--cx-sep) !important;
+}
+.application.faserip-sheet.sheet:not(.vehicle) .sheet-tab-content .effect-header .effect-control.btn-add { color: var(--cx-btn-text) !important; }
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .secondary-abilities .stacked-values.slash-values { flex-direction: row !important; padding: 0 2px; }
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .secondary-abilities .stacked-values.slash-values input[type="number"] { width: 25px !important; min-width: 25px !important; max-width: 25px !important; height: 22px !important; font-size: 13px !important; }
+.application.faserip-sheet.sheet:not(.vehicle).compact-mode .secondary-abilities .stacked-values.slash-values .slash { font-size: 13px; }
+
+/* ---- each stat is its own rounded card; the movement ribbon is its own rounded bar ---- */
+.application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .abilities-container.secondary-abilities {
+  background: transparent !important; background-image: none !important; border: 0 !important; box-shadow: none !important; overflow: visible;
+}
+.application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .secondary-abilities .sec-grid { column-gap: 6px; }
+.application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .secondary-abilities .sec-col,
+.application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .secondary-abilities .sec-col:last-child {
+  border: 1.5px solid var(--cx-card-line) !important; border-radius: 9px; overflow: hidden; background: var(--cx-card-bg) !important;
+  box-shadow: 1px 1px 0 rgba(0,0,0,.45);
+}
+.application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .movement-inline { margin-top: 6px; border-radius: 9px; border-width: 1.5px; }
+.application.faserip-sheet.sheet:not(.vehicle):not(.compact-mode) .abilities-container.primary-abilities { border-radius: 9px; overflow: hidden; }

@@ -1,3 +1,7 @@
+// scripts/actor-sheet-v2.js v1.7.0 - 2026-11-19
+// v1.7.0: Light or dark comes from Foundry's own setting through
+//         modules/ui/sheet-theme.js, not from the removed "Character Sheet
+//         Colors" system setting.
 // scripts/actor-sheet-v2.js v1.6.0 - 2026-11-11
 // v1.6.0: The legacy class this sheet wraps is now a plain class, not a V1
 //         sheet, so everything it needs comes through the adapter: getData
@@ -60,6 +64,7 @@
 import { FaseripActorSheet } from "./actorSheet.js";
 import { initSheetZoom } from "./modules/ui/sheet-zoom.js";
 import { normalizeActorSubmit } from "./actor-sheet-submit.js";
+import { isCharacterSheet, resolveSheetTheme, applySheetTheme } from "./modules/ui/sheet-theme.js";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -220,6 +225,11 @@ export class FaseripActorSheetV2 extends HandlebarsApplicationMixin(ActorSheetV2
   /** @override */
   async _onRender(context, options) {
     await super._onRender(context, options);
+
+    // Light or dark follows Foundry's own setting. The render hook in
+    // sheet-theme.js does the same for every FASERIP window; doing it here
+    // too keeps the palette right if a PART re-render ever runs without it.
+    if (isCharacterSheet(this)) applySheetTheme(this.element, resolveSheetTheme(this).theme);
 
     // jQuery shim — preserves the v1 activateListeners(html) signature.
     const html = $(this.element);

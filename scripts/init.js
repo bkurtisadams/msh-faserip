@@ -1,4 +1,8 @@
-﻿// init.js v1.26.0 - 2026-11-19
+// init.js v1.27.0 - 2026-11-19
+// v1.27.0: The character sheet's light/dark follows Foundry's own setting
+//          (modules/ui/sheet-theme.js). The "Character Sheet Colors" system
+//          setting is removed; a value saved for it is simply ignored.
+// init.js v1.26.0 - 2026-11-19
 // v1.26.0: Karma ledger: a character created with Karma and an empty ledger
 //          gets a Starting Karma entry; every startup does the same for
 //          empty ledgers (ledgers with spends are only reported).
@@ -258,6 +262,7 @@ import { migrateAbsorption } from "./absorption-migration.js";
 import { registerKarmaSettings, migrateKarmaSettings } from "./karma-multipliers.js";
 import { registerQuickKarma } from "./apps/quick-karma.js";
 import { registerStuntPowerSync } from "./stunt-power.js";
+import { registerSheetTheme } from "./modules/ui/sheet-theme.js";
 
 
 const FASERIP_CHARACTER_ACTOR_TYPES = new Set(["hero", "villain", "npc"]);
@@ -654,20 +659,11 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
     }
   }});
 
-/* Force system-owned windows to render with Foundry's light theme.
-   The FASERIP UI is a fixed light-parchment design; a client using the
-   Dark interface theme (or Browser Default on a dark-mode device)
-   otherwise injects dark-theme text/heading/input/table colors into
-   every surface the CSS does not explicitly pin (chargen tab, HUD
-   action dialogs, combat panel, karma sheets). AppV2 unions classes
-   across the inheritance chain, so prefix-matching faserip/msh covers
-   all system apps including shim dialogs and item-sheet subclasses. */
-Hooks.on("renderApplicationV2", (app, element) => {
-  const classes = app.options?.classes ?? [];
-  if (!classes.some(c => c.startsWith("faserip") || c.startsWith("msh"))) return;
-  element.classList.remove("theme-dark");
-  element.classList.add("themed", "theme-light");
-});
+/* Light or dark. The character sheet follows Foundry's own choice (the sheet's
+ * Sheet Configuration, then Configure Settings > Core > UI > Applications,
+ * then the browser preference). Every other FASERIP window is a fixed light
+ * design and is pinned to light. See modules/ui/sheet-theme.js. */
+registerSheetTheme();
 
 Hooks.once("init", async () => {
   // --- Global flag scope & namespace ---

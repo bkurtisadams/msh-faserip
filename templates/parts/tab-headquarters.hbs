@@ -1,4 +1,8 @@
         <div class="tab" data-tab="headquarters">
+          <div class="tab-banner">
+            <i class="fas fa-building"></i><span class="tab-banner-title">Headquarters</span>
+            <span class="tab-banner-actions"><a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a> <a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a></span>
+          </div>
 
           {{#if teamHQs.length}}
           <div class="team-hq-label">Team HQs</div>
@@ -32,7 +36,7 @@
           <table class="headquarters-table">
             <thead>
               <tr>
-                <th class="name-col">Name<span class="th-inline-actions"><a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a><a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a></span></th>
+                <th class="name-col">Name</th>
                 <th class="location-col">Location</th>
                 <th class="size-col">Size</th>
                 <th class="material-col">Material</th>
