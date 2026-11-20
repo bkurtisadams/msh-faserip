@@ -1,4 +1,9 @@
-// actorSheet.js v2.21.0 - 2026-11-19
+// actorSheet.js v2.21.1 - 2026-11-20
+// v2.21.1: Fixed-bug: both Headquarters popups passed the HQ's name to
+//          rollHQResourceFEAT instead of the item, so rent was never stamped
+//          and bank loans never saved. The button is Pay Rent on a rented
+//          HQ, Pay Loan shows while a loan is open, and the popup shows the
+//          Area modifier (was the retired isRichArea field).
 // v2.21.0: Powers tab context powerGear: GEAR badge on equipment-granted
 //          powers, dimmed with GEAR: BROKEN / GEAR: MISSING while the item
 //          is out.
@@ -4729,13 +4734,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             <p><strong>Ownership:</strong> ${item.system.ownership === 'rented' ? 'Rented' : 'Owned'}</p>
             ${item.system.purchaseCost ? `<p><strong>Buy Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
             ${item.system.rentCost ? `<p><strong>Rent Cost:</strong> ${item.system.rentCost}</p>` : ''}
-            ${item.system.isRichArea ? `<p><strong>Rich Area:</strong> +1CS cost</p>` : ''}
+            ${item.system.locationModifier === 'rich' ? `<p><strong>Area:</strong> Rich (+1CS cost)</p>` : item.system.locationModifier === 'secluded' ? `<p><strong>Area:</strong> Secluded (-1CS cost)</p>` : ''}
             ${packages ? `<h3>Room Packages</h3><ul>${packages}</ul>` : ''}
             ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
           </div>
           ${item.system.notes ? `<div class="description">${item.system.notes}</div>` : ''}
           <div style="margin-top:8px;text-align:center;">
-            <button type="button" class="hq-info-resource-feat" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">Resource FEAT</button>
+            <button type="button" class="hq-info-resource-feat" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">${item.system.ownership === 'rented' ? 'Pay Rent' : 'Resource FEAT'}</button>
+            ${FaseripHeadquartersSheet.hasLoan(item) ? `<button type="button" class="hq-info-pay-loan" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">Pay Loan (${item.system.loanPaymentRank}/mo, ${item.system.loanPaymentsRemaining} left)</button>` : ''}
           </div>
         `,
         buttons: { close: { label: "Close" } },
@@ -4750,12 +4756,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             function() { $(this).css('color', '#8b0000'); },
             function() { $(this).css('color', ''); }
           );
-          html.find('.hq-info-resource-feat').click(() => {
-            const isRented = item.system.ownership === "rented";
-            const costRank = isRented ? (item.system.rentCost || "Typical") : (item.system.purchaseCost || "Typical");
-            const costType = isRented ? "Rent" : "Purchase";
-            FaseripHeadquartersSheet.rollHQResourceFEAT(item.name, costRank, costType);
-          });
+          html.find('.hq-info-resource-feat').click(() => FaseripHeadquartersSheet.rollCost(item));
+          html.find('.hq-info-pay-loan').click(() => FaseripHeadquartersSheet.payLoan(item));
         }
       });
     });
@@ -4795,13 +4797,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           <p><strong>Ownership:</strong> ${item.system.ownership === 'rented' ? 'Rented' : 'Owned'}</p>
           ${item.system.purchaseCost ? `<p><strong>Buy Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
           ${item.system.rentCost ? `<p><strong>Rent Cost:</strong> ${item.system.rentCost}</p>` : ''}
-          ${item.system.isRichArea ? `<p><strong>Rich Area:</strong> +1CS cost</p>` : ''}
+          ${item.system.locationModifier === 'rich' ? `<p><strong>Area:</strong> Rich (+1CS cost)</p>` : item.system.locationModifier === 'secluded' ? `<p><strong>Area:</strong> Secluded (-1CS cost)</p>` : ''}
           ${packages ? `<h3>Room Packages</h3><ul>${packages}</ul>` : ''}
           ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
         </div>
         ${item.system.notes ? `<div class="description">${item.system.notes}</div>` : ''}
         <div style="margin-top:8px;text-align:center;">
-          <button type="button" class="hq-info-resource-feat" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">Resource FEAT</button>
+          <button type="button" class="hq-info-resource-feat" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">${item.system.ownership === 'rented' ? 'Pay Rent' : 'Resource FEAT'}</button>
+            ${FaseripHeadquartersSheet.hasLoan(item) ? `<button type="button" class="hq-info-pay-loan" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">Pay Loan (${item.system.loanPaymentRank}/mo, ${item.system.loanPaymentsRemaining} left)</button>` : ''}
         </div>
       `;
 
@@ -4820,12 +4823,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             function() { $(this).css('color', '#8b0000'); },
             function() { $(this).css('color', ''); }
           );
-          html.find('.hq-info-resource-feat').click(() => {
-            const isRented = item.system.ownership === "rented";
-            const costRank = isRented ? (item.system.rentCost || "Typical") : (item.system.purchaseCost || "Typical");
-            const costType = isRented ? "Rent" : "Purchase";
-            FaseripHeadquartersSheet.rollHQResourceFEAT(item.name, costRank, costType);
-          });
+          html.find('.hq-info-resource-feat').click(() => FaseripHeadquartersSheet.rollCost(item));
+          html.find('.hq-info-pay-loan').click(() => FaseripHeadquartersSheet.payLoan(item));
         }
       });
     });

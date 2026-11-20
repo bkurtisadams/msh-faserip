@@ -1,3 +1,7 @@
+// teamSheet.js v4.23.1 - 2026-11-20
+// v4.23.1: Process Rent also sends a loan payment notice for each HQ with an
+//          open bank loan (was a count in a toast). HQ popup shows the Area
+//          modifier.
 // teamSheet.js v4.23.0 - 2026-11-13
 // v4.23.0: Award lines on Karma History no longer repeat themselves: a bonus
 //          named like its report is dropped, a lone bonus loses its amount
@@ -2856,17 +2860,17 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     const { FaseripHeadquartersSheet } = await import('./headquartersSheet.js');
     const teamIds = game.settings.get("msh-faserip", "teamMembers") || [];
 
-    // Collect all rented HQs: team HQs + personal HQs on team members
     const rentedHQs = [];
+    const loanHQs = [];
 
     // Team HQs (from the shared team HQ actor)
     const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
     const hqActor = hqActorId ? game.actors.get(hqActorId) : null;
     if (hqActor) {
       for (const item of hqActor.items) {
-        if (item.type === "headquarters" && item.system.ownership === "rented") {
-          rentedHQs.push({ item, ownerActorIds: [...teamIds] });
-        }
+        if (item.type !== "headquarters") continue;
+        if (item.system.ownership === "rented") rentedHQs.push({ item, ownerActorIds: [...teamIds] });
+        if (FaseripHeadquartersSheet.hasLoan(item)) loanHQs.push({ item, ownerActorIds: [...teamIds] });
       }
     }
 
@@ -2875,14 +2879,14 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       const actor = game.actors.get(actorId);
       if (!actor) continue;
       for (const item of actor.items) {
-        if (item.type === "headquarters" && item.system.ownership === "rented") {
-          rentedHQs.push({ item, ownerActorIds: [actorId] });
-        }
+        if (item.type !== "headquarters") continue;
+        if (item.system.ownership === "rented") rentedHQs.push({ item, ownerActorIds: [actorId] });
+        if (FaseripHeadquartersSheet.hasLoan(item)) loanHQs.push({ item, ownerActorIds: [actorId] });
       }
     }
 
-    if (!rentedHQs.length) {
-      ui.notifications.info("No rented headquarters found.");
+    if (!rentedHQs.length && !loanHQs.length) {
+      ui.notifications.info("No rent or loan payments due.");
       return;
     }
 
@@ -2892,28 +2896,16 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       count++;
     }
 
-    // Also process loan payments due
-    // (loans on owned properties from bank loan purchases)
     let loanCount = 0;
-    if (hqActor) {
-      for (const item of hqActor.items) {
-        if (item.type === "headquarters" && (item.system.loanPaymentsRemaining || 0) > 0) {
-          loanCount++;
-        }
-      }
-    }
-    for (const actorId of teamIds) {
-      const actor = game.actors.get(actorId);
-      if (!actor) continue;
-      for (const item of actor.items) {
-        if (item.type === "headquarters" && (item.system.loanPaymentsRemaining || 0) > 0) {
-          loanCount++;
-        }
-      }
+    for (const { item, ownerActorIds } of loanHQs) {
+      await FaseripHeadquartersSheet.sendLoanDueChatCard(item, ownerActorIds);
+      loanCount++;
     }
 
-    const loanNote = loanCount > 0 ? ` (${loanCount} loan payments also pending)` : '';
-    ui.notifications.info(`Sent ${count} rent due notice${count !== 1 ? 's' : ''}${loanNote}.`);
+    const parts = [];
+    if (count) parts.push(`${count} rent due notice${count !== 1 ? 's' : ''}`);
+    if (loanCount) parts.push(`${loanCount} loan payment notice${loanCount !== 1 ? 's' : ''}`);
+    ui.notifications.info(`Sent ${parts.join(' and ')}.`);
   }
 
   async _onViewTeamHQ(itemId) {
@@ -2953,7 +2945,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           <p><strong>Ownership:</strong> ${item.system.ownership === 'rented' ? 'Rented' : 'Owned'}</p>
           ${item.system.purchaseCost ? `<p><strong>Buy Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
           ${item.system.rentCost ? `<p><strong>Rent Cost:</strong> ${item.system.rentCost}</p>` : ''}
-          ${item.system.isRichArea ? `<p><strong>Rich Area:</strong> +1CS cost</p>` : ''}
+          ${item.system.locationModifier === 'rich' ? `<p><strong>Area:</strong> Rich (+1CS cost)</p>` : item.system.locationModifier === 'secluded' ? `<p><strong>Area:</strong> Secluded (-1CS cost)</p>` : ''}
           ${packages ? `<h3>Room Packages</h3><ul>${packages}</ul>` : ''}
           ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
         </div>

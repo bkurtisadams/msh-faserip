@@ -1,4 +1,10 @@
-// headquartersSheet.js v3.3.0 - 2026-11-11
+// headquartersSheet.js v3.4.0 - 2026-11-20
+// v3.4.0: Fixed-bugs: rent, loan-payment and bank-loan writes went through an
+//         unknown GM operation ('updateItem') and were never saved; they now
+//         go through writeHQ. payRent / payLoan / rollCost / effectiveCost /
+//         hasLoan are shared with the actor sheet's HQ popups. The sheet's
+//         Resource FEAT button stamps rent when the HQ is rented.
+//         sendLoanDueChatCard for the Team sheet's Process Rent.
 // v3.3.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v3.2.0: HQ Resource FEATs (purchase, rent, loan payment) share the hero's
 //         weekly resourceFeat ledger with the actor sheet (setting-gated by
@@ -76,6 +82,46 @@ function _computeRentStatus(lastPaidStr) {
 }
 
 export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+
+  static effectiveCost(rank, locMod = "normal") {
+    if (!rank || locMod === "normal") return rank;
+    const idx = RANKS.indexOf(rank);
+    if (idx < 0) return rank;
+    const shift = locMod === "rich" ? 1 : locMod === "secluded" ? -1 : 0;
+    return RANKS[Math.max(0, Math.min(RANKS.length - 1, idx + shift))];
+  }
+
+  static hasLoan(hqItem) {
+    const sys = hqItem?.system ?? {};
+    return (Number(sys.loanPaymentsRemaining) || 0) > 0 && !!sys.loanPaymentRank;
+  }
+
+  static async writeHQ(hqItem, updates) {
+    if (!hqItem || !Object.keys(updates).length) return;
+    if (hqItem.isOwner || !hqItem.parent) return hqItem.update(updates);
+    return game.msh.runAsGM({
+      operation: "updateEmbeddedDocuments",
+      targetActorUuid: hqItem.parent.uuid,
+      args: ["Item", [{ _id: hqItem.id, ...updates }]]
+    });
+  }
+
+  static payRent(hqItem) {
+    const sys = hqItem.system;
+    const cost = FaseripHeadquartersSheet.effectiveCost(sys.rentCost || sys.rentalCost || "Typical", sys.locationModifier);
+    FaseripHeadquartersSheet.rollHQResourceFEAT(hqItem, cost, "Rent", true);
+  }
+
+  static payLoan(hqItem) {
+    FaseripHeadquartersSheet.rollHQResourceFEAT(hqItem, hqItem.system.loanPaymentRank || "Typical", "Loan Payment", true, true);
+  }
+
+  static rollCost(hqItem) {
+    const sys = hqItem.system;
+    if (sys.ownership === "rented") return FaseripHeadquartersSheet.payRent(hqItem);
+    const cost = FaseripHeadquartersSheet.effectiveCost(sys.purchaseCost || "Typical", sys.locationModifier);
+    FaseripHeadquartersSheet.rollHQResourceFEAT(hqItem, cost, "Purchase", false);
+  }
 
   static DEFAULT_OPTIONS = {
     classes: ["faserip", "sheet", "item", "headquarters"],
@@ -196,7 +242,8 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
     context.rentStatusLabel = statusLabels[rentStatus] || "";
 
     // Loan tracking
-    context.hasLoan = (context.system.loanPaymentsRemaining || 0) > 0 && context.system.loanPaymentRank;
+    context.hasLoan = FaseripHeadquartersSheet.hasLoan(this.item);
+    context.loanMissed = Number(this.item.getFlag("msh-faserip", "loanMissed")) || 0;
 
     return context;
   }
@@ -239,47 +286,9 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
     });
 
     // Resource FEAT button (for purchase)
-    html.find('.hq-resource-feat').click(ev => {
-      const sys = this.item.system;
-      const isRented = sys.ownership === "rented";
-      const baseRank = isRented ? (sys.rentCost || "Typical") : (sys.purchaseCost || "Typical");
-      // Apply location modifier to both rent and purchase per the rules.
-      const locMod = sys.locationModifier || "normal";
-      let costRank = baseRank;
-      if (locMod !== "normal") {
-        const idx = RANKS.indexOf(baseRank);
-        if (idx >= 0) {
-          const shift = locMod === "rich" ? 1 : -1;
-          costRank = RANKS[Math.max(0, Math.min(RANKS.length - 1, idx + shift))];
-        }
-      }
-      const costType = isRented ? "Rent" : "Purchase";
-      FaseripHeadquartersSheet.rollHQResourceFEAT(this.item, costRank, costType, false);
-    });
-
-    // Pay Rent button
-    html.find('.hq-pay-rent').click(ev => {
-      const sys = this.item.system;
-      const rentCost = sys.rentCost || "Typical";
-      // Apply location modifier
-      const locMod = sys.locationModifier || "normal";
-      let effectiveCost = rentCost;
-      if (locMod !== "normal") {
-        const idx = RANKS.indexOf(rentCost);
-        if (idx >= 0) {
-          const shift = locMod === "rich" ? 1 : -1;
-          effectiveCost = RANKS[Math.max(0, Math.min(RANKS.length - 1, idx + shift))];
-        }
-      }
-      FaseripHeadquartersSheet.rollHQResourceFEAT(this.item, effectiveCost, "Rent", true);
-    });
-
-    // Pay Loan button
-    html.find('.hq-pay-loan').click(ev => {
-      const sys = this.item.system;
-      const loanRank = sys.loanPaymentRank || "Typical";
-      FaseripHeadquartersSheet.rollHQResourceFEAT(this.item, loanRank, "Loan Payment", true, true);
-    });
+    html.find('.hq-resource-feat').click(() => FaseripHeadquartersSheet.rollCost(this.item));
+    html.find('.hq-pay-rent').click(() => FaseripHeadquartersSheet.payRent(this.item));
+    html.find('.hq-pay-loan').click(() => FaseripHeadquartersSheet.payLoan(this.item));
 
     // Rent last-paid date — manual save on blur to avoid submitOnChange re-render
     html.find('.hq-rent-date-input').on('blur', async ev => {
@@ -542,6 +551,39 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
     });
   }
 
+  static async sendLoanDueChatCard(hqItem, ownerActorIds) {
+    const sys = hqItem.system;
+    const gd = _getGameDate();
+    const missed = Number(hqItem.getFlag("msh-faserip", "loanMissed")) || 0;
+    const content = `
+      <div class="faserip-chat-card" style="border:1px solid #c0a070;border-radius:4px;padding:6px 8px;background:#fdf8f0;">
+        <div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Loan Payment Due</div>
+        <div style="font-weight:bold;font-size:13px;color:#8b0000;">${hqItem.name}</div>
+        <div style="font-size:11px;color:#666;margin-top:2px;">${sys.location || ''}</div>
+        <div style="font-size:12px;margin-top:4px;">
+          <strong>Loan: ${sys.loanPaymentRank}/month</strong> — ${sys.loanPaymentsRemaining} of ${sys.loanPaymentsTotal} payments remaining
+        </div>
+        ${gd.formatted ? `<div style="font-size:11px;color:#666;margin-top:2px;">Due: ${gd.formatted}</div>` : ''}
+        ${missed ? `<div style="font-size:11px;color:#c0392b;margin-top:2px;">Missed payments: ${missed}</div>` : ''}
+        <div style="font-size:11px;margin-top:6px;padding:3px 6px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;">
+          Resource FEAT vs <strong>${sys.loanPaymentRank}</strong> required to cover the payment.
+        </div>
+      </div>
+    `;
+    const whisperIds = [];
+    for (const actorId of ownerActorIds) {
+      const actor = game.actors.get(actorId);
+      if (!actor) continue;
+      for (const user of game.users) {
+        if (!user.isGM && actor.testUserPermission(user, "OWNER") && !whisperIds.includes(user.id)) whisperIds.push(user.id);
+      }
+    }
+    for (const user of game.users) {
+      if (user.isGM && !whisperIds.includes(user.id)) whisperIds.push(user.id);
+    }
+    await ChatMessage.create({ content, speaker: { alias: "HQ Management" }, whisper: whisperIds });
+  }
+
   // ===== RESOURCE FEAT =====
 
   static rollHQResourceFEAT(hqItem, costRank, costType, isPayment, isLoan = false) {
@@ -700,7 +742,9 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
               await hero.setFlag("msh-faserip", "resourceFeat", foundry.utils.mergeObject(hero.getFlag("msh-faserip", "resourceFeat") || {}, upd));
             }
             if (isLoan && !success) {
-              await hqItem.setFlag("msh-faserip", "loanMissed", ((hqItem.getFlag("msh-faserip", "loanMissed") || 0) + 1));
+              await FaseripHeadquartersSheet.writeHQ(hqItem, {
+                "flags.msh-faserip.loanMissed": (Number(hqItem.getFlag("msh-faserip", "loanMissed")) || 0) + 1
+              });
             }
 
             // Stamp rent/loan payment on success
@@ -719,28 +763,12 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
                 hqUpdates["system.rentLastPaid"] = new Date().toISOString();
                 hqUpdates["system.rentLastPaidGameDate"] = gd.formatted;
               }
-              if (typeof game.msh?.runAsGM === 'function') {
-                game.msh.runAsGM({
-                  operation: 'updateItem',
-                  targetItemUuid: hqItem.uuid,
-                  args: [hqUpdates]
-                });
-              } else {
-                await hqItem.update(hqUpdates);
-              }
+              await FaseripHeadquartersSheet.writeHQ(hqItem, hqUpdates);
             }
 
             // Bank loan setup on HQ item
             if (Object.keys(loanUpdates).length) {
-              if (typeof game.msh?.runAsGM === 'function') {
-                game.msh.runAsGM({
-                  operation: 'updateItem',
-                  targetItemUuid: hqItem.uuid,
-                  args: [loanUpdates]
-                });
-              } else {
-                await hqItem.update(loanUpdates);
-              }
+              await FaseripHeadquartersSheet.writeHQ(hqItem, loanUpdates);
             }
 
             // Log to karma history

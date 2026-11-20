@@ -92,19 +92,30 @@
           <input type="text" value="{{system.rentLastPaidGameDate}}" class="hq-rent-date-input" placeholder="Never" title="Game date of last rent payment (e.g. 3/1/1976)" />
           <span class="hq-rent-status {{rentStatusClass}}">{{rentStatusLabel}}</span>
         </div>
-        {{#if hasLoan}}
+        <div class="hq-rent-actions">
+          <button type="button" class="hq-pay-rent" title="Make Resource FEAT for monthly rent"><i class="fas fa-dice-d20"></i> Pay Rent</button>
+        </div>
+      </div>
+    </fieldset>
+    {{/if}}
+
+    {{#if hasLoan}}
+    <fieldset class="hq-fieldset hq-rent-fieldset hq-loan-fieldset">
+      <legend>Bank Loan</legend>
+      <div class="hq-rent-info">
         <div class="hq-rent-row">
-          <span class="hq-rent-label">Loan:</span>
+          <span class="hq-rent-label">Payment:</span>
           <span class="hq-rent-value">{{system.loanPaymentRank}}/mo</span>
           <span class="hq-rent-label">Remaining:</span>
           <span class="hq-rent-value">{{system.loanPaymentsRemaining}} of {{system.loanPaymentsTotal}}</span>
-        </div>
-        {{/if}}
-        <div class="hq-rent-actions">
-          <button type="button" class="hq-pay-rent" title="Make Resource FEAT for monthly rent"><i class="fas fa-dice-d20"></i> Pay Rent</button>
-          {{#if hasLoan}}
-          <button type="button" class="hq-pay-loan" title="Make Resource FEAT for loan payment"><i class="fas fa-dice-d20"></i> Pay Loan</button>
+          {{#if system.loanLastPaidGameDate}}
+          <span class="hq-rent-label">Last Paid:</span>
+          <span class="hq-rent-value">{{system.loanLastPaidGameDate}}</span>
           {{/if}}
+          {{#if loanMissed}}<span class="hq-rent-status rent-overdue">MISSED {{loanMissed}}</span>{{/if}}
+        </div>
+        <div class="hq-rent-actions">
+          <button type="button" class="hq-pay-loan" title="Make Resource FEAT for loan payment"><i class="fas fa-dice-d20"></i> Pay Loan</button>
         </div>
       </div>
     </fieldset>
