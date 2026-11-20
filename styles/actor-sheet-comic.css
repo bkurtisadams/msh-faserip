@@ -1,4 +1,5 @@
-/* styles/actor-sheet-comic.css v1.3.0 - 2026-11-20
+/* styles/actor-sheet-comic.css v1.3.1 - 2026-11-20
+ * v1.3.1: The lighter blue of v1.3.0 toned down a notch.
  * v1.3.0: Dark palette: the header panel, the idle tabs and the column-head
  *         rows are a lighter blue instead of near-black, and each header
  *         field sits in its own outlined cell.
@@ -358,7 +359,7 @@
 .application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .power-controls .item-control { border: 1.5px solid var(--fd-gold) !important; box-shadow: 0 0 0 1px #000; }
 
 /* ---- lighter blue header, tabs and column heads; header fields in cells (v1.3.0) ---- */
-.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette { --rx-blue: #14274a; --rx-blue-cell: #1b3258; --cx-colhead-bg: #16294a; --cx-colhead-text: #ffffff; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette { --rx-blue: #0f1e36; --rx-blue-cell: #152844; --cx-colhead-bg: #11223c; --cx-colhead-text: #ffffff; }
 .application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette :is(.msh-compact-header, .msh-bio) { background-color: var(--rx-blue) !important; }
 .application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .msh-compact-header :is(.msh-row1 > .msh-field, .msh-row2 > .msh-field:not(.msh-field-bio), .msh-player-top, .msh-player-bottom),
 .application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .msh-bio .msh-biofield {
@@ -367,4 +368,4 @@
   border-radius: 1px;
 }
 .application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tabs-navigation .item:not(.active) { background: var(--rx-blue-cell) !important; border-color: #6f88a8 !important; }
-.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tabs-navigation .item:not(.active):hover { background: #24406e !important; }
+.application.faserip-sheet.sheet:not(.vehicle).faserip-dark-palette .sheet-tabs-navigation .item:not(.active):hover { background: #1d3558 !important; }
