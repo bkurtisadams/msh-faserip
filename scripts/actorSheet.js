@@ -1,3 +1,14 @@
+// actorSheet.js v2.23.0 - 2026-11-20
+// v2.23.0: _rollVehicleControl follows the Out of Control and Crashes rules.
+//          A failed Control FEAT puts the vehicle out of control
+//          (flags.msh-faserip.ooc: speed, rounds, fallen) instead of crashing
+//          it; later rolls regain control (no Karma; Air needs yellow), with
+//          Road / Off-Road / Railed / GEV losing a Speed rank per failed
+//          round, Water / Sub holding speed and Air falling 3 / 6 / 10 / 20
+//          floors. Crash is its own button: a break-through cuts Speed by
+//          the material's rank; a stop rolls a Blunt or Edged attack per
+//          occupant for damage after Protection and checks Damage to the
+//          Vehicle. Crash damage no longer comes off Body HP.
 // actorSheet.js v2.22.0 - 2026-11-20
 // v2.22.0: _rollVehicleControl fixed-bugs: rankValues was never defined in
 //          the method, so the Vehicles tab control roll threw before its
@@ -6212,12 +6223,50 @@ _rollVehicleControl(vehicle) {
     return;
   }
 
-  showFaseripButtonDialog({
-    title: `Vehicle Control FEAT: ${vehicle.name}`,
+  const oocState = vehicle.getFlag("msh-faserip", "ooc") || null;
+  const vType = vehicle.system.type || "Road";
+  const slowsWhenOoc = ["Road", "Off-Road", "Railed", "GEV"].includes(vType);
+  const fallsWhenOoc = vType === "Air";
+  const FALL_FLOORS = [3, 6, 10, 20];
+  const colorOrder = { white: 0, green: 1, yellow: 2, red: 3 };
+  const getFEATColor = (rank, total) => String(rollUniversalTable(rank, total)).toLowerCase();
+  const bodyCSLoss = Math.abs(Number(vehicle.system.bodyCSLoss) || 0);
+  const effectiveBodyRank = rankTable[Math.max(0, rankTable.indexOf(bodyRank) - bodyCSLoss)] || bodyRank;
+  const setOoc = (state) => state
+    ? vehicle.setFlag("msh-faserip", "ooc", state)
+    : vehicle.unsetFlag("msh-faserip", "ooc");
+  const banner = (color, text) => {
+    const bg = { white: "#f5f5f5", green: "#e8f5e9", yellow: "#fffde7", red: "#ffebee" }[color] || "#eee";
+    const tx = { white: "#333", green: "#1b5e20", yellow: "#5d4037", red: "#b71c1c" }[color] || "#333";
+    return `<div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;border:1px solid #ccc;background:${bg};color:${tx};">${text}</div>`;
+  };
+  const postCard = (title, lines, body) => ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
     content: `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#a52a2a;">
+          <strong>${actor.name} - ${title}</strong>
+        </div>
+        <div style="padding:5px 10px;font-size:.9em;">${lines.filter(Boolean).map(l => `<div>${l}</div>`).join("")}</div>
+        ${body}
+      </div>`
+  });
+  const oocMovementNote = (speed) => fallsWhenOoc
+    ? `Continues in a straight line at ${speed} and loses altitude as if falling.`
+    : slowsWhenOoc
+      ? `Continues forward at ${speed}; Speed drops one rank each round control is not regained.`
+      : `Continues in a straight line at ${speed} without slowing.`;
+  const dialogSpeed = oocState?.speed && rankTable.includes(oocState.speed) ? oocState.speed : effectiveSpeedRank;
+
+  showFaseripButtonDialog({
+    title: `${oocState ? "Regain Control" : "Vehicle Control FEAT"}: ${vehicle.name}`,
+    content: `
+      ${oocState ? `<div style="margin-bottom:8px;padding:6px;border:1px solid #c62828;background:#ffebee;color:#b71c1c;border-radius:3px;font-weight:bold;">
+        OUT OF CONTROL at ${oocState.speed} — ${fallsWhenOoc ? "a yellow FEAT regains control" : "a green FEAT regains control"}. Karma may not be spent.
+      </div>` : ""}
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:120px;">Vehicle:</label>
-        <strong>${vehicle.name}</strong>
+        <strong>${vehicle.name}</strong> <span style="color:#666;font-size:.85em;">(${vType})</span>
       </div>
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:120px;">Driver:</label>
@@ -6238,18 +6287,18 @@ _rollVehicleControl(vehicle) {
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:120px;">Current Speed:</label>
         <select id="current-speed">
-          ${rankTable.slice(0, 17).map(r => `<option value="${r}" ${r === effectiveSpeedRank ? "selected" : ""}>${r}</option>`).join('')}
+          ${rankTable.slice(0, 17).map(r => `<option value="${r}" ${r === dialogSpeed ? "selected" : ""}>${r}</option>`).join('')}
         </select>
         <span style="color:#666;font-size:.85em;">(speed at moment of FEAT)</span>
       </div>
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:120px;">Karma Points:</label>
-        <input id="karma" type="number" value="0" min="0" style="width:60px;">
-        <span style="color:#666;font-size:.85em;">(spend only up to 100)</span>
+        <input id="karma" type="number" value="0" min="0" style="width:60px;" ${oocState ? "disabled" : ""}>
+        <span style="color:#666;font-size:.85em;">${oocState ? "(none while out of control)" : "(spend only up to 100)"}</span>
       </div>
 
-      <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
+      ${oocState ? "" : `<div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
         <div style="font-weight:bold;margin-bottom:6px;">Stunt Settings</div>
         <div style="margin-bottom:6px;">
           <label><input type="checkbox" id="stunt-check"> Attempting Stunt?</label>
@@ -6258,10 +6307,10 @@ _rollVehicleControl(vehicle) {
           <label style="display:inline-block;width:100px;">Stunt Name:</label>
           <input id="stunt-name" type="text" placeholder="e.g., Bootleg Turn" style="width:200px;">
         </div>
-      </div>
+      </div>`}
 
       <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
-        <div style="font-weight:bold;margin-bottom:6px;">Crash Settings</div>
+        <div style="font-weight:bold;margin-bottom:6px;">Crash Settings <span style="font-weight:normal;color:#666;font-size:.85em;">(used by the Crash button)</span></div>
         <div style="margin-bottom:6px;">
           <label style="display:inline-block;width:120px;">Crash Object:</label>
           <select id="crash-object">
@@ -6269,245 +6318,199 @@ _rollVehicleControl(vehicle) {
           </select>
         </div>
         <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:120px;">Passengers:</label>
+          <label style="display:inline-block;width:120px;">Occupants:</label>
           <select id="buckled">
-            <option value="yes">Buckled In (Blunt)</option>
-            <option value="no">Not Buckled (Edged)</option>
+            <option value="yes">Strapped in (Blunt)</option>
+            <option value="no">Not strapped in (Edged)</option>
           </select>
+        </div>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;">Passengers:</label>
+          <input id="passenger-count" type="number" value="0" min="0" max="20" style="width:60px;">
+          <span style="color:#666;font-size:.85em;">(besides the driver)</span>
         </div>
       </div>
     `,
     buttons: {
       roll: {
-        label: "Roll",
+        label: oocState ? "Regain Control" : "Roll",
         callback: async html => {
           const cs = parseInt(html.find("#cs").val()) || 0;
-          const currentSpeed = html.find("#current-speed").val();
-          const karma = parseInt(html.find("#karma").val()) || 0;
-          const crashObjRank = html.find("#crash-object").val();
-          const buckled = html.find("#buckled").val();
-          const stunt = html.find("#stunt-check")[0].checked;
-          const stuntName = html.find("#stunt-name").val();
+          const currentSpeed = html.find("#current-speed").val() || dialogSpeed;
+          const karma = oocState ? 0 : (parseInt(html.find("#karma").val()) || 0);
+          const stunt = !oocState && !!html.find("#stunt-check")[0]?.checked;
+          const stuntName = oocState ? "" : (html.find("#stunt-name").val() || "");
 
           const shiftedIndex = Math.min(Math.max(baseRankIndex + cs, 0), rankTable.length - 1);
           const shiftedRank = rankTable[shiftedIndex];
-          const shiftedValue = rankValues[shiftedRank];
 
           const controlRoll = new Roll("1d100");
           await controlRoll.evaluate();
           await controlRoll.toMessage({
             speaker: ChatMessage.getSpeaker({ actor }),
-            flavor: `${actor.name} makes a Vehicle Control FEAT${stunt ? ` to perform a stunt: ${stuntName}` : ""}`
+            flavor: `${actor.name} makes a Vehicle Control FEAT${oocState ? " to regain control" : stunt ? ` to perform a stunt: ${stuntName}` : ""}`
           });
 
-          // Karma spending - uses lifetime karma only
           let cappedTotal = controlRoll.total;
-          let karmaUsed = 0;
-
           if (karma > 0) {
             cappedTotal = Math.min(100, controlRoll.total + karma);
-            karmaUsed = karma;
-
-            // Create history entry for karma spending
-            const historyEntry = {
+            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+            currentHistory.push({
               timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
               gameDate: "",
               amount: -karma,
               type: "Die Roll",
               description: `Spent karma on Vehicle Control for ${vehicle.name}`
-            };
-            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-            currentHistory.push(historyEntry);
+            });
             await game.msh.runAsGM({
               operation: 'update',
               targetActorUuid: this.actor.uuid,
               args: [{ "system.karma.history": currentHistory }]
             });
           }
-          const totalKarmaUsed = karmaUsed;
 
-          // ---- Defense-style banner helpers (safe local fallbacks) ----
-          const colorStyles = (globalThis.colorStyles)
-            || (game?.msh?.ui?.colorStyles)
-            || { white:"#f5f5f5", green:"#e8f5e9", yellow:"#fffde7", red:"#ffebee" };
+          const featColor = getFEATColor(shiftedRank, cappedTotal);
+          const needed = oocState && fallsWhenOoc ? "yellow" : "green";
+          const success = colorOrder[featColor] >= colorOrder[needed];
 
-          const textColor = (globalThis.textColor)
-            || (game?.msh?.ui?.textColor)
-            || (c => {
-                const m = { white:"#333", green:"#1b5e20", yellow:"#5d4037", red:"#b71c1c" };
-                return m[String(c).toLowerCase()] || "#333";
-              });
-
-          const getFEATColor = (rank, total) => String(rollUniversalTable(rank, total)).toLowerCase();
-
-          const featColor = getFEATColor(shiftedRank, cappedTotal).toLowerCase();
-          const isCrash = (featColor === "white");
-          const stuntFailure = (stunt && isCrash);
-
-          // Crash sequence
-          let crashDetails = "";
-          if (isCrash) {
-            // need current speed for crash sequence:
-            const speedRank = currentSpeed || vehicle.system.speed || "Typical";
-            const bodyRank  = vehicle.system.body  || "Typical";
-
-            // CRITICAL FIX: Crash FEAT uses LOWER of Speed or Body (per rules page 53)
-            // "as if the vehicle had a 'strength' equal to its Speed or Body, whichever is lower"
-            const vehicleStrengthRank = rankValues[speedRank] <= rankValues[bodyRank]
-              ? speedRank
-              : bodyRank;
-
-            const crashRoll = new Roll("1d100"); await crashRoll.evaluate();
-            const crashColor = getFEATColor(vehicleStrengthRank, crashRoll.total).toLowerCase();
-            const materialDiff = rankTable.indexOf(crashObjRank) - rankTable.indexOf(vehicleStrengthRank);
-            const crashNeeded = materialDiff < 0 ? "green" : materialDiff === 0 ? "yellow" : "red";
-            const colorOrder = { white: 0, green: 1, yellow: 2, red: 3 };
-            const brokeThrough = colorOrder[crashColor] >= colorOrder[crashNeeded];
-
-            const baseDamageRank = rankValues[crashObjRank] >= rankValues[speedRank] ? crashObjRank : speedRank;
-            const baseDamage     = rankValues[baseDamageRank];
-
-            const protectionRank = vehicle.system.protection || "Typical";
-            const protection     = rankValues[protectionRank];
-            const netDamage      = Math.max(0, baseDamage - protection);
-
-            // Post-crash FEAT vs Body to determine CS losses
-            const bodyValue   = rankValues[bodyRank];
-            const damageLevel = baseDamage > bodyValue ? "greater" : baseDamage === bodyValue ? "equal" : "less";
-            const damageRoll  = new Roll("1d100"); await damageRoll.evaluate();
-            const damageColor = getFEATColor(bodyRank, damageRoll.total).toLowerCase();
-
-            let outcome = "";
-            if (damageLevel === "greater") {
-              outcome = damageColor === "red"    ? "Body -1CS"
-                    : damageColor === "yellow" ? "Speed -1CS, Control FEAT required"
-                    : damageColor === "green"  ? "Control -1CS, Control FEAT required"
-                                                : "All -1CS, Vehicle out of control!";
-            } else if (damageLevel === "equal") {
-              outcome = damageColor === "red"    ? "No damage to vehicle"
-                    : damageColor === "yellow" ? "Body -1CS"
-                    : damageColor === "green"  ? "Speed -1CS, Control FEAT required"
-                                                : "Control -1CS, Control FEAT required";
+          let resultText, note = "";
+          if (!oocState) {
+            if (success) {
+              resultText = stunt ? `STUNT SUCCEEDS — ${stuntName || "UNNAMED STUNT"}` : "CONTROL MAINTAINED";
             } else {
-              outcome = ["red", "yellow"].includes(damageColor) ? "No effect"
-                    : damageColor === "green"  ? "Body -1CS, Control FEAT required"
-                                                : "Control -1CS, damage to passengers, Control FEAT required";
+              const state = { speed: currentSpeed, rounds: 0, fallen: 0 };
+              if (fallsWhenOoc) { state.rounds = 1; state.fallen = FALL_FLOORS[0]; }
+              await setOoc(state);
+              resultText = stunt ? `STUNT FAILED — OUT OF CONTROL` : "OUT OF CONTROL";
+              note = `${oocMovementNote(currentSpeed)}${fallsWhenOoc ? ` Falls ${FALL_FLOORS[0]} floors this round.` : ""} The driver may try to regain control next round; Karma may not be spent on that FEAT.`;
             }
-
-            // Apply effects to vehicle
-            const updateData = {};
-
-            if (damageLevel === "greater") {
-              if (damageColor === "red")    updateData["system.bodyCSLoss"]    = nextLoss("bodyCSLoss");
-              if (damageColor === "yellow") updateData["system.speedCSLoss"]   = nextLoss("speedCSLoss");
-              if (damageColor === "green")  updateData["system.controlCSLoss"] = nextLoss("controlCSLoss");
-              if (damageColor === "white") {
-                updateData["system.bodyCSLoss"]    = nextLoss("bodyCSLoss");
-                updateData["system.speedCSLoss"]   = nextLoss("speedCSLoss");
-                updateData["system.controlCSLoss"] = nextLoss("controlCSLoss");
+          } else if (success) {
+            await setOoc(null);
+            resultText = "CONTROL REGAINED";
+            note = `${vehicle.name} is back under control at ${oocState.speed}.`;
+          } else {
+            const rounds = (Number(oocState.rounds) || 0) + 1;
+            if (slowsWhenOoc) {
+              const newIdx = Math.max(0, rankTable.indexOf(oocState.speed) - 1);
+              if (newIdx <= 0) {
+                await setOoc(null);
+                resultText = "STILL OUT OF CONTROL — VEHICLE STOPS";
+                note = `${vehicle.name} has slowed to a complete stop.`;
+              } else {
+                await setOoc({ ...oocState, speed: rankTable[newIdx], rounds });
+                resultText = "STILL OUT OF CONTROL";
+                note = `Speed drops one rank: ${oocState.speed} → ${rankTable[newIdx]}. Another attempt may be made next round.`;
               }
-            } else if (damageLevel === "equal") {
-              if (damageColor === "yellow") updateData["system.bodyCSLoss"]    = nextLoss("bodyCSLoss");
-              if (damageColor === "green")  updateData["system.speedCSLoss"]   = nextLoss("speedCSLoss");
-              if (damageColor === "white")  updateData["system.controlCSLoss"] = nextLoss("controlCSLoss");
+            } else if (fallsWhenOoc) {
+              const floors = FALL_FLOORS[Math.min(rounds - 1, FALL_FLOORS.length - 1)];
+              const fallen = (Number(oocState.fallen) || 0) + floors;
+              await setOoc({ ...oocState, rounds, fallen });
+              resultText = "STILL OUT OF CONTROL";
+              note = `Holds ${oocState.speed} in a straight line and falls ${floors} more floors this round (${fallen} floors, ${fallen * 15} feet in all).`;
             } else {
-              if (damageColor === "green")  updateData["system.bodyCSLoss"]    = nextLoss("bodyCSLoss");
-              if (damageColor === "white")  updateData["system.controlCSLoss"] = nextLoss("controlCSLoss");
+              await setOoc({ ...oocState, rounds });
+              resultText = "STILL OUT OF CONTROL";
+              note = `Holds ${oocState.speed} in a straight line without slowing.`;
             }
-
-            // HP tracking from Body rank min value
-            const maxHP     = rankValues[bodyRank] ?? 6;
-            const currentHP = vehicle.system.bodyHP ?? maxHP;
-            updateData["system.bodyHP"] = Math.max(0, currentHP - netDamage);
-            await vehicle.update(updateData);
-
-            if (updateData["system.bodyHP"] === 0) {
-              outcome += " <strong style='color:#c62828;'>Vehicle destroyed!</strong>";
-            }
-
-            // Use defense-style color helpers
-            const bannerBg1 = colorStyles?.[crashColor] || "#eee";
-            const bannerTx1 = (typeof textColor === "function") ? textColor(crashColor) : "#333";
-            const bannerBg2 = colorStyles?.[damageColor] || "#eee";
-            const bannerTx2 = (typeof textColor === "function") ? textColor(damageColor) : "#333";
-
-            crashDetails = `
-              <div style="padding:8px 10px;margin:0;background:#fff;border-top:1px solid #ddd;font-size:.9em;">
-                <div style="font-weight:bold;margin-bottom:6px;color:#d32f2f;">Crash Outcome</div>
-                <div>Vehicle Crash Strength: ${vehicleStrengthRank} (lower of Speed/Body)</div>
-                <div>Obstacle: ${crashObjRank} material — ${crashNeeded} FEAT needed to break through</div>
-                <div>Crash Roll: ${crashRoll.total}</div>
-                <div style="margin:8px 0;">
-                  <div style="text-align:center;padding:8px;font-weight:bold;font-size:1em;border-radius:3px;background-color:${bannerBg1};color:${bannerTx1};">
-                    CRASH FEAT: ${crashColor.toUpperCase()}
-                  </div>
-                </div>
-                <div>${brokeThrough ? "✓ Vehicle broke through obstacle" : "✗ Vehicle stopped by obstacle"}</div>
-                <div>Base Damage: ${baseDamageRank} (${baseDamage}) (higher of material/Speed)</div>
-                <div>After Protection: ${netDamage}</div>
-                <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
-                  <div>Post-Crash Roll: ${damageRoll.total}</div>
-                  <div style="margin:6px 0;">
-                    <div style="text-align:center;padding:8px;font-weight:bold;font-size:1em;border-radius:3px;background-color:${bannerBg2};color:${bannerTx2};">
-                      POST-CRASH: ${damageColor.toUpperCase()}
-                    </div>
-                  </div>
-                  <div><strong>${stuntFailure ? `Stunt caused crash!` : outcome}</strong></div>
-                </div>
-              </div>
-            `;
           }
 
-          // Defense-style result banner for the main FEAT
-          const mainBg = colorStyles?.[featColor] || "#eee";
-          const mainTx = (typeof textColor === "function") ? textColor(featColor) : "#333";
+          postCard("Vehicle Control FEAT", [
+            `Vehicle: ${vehicle.name} (${vType})`,
+            `Driver Agility: ${driverAgiRank} (${agility})`,
+            `Control Rank: ${controlRank}${controlCSLoss > 0 ? ` — ${controlCSLoss} CS Lost → ${adjustedControlRank}` : ""}`,
+            `Used Rank: ${baseUsedRank}${cs !== 0 ? ` — Shift ${cs >= 0 ? '+' : ''}${cs} → ${shiftedRank}` : ""}`,
+            `Roll: ${controlRoll.total}${karma ? ` + Karma: ${karma}` : ""} = ${cappedTotal}`,
+            `Needed: ${needed}${oocState ? " (regaining control)" : ""}`,
+            stunt ? `<strong>Stunt:</strong> ${stuntName || "(unnamed)"}` : ""
+          ], `${banner(featColor, `${featColor.toUpperCase()} — ${resultText}`)}
+              ${note ? `<div style="padding:4px 10px 8px;font-size:.9em;">${note}</div>` : ""}`);
+        }
+      },
+      crash: {
+        label: "Crash",
+        callback: async html => {
+          const speedRank = html.find("#current-speed").val() || dialogSpeed;
+          const crashObjRank = html.find("#crash-object").val() || "Excellent";
+          const strapped = html.find("#buckled").val() !== "no";
+          const passengerCount = Math.max(0, Math.min(20, parseInt(html.find("#passenger-count").val()) || 0));
 
-          ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: `
-              <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#a52a2a;">
-                  <strong>${actor.name} - Vehicle Control FEAT</strong>
-                </div>
-                <div style="padding:5px 10px;font-size:.9em;">
-                  <div>Vehicle: ${vehicle.name}</div>
-                  <div>Driver Agility: ${driverAgiRank} (${agility})</div>
-                  <div>Control Rank: ${controlRank}${controlCSLoss > 0 ? ` — ${controlCSLoss} CS Lost → ${adjustedControlRank}` : ""}</div>
-                  <div>Used Rank: ${baseUsedRank}${cs !== 0 ? ` — Shift ${cs >= 0 ? '+' : ''}${cs} → ${shiftedRank}` : ""}</div>
-                  <div>Roll: ${controlRoll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-                  ${stunt ? `<div style="margin-top:4px;"><strong>Stunt:</strong> ${stuntName || "(unnamed)"}</div>` : ""}
-                </div>
+          const vehicleStrengthRank = rankValues[speedRank] <= rankValues[effectiveBodyRank] ? speedRank : effectiveBodyRank;
+          const materialDiff = rankTable.indexOf(crashObjRank) - rankTable.indexOf(vehicleStrengthRank);
+          const crashNeeded = materialDiff < 0 ? "green" : materialDiff === 0 ? "yellow" : "red";
+          const crashRoll = new Roll("1d100"); await crashRoll.evaluate();
+          const crashColor = getFEATColor(vehicleStrengthRank, crashRoll.total);
+          const brokeThrough = colorOrder[crashColor] >= colorOrder[crashNeeded];
 
-                <div style="padding:8px 10px;border-top:1px solid #ddd;">
-                  <div style="font-weight:bold;margin-bottom:6px;">Possible Results:</div>
-                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:.85em;text-align:center;">
-                    <div style="padding:6px 4px;background:${featColor === 'white' ? '#333' : '#e0e0e0'};color:${featColor === 'white' ? '#fff' : '#666'};border-radius:2px;font-weight:600;" title="Vehicle crashes and goes out of control. Damage to passengers and vehicle.">
-                      <div>White:</div>
-                      <div>Crash</div>
-                    </div>
-                    <div style="padding:6px 4px;background:${featColor === 'green' ? '#4caf50' : '#e0e0e0'};color:${featColor === 'green' ? '#fff' : '#666'};border-radius:2px;font-weight:600;" title="Control maintained successfully.">
-                      <div>Green:</div>
-                      <div>Control</div>
-                    </div>
-                    <div style="padding:6px 4px;background:${featColor === 'yellow' ? '#fbc02d' : '#e0e0e0'};color:${featColor === 'yellow' ? '#333' : '#666'};border-radius:2px;font-weight:600;" title="Control maintained successfully.">
-                      <div>Yellow:</div>
-                      <div>Control</div>
-                    </div>
-                    <div style="padding:6px 4px;background:${featColor === 'red' ? '#d32f2f' : '#e0e0e0'};color:${featColor === 'red' ? '#fff' : '#666'};border-radius:2px;font-weight:600;" title="Control maintained successfully.">
-                      <div>Red:</div>
-                      <div>Control</div>
-                    </div>
-                  </div>
-                </div>
+          const head = [
+            `Vehicle: ${vehicle.name} (${vType}) at ${speedRank}`,
+            `Obstacle: ${crashObjRank} material`,
+            `Crash Strength: ${vehicleStrengthRank} (lower of Speed/Body) — ${crashNeeded} FEAT needed`,
+            `Crash Roll: ${crashRoll.total}`
+          ];
 
-                <div style="text-align:center;padding:10px;margin:8px 0;font-weight:bold;font-size:1.1em;text-transform:uppercase;border-radius:3px;background:${mainBg};color:${mainTx};">
-                  ${stuntFailure ? `STUNT FAILED — ${stuntName || "UNNAMED STUNT"}` : `RESULT: ${featColor.toUpperCase()} — ${isCrash ? "OUT OF CONTROL" : "CONTROL MAINTAINED"}`}
-                </div>
-                ${crashDetails}
-              </div>
-            `
-          });
+          if (brokeThrough) {
+            const newIdx = Math.max(0, rankTable.indexOf(speedRank) - rankTable.indexOf(crashObjRank));
+            const newSpeed = rankTable[newIdx];
+            const stopped = newIdx <= 0;
+            if (oocState) await setOoc(stopped ? null : { ...oocState, speed: newSpeed });
+            postCard("Vehicle Crash", head, `
+              ${banner(crashColor, `${crashColor.toUpperCase()} — BREAKS THROUGH`)}
+              <div style="padding:4px 10px 8px;font-size:.9em;">
+                Speed reduced by the rank of the material (${rankTable.indexOf(crashObjRank)}): ${speedRank} → ${stopped ? "0 (stopped)" : newSpeed}.
+                ${oocState && !stopped ? "The vehicle is still out of control." : ""}
+              </div>`);
+            return;
+          }
+
+          if (oocState) await setOoc(null);
+
+          const baseDamageRank = rankValues[crashObjRank] >= rankValues[speedRank] ? crashObjRank : speedRank;
+          const baseDamage = rankValues[baseDamageRank];
+          const noProtection = rankTable.indexOf(effectiveBodyRank) <= 0;
+          const protectionRank = vehicle.system.protection || "Typical";
+          const protection = noProtection ? 0 : (Number(rankValues[protectionRank]) || 0);
+          const occupantDamage = Math.max(0, baseDamage - protection);
+
+          const effectFor = (color) => strapped
+            ? { white: "No damage", green: "Hit", yellow: "Slam", red: "Stun" }[color]
+            : { white: "No damage", green: "Hit", yellow: "Stun", red: "Kill" }[color];
+          const occupants = [actor.name, ...Array.from({ length: passengerCount }, (_, i) => `Passenger ${i + 1}`)];
+          const occupantLines = [];
+          for (const name of occupants) {
+            const r = new Roll("1d100"); await r.evaluate();
+            const c = getFEATColor(baseDamageRank, r.total);
+            const dmg = c === "white" ? 0 : occupantDamage;
+            occupantLines.push(`<div>${name}: roll ${r.total} (${c}) — <strong>${effectFor(c)}</strong>${dmg ? `, ${dmg} damage before own armor` : ""}</div>`);
+          }
+
+          const bodyValue = rankValues[effectiveBodyRank];
+          const damageLevel = baseDamage > bodyValue ? "greater" : baseDamage === bodyValue ? "equal" : "less";
+          const damageRoll = new Roll("1d100"); await damageRoll.evaluate();
+          const damageColor = getFEATColor(effectiveBodyRank, damageRoll.total);
+          const table = {
+            greater: { red: ["Body -1CS", ["bodyCSLoss"]], yellow: ["Speed -1CS, Control FEAT", ["speedCSLoss"]], green: ["Control -1CS, Control FEAT", ["controlCSLoss"]], white: ["All -1CS, Out of Control", ["bodyCSLoss", "speedCSLoss", "controlCSLoss"]] },
+            equal:   { red: ["No damage to vehicle", []], yellow: ["Body -1CS", ["bodyCSLoss"]], green: ["Speed -1CS, Control FEAT", ["speedCSLoss"]], white: ["Control -1CS, Control FEAT", ["controlCSLoss"]] },
+            less:    { red: ["No damage", []], yellow: ["No damage", []], green: ["Body -1CS, Control FEAT", ["bodyCSLoss"]], white: ["Control -1CS, Control FEAT", ["controlCSLoss"]] }
+          };
+          const [outcome, lossKeys] = table[damageLevel][damageColor];
+          const updateData = {};
+          for (const key of lossKeys) updateData[`system.${key}`] = nextLoss(key);
+          if (lossKeys.length) await vehicle.update(updateData);
+
+          postCard("Vehicle Crash", head, `
+            ${banner(crashColor, `${crashColor.toUpperCase()} — STOPPED BY OBSTACLE`)}
+            <div style="padding:4px 10px;font-size:.9em;">
+              <div>Base Damage: ${baseDamageRank} (${baseDamage}) (higher of material/Speed)</div>
+              <div>Protection: ${noProtection ? "none (Body at 0)" : `${protectionRank} (${protection})`} — each occupant faces ${occupantDamage}</div>
+              <div style="margin-top:6px;font-weight:bold;">Occupants (${strapped ? "strapped in, Blunt Attack" : "not strapped in, Edged Attack"}; no Karma on the roll)</div>
+              ${occupantLines.join("")}
+            </div>
+            <div style="padding:6px 10px 8px;margin-top:4px;border-top:1px solid #ddd;font-size:.9em;">
+              <div style="font-weight:bold;">Damage to the Vehicle</div>
+              <div>Damage ${baseDamage} is ${damageLevel === "equal" ? "equal to" : damageLevel + " than"} Body ${effectiveBodyRank} (${bodyValue}); Body FEAT roll ${damageRoll.total} (${damageColor})</div>
+              <div><strong>${outcome}</strong></div>
+            </div>`);
         }
       },
       cancel: { label: "Cancel" }

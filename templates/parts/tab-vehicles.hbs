@@ -32,6 +32,9 @@
                   <span class="vehicle-name-text vehicle-draggable" data-item-id="{{item._id}}" draggable="true">
                     {{item.name}}
                   </span>
+                  {{#with (lookup item.flags "msh-faserip")}}{{#if this.ooc}}
+                  <span class="vehicle-ooc-badge" title="Out of control — roll the Control FEAT to regain control" style="margin-left:6px;padding:1px 5px;border-radius:3px;background:#c62828;color:#fff;font-size:10px;font-weight:bold;white-space:nowrap;">OUT OF CONTROL · {{abbreviateRank this.ooc.speed}}</span>
+                  {{/if}}{{/with}}
                 </td>
                 
                 <td>{{item.system.type}}</td>
