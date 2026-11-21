@@ -1,4 +1,5 @@
-/* styles/vehicle-sheet.css v1.1.0 - 2026-03-13 */
+/* styles/vehicle-sheet.css v1.2.0 - 2026-11-20 */
+/* v1.2.0: Current Speed areas/round readout (.veh-speed-areas). */
 /* Compact vehicle actor sheet layout */
 
 /* ── TABS — force horizontal ── */
@@ -151,6 +152,14 @@
   font-size: .85em;
   padding: 1px 2px;
 }
+.vehicle-sheet .veh-speed-areas {
+  font-size: .8em;
+  font-weight: bold;
+  color: #333;
+  white-space: nowrap;
+  cursor: help;
+}
+.vehicle-sheet .veh-speed-areas.veh-speed-over { color: #c62828; }
 .vehicle-sheet .veh-ooc {
   display: flex;
   align-items: center;

@@ -1,3 +1,9 @@
+// scripts/vehicle-actor-sheet.js v3.6.0 - 2026-11-20
+// v3.6.0: Current Speed shows areas/round beside the rank, against the safe
+//         maximum (Speed after CS losses), with mph in the hover text; each
+//         Cur.Speed option carries its areas. Figures come from the kernel's
+//         Long Distance Movement table: Air column for Air, Space and GEV,
+//         Land/Water for the rest.
 // scripts/vehicle-actor-sheet.js v3.5.0 - 2026-11-20
 // v3.5.0: Control FEAT button in the condition strip. It opens the shared
 //         Vehicle Control dialog (modules/actions/vehicle-control.js) with
@@ -35,6 +41,25 @@ import {
   RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
   stepRank, rankValue as rankVal
 } from "./rules/rules-reference.js";
+import { LONG_DISTANCE } from "./lib/faserip-rules/faserip-movement.js";
+
+const SPEED_KEYS = {
+  "Feeble": "FE", "Poor": "PR", "Typical": "TY", "Good": "GD", "Excellent": "EX",
+  "Remarkable": "RM", "Incredible": "IN", "Amazing": "AM", "Monstrous": "MN",
+  "Unearthly": "UN", "Shift-X": "SHX", "Shift-Y": "SHY", "Shift-Z": "SHZ",
+  "Class 1000": "CL1000", "Class 3000": "CL3000", "Class 5000": "CL5000"
+};
+const AIR_COLUMN_TYPES = ["Air", "Space", "GEV"];
+
+export function vehicleSpeedInfo(rank, type) {
+  const air = AIR_COLUMN_TYPES.includes(type);
+  const row = LONG_DISTANCE[SPEED_KEYS[rank]];
+  if (!row) return { areas: 0, mph: 0, numeric: true, short: "0", long: "0 areas/round" };
+  const areas = air ? row.air : row.land;
+  if (typeof areas !== "number") return { areas, mph: null, numeric: false, short: areas, long: areas };
+  const mph = (air ? row.airMph : row.landMph) ?? areas * 15;
+  return { areas, mph, numeric: true, short: String(areas), long: `${areas} areas/round, ${mph.toLocaleString("en-US")} mph` };
+}
 
 function lesserRank(a, b) {
   return rankVal(a) <= rankVal(b) ? a : b;
@@ -127,6 +152,29 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
     const actualBody = effBody || sys.body || "Typical";
     const actualSpeed = effSpeed || sys.speed || "Typical";
     data.chargingRank = lesserRank(actualBody, actualSpeed);
+
+    // --- Current Speed in areas/round against the safe maximum ---
+    const vType = sys.type || "Road";
+    const current = RANK_ORDER.includes(sys.currentSpeed) ? sys.currentSpeed : "";
+    const now = vehicleSpeedInfo(current, vType);
+    const safe = vehicleSpeedInfo(actualSpeed, vType);
+    const over = current ? RANK_ORDER.indexOf(current) - RANK_ORDER.indexOf(actualSpeed) : 0;
+    data.speedOptions = data.allRanks.map(rank => ({
+      value: rank,
+      label: `${rank} (${vehicleSpeedInfo(rank, vType).short})`,
+      selected: rank === current
+    }));
+    data.speedReadout = {
+      text: now.numeric && safe.numeric ? `${now.short} of ${safe.short} areas` : `${now.short} of ${safe.short}`,
+      over: over > 0,
+      title: [
+        current ? `Current Speed ${current}: ${now.long}` : "Stopped",
+        `Safe maximum ${actualSpeed}: ${safe.long}`,
+        over === 1 ? "Speeding: one rank over safe Speed, every action needs a Control FEAT one colour higher" : "",
+        over > 1 ? "More than one rank over safe Speed is not allowed" : "",
+        `${AIR_COLUMN_TYPES.includes(vType) ? "Air" : "Land/Water"} column, Long Distance Movement table`
+      ].filter(Boolean).join("\n")
+    };
 
     return data;
   }

@@ -71,10 +71,11 @@
       <label title="Current speed rank this round">Cur.Speed</label>
       <select name="system.currentSpeed" class="veh-cur-speed">
         <option value="" {{#unless system.currentSpeed}}selected{{/unless}}>Stopped</option>
-        {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.currentSpeed this)}}selected{{/if}}>{{this}}</option>
+        {{#each speedOptions}}
+          <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
         {{/each}}
       </select>
+      <span class="veh-speed-areas {{#if speedReadout.over}}veh-speed-over{{/if}}" title="{{speedReadout.title}}">{{speedReadout.text}}</span>
     </div>
     <label class="veh-ooc {{#if system.outOfControl}}veh-ooc-active{{/if}}" title="Out of control — no Karma to recover">
       <input type="checkbox" name="system.outOfControl" {{#if system.outOfControl}}checked{{/if}}>
