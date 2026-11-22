@@ -1,4 +1,7 @@
-/* styles/vehicle-sheet-dark.css v1.0.0 - 2026-11-20
+/* styles/vehicle-sheet-dark.css v1.1.0 - 2026-11-22
+ * v1.1.0: counterparts for the compact layout (styles/vehicle-sheet.css
+ *         v1.3.0) and for the Current Speed readout, which had none.
+ *
  * Dark palette for the vehicle actor sheet, Foundry v14. Same navy, crimson
  * and yellow as the character sheet, the item sheets and the dialogs.
  *
@@ -290,3 +293,22 @@
   box-shadow: inset 0 3px 0 var(--fd-gold);
   text-shadow: 1px 1px 0 #000;
 }
+
+/* ---- from styles/vehicle-sheet.css v1.2.0 / v1.3.0 (readout, compact layout) ---- */
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-speed-areas { color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-speed-areas.veh-speed-over { color: #ff9989; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-header { border: none; border-bottom: 2px solid #c22929; box-shadow: none; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-name { background: #08111c; border: 1px solid #6b82a0; color: #f4ecdd; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-head-field,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-comp,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-stat label,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-hp-group label,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-cspeed-group label,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-seats,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-crew-label,
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-crew-agi { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs { border: none; border-bottom: 1px solid #a8892c; box-shadow: none; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item { color: #d3cab9; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .sheet-tabs.tabs .item.active { color: #f8f070; border-bottom-color: #f5cf45; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .veh-box-title { color: #f5cf45; }
+.application.faserip-vehicle-window.faserip-dark-palette .vehicle-sheet .crew-drop-zone { color: #a3adba; }

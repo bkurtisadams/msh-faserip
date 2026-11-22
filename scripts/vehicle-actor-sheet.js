@@ -1,3 +1,10 @@
+// scripts/vehicle-actor-sheet.js v3.7.0 - 2026-11-22
+// v3.7.0: Compacted sheet. The Control FEAT button carries the FEAT rank and
+//         the charging rank moves to its hover text; effective ranks show as
+//         abbreviations inside their stat boxes; Seats sits in the Crew
+//         heading; Art Facing, Special Features and Description move to a
+//         Details tab; the window opens at 420 high. vehicleSpeedInfo moved
+//         to modules/actions/vehicle-control.js.
 // scripts/vehicle-actor-sheet.js v3.6.0 - 2026-11-20
 // v3.6.0: Current Speed shows areas/round beside the rank, against the safe
 //         maximum (Speed after CS losses), with mph in the hover text; each
@@ -36,31 +43,11 @@
 
 import { FaseripActorSheet } from "./actorSheet.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
-import { openVehicleControl } from "./modules/actions/vehicle-control.js";
+import { openVehicleControl, vehicleSpeedInfo, usesAirColumn } from "./modules/actions/vehicle-control.js";
 import {
   RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
   stepRank, rankValue as rankVal
 } from "./rules/rules-reference.js";
-import { LONG_DISTANCE } from "./lib/faserip-rules/faserip-movement.js";
-
-const SPEED_KEYS = {
-  "Feeble": "FE", "Poor": "PR", "Typical": "TY", "Good": "GD", "Excellent": "EX",
-  "Remarkable": "RM", "Incredible": "IN", "Amazing": "AM", "Monstrous": "MN",
-  "Unearthly": "UN", "Shift-X": "SHX", "Shift-Y": "SHY", "Shift-Z": "SHZ",
-  "Class 1000": "CL1000", "Class 3000": "CL3000", "Class 5000": "CL5000"
-};
-const AIR_COLUMN_TYPES = ["Air", "Space", "GEV"];
-
-export function vehicleSpeedInfo(rank, type) {
-  const air = AIR_COLUMN_TYPES.includes(type);
-  const row = LONG_DISTANCE[SPEED_KEYS[rank]];
-  if (!row) return { areas: 0, mph: 0, numeric: true, short: "0", long: "0 areas/round" };
-  const areas = air ? row.air : row.land;
-  if (typeof areas !== "number") return { areas, mph: null, numeric: false, short: areas, long: areas };
-  const mph = (air ? row.airMph : row.landMph) ?? areas * 15;
-  return { areas, mph, numeric: true, short: String(areas), long: `${areas} areas/round, ${mph.toLocaleString("en-US")} mph` };
-}
-
 function lesserRank(a, b) {
   return rankVal(a) <= rankVal(b) ? a : b;
 }
@@ -152,6 +139,13 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
     const actualBody = effBody || sys.body || "Typical";
     const actualSpeed = effSpeed || sys.speed || "Typical";
     data.chargingRank = lesserRank(actualBody, actualSpeed);
+    data.controlFeatTitle = [
+      data.effectiveControlFEAT
+        ? `Control FEAT on ${data.effectiveControlFEAT}: lesser of driver Agility and Control`
+        : "Add a driver on the Crew tab to roll a Control FEAT",
+      `Charging attack rank ${data.chargingRank}: lesser of Body and Speed`,
+      "Opens the Control FEAT dialog: maneuvers, regaining control, crashes"
+    ].join("\n");
 
     // --- Current Speed in areas/round against the safe maximum ---
     const vType = sys.type || "Road";
@@ -172,7 +166,7 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
         `Safe maximum ${actualSpeed}: ${safe.long}`,
         over === 1 ? "Speeding: one rank over safe Speed, every action needs a Control FEAT one colour higher" : "",
         over > 1 ? "More than one rank over safe Speed is not allowed" : "",
-        `${AIR_COLUMN_TYPES.includes(vType) ? "Air" : "Land/Water"} column, Long Distance Movement table`
+        `${usesAirColumn(vType) ? "Air" : "Land/Water"} column, Long Distance Movement table`
       ].filter(Boolean).join("\n")
     };
 
@@ -330,7 +324,7 @@ export class MSHVehicleActorSheetV2 extends FaseripActorSheetV2 {
   /** @override */
   static DEFAULT_OPTIONS = {
     classes: ["vehicle", "faserip-vehicle-window"],
-    position: { width: 620, height: 580 }
+    position: { width: 620, height: 420 }
   };
 
   /** @override */
@@ -342,7 +336,7 @@ export class MSHVehicleActorSheetV2 extends FaseripActorSheetV2 {
   };
 
   static TABS_SHIM = { nav: ".sheet-tabs", content: ".sheet-body", initial: "crew" };
-  static NORMAL_SIZE = { width: 620, height: 580 };
+  static NORMAL_SIZE = { width: 620, height: 420 };
 
   // The character sheet's form.faserip-sheet rules style the window itself.
   // The vehicle sheet keeps its own look: the class goes on the template's

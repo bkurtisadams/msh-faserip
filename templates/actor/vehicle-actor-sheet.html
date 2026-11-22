@@ -2,18 +2,22 @@
 
   {{!-- ═══ HEADER: img + name + type + cost + compartmented ═══ --}}
   <header class="sheet-header veh-header">
-    <img class="profile-img" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" width="48" height="48" />
+    <img class="profile-img" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" width="30" height="30" />
     <input class="veh-name" name="name" type="text" value="{{actor.name}}" placeholder="Vehicle Name"/>
-    <select class="veh-type-sel" name="system.type" title="Vehicle Type">
-      {{#each vehicleTypes}}
-        <option value="{{this}}" {{#if (eq ../system.type this)}}selected{{/if}}>{{this}}</option>
-      {{/each}}
-    </select>
-    <select class="veh-cost-sel" name="system.cost" title="Cost (Resources)">
-      {{#each allRanks}}
-        <option value="{{this}}" {{#if (eq ../system.cost this)}}selected{{/if}}>{{this}}</option>
-      {{/each}}
-    </select>
+    <label class="veh-head-field" title="Vehicle Type">Type
+      <select class="veh-type-sel" name="system.type">
+        {{#each vehicleTypes}}
+          <option value="{{this}}" {{#if (eq ../system.type this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+    </label>
+    <label class="veh-head-field" title="Cost (Resources rank)">Cost
+      <select class="veh-cost-sel" name="system.cost">
+        {{#each allRanks}}
+          <option value="{{this}}" {{#if (eq ../system.cost this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+    </label>
     <label class="veh-comp" title="Compartmented — passengers cannot be targeted without destroying Body first">
       <input type="checkbox" name="system.compartmented" {{#if system.compartmented}}checked{{/if}}>
       Comp.
@@ -24,42 +28,50 @@
   <div class="veh-stat-bar">
     <div class="veh-stat">
       <label>Control</label>
-      <select name="system.control">
-        {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.control this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
-      {{#if effectiveControl}}<span class="veh-eff" title="Effective after {{system.controlCSLoss}} CS loss">⇒ {{effectiveControl}}</span>{{/if}}
+      <div class="veh-stat-row">
+        <select name="system.control">
+          {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq ../system.control this)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+        {{#if effectiveControl}}<span class="veh-eff" title="{{effectiveControl}} after {{system.controlCSLoss}} CS loss">⇒ {{abbreviateRank effectiveControl}}</span>{{/if}}
+      </div>
     </div>
     <div class="veh-stat">
       <label>Speed</label>
-      <select name="system.speed">
-        {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.speed this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
-      {{#if effectiveSpeed}}<span class="veh-eff" title="Effective after {{system.speedCSLoss}} CS loss">⇒ {{effectiveSpeed}}</span>{{/if}}
+      <div class="veh-stat-row">
+        <select name="system.speed">
+          {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq ../system.speed this)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+        {{#if effectiveSpeed}}<span class="veh-eff" title="{{effectiveSpeed}} after {{system.speedCSLoss}} CS loss">⇒ {{abbreviateRank effectiveSpeed}}</span>{{/if}}
+      </div>
     </div>
     <div class="veh-stat">
       <label>Body</label>
-      <select name="system.body">
-        {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.body this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
-      {{#if effectiveBody}}<span class="veh-eff" title="Effective after {{system.bodyCSLoss}} CS loss">⇒ {{effectiveBody}}</span>{{/if}}
+      <div class="veh-stat-row">
+        <select name="system.body">
+          {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq ../system.body this)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+        {{#if effectiveBody}}<span class="veh-eff" title="{{effectiveBody}} after {{system.bodyCSLoss}} CS loss">⇒ {{abbreviateRank effectiveBody}}</span>{{/if}}
+      </div>
     </div>
     <div class="veh-stat">
       <label>Protection</label>
-      <select name="system.protection">
-        {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.protection this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
+      <div class="veh-stat-row">
+        <select name="system.protection">
+          {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq ../system.protection this)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
     </div>
   </div>
 
-  {{!-- ═══ CONDITION STRIP: HP + current speed + OOC + FEAT rank ═══ --}}
+  {{!-- ═══ CONDITION STRIP: HP + current speed + OOC + Control FEAT ═══ --}}
   <div class="veh-condition-strip">
     <div class="veh-hp-group">
       <label>Body HP</label>
@@ -81,13 +93,7 @@
       <input type="checkbox" name="system.outOfControl" {{#if system.outOfControl}}checked{{/if}}>
       OOC
     </label>
-    <button type="button" class="veh-control-roll" title="Roll the driver's Control FEAT, regain control, or resolve a crash"><i class="fas fa-dice-d20"></i> Control FEAT</button>
-    {{#if effectiveControlFEAT}}
-    <span class="veh-feat-rank" title="Control FEAT rank = lesser of driver Agility and effective Control">FEAT: {{effectiveControlFEAT}}</span>
-    {{/if}}
-    {{#if chargingRank}}
-    <span class="veh-charge-rank" title="Charging attack rank = lesser of Body and Speed">Chg: {{chargingRank}}</span>
-    {{/if}}
+    <button type="button" class="veh-control-roll" title="{{controlFeatTitle}}"><i class="fas fa-dice-d20"></i> Control FEAT{{#if effectiveControlFEAT}} · {{effectiveControlFEAT}}{{/if}}</button>
   </div>
 
   {{!-- ═══ TABS ═══ --}}
@@ -95,6 +101,7 @@
     <a class="item" data-tab="crew">Crew</a>
     <a class="item" data-tab="equipment">Equipment</a>
     <a class="item" data-tab="condition">Condition</a>
+    <a class="item" data-tab="details">Details</a>
     <a class="item" data-tab="effects">Effects</a>
   </nav>
 
@@ -102,14 +109,19 @@
 
     {{!-- ═══════ Tab: Crew ═══════ --}}
     <div class="tab" data-tab="crew">
-      <fieldset class="veh-fieldset">
-        <legend>Crew &amp; Passengers</legend>
+      <div class="veh-fieldset veh-crew-box">
+        <div class="veh-box-head">
+          <span class="veh-box-title">Crew &amp; Passengers</span>
+          <label class="veh-seats" title="Seats occupied, of seating capacity">{{crewCount}} of
+            <input type="number" name="system.seatingCapacity" value="{{system.seatingCapacity}}" min="1" class="veh-seats-input" />
+            seats</label>
+        </div>
 
         <div class="veh-crew-row">
           <label class="veh-crew-label">Driver</label>
           {{#if driverActor}}
             <div class="crew-slot crew-driver">
-              <img src="{{driverActor.img}}" width="22" height="22" />
+              <img src="{{driverActor.img}}" width="20" height="20" />
               <a class="crew-link" data-uuid="{{driverActor.uuid}}" title="Open sheet">{{driverActor.name}}</a>
               <span class="veh-crew-agi">Agi: {{driverActor.agility}}</span>
               <a class="crew-remove" data-slot="driver" title="Remove"><i class="fas fa-times"></i></a>
@@ -125,7 +137,7 @@
           <div class="veh-passenger-list">
             {{#each passengerActors}}
               <div class="crew-slot crew-passenger">
-                <img src="{{this.img}}" width="22" height="22" />
+                <img src="{{this.img}}" width="20" height="20" />
                 <a class="crew-link" data-uuid="{{this.uuid}}" title="Open sheet">{{this.name}}</a>
                 <a class="crew-remove" data-slot="passenger" data-uuid="{{this.uuid}}" title="Remove"><i class="fas fa-times"></i></a>
               </div>
@@ -136,14 +148,11 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="veh-seats-row">
-          <label>Seats</label>
-          <input type="number" name="system.seatingCapacity" value="{{system.seatingCapacity}}" min="1" class="veh-seats-input" />
-          <span class="veh-seats-info">({{crewCount}} / {{system.seatingCapacity}} occupied)</span>
-        </div>
-      </fieldset>
-
+    {{!-- ═══════ Tab: Details ═══════ --}}
+    <div class="tab" data-tab="details">
       <fieldset class="veh-fieldset">
         <legend>Details</legend>
         <div class="veh-detail-row veh-facing-row">
@@ -154,11 +163,11 @@
         </div>
         <div class="veh-detail-row">
           <label>Special Features</label>
-          <textarea name="system.features" rows="2" placeholder="ECM, Sensors, Autopilot, Amphibious…">{{system.features}}</textarea>
+          <textarea name="system.features" rows="3" placeholder="ECM, Sensors, Autopilot, Amphibious…">{{system.features}}</textarea>
         </div>
         <div class="veh-detail-row">
           <label>Description</label>
-          <textarea name="system.description" rows="2">{{system.description}}</textarea>
+          <textarea name="system.description" rows="4">{{system.description}}</textarea>
         </div>
       </fieldset>
     </div>

@@ -1,4 +1,8 @@
-/* styles/vehicle-sheet.css v1.2.0 - 2026-11-20 */
+/* styles/vehicle-sheet.css v1.3.0 - 2026-11-22 */
+/* v1.3.0: Compact layout (section COMPACT LAYOUT, before the item sheet
+           rules): slim one-row header with Type and Cost labels, effective
+           ranks inside the stat boxes, a one-line condition strip, slim
+           tabs, Seats in the Crew heading. */
 /* v1.2.0: Current Speed areas/round readout (.veh-speed-areas). */
 /* Compact vehicle actor sheet layout */
 
@@ -401,6 +405,248 @@
 .vehicle-sheet .vehicle-repair-quick:hover {
   background: #c8e6c9 !important;
 }
+
+/* ══════════════════════════════════════════
+   COMPACT LAYOUT (v1.3.0)
+   Sizes are set outright so the sheet does not inherit the tall default
+   fields or the character sheet's boxed header and tab bar.
+   ══════════════════════════════════════════ */
+.faserip-vehicle-window .vehicle-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+.vehicle-sheet input[type="text"],
+.vehicle-sheet input[type="number"],
+.vehicle-sheet select {
+  height: 24px;
+  min-height: 0;
+  padding: 0 4px;
+  font-size: 13px;
+  line-height: 1.2;
+  border-radius: 3px;
+}
+
+.vehicle-sheet .veh-header {
+  flex-wrap: nowrap;
+  margin: 0;
+  padding: 4px 6px;
+  border: none;
+  border-bottom: 2px solid #8b0000;
+  border-radius: 0;
+  box-shadow: none;
+}
+.vehicle-sheet .veh-header .profile-img {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  object-fit: cover;
+}
+.vehicle-sheet .veh-name {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 15px;
+  border: 1px solid #b9b09a;
+  border-radius: 3px;
+  background: #fffdf8;
+}
+.vehicle-sheet .veh-head-field {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: bold;
+  color: #5a5446;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.vehicle-sheet .veh-head-field select {
+  width: auto;
+  min-width: 0;
+  height: 26px;
+  font-weight: normal;
+  text-transform: none;
+}
+.vehicle-sheet .veh-comp {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 11px;
+  color: #5a5446;
+  text-transform: uppercase;
+}
+
+.vehicle-sheet .veh-stat-bar {
+  gap: 6px;
+  margin: 0;
+  padding: 4px 6px 5px;
+}
+.vehicle-sheet .veh-stat label {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #5a5446;
+}
+.vehicle-sheet .veh-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.vehicle-sheet .veh-stat-row select {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.vehicle-sheet .veh-eff {
+  flex: 0 0 auto;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.vehicle-sheet .veh-condition-strip {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 4px 6px;
+}
+.vehicle-sheet .veh-hp-group,
+.vehicle-sheet .veh-cspeed-group { flex: 0 0 auto; gap: 4px; }
+.vehicle-sheet .veh-hp-group label,
+.vehicle-sheet .veh-cspeed-group label {
+  margin: 0;
+  font-size: 12px;
+  color: #5a5446;
+  white-space: nowrap;
+}
+.vehicle-sheet .veh-hp-input {
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  font-size: 13px;
+}
+.vehicle-sheet .veh-hp-input,
+.vehicle-sheet .veh-seats-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.vehicle-sheet .veh-hp-input::-webkit-inner-spin-button,
+.vehicle-sheet .veh-hp-input::-webkit-outer-spin-button,
+.vehicle-sheet .veh-seats-input::-webkit-inner-spin-button,
+.vehicle-sheet .veh-seats-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.vehicle-sheet .veh-cur-speed { width: 106px; min-width: 0; height: 24px; }
+.vehicle-sheet .veh-speed-areas { font-size: 12px; }
+.vehicle-sheet .veh-ooc {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 2px 5px;
+  font-size: 12px;
+  color: #5a5446;
+}
+.vehicle-sheet .veh-control-roll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  margin: 0 0 0 auto;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.vehicle-sheet .sheet-tabs.tabs {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid #c0a070;
+  border-radius: 0;
+  box-shadow: none;
+}
+.vehicle-sheet .sheet-tabs.tabs .item {
+  flex: 0 0 auto;
+  height: auto;
+  margin: 0;
+  padding: 4px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #5a5446;
+}
+.vehicle-sheet .sheet-body {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 8px;
+  border: none;
+  background: transparent;
+}
+
+.vehicle-sheet .veh-crew-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.vehicle-sheet .veh-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.vehicle-sheet .veh-box-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #8b0000;
+}
+.vehicle-sheet .veh-seats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 12px;
+  color: #5a5446;
+  white-space: nowrap;
+}
+.vehicle-sheet .veh-seats-input {
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  font-size: 12px;
+}
+.vehicle-sheet .veh-crew-row { margin: 0; }
+.vehicle-sheet .veh-crew-label {
+  margin: 0;
+  font-size: 12px;
+  color: #5a5446;
+}
+.vehicle-sheet .crew-slot { padding: 2px 6px; gap: 6px; }
+.vehicle-sheet .crew-slot img { width: 20px; height: 20px; object-fit: cover; }
+.vehicle-sheet .crew-link { font-size: 13px; }
+.vehicle-sheet .crew-passenger .crew-remove { margin-left: auto; }
+.vehicle-sheet .veh-crew-agi { font-size: 11px; color: #5a5446; }
+.vehicle-sheet .crew-drop-zone {
+  padding: 3px;
+  font-size: 12px;
+  color: #6b6455;
+}
+.vehicle-sheet .crew-add-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+.vehicle-sheet .veh-detail-row textarea { height: auto; }
 
 /* ══════════════════════════════════════════
    VEHICLE ITEM SHEET (compendium stat card)
