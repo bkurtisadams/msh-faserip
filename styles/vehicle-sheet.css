@@ -1,4 +1,9 @@
-/* styles/vehicle-sheet.css v1.3.0 - 2026-11-22 */
+/* styles/vehicle-sheet.css v1.3.1 - 2026-11-22 */
+/* v1.3.1: Fixed-bug: on a tab taller than the window (Condition, Details,
+           Effects) the tab bar was squeezed and its labels rode up into the
+           strip above. The header, stat bar, strip and tab bar no longer
+           shrink; the tab's content scrolls beneath them. The Damage Log
+           box fills its panel's width. */
 /* v1.3.0: Compact layout (section COMPACT LAYOUT, before the item sheet
            rules): slim one-row header with Type and Cost labels, effective
            ranks inside the stat boxes, a one-line condition strip, slim
@@ -414,9 +419,17 @@
 .faserip-vehicle-window .vehicle-sheet {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
   margin: 0;
   padding: 0;
+}
+.vehicle-sheet .veh-header,
+.vehicle-sheet .veh-stat-bar,
+.vehicle-sheet .veh-condition-strip,
+.vehicle-sheet .sheet-tabs.tabs {
+  flex: 0 0 auto;
 }
 .vehicle-sheet input[type="text"],
 .vehicle-sheet input[type="number"],
@@ -584,7 +597,9 @@
   color: #5a5446;
 }
 .vehicle-sheet .sheet-body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
   margin: 0;
   padding: 8px;
   border: none;
@@ -647,6 +662,7 @@
   line-height: 1;
 }
 .vehicle-sheet .veh-detail-row textarea { height: auto; }
+.vehicle-sheet .veh-fieldset textarea { width: 100%; box-sizing: border-box; height: auto; }
 
 /* ══════════════════════════════════════════
    VEHICLE ITEM SHEET (compendium stat card)
@@ -735,6 +751,8 @@
 /* V2 vehicle window (v3.3.0): the template root carries .faserip-sheet, so
    the window itself only needs to scroll and drop its default padding. */
 .faserip-vehicle-window .window-content {
+  display: flex;
+  flex-direction: column;
   padding: 0;
-  overflow: auto;
+  overflow: hidden;
 }
