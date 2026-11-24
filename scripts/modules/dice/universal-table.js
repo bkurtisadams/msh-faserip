@@ -119,24 +119,6 @@ function buildResultRow(color) {
 
 export const resultRows = ['white', 'green', 'yellow', 'red'].map(buildResultRow);
 
-// === Compatibility exports for column-shifts.js ===
-export const RANKS_ORDERED = EXTENDED_KEYS
-  .filter(k => !['CL1000', 'CL3000', 'CL5000', 'BEYOND'].includes(k))
-  .map(k => (k === 'SH0' ? 'Shift-0' : foundryNameFor(k, 'space')));
-
-export function rankIndexOf(rankName) {
-  const key = kernelKeyFor(rankName);
-  if (!key) return 0;
-  const name = key === 'SH0' ? 'Shift-0' : foundryNameFor(key, 'space');
-  const idx = RANKS_ORDERED.indexOf(name);
-  return idx >= 0 ? idx : 0;
-}
-
-export function rankNameAt(index) {
-  const i = Math.max(0, Math.min(RANKS_ORDERED.length - 1, index | 0));
-  return RANKS_ORDERED[i];
-}
-
 /**
  * Roll on the Universal Table to determine color result
  * @param {String} rank - The rank name (e.g. "Excellent", "Shift X")

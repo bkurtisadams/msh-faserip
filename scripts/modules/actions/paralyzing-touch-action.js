@@ -25,7 +25,7 @@
 
 import { showFaseripDialog } from "./dialog-shim.js";
 import { getRollMode } from "./action-utils.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { RANK_ABBR, shiftRank } from "../../rules/rules-reference.js";
 import { colorBg, colorFg } from "./card-kit.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 import { applyUnconscious } from "../effects/effect-engine.js";
@@ -35,7 +35,6 @@ import {
   getAvailableKarma,
   showKarmaDecisionDialog,
 } from "../dice/dice-roller.js";
-import { applyColumnShifts } from "../dice/column-shifts.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
@@ -278,7 +277,7 @@ export async function showParalyzingTouchDialog(hero, item) {
         const csInfo = csPanel ? csPanel.get() : { totalShift: 0, manualCS: 0 };
         const manualShift = Number(csInfo.totalShift) || 0;
         const totalShift = manualShift + effectShift;
-        const effectiveFightRank = totalShift !== 0 ? applyColumnShifts(heroFightRank, totalShift).name : heroFightRank;
+        const effectiveFightRank = totalShift !== 0 ? shiftRank(heroFightRank, totalShift) : heroFightRank;
         const effectiveFightValue = game.msh?.getRankValue?.(effectiveFightRank) ?? heroFightValue;
         const spendKarma = html.find('#spend-karma').is(':checked');
 

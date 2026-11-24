@@ -577,6 +577,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
   // armorNature. Unknown / missing armorNature defaults to "natural" to match
   // the schema default and pre-v3.2.0 data.
   let armorPhys = 0, armorEner = 0, armorPR = "", armorER = "";
+  let setPhys = 0, setEner = 0, setPR = "", setER = "";
   for (const ae of activeDefenses) {
     const f = ae.flags?.[scope];
     if (f?.defenseType !== "bodyArmor") continue;
@@ -585,6 +586,12 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     if (ignoresArtificialArmor && nature === "artificial") continue;
     const p = Number(f.physical) || 0;
     const e = Number(f.energy) || 0;
+    // Body-control armor (Density, Plasticity) states its own energy value.
+    if (String(f.ongoingId || "").startsWith("bc-")) {
+      if (p > setPhys) { setPhys = p; setPR = f.physicalRank || ""; }
+      if (e > setEner) { setEner = e; setER = f.energyRank || ""; }
+      continue;
+    }
     if (p > armorPhys) { armorPhys = p; armorPR = f.physicalRank || ""; }
     if (e > armorEner) { armorEner = e; armorER = f.energyRank || ""; }
   }
@@ -595,6 +602,12 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     const eq = equipmentArmorValues(actor);
     if (eq.physical > armorPhys) { armorPhys = eq.physical; armorPR = eq.rank; }
     if (eq.energy > armorEner) { armorEner = eq.energy; armorER = eq.rank; }
+  }
+  const armorEnergyResolved = setPhys > 0 || setEner > 0;
+  if (armorEnergyResolved) {
+    armorEner = bodyArmorEnergyValue(armorPhys, armorEner);
+    if (setPhys > armorPhys) { armorPhys = setPhys; armorPR = setPR; }
+    if (setEner > armorEner) { armorEner = setEner; armorER = setER; }
   }
 
   // Aggregate force field (take highest)
@@ -726,7 +739,7 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     hasResistance: resDR > 0 || resCS > 0 || resImm,
     hasAbsorption: absRank > 0,
     hasReflection: reflThreshold > 0,
-    armor: { physical: armorPhys, energy: armorEner, physicalRank: armorPR, energyRank: armorER },
+    armor: { physical: armorPhys, energy: armorEner, physicalRank: armorPR, energyRank: armorER, energyResolved: armorEnergyResolved },
     forceField: { physical: ffPhys, energy: ffEner, fullValue: ffFull, physicalRank: ffPR, energyRank: ffER, isPersonal: ffPersonal, aeId: ffAeId },
     resistance: { damageReduction: resDR, csBonus: resCS, hasImmunity: resImm, immunityThreshold: resImmThr, type: resType },
     absorption: { rank: absRank, rankLabel: absRankLabel, aeId: absAeId, itemId: absItemId, matchedType: absMatched, specific: absSpecific },
@@ -782,6 +795,16 @@ function isDefenseAEBackedByCurrentPower(actor, ae, scope) {
 
 // ─── AE-based mitigation layers ──────────────────────────────────────────────
 
+// RAW Body Armor is 20 points less effective vs Energy attacks.
+// Some older/stale defense AEs stored energy equal to physical, so derive
+// the effective energy armor from physical when the stored energy value is
+// blank, equal to physical, or otherwise higher than the RAW reduction.
+function bodyArmorEnergyValue(physArmor, enerArmor) {
+  if (!(physArmor > 0)) return enerArmor;
+  const rawEnergyFromPhysical = defenseValue({ kind: "body-armor", rankNumber: physArmor }, "energy"); // kernel slice 4b
+  return (!enerArmor || enerArmor >= physArmor || enerArmor > rawEnergyFromPhysical) ? rawEnergyFromPhysical : enerArmor;
+}
+
 function applyBodyArmorFromAE(damage, armorData, options) {
   const { isEnergyDamage, armorPiercing, armorPiercingCS } = options;
   const apCS = (Number(armorPiercingCS) || 0) || (Number(armorPiercing) || 0);
@@ -789,16 +812,7 @@ function applyBodyArmorFromAE(damage, armorData, options) {
   let physArmor = Number(armorData.physical || 0);
   let enerArmor = Number(armorData.energy || 0);
 
-  if (isEnergyDamage && physArmor > 0) {
-    // RAW Body Armor is 20 points less effective vs Energy attacks.
-    // Some older/stale defense AEs stored energy equal to physical, so derive
-    // the effective energy armor from physical when the AE's energy value is
-    // blank, equal to physical, or otherwise higher than the RAW reduction.
-    const rawEnergyFromPhysical = defenseValue({ kind: "body-armor", rankNumber: physArmor }, "energy"); // kernel slice 4b
-    if (!enerArmor || enerArmor >= physArmor || enerArmor > rawEnergyFromPhysical) {
-      enerArmor = rawEnergyFromPhysical;
-    }
-  }
+  if (isEnergyDamage && !armorData.energyResolved) enerArmor = bodyArmorEnergyValue(physArmor, enerArmor);
 
   if (apCS > 0) {
     const toReduce = isEnergyDamage ? enerArmor : physArmor;
