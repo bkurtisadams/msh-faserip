@@ -716,8 +716,13 @@
                 <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
               </select>
             </div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+              <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;">Vs energy:</label>
+              <input type="number" name="system.armorEnergy" value="{{#if system.armorEnergy}}{{system.armorEnergy}}{{/if}}" min="0" placeholder="{{armorEnergyStandard}}" data-dtype="Number" title="Leave blank for the standard value (rank number -20)" style="width:44px;text-align:center;font-weight:bold;"/>
+              <span style="color:#555;font-size:0.75em;">blank = standard ({{armorEnergyStandard}})</span>
+            </div>
             <p style="margin:4px 0 0;color:#555;font-size:0.75em;">
-              Reduces physical damage by rank number. -20 vs Energy attacks per rules.
+              Reduces physical damage by rank number. -20 vs Energy attacks per rules, unless a Vs energy value is entered.
             </p>
           </div>
         </details>

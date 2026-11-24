@@ -1,3 +1,6 @@
+// scripts/dev/power-rules-runtime-tests.js v2.1.0 - 2026-11-23
+// v2.1.0: Body Armor custom / physical-only energy values and an armor
+//         item's own Vs energy value.
 // scripts/dev/power-rules-runtime-tests.js v2.0.1 - 2026-11-19
 // v2.0.1: Healing records through recordHealingHealth (dotted ids); Density
 //         Self has one armor effect; Plasticity is physical-only armor.
@@ -577,6 +580,24 @@ async function equipmentTests(recorder, state) {
   await waitFor(() => getActiveDefenseEffects(mixed).length, { timeout: 3000 });
   recorder.equal(net(mixed, 30, "physical-blunt"), 24, "Armor equipment: still counts when the character also has a defense power (Blunt 30 net 24)");
   recorder.equal(net(mixed, 30, "energy-cold"), 20, "Armor equipment: a cold resistance power still works beside it (net 20)");
+
+  // Body Armor vs energy: rank number -20 as standard; a custom Vs energy
+  // value or a physical-only setting is used as set. Same for armor items.
+  const baSys = { rank: "Remarkable", value: 30, category: "bodyAlterationsDefensive", type: "Body Armor", isBodyArmor: true, bodyArmorType: "both", armorNature: "natural", isDefensePower: true };
+  const baStd = await createActor(state, "Armor Standard", { items: [power("Body Armor", baSys)] });
+  const baCustom = await createActor(state, "Armor Custom", { items: [power("Body Armor", { ...baSys, armorPhysical: 30, armorEnergy: 30, armorEnergyCustom: true })] });
+  const baPhys = await createActor(state, "Armor Physical", { items: [power("Body Armor", { ...baSys, bodyArmorType: "physical" })] });
+  const ownSuit = await createActor(state, "Suit Own Energy", { items: [
+    { name: "Energy Suit", type: "equipment", system: { category: "armor", protection: "Excellent", broken: false, armorEnergy: 40 } },
+    power("Resistance to Cold", { rank: "Good", value: 10, category: "resistances", type: "Resistance to Cold", isDefensePower: true, isResistance: true, resistanceType: "cold", resistanceEffect: "damageReduction" })
+  ] });
+  await waitFor(() => getActiveDefenseEffects(baStd).length && getActiveDefenseEffects(baCustom).length && getActiveDefenseEffects(baPhys).length && getActiveDefenseEffects(ownSuit).length, { timeout: 3000 });
+  recorder.equal(net(baStd, 40, "energy-fire"), 30, "Body Armor: Remarkable stops 10 vs energy as standard (40 net 30)");
+  recorder.equal(net(baCustom, 40, "energy-fire"), 10, "Body Armor: a custom Vs energy of 30 stops 30 (40 net 10)");
+  recorder.equal(net(baPhys, 40, "physical-blunt"), 10, "Body Armor: physical-only still stops 30 physical (40 net 10)");
+  recorder.equal(net(baPhys, 40, "energy-fire"), 40, "Body Armor: physical-only stops nothing vs energy (40 net 40)");
+  recorder.equal(net(ownSuit, 50, "energy-fire"), 10, "Armor equipment: its own Vs energy 40 is used (50 net 10)");
+  recorder.equal(net(ownSuit, 50, "physical-blunt"), 30, "Armor equipment: Excellent protection still stops 20 physical (50 net 30)");
 }
 
 async function karmaLedgerTests(recorder, state) {

@@ -122,6 +122,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       const rv = CONFIG.FASERIP?.rankValues?.[this.item.system.protection];
       if (rv !== undefined) context.system.protectionValue = rv;
     }
+    context.armorEnergyStandard = Math.max(0, (Number(CONFIG.FASERIP?.rankValues?.[this.item.system.protection]) || 0) - 20);
 
     // Auto-compute resistance values from rank if not set
     if (Array.isArray(this.item.system.resistances)) {

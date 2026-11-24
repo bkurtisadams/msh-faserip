@@ -162,7 +162,7 @@ class FaseripContactData extends PermissiveDataModel {
 
 class FaseripEquipmentData extends PermissiveDataModel {
   static KEYS = [
-    "abilityModifiers", "ammoType", "apMode", "areaRadius", "armorPiercing",
+    "abilityModifiers", "ammoType", "apMode", "areaRadius", "armorEnergy", "armorPiercing",
     "armorPiercingCS", "attackModes", "attackType", "broken", "burst", "burstScatter",
     "bypassForceField", "canisterSubType", "category", "continuingDamage",
     "continuingDamageRandom", "continuingDamageRounds", "controlType", "coverage",

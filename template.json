@@ -684,6 +684,7 @@
       "continuingDamageRounds": "",
       "requiresTwoOperators": false,
       "protection": "",
+      "armorEnergy": 0,
       "coverage": "partial",
       "powerRank": "Typical",
       "linkedAbility": "reason",

@@ -187,6 +187,7 @@ function resolveBodyArmorValues(item) {
     energy,
     physicalRank: sys.rank || getClosestRankName(physical),
     energyRank: getClosestRankName(energy),
+    energyExplicit: armorType === "physical" || (sys.armorEnergyCustom === true && Number(sys.armorEnergy) > 0),
     armorType,
     armorNature: inferArmorNature(sys),
     // Material strength of the BA itself — used by Shred FEAT.
@@ -339,6 +340,7 @@ export function buildBodyArmorAE(item, values) {
         energy: values.energy,
         physicalRank: values.physicalRank,
         energyRank: values.energyRank,
+        energyExplicit: values.energyExplicit === true,
         armorType: values.armorType,
         armorNature: values.armorNature,
         materialStrength: values.materialStrength,

@@ -594,8 +594,9 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     if (ignoresArtificialArmor && nature === "artificial") continue;
     const p = Number(f.physical) || 0;
     const e = Number(f.energy) || 0;
-    // Body-control armor (Density, Plasticity) states its own energy value.
-    if (String(f.ongoingId || "").startsWith("bc-")) {
+    // Body-control armor (Density, Plasticity) and Body Armor powers with a
+    // custom or physical-only setting state their own energy value.
+    if (f.energyExplicit === true || String(f.ongoingId || "").startsWith("bc-")) {
       if (p > setPhys) { setPhys = p; setPR = f.physicalRank || ""; }
       if (e > setEner) { setEner = e; setER = f.energyRank || ""; }
       continue;
