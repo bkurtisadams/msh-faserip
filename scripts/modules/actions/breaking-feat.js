@@ -24,7 +24,6 @@
 // v1.2.0: Auto-populate target material from attack context
 // v1.1.0: Chat card styled to match attack action format
 
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 const RANKS = [

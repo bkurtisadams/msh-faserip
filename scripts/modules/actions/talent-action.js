@@ -39,16 +39,13 @@ import {
   shiftRank,
   RANKS
 } from "./action-utils.js";
-import { ACTION_EFFECTS } from "./action-config.js";
 import {
   generateKarmaControlsHTML,
   setupKarmaControlHandlers,
-  extractKarmaFromDialog,
-  getAvailableKarma
+  extractKarmaFromDialog
 } from "../dice/dice-roller.js";
 import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // ── Constants ──────────────────────────────────────────────

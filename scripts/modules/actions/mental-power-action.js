@@ -37,8 +37,8 @@
 //         Save ability defaults to Endurance for Nullifying Power.
 // v1.1.0: Unified chat card layout via buildCardShell/buildContentBox utilities
 import { BaseAction } from "./base-action.js";
-import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
-import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, RANKS, rankValue, valueToRank, shiftRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
+import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, rankValue, valueToRank, shiftRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";
 import { presetsForItem } from "./stunt-mechanics.js";
 import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
 import { POWER_RANGE, RANKS_ORDERED } from "../../rules/rules-reference.js";

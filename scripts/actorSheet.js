@@ -324,15 +324,12 @@
 // v1.0.1: Remove verbose debug logging on sheet render
 import { powerGearState } from "./equipment-link.mjs";
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
-import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { ACTION_INFO } from "./modules/actions/action-config.js";
 import { StuntRoller } from './stunts.js';
 import { stuntRow, stuntRows, openAddStuntDialog } from './stunt-ledger.js';
 import { stuntShift } from './modules/actions/stunt-mechanics.js';
-import { rollUniversalTable } from "./modules/dice/universal-table.js";
 import { ChargenUIManager } from './chargen.js';
-import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
 import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 import { openVehicleControl } from './modules/actions/vehicle-control.js';
@@ -345,8 +342,8 @@ import {
   rankValueForStorage,
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
-import { showFaseripDialog, showFaseripButtonDialog, showFaseripConfirm, showFaseripPrompt, isDialogDetached } from "./modules/actions/dialog-shim.js";
-import { computeEffectiveCost, computeCost, buildDays, adjustedDays, defaultHardware,
+import { showFaseripDialog, showFaseripButtonDialog, showFaseripConfirm, isDialogDetached } from "./modules/actions/dialog-shim.js";
+import { computeCost, buildDays, adjustedDays, defaultHardware,
          successFeatCS, costExceedsReason, fundingResourceRank,
          kitbashKarma, kitbashRounds, repairHours, centerRepairAuto,
          effectiveRepairReason, requiredColorVsIntensity, colorMeets,

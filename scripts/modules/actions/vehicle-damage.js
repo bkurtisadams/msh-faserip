@@ -6,7 +6,7 @@
 // Implements: Protection as passenger armor, Body as vehicle HP,
 // Vehicle Damage Table (p.50-51) for CS degradation
 
-import { valueToRank, stepRank, rankValue } from "../../rules/rules-reference.js";
+import { stepRank, rankValue } from "../../rules/rules-reference.js";
 
 // Universal Table color from d100 roll vs rank
 function universalColor(roll, rankName) {

@@ -81,10 +81,6 @@ import { openGrabbingBreakDialog } from "./grabbing-break.js";
 import { openCollisionDamageDialog } from "./collision-damage.js";
 import { 
   shiftRank, 
-  rollWithKarmaAndHistory, 
-  buildResultGrid, 
-  bannerColors, 
-  effectsFor,
   applyDamageToTargets,
   applyDamageToActorUuid,
   getBodyArmorValues,
@@ -92,7 +88,6 @@ import {
 } from "./action-utils.js";
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import * as Effects from "../effects/effect-engine.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 

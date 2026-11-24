@@ -42,7 +42,6 @@
 // v1.0.0: Unified equipment action hub. Inspects item fields and presents contextual action buttons.
 //         Replaces fragmented click handlers with a single dialog opened from the equipment roll button.
 import { AreaTemplate } from "./area-template.js";
-import { getTargetData } from "./action-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // ── Display config ──

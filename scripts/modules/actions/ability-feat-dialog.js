@@ -76,7 +76,7 @@
 // Standalone ability FEAT dialog. Fighting supports Multiple Combat Actions pre-action FEAT.
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
-import { applyColumnShifts } from '../dice/column-shifts.js';
+
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
 import { executeAsGM } from "../../gm-utils.js";
 import { RANK_ABBR, rankValue, RANK_RANGES, RANKS_ORDERED, valueToRank, shiftRank as sharedShiftRank } from "../../rules/rules-reference.js";

@@ -46,7 +46,7 @@ import {
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { ACTIONS as ACTION_LIST } from "../helpers/action-constants.js";
 import { safeActorDeleteEffects } from "./gm-utils.js";
-import { RANKS_ORDERED, rankValue, shiftRank } from "./rules/rules-reference.js";
+import { RANKS_ORDERED, rankValue } from "./rules/rules-reference.js";
 import { loseOneEnduranceRank, restoreOneEnduranceRank } from "./modules/effects/ongoing-engine.js";
 import { TURN_SECONDS } from "./modules/recovery-timing.js";
 import { showFaseripConfirm } from "./modules/actions/dialog-shim.js";

@@ -181,20 +181,12 @@ import {
 import { 
   applyDamageToTargets,
   attachAutoFillRange,
-  bannerColors,
-  buildActionsBox,
-  buildResultGrid,
-  debugLog,
   effectsFor,
   getAbilityInfo,
   getBodyArmorValues,
   getTargetData,
   labelFor,
-  RANKS,
-  rollWithKarmaAndHistory,
   applyCapabilitiesToDialog,
-  shiftRank,
-  buildInlineFeatDisplay,
   getEffectiveArmor as _getEffectiveArmor,
   getItemArmorPiercingCS,
   getDeclaredMultiAttackState,
@@ -208,8 +200,6 @@ import { foundryNameFor } from "../../kernel/adapter.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { AreaTemplate } from "./area-template.js";
 import { weaponFireMode, burstTargets, scatterTokens, slowWeaponStatus, markSlowWeaponFired, fireModeBoxHtml } from "./fire-modes.js";
-import { canEffectsApply } from "../../rules/effects-gate.js";
-import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildCSRow, wireCSPanel, detectAutoSituational, resolveAttackerToken, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
 import { EFFECT_REDUCTION_COST } from "../../lib/faserip-rules/faserip-karma.js";

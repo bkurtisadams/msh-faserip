@@ -1,7 +1,7 @@
 // scripts/modules/actions/manual-mode-dialog.js
-import { ACTION_RESULT_LABELS } from "../dice/universal-table.js";
-import { shiftRank, getAbilityInfo, labelFor, bannerColors, buildResultGrid, rollWithKarma, debugLog } from "./action-utils.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
+
+
+
 
 // scripts/modules/actions/manual-mode-dialog.js
 export class ManualModeDialog {

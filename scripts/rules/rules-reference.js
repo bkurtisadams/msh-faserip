@@ -77,9 +77,8 @@ import {
   rankForNumber as kernelRankForNumber, shiftRank as kernelShiftRank,
   rankDistance as kernelRankDistance,
 } from "../lib/faserip-rules/faserip-kernel.js";
-import { EFFECT_COLUMNS } from "../lib/faserip-rules/faserip-effects.js";
 import { initiativeModifier } from "../lib/faserip-rules/faserip-initiative.js";
-import { kernelKeyFor, labelForToken } from "../kernel/adapter.js";
+import { kernelKeyFor } from "../kernel/adapter.js";
 
 function hyphenName(key) {
   const r = kernelRankByKey(key);
@@ -201,32 +200,6 @@ export function rankIndex(name) {
 // Turn=6sec, 10 turns/min, 600 turns/hr
 export const TIME = { turnSeconds: 6, turnsPerMinute: 10, turnsPerHour: 600 };
 
-// ── COMBAT RESULTS BY ATTACK TYPE (derived from kernel EFFECT_COLUMNS) ──
-const ATTACK_TYPE_TO_COLUMN = {
-  blunt: "BA", edged: "EA", shooting: "Sh", throwingEdged: "TE",
-  throwingBlunt: "TB", energy: "En", force: "Fo", charging: "Ch",
-  grappling: "Gp", escaping: "Es", grabbing: "Gb"
-};
-
-export const ATTACK_RESULTS = Object.fromEntries(
-  Object.entries(ATTACK_TYPE_TO_COLUMN).map(([type, code]) => [type,
-    Object.fromEntries(Object.entries(EFFECT_COLUMNS[code].results)
-      .map(([color, token]) => [color, labelForToken(token)]))
-  ])
-);
-
-// Which effects each attack type can trigger
-// pullDamage: can reduce damage. pullEffect: can reduce effect column.
-export const ATTACK_EFFECTS = Object.fromEntries(
-  ["blunt", "edged", "shooting", "throwingEdged", "throwingBlunt", "energy", "force", "charging"]
-    .map(type => {
-      const col = EFFECT_COLUMNS[ATTACK_TYPE_TO_COLUMN[type]];
-      const effects = ["Slam", "Stun", "Kill"]
-        .filter(e => Object.values(col.results).includes(e.toLowerCase()));
-      return [type, { effects, pullDamage: col.reduceDamage, pullEffect: col.reduceEffect }];
-    })
-);
-
 // Blunt weapon dmg (Slugfest / melee only):
 //   = Str or material strength (whichever less);
 //   if material > Str, use next rank minimum.
@@ -234,30 +207,8 @@ export const ATTACK_EFFECTS = Object.fromEntries(
 //   max of min(Str, material) for powerful wielders.
 // Blunt Throwing: plain min(Str, material). No bump rule.
 
-// ── SLAM (Endurance FEAT after Slam result) ──
-export const SLAM_RESULTS = {
-  white:  "Grand Slam",  // speed = attacker Str as ground speed
-  green:  "1 Area",      // attacker chooses direction if dmg dealt, defender if no dmg
-  yellow: "Stagger",     // not adjacent, no extra dmg
-  red:    "No Slam"
-};
 // Slammed into building = charging attack on that building.
 
-// ── STUN (Endurance FEAT after Stun result) ──
-export const STUN_RESULTS = {
-  white:  "Unconscious 1-10 rounds",  // no actions
-  green:  "Stunned 1 round",          // conscious but no action, can play possum
-  yellow: "No Effect",
-  red:    "No Effect"
-};
-
-// ── KILL (Endurance FEAT after Kill result) ──
-export const KILL_RESULTS = {
-  white:  "Endurance Loss",  // dying: lose 1 rank/turn until Shift0=death
-  green:  "E/S Only",        // only Edged Slugfest, Shooting, Thrown Edged cause dying; else No Effect
-  yellow: "No Effect",
-  red:    "No Effect"
-};
 // Kill result: attacker loses ALL Karma to 0.
 // Energy attacks: only White causes dying (Green/Yellow/Red = No Effect).
 
@@ -273,26 +224,6 @@ export const KILL_RESULTS = {
 // Thrown Blunt: can reduce both damage and effect.
 // Force: can reduce damage, cannot reduce effect.
 
-// ── 0 HP / DYING ──
-export const ZERO_HP = {
-  unconsciousRounds: "1-10",
-  // Roll Endurance FEAT vs Kill column
-  // No Effect = unconscious, wake with HP = Endurance rank number
-  // Endurance Loss = dying (lose 1 rank/turn, Shift0 = death)
-  stabilize: {
-    karma50: "Stabilize 1 round",
-    karma200: "Re-roll Endurance FEAT (requires FEAT success)",
-    anyAid: "Stops Endurance loss (unconscious 1-10 hrs)"
-    // Any aid = first aid, pulling to safety, checking on them
-  },
-  impaired: {
-    penalty: "-2CS all actions until Endurance restored",
-    healNormal: "1 Endurance rank/week",
-    healMedical: "1 Endurance rank/day"
-  },
-  disabilities: "At Shift0, roll green FEAT each physical ability above Good or lose to next lowest printed number"
-};
-
 // ── RECOVERY & HEALING ──
 export const RECOVERY = {
   // Recovery: 10 turns after last damage (no further damage), regain Endurance rank# HP (once/day)
@@ -301,48 +232,6 @@ export const RECOVERY = {
   // Healing: Endurance rank# HP per hour after last damage
   // Doubled by bedrest or medical care
   healingMultiplier: { normal: 1, bedrest: 2, medicalCare: 2 }
-};
-
-// ── DEFENSIVE ACTIONS ──
-export const DEFENSIVE_ACTIONS = {
-  dodging: {
-    // Agility FEAT, pre-action
-    ability: "agility",
-    results: { white: 0, green: -2, yellow: -4, red: -6 }, // CS shift on incoming attacks
-    penalties: "Half move, -2CS on own FEATs",
-    notes: "Only vs attacks character is aware of. No effect on adjacent Slugfest/Wrestling."
-  },
-  evading: {
-    // Fighting FEAT, adjacent only, 1 opponent
-    ability: "fighting",
-    results: {
-      white: "Auto-Hit (at least green)",
-      green: "Evasion (miss)",
-      yellow: "Evasion + 1CS next round",
-      red: "Evasion + 2CS next round"
-    },
-    notes: "No attacks that round. Bonus applies only to first attack next round vs that attacker."
-  },
-  blocking: {
-    // Strength FEAT, no other actions
-    ability: "strength",
-    // Str as Body Armor vs physical attacks (Slugfest, Throwing, Force, Wrestling)
-    // NOT vs Shooting, Energy, Charging
-    results: { white: -6, green: -4, yellow: -2, red: 1 }, // CS from Str rank for BA value
-    notes: "Normal BA still applies (not Force Fields)."
-  },
-  catching: {
-    // Agility FEAT, 1 item
-    ability: "agility",
-    results: {
-      white: "Auto-hit",
-      green: "Miss (+1CS for attacker)",
-      yellow: "Damage (catch but may damage item)",
-      red: "Catch (no ill effects)"
-    },
-    modifiers: "-3CS vs objects directed at catcher",
-    minimumAgility: { bullets: "Unearthly", arrows: "Amazing", thrown: "Remarkable", falling: "any" }
-  }
 };
 
 // ── BODY ARMOR & FORCE FIELDS ──
@@ -363,28 +252,6 @@ export const ARMOR = {
   stacking: "Use one or other, not both (unless FF projected by third party)"
 };
 
-// ── WRESTLING (Strength FEAT, adjacent) ──
-export const WRESTLING = {
-  grappling: {
-    white: "Miss (no other attacks)",
-    green: "Miss (no other attacks)",
-    yellow: "Partial Hold (-2CS actions, no move if attacker Str >= target)",
-    red: "Full Hold (restrained, attacker +1 action, Str dmg)"
-  },
-  escaping: {
-    white: "Miss (still held, no action)",
-    green: "Miss (still held, no action)",
-    yellow: "Escape (free, half move, no other actions)",
-    red: "Reverse (free + grapple back or action at -2CS)"
-  },
-  grabbing: {
-    white: "Miss",
-    green: "Take (only if Str >= target)",
-    yellow: "Grab (take regardless of Str)",
-    red: "Break (take + depart or risk triggering item on failed material FEAT)"
-  }
-};
-
 // ── CHARGING (Endurance FEAT) ──
 export const CHARGING = {
   requirement: "Must move 1+ area",
@@ -393,83 +260,6 @@ export const CHARGING = {
   rebound: "Damage absorbed by defender BA rebounds to attacker; attacker absorbs rebound with own BA. Formula: defender takes max(0, dmg - defBA); attacker takes max(0, min(dmg, defBA) - attBA). Stun/Slam effects still apply even when all damage is absorbed. Book example (Advanced Set): Gd End 10-speed (30 dmg) vs Ex BA (20) + Gd atk BA (10) → target takes 10 through + rebound 20 → attacker absorbs 10, takes 10.",
   inanimate: "Material strength = BA",
   missResult: "Continues half speed, may hit obstacle"
-};
-
-// ── MARTIAL ARTS ──
-export const MARTIAL_ARTS = {
-  A: "Stun/Slam ignores Str/End",
-  B: "+1CS Fighting",
-  C: "+1CS grapple/escape/dodge",
-  D: "Ignore armor for effects (2 rounds study required)",
-  E: "+1 initiative"
-};
-
-// ── TALENTS (combat-relevant) ──
-export const COMBAT_TALENTS = {
-  wrestling: "+2CS Grappling (no damage bonus)",
-  thrownObjects: "+1CS throw/catch",
-  acrobatics: "+1CS dodge/evade/escape",
-  tumbling: "Agility FEAT to land feet-first"
-};
-
-// ── MEDICINE / FIRST AID ──
-export const MEDICINE = {
-  medicine: {
-    revive: "Revive Shift 0 character up to 20 turns after death",
-    restore: "Restore 1 Endurance rank/week"
-  },
-  firstAid: {
-    halt: "Halt Endurance loss",
-    recover: "Recover 1 rank immediately (once)",
-    stabilize: "Stabilize Shift 0 character up to 5 rounds after death"
-  }
-};
-
-// ── KARMA ──
-export const KARMA_SPENDING = {
-  modifyRoll: { cost: 10, note: "Minimum 10pt to modify roll (add spent amount to result)" },
-  reduceEffect: { cost: 50, note: "Reduces combat effect by one color" },
-  powerStunt: { cost: 100, note: "Attempt a Power Stunt" },
-  blindsiding: { note: "+2CS to hit, target cannot add Karma to Slam/Stun/Kill FEATs" }
-};
-
-export const KARMA_GAINS = {
-  stopCrime: {
-    violent: { stop: 30, arrest: 15 },
-    destructive: { stop: 20, arrest: 10 },
-    theft: { stop: 10, arrest: 5 },
-    robbery: { stop: 20, arrest: 10 },
-    misdemeanor: { stop: 5, arrest: 5 },
-    nationalOffense: { stop: 20, arrest: 10 },
-    localConspiracy: { stop: 30, arrest: 15 },
-    nationalConspiracy: { stop: 40, arrest: 20 },
-    globalConspiracy: { stop: 50, arrest: 25 },
-    other: { stop: 15, arrest: 5 }
-  },
-  rescue: 20,          // max 100
-  defeatFoe: "Highest rank number (Rm+ foes only)",
-  losses: {
-    commitCrime: "2x listed value",
-    publicDefeat: -40,
-    privateDefeat: -20,
-    propertyDamage: -5, // per area
-    permitCrime: "negative arrest value",
-    kill: "ALL Karma to 0",
-    nobleSacrifice: -50, // each hero
-    mysteriousDeath: -50,
-    selfDestruct: -50
-  }
-};
-
-// ── INITIATIVE ──
-export const INITIATIVE = {
-  // Each side rolls, add modifier from highest Intuition
-  intuitionModifiers: {
-    0: 0, 10: 0, 11: 1, 20: 1, 21: 2, 30: 2,
-    31: 3, 40: 3, 41: 4, 50: 4, 51: 5, 75: 5, 76: 6
-  },
-  // Roll of 1 always = 1
-  changeAction: "Yellow Agility FEAT, -1CS on subsequent FEATs"
 };
 
 // Intuition modifier lookup — kernel initiative module (keys on rank
@@ -503,28 +293,6 @@ export const FEAT_DIFFICULTY = {
   }
 };
 
-// ── TACTICS ──
-export const TACTICS = {
-  multipleTargets: {
-    note: "Single roll, all adjacent, -4CS",
-    allowedTypes: ["Blunt", "Escaping", "Energy", "Force"]
-  },
-  multipleAttacks: {
-    note: "Fighting FEAT pre-action, all at -1CS; fail = 1 attack at -3CS",
-    intensity: { 2: "Remarkable", 3: "Amazing" },
-    allowedTypes: ["Slugfest", "Shooting"]
-  },
-  entangling: "Agility FEAT to hit, target Agility FEAT vs material strength or enmeshed",
-  combinedAttack: "2+ attackers, damages within 10 points of each other; higher raised to next rank minimum if lower makes Agility FEAT (higher scores normal hit)",
-  doubleTeam: "Hold + attack, +1CS but miss may hit holder",
-  groundstrike: "Energy power vs ground, dmg on Force table, target takes material strength dmg",
-  shockwave: "Str 2+ ranks above material, Charge at Str, no dmg but Stun/Slam possible, 2 areas",
-  fastballSpecial: "Thrower Agi or thrown Fighting to hit, Endurance or Slugfest dmg with Charging bonuses",
-  luring: "Opponent +2CS, but defender pulls defensive move; miss hits whatever behind lurer",
-  aiming: "1 turn no fire = +1CS",
-  pointBlank: { nonFighting: "+3CS", fighting: "-3CS" }
-};
-
 // ── MOVEMENT ──
 export const MOVEMENT = {
   groundSpeed: {
@@ -548,22 +316,6 @@ export const MOVEMENT = {
     upTo5Areas: -1,
     upTo10Areas: -2,
     faster: -4
-  }
-};
-
-// ── GROWTH & SHRINKING ──
-export const SIZE_MODIFIERS = {
-  growth: {
-    "18ft": { toHit: +1 },
-    "22ft": { toHit: +2 },
-    "over22ft": { toHit: +3 }
-    // Also +CS to Str FEATs/Wrestling/dmg
-  },
-  shrinking: {
-    "1inch":   { toHit: -1, attacking: +1 },
-    "quarter": { toHit: -2, attacking: +2 },
-    "smaller": { toHit: -3, attacking: +3 }
-    // Slugfest/Missile only
   }
 };
 
@@ -616,30 +368,6 @@ export const RESOURCES = {
     cleared: +10, media: -5, charity: +1, rescue: +2,
     mutant: "All Pop awards reduced by 1"
   }
-};
-
-// ── RESOURCE POINTS (Original Rules) ──
-// Weekly rate = rank number of RP gained per week. Max = accumulation cap.
-// Amazing+ has no maximum (Infinity).
-export const RESOURCE_POINTS = {
-  "Shift-0":    { weekly: 0,   max: 0 },
-  "Feeble":     { weekly: 2,   max: 10 },
-  "Poor":       { weekly: 4,   max: 20 },
-  "Typical":    { weekly: 6,   max: 50 },
-  "Good":       { weekly: 10,  max: 100 },
-  "Excellent":  { weekly: 20,  max: 500 },
-  "Remarkable": { weekly: 30,  max: 1000 },
-  "Incredible": { weekly: 40,  max: 5000 },
-  "Amazing":    { weekly: 50,  max: Infinity },
-  "Monstrous":  { weekly: 75,  max: Infinity },
-  "Unearthly":  { weekly: 100, max: Infinity },
-  "Shift-X":    { weekly: 150, max: Infinity },
-  "Shift-Y":    { weekly: 200, max: Infinity },
-  "Shift-Z":    { weekly: 500, max: Infinity },
-  "Class 1000": { weekly: 1000, max: Infinity },
-  "Class 3000": { weekly: 3000, max: Infinity },
-  "Class 5000": { weekly: 5000, max: Infinity },
-  "Beyond":     { weekly: 10000, max: Infinity }
 };
 
 // 1 RP ≈ $50–75
@@ -709,277 +437,6 @@ export const MATERIAL_STRENGTH = {
 // Breaking: Str FEAT vs material, success = 2ft hole max
 // <2" thick = -1 rank, 1-2ft = +1 rank, >2ft = +2 ranks
 
-// ── VEHICLES ──
-export const VEHICLES = {
-  stats: ["Type", "Cost", "Control", "Speed", "Body", "Protection"],
-  types: ["Road", "Off-Road", "Railed", "GEV", "Air", "Space", "Water", "Sub"],
-
-  // Control FEAT ability: use lesser of operator's Agility or vehicle's Control.
-  controlFEAT: {
-    ability: "Lesser of Agility or Control",
-    triggersByType: {
-      road:    ["sudden stop", "traveling off-road", "turn 90°+", "any action above listed Speed"],
-      offRoad: ["sudden stop", "turn 90°+", "any action above listed Speed"],
-      railed:  ["sudden stop"],
-      gev:     ["as off-road + as air vehicle"],
-      air:     ["sudden turn / dodge", "turn 45°+ (one-eighth circle)", "abnormal takeoff/landing (fog, damaged, etc.)"],
-      space:   ["takeoff", "landing", "sudden movement"],
-      water:   ["sudden course change"],
-      sub:     ["sudden course change"]
-    }
-  },
-
-  // Accel: 2 areas/round per round as if Ex Endurance. Current speed rank =
-  // rank equal to areas moved, or next highest on long-distance movement table.
-  acceleration: {
-    rate: "2 areas/round",
-    asEndurance: "Excellent",
-    column: "Land/Water (Air column used for GEV, Space, Air types)"
-  },
-
-  // Decel: 2 ranks/round normally; 3 ranks with a sudden-stop Control FEAT.
-  deceleration: {
-    normal: "2 ranks/round until Shift 0",
-    sudden: "3 ranks/round (Control FEAT)"
-  },
-
-  // Air vehicles must reach ground speed equal to listed air speed rank before
-  // takeoff. During runway roll they count as Ground vehicles for Control.
-  // Catapults (carriers, Avengers Mansion) fling craft at required speed.
-  airTakeoff: {
-    groundSpeedRequired: "Equal rank to listed air speed",
-    duringRunway: "Treated as Road vehicle for Control",
-    catapult: "Aircraft carriers, Avengers Mansion — launched at required speed"
-  },
-
-  // Air landing: must match ground equivalent of air speed rank for safe landing.
-  // Faster-than-safe landings require Control FEAT.
-  airLanding: {
-    safeSpeed: "Ground equivalent of air-rank speed",
-    faster: "Control FEAT required"
-  },
-
-  // If floors climbed or descended in a round > forward areas moved, Control
-  // FEAT required. Failure = falling spin from end of that round. For downward
-  // movement, falling speed = aircraft speed.
-  airAscentDescent: {
-    rule: "Floors changed > forward areas moved → Control FEAT",
-    failure: "Falling spin starts end of round; falling speed = aircraft speed"
-  },
-
-  // Speeding: up to +1 rank above safe speed.
-  // All actions and all turns require Control FEATs, and all FEATs shift +1
-  // color for success. Red remains red (no shift beyond).
-  speeding: {
-    max: "+1 rank above listed Speed",
-    allActionsNeedControlFEAT: true,
-    featShift: "green→yellow, yellow→red, red→red"
-  },
-
-  // Turns up to 90° cost 1 area of movement. Turns >90° are Vehicle Stunts.
-  turns: {
-    upTo90: "Costs 1 area of movement",
-    over90: "Vehicle Stunt (see stunts)"
-  },
-
-  // Vehicle Stunts: player-proposed, Judge adjudicates feasibility.
-  // Examples: bootleg turn (sports car), Immelman/loop (aircraft), barrel roll.
-  // Karma is NOT required to attempt; failed FEAT = automatic out-of-control.
-  stunts: {
-    proposal: "Player proposes; Judge decides if vehicle can do it and if character can attempt",
-    feat: {
-      withTalentOrPowerOrBackground: "green or yellow FEAT",
-      novice: "red FEAT"
-    },
-    karma: "No Karma required to attempt",
-    failure: "Automatic out-of-control"
-  },
-
-  // Out-of-Control behavior by vehicle type. Karma cannot be spent to regain
-  // control. Recovery = succeed the required Control FEAT in a later round.
-  outOfControl: {
-    karmaNotAllowed: true,
-    road:    "Continues forward at current speed. Retry next round. Failed recovery → -1 rank speed, retry again. Continues until stop, recovery, or crash.",
-    offRoad: "As road.",
-    railed:  "As road.",
-    gev:     "As road.",
-    water:   "Continues forward in straight line, no speed loss, until recovery or crash.",
-    sub:     "As water.",
-    airOnGround: "Treated as Road (takeoff/landing).",
-    airInFlight: "Straight line, no speed loss, + falling (3 floors round 1, 6 round 2, 10 round 3, 20/round thereafter). Recovery FEATs always yellow minimum. Continues until recovery or crash."
-  },
-
-  // Crash resolution: two-step.
-  // Step 1: break-through check (Strength FEAT, min(Body,Speed) vs material).
-  //   Success: vehicle continues, speed reduced by material rank.
-  //   Failure: vehicle stops; proceed to step 2.
-  // Step 2: damage to occupants.
-  //   Base damage = max(material strength, Speed) - Protection.
-  //   Attack rolled on max(material, Speed) rank column.
-  //   Belted passengers: Blunt Attack. Unbelted: Edged Attack.
-  //   Karma may not add to the attack roll; may spend Karma vs Stun/Slam/Kill.
-  crash: {
-    stepOne: {
-      name: "Break-through check",
-      feat: "Strength FEAT: min(Body, Speed) vs object material strength",
-      success: "Vehicle continues; Speed reduced by material rank",
-      failure: "Vehicle stops; step 2 applies"
-    },
-    stepTwo: {
-      name: "Damage to occupants",
-      baseDamage: "max(material strength, Speed) - Protection",
-      attackColumn: "max(material, Speed) rank",
-      attackType: { belted: "Blunt Attack", unbelted: "Edged Attack" },
-      karma: "Not allowed on attack roll; may spend vs Stun/Slam/Kill effects"
-    }
-  },
-
-  // Damage-to-Vehicle table: separate from crash damage to occupants.
-  // Applies when vehicle takes damage from attacks OR survives a crash with
-  // damage. Compare damage-inflicted vs vehicle Body, roll FEAT vs Body.
-  // Penalties persist until repaired.
-  damageToVehicle: {
-    featVs: "Body rank",
-    greaterThanBody: {
-      red:    { statChange: "Body -1CS", extra: "damage to passengers" },
-      yellow: { statChange: "Speed -1CS", extra: "Control FEAT required" },
-      green:  { statChange: "Control -1CS", extra: "Control FEAT required" },
-      white:  { statChange: "All -1CS", extra: "Automatic out-of-control" }
-    },
-    equalToBody: {
-      red:    { statChange: "None", extra: "damage to passengers" },
-      yellow: { statChange: "Body -1CS", extra: "damage to passengers" },
-      green:  { statChange: "Speed -1CS", extra: "Control FEAT required" },
-      white:  { statChange: "Control -1CS", extra: "Control FEAT required" }
-    },
-    lessThanBody: {
-      red:    { statChange: "None", extra: "None" },
-      yellow: { statChange: "None", extra: "None" },
-      green:  { statChange: "Body -1CS", extra: "Control FEAT required" },
-      white:  { statChange: "Control -1CS", extra: "damage to passengers, Control FEAT required" }
-    },
-    collapse: {
-      controlBelowFeeble: "Vehicle out of control",
-      speedBelowFeeble:   "Vehicle stops (crash result for plane)",
-      bodyZero:           "No Protection to passengers. Water/Sub: begins sinking. Air: any action requires Control FEAT."
-    }
-  },
-
-  // Vehicles in combat: attacker chooses whether to target vehicle or passenger.
-  combat: {
-    targetVehicle:   "Normal attack vs vehicle Body.",
-    targetPassenger: "Bullseye result required to hit; Protection applies as Body Armor (unless attacker has negated it — e.g. ripped off the roof).",
-    vehicleAsCharge: {
-      attackRank: "Lesser of Body or Speed",
-      bonus: "+1CS (target is not fixed)",
-      resolvedAs: "Crash — may destroy vehicle while target survives"
-    }
-  }
-};
-
-// ── VEHICLE CATALOG ──
-// Stats: { cost, control, speed, body, protection, notes? }
-// Notes call out unique per-vehicle rules (armament, compartments, special
-// control quirks). "Re" in some source scans = Rm (OCR artifact).
-export const VEHICLE_CATALOG = {
-  // Road
-  sedan:          { type: "Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Gd", protection: "Pr", seats: 5 },
-  miniCar:        { type: "Road", cost: "Ex", control: "Gd", speed: "Gd",  body: "Pr", protection: "Fe", seats: 4 },
-  sportsCar:      { type: "Road", cost: "In", control: "Ex", speed: "Rm",  body: "Pr", protection: "Pr", seats: "2-4 (crowded)" },
-  luxuryCar:      { type: "Road", cost: "In", control: "Pr", speed: "Gd",  body: "Ex", protection: "Gd", seats: "5-10" },
-  securityLimo:   { type: "Road", cost: "Am", control: "Ty", speed: "Ex",  body: "Rm", protection: "Rm", seats: "5-10", notes: "Luxury car variant: thicker plating, bullet-proof glass" },
-  van:            { type: "Road", cost: "Rm", control: "Pr", speed: "Gd",  body: "Gd", protection: "Gd", seats: 8 },
-  convertible:    { type: "Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Gd", protection: "Fe", seats: 5, notes: "Includes T-tops; Protection as sedan with top up" },
-  taxi:           { type: "Road", cost: "Ex", control: "Ty", speed: "Gd",  body: "Ty", protection: "Pr", seats: 4 },
-  bus:            { type: "Road", cost: "In", control: "Pr", speed: "Gd",  body: "Ty", protection: "Ty", seats: 80 },
-  policeCar:      { type: "Road", cost: "Rm", control: "Gd", speed: "Ex",  body: "Ty", protection: "Ty", seats: 5, notes: "Often grilled between front and rear seats" },
-  policeVan:      { type: "Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Ty", protection: "Ty", notes: "Often carries riot guns and gas canisters; holds ~10 prisoners briefly" },
-  swatVan:        { type: "Road", cost: "In", control: "Ty", speed: "Gd",  body: "Rm", protection: "Ex", seats: 10, notes: "Portable armory: 10 riot guns, 10 sniper rifles, 10 flak jackets, smoke/tear/KO grenades (weapons separate)" },
-  semi:           { type: "Road", cost: "Rm", control: "Ty", speed: "Ex",  body: "Ex", protection: "Gd", seats: 3, notes: "Tractor detaches from trailer; various trailer types" },
-  sleeper:        { type: "Road", cost: "In", control: "Ty", speed: "Ex",  body: "Ex", protection: "Ex", notes: "Sleeper tractor; king-size sleeping compartment" },
-  armoredCar:     { type: "Road", cost: "In", control: "Ty", speed: "Ty",  body: "Rm", protection: "Rm", seats: "2 guards + optional 3rd" },
-  fireTruck:      { type: "Road", cost: "In", control: "Ty", speed: "Ex",  body: "Gd", protection: "Ty", seats: 12, notes: "Includes fire hoses, hook and ladder, nets, fireproof suits" },
-  ambulance:      { type: "Road", cost: "Rm", control: "Gd", speed: "Ex",  body: "Gd", protection: "Gd", notes: "Medical gear; right-of-way with top-lights flashing" },
-  rocketCar:      { type: "Road", cost: "Am", control: "Fe", speed: "ShZ", body: "Pr", protection: "Pr", notes: "Fastest land vehicle; only usable on open flats (Bonneville)" },
-
-  // Off-Road
-  bicycle:        { type: "Off-Road", cost: "Pr", control: "Gd", speed: "Ty",  body: "Fe", protection: 0, seats: 1 },
-  motorcycle:     { type: "Off-Road", cost: "Ex", control: "Ty", speed: "Ex",  body: "Pr", protection: 0, seats: 2, notes: "Out-of-control cannot be recovered until stopped. -1 rank damage with adequate headgear." },
-  motorTrike:     { type: "Off-Road", cost: "Rm", control: "Rm", speed: "Gd",  body: "Gd", protection: 0, notes: "More stable than motorcycle; CAN recover while moving" },
-  pickupTruck:    { type: "Off-Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Gd", protection: "Ty" },
-  jeep:           { type: "Off-Road", cost: "Rm", control: "Gd", speed: "Ex",  body: "Gd", protection: "Pr" },
-  atv:            { type: "Off-Road", cost: "Rm", control: "Rm", speed: "Gd",  body: "Gd", protection: "Ty" },
-  snowmobile:     { type: "Off-Road", cost: "Ex", control: "Gd", speed: "Gd",  body: "Ty", protection: "Rm", notes: "Control = Feeble on ice or non-snow terrain" },
-  heavyTruck:     { type: "Off-Road", cost: "In", control: "Pr", speed: "Ty",  body: "Ex", protection: "Gd", notes: "Dump trucks, heavy construction" },
-  tractor:        { type: "Off-Road", cost: "Rm", control: "Gd", speed: "Ty",  body: "Gd", protection: 0 },
-  bulldozer:      { type: "Off-Road", cost: "In", control: "Ty", speed: "Ty",  body: "Ex", protection: "Ty", notes: "Blade = Rm material; suitable as battering ram" },
-  tank:           { type: "Off-Road", cost: "Am", control: "Ex", speed: "Ty",  body: "In", protection: "Rm", notes: "1 Light Artillery + 1-2 Machine Guns (standard). Laser/Stun/Concussion Cannon variants exist." },
-  spg:            { type: "Off-Road", cost: "Mn", control: "Ty", speed: "Pr",  body: "Rm", protection: "Ex", notes: "Self-Propelled Gun: Heavy Artillery + Machine Gun, halftrack; less protection than tank, more range/firepower" },
-  armoredCarrier: { type: "Off-Road", cost: "Am", control: "Gd", speed: "Gd",  body: "In", protection: "Rm", seats: 20, notes: "2 Machine Guns (lasers in some versions)" },
-  walker:         { type: "Off-Road", cost: "In", control: "Gd", speed: "Gd",  body: "Rm", protection: "Rm", seats: "4-8", notes: "Legged vehicle; Stun Cannon (recoil weapons require Control FEAT to avoid tipping). Any attack on walker requires Control FEAT to stay upright." },
-  borer:          { type: "Off-Road", cost: "In", control: "Pr", speed: "Ty",  body: "Rm", protection: "Rm", notes: "Subterranean vehicle. At Poor speed leaves usable tunnel; otherwise churned earth. Forward screw makes Edged Attack for In (40) damage." },
-
-  // Railed
-  train:          { type: "Railed", cost: "In", control: "Fe", speed: "Ex",  body: "Gd", protection: "Gd", notes: "Crew 5 + 3+ passenger cars (100+ each). Track destruction = immediate out-of-control, no recovery." },
-  bulletTrain:    { type: "Railed", cost: "Am", control: "Pr", speed: "In",  body: "Gd", protection: "Gd", notes: "High-speed passenger only; France/Japan" },
-  el:             { type: "Railed", cost: "In", control: "Pr", speed: "Ty",  body: "Gd", protection: "Gd", notes: "Elevated/light rail. 80/car, Fe ticket cost" },
-  monorail:       { type: "Railed", cost: "In", control: "Pr", speed: "Ex",  body: "Ex", protection: "Gd", notes: "Power from track; breaking line = immediate halt" },
-
-  // GEV
-  hovercraft:     { type: "GEV", cost: "In", control: "Ex", speed: "Rm",  body: "Gd", protection: "Gd", notes: "Max Good speed off-road, broken ground, or stormy weather" },
-
-  // Air
-  privatePlane:   { type: "Air", cost: "In", control: "Ty", speed: "Am",  body: "Fe", protection: "Ty", seats: 5 },
-  corporateJet:   { type: "Air", cost: "Am", control: "Ty", speed: "Am",  body: "Pr", protection: "Ty", seats: "20 + 2 crew" },
-  militaryJet:    { type: "Air", cost: "Mn", control: "Ex", speed: "ShX", body: "Ty", protection: "Ty", notes: "4 missiles (separate purchase) + Machine Gun (or lasers)" },
-  commercialJet:  { type: "Air", cost: "Mn", control: "Gd", speed: "Mn",  body: "Ty", protection: "Ty", seats: "100+", notes: "DC-10, Tristar, 707/747 class. Gd domestic / Ex international fare" },
-  blimp:          { type: "Air", cost: "Am", control: "Fe", speed: "Pr",  body: "Fe", protection: 0, notes: "May hover at 0 speed. Susceptible to winds. Body=0 → not enough lift, crashes. Historic hydrogen = Am explosion." },
-  trafficCopter:  { type: "Air", cost: "In", control: "Gd", speed: "Ex",  body: "Fe", protection: "Fe", notes: "VTOL; includes private/medivac copters" },
-  battleCopter:   { type: "Air", cost: "Am", control: "Ex", speed: "Ex",  body: "Ty", protection: "Gd", seats: 15, notes: "VTOL; 15 + crew; Machine Guns (or lasers)" },
-  wwiiPlane:      { type: "Air", cost: "In", control: "Gd", speed: "Rm",  body: "Ty", protection: "Ty", notes: "Corsair/Spitfire/Zero class; Machine Gun + 2 bombs" },
-  wwiiBomber:     { type: "Air", cost: "In", control: "Ty", speed: "Ex",  body: "Gd", protection: "Gd", notes: "Flying Fortress/Junkers class; Machine Guns + 100 bombs" },
-  wwiFighter:     { type: "Air", cost: "In", control: "Rm", speed: "Gd",  body: "Pr", protection: 0, notes: "Spad/Neuport/Fokker/Sopwith; Machine Guns" },
-  vtolJet:        { type: "Air", cost: "Mn", control: "Rm", speed: "Un",  body: "Ty", protection: "Ty", notes: "Jet fighter + hover/vertical takeoff; 4 missiles" },
-  ultraLight:     { type: "Air", cost: "Ex", control: "Ex", speed: "Ty",  body: "Fe", protection: 0, notes: "Mylar wings; fragile, quiet, portable" },
-  gliders:        { type: "Air", cost: "Ex", control: "Ty", speed: "Ty",  body: "Fe", protection: 0, notes: "Hang gliders, paragliders. Fall 3 floors/round; travel 6 areas. Skilled: 1 floor/round rise via thermals (Control FEAT)." },
-  autogyro:       { type: "Air", cost: "Rm", control: "Ex", speed: "Ex",  body: "Pr", protection: "Pr", notes: "VTOL; one-man helicopter relative" },
-  airCar:         { type: "Air", cost: "In", control: "Ex", speed: "Pr",  body: "Gd", protection: "Gd", notes: "VTOL; rises 10 floors/round; better for vertical than linear" },
-  skymobile:      { type: "Air", cost: "Rm", control: "Ex", speed: "In",  body: "Ex", protection: 0, notes: "Airborne motorcycle, VTOL, half-ton lift (Hawkeye/WCA)" },
-  flyingCar:      { type: "Air", cost: "Am", control: "Rm", speed: "Am",  body: "Ex", protection: "Gd", notes: "S.H.I.E.L.D. standard. Ground stats apply while on ground. Forward Stun Cannon + rear LAW (in trunk)." },
-  quinjet:        { type: "Air", cost: "Am", control: "Rm", speed: "ShY", body: "Ex", protection: "Gd", seats: "7 (5 + 2 crew)", notes: "Wakanda/Stark design; VTOL; formerly catapult-launched" },
-  concorde:       { type: "Air", cost: "Mn", control: "Ty", speed: "ShX", body: "Gd", protection: "Gd", seats: "200+", notes: "SST; Rm cost Paris-NYC" },
-  omnijet:        { type: "Air", cost: "Am", control: "Ex", speed: "ShY", body: "Ex", protection: "Gd", seats: 7, notes: "Alpha Flight's Quinjet equivalent; VTOL + hover" },
-  pogoPlane:      { type: "Air", cost: "Am", control: "Ex", speed: "ShY", body: "Ex", protection: "Gd", seats: 4, notes: "Reed Richards design; takes off/lands vertical; CANNOT hover" },
-  fantasticar:    { type: "Air", cost: "In", control: "In", speed: "Ex",  body: "Ty", protection: "Ty", seats: 6, notes: "Side seats split off as miniplanes. Stats listed are for the main craft." },
-  src:            { type: "Air", cost: "In", control: "Gd", speed: "Rm",  body: "Ex", protection: "Ty", notes: "Short Range Carrier; anti-grav/air-cushion. Original FF 'Flying Bathtub'." },
-  blackbird:      { type: "Air", cost: "Am", control: "Rm", speed: "ShY", body: "Ex", protection: "Gd", seats: 10, notes: "X-Men RS-150 Lockheed + Shi'ar mods. VTOL (Shi'ar-enabled; standard RS-150 is not)." },
-
-  // Space
-  spaceShuttle:   { type: "Space", cost: "Am", control: "Ty", speed: "ShZ",    body: "Rm", protection: "Rm", notes: "Atmospheric: aircraft stats. Near-space only (can't reach moon)." },
-  lunarShuttle:   { type: "Space", cost: "Un", control: "Gd", speed: "Cl1000", body: "Rm", protection: "Rm", notes: "Earth-to-moon range; retroengines for landing" },
-  spaceShip:      { type: "Space", cost: "Un", control: "Ex", speed: "Cl3000", body: "Ex", protection: "Ex", notes: "Generic interstellar; 1-100 compartments; usually laser cannons", compartmented: true },
-
-  // Water
-  raft:           { type: "Water", cost: "Fe", control: "Ty", speed: "Fe", body: "Pr", protection: 0 },
-  rowboat:        { type: "Water", cost: "Ty", control: "Gd", speed: "Fe", body: "Ty", protection: "Fe", notes: "Oar-powered; includes canoes/liferafts; holds up to 20" },
-  sailboat:       { type: "Water", cost: "Gd", control: "Pr", speed: "Pr", body: "Fe", protection: 0, notes: "Sunfish/sailfish class. +1CS speed with wind; cannot exceed listed speed against wind." },
-  racingSloop:    { type: "Water", cost: "Rm", control: "Gd", speed: "Gd", body: "Pr", protection: "Pr", seats: 5, notes: "Ocean-going sailboat; may add motorboat engine" },
-  motorboat:      { type: "Water", cost: "Gd", control: "Ex", speed: "Ex", body: "Ty", protection: "Pr" },
-  yacht:          { type: "Water", cost: "In", control: "Ty", speed: "Gd", body: "Ty", protection: "Ty", seats: 10 },
-  speedboat:      { type: "Water", cost: "Rm", control: "Gd", speed: "In", body: "Ty", protection: "Pr", seats: 4 },
-  patrolBoat:     { type: "Water", cost: "Rm", control: "Gd", speed: "Rm", body: "Gd", protection: "Ty", seats: 10, notes: "1 Light Artillery + 1-3 Machine Guns" },
-  hydrofoil:      { type: "Water", cost: "In", control: "Ty", speed: "In", body: "Ty", protection: "Ty", notes: "Successful attack → Control FEAT. Lost control above Ex speed = crashes into water." },
-  jetskis:        { type: "Water", cost: "Rm", control: "Ex", speed: "Ex", body: "Gd", protection: 0, seats: 1, notes: "Sea snowmobile. Some carry weapons, flight, or underwater mods." },
-  oceanLiner:     { type: "Water", cost: "Am", control: "Gd", speed: "Ty", body: "Ty", protection: "Gd", seats: "300+", compartments: 40, notes: "Rm cruise cost, Ex tramp-steamer fare", compartmented: true },
-  destroyer:      { type: "Water", cost: "Mn", control: "Ty", speed: "Ty", body: "Gd", protection: "Ex", crew: 150, compartments: 20, notes: "0-3 Heavy Artillery + 1-4 Light Artillery (some missile-equipped)", compartmented: true },
-  battleship:     { type: "Water", cost: "Un", control: "Ty", speed: "Pr", body: "Rm", protection: "Ex", crew: 1000, compartments: 40, notes: "2-4 Super-Heavy Artillery + 4-6 Heavy Artillery. Reduced role in modern navy.", compartmented: true },
-  carrier:        { type: "Water", cost: "Un", control: "Ty", speed: "Pr", body: "Ex", protection: "Ex", crew: 100, compartments: 40, notes: "Aircraft not included. Missile-armed.", compartmented: true },
-
-  // Sub
-  submarine:      { type: "Sub", cost: "Am", control: "Gd", speed: "Pr", body: "Rm", protection: "Ex", crew: 50, compartments: 5, notes: "8 missiles + ~20 torpedoes (treat as undersea missiles)", compartmented: true },
-  miniSub:        { type: "Sub", cost: "In", control: "Ex", speed: "Gd", body: "Gd", protection: "Gd", seats: "1-2", notes: "Launched from parent ship; missile or laser-rifle armed" }
-};
-
 // ── UNIVERSAL TABLE ──
 // The core resolution mechanic. Roll d100, cross-reference with rank column.
 // Returns: "white", "green", "yellow", "red"
@@ -1010,28 +467,6 @@ export const VEHICLE_CATALOG = {
 // removed from this file in v1.3.0 — resolve rolls via
 // game.msh.rollUniversalTable / action-utils.universalColor().
 
-// Color-to-label maps for each action column
-export const ACTION_COLUMN_RESULTS = {
-  BA: { ability: "fighting",  white: "Miss",    green: "Hit",     yellow: "Slam",     red: "Stun" },
-  EA: { ability: "fighting",  white: "Miss",    green: "Hit",     yellow: "Stun",     red: "Kill" },
-  Sh: { ability: "agility",   white: "Miss",    green: "Hit",     yellow: "Bullseye", red: "Kill" },
-  TE: { ability: "agility",   white: "Miss",    green: "Hit",     yellow: "Stun",     red: "Kill" },
-  TB: { ability: "agility",   white: "Miss",    green: "Hit",     yellow: "Hit",      red: "Stun" },
-  En: { ability: "agility",   white: "Miss",    green: "Hit",     yellow: "Bullseye", red: "Kill" },
-  Fo: { ability: "agility",   white: "Miss",    green: "Hit",     yellow: "Bullseye", red: "Stun" },
-  Gp: { ability: "strength",  white: "Miss",    green: "Miss",    yellow: "Partial",  red: "Hold" },
-  Gb: { ability: "strength",  white: "Miss",    green: "Take",    yellow: "Grab",     red: "Break" },
-  Es: { ability: "strength",  white: "Miss",    green: "Miss",    yellow: "Escape",   red: "Reverse" },
-  Ch: { ability: "endurance", white: "Miss",    green: "Hit",     yellow: "Slam",     red: "Stun" },
-  Do: { ability: "agility",   white: "None",    green: "-2 CS",   yellow: "-4 CS",    red: "-6 CS" },
-  Ev: { ability: "fighting",  white: "Autohit", green: "Evasion", yellow: "+1 CS",    red: "+2 CS" },
-  Bl: { ability: "strength",  white: "-6 CS",   green: "-4 CS",   yellow: "-2 CS",    red: "+1 CS" },
-  Ca: { ability: "agility",   white: "Autohit", green: "Miss",    yellow: "Damage",   red: "Catch" },
-  St: { ability: "endurance", white: "1-10",    green: "1",       yellow: "No",       red: "No" },
-  Sl: { ability: "endurance", white: "Gr.Slam", green: "1 area",  yellow: "Stagger",  red: "No" },
-  Ki: { ability: "endurance", white: "En.Loss", green: "E/S",     yellow: "No",       red: "No" }
-};
-
 // ══════════════════════════════════════════════════════════════
 // EQUIPMENT: WEAPONS
 // ══════════════════════════════════════════════════════════════
@@ -1045,69 +480,6 @@ export const ACTION_COLUMN_RESULTS = {
 // Shots: rounds before reload (1 round to reload; Bow talent may negate).
 // Damage: standard ammo. Stun weapons have Intensity instead.
 // Type: S=Shooting, E=Energy, F=Force column on Universal Table.
-
-export const SHOOTING_WEAPONS = {
-  // Handguns
-  cheapHandgun:      { name: "Cheap Handgun",       range: 2,  price: "Fe", damage: 6,  type: "S", rate: 1, shots: 6,  material: "Pr", notes: "One-handed, no special ammo" },
-  handgun:           { name: "Handgun/Pistol",       range: 3,  price: "Ty", damage: 6,  type: "S", rate: 1, shots: "6,8,9", material: "Ex", notes: "One-handed" },
-  targetPistol:      { name: "Target Pistol",        range: 5,  price: "Ty", damage: 6,  type: "S", rate: 1, shots: 1,  material: "Ex", notes: "One-handed, no range penalty when firing two-handed" },
-  variablePistol:    { name: "Variable Pistol",      range: 3,  price: "Gd", damage: 6,  type: "S", rate: 1, shots: "6,8,9", material: "Ex", notes: "One-handed, may change ammo type in field" },
-  gyroJetPistol:     { name: "GyroJet Pistol",       range: 5,  price: "Ex", damage: 10, type: "S", rate: "1 per 2", shots: 3, material: "Gd", notes: "One-handed, gyro-jet ammo only, illegal" },
-  laserPistol:       { name: "Laser Pistol",         range: 10, price: "Rm", damage: 10, type: "E", rate: 1, shots: 10, material: "Pr", notes: "One-handed, power pack, illegal" },
-  stunPistol:        { name: "Stun Pistol",          range: 2,  price: "Rm", damage: null, type: "stun", rate: 1, shots: 10, material: "Pr", notes: "One-handed, power pack, Typical Intensity stunning" },
-  concussionPistol:  { name: "Concussion Pistol",    range: 4,  price: "In", damage: 10, type: "F", rate: 1, shots: 5, material: "Ty", notes: "One-handed, power pack, illegal" },
-  plasmaBeam:        { name: "Plasma Beam Handgun",  range: 7,  price: "Am", damage: 20, type: "F", rate: 1, shots: 10, material: "Ex", notes: "One-handed, power pack" },
-  machinePistol:     { name: "Machine Pistol",       range: 3,  price: "Ex", damage: 20, type: "S", rate: 1, shots: 6, material: "Ex", notes: "One-handed, bursts, military" },
-
-  // Rifles
-  rifle:             { name: "Rifle",                range: 10, price: "Ty", damage: 10, type: "S", rate: 1, shots: 4, material: "Gd", notes: "Two-handed, fire one-handed at -2CS" },
-  huntingRifle:      { name: "Hunting Rifle",        range: 10, price: "Gd", damage: 10, type: "S", rate: 1, shots: "6,7,8", material: "Gd", notes: "Two-handed" },
-  sniperRifle:       { name: "Sniper Rifle",         range: 10, price: "Gd", damage: 15, type: "S", rate: 1, shots: 4, material: "Gd", notes: "Two-handed, no range penalty" },
-  assaultRifle:      { name: "Assault Rifle",        range: 7,  price: "Ex", damage: 10, type: "S", rate: 2, shots: 20, material: "Gd", notes: "Military" },
-  // Type "S" as printed; prose says lasers use the Energy column (cf. laserPistol/
-  // laserCannon "E"). Likely table misprint — GM ruling pending.
-  laserRifle:        { name: "Laser Rifle",          range: 4,  price: "Rm", damage: 20, type: "E", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal. RULED 2026-08-31: lasers are Energy attacks (printed \"S\" is wrong)" },
-  stunRifle:         { name: "Stun Rifle",           range: 5,  price: "Rm", damage: null, type: "stun", rate: 1, shots: 20, material: "Ty", notes: "Power pack, illegal, Remarkable Intensity stunning" },
-  concussionRifle:   { name: "Concussion Rifle",     range: 7,  price: "Rm", damage: 10, type: "F", rate: 1, shots: 12, material: "Gd", notes: "Power pack, illegal" },
-  automaticRifle:    { name: "Automatic Rifle",      range: 5,  price: "Ex", damage: 15, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Military, bursts" },
-  shotgun:           { name: "Shotgun",              range: 3,  price: "Gd", damage: 20, type: "S", rate: "1,2", shots: 2, material: "Gd", notes: "Bursts, may fire 1 or both barrels" },
-  riotGun:           { name: "Riot Gun",             range: 2,  price: "Gd", damage: 15, type: "S", rate: 1, shots: 6, material: "Ex", notes: "Fire one-handed at -1CS, fires canister shot" },
-  grenadeLauncher:   { name: "Grenade Launcher",     range: 4,  price: "Ex", damage: null, type: "S", rate: "1 per 2", shots: 1, material: "Gd", notes: "Military, fires grenades, no range penalty" },
-
-  // Heavy weapons
-  subMachineGun:     { name: "Sub-Machine Gun",      range: 7,  price: "Rm", damage: 25, type: "S", rate: 1, shots: 7, material: "Gd", notes: "Fire one-handed at -2CS, bursts, military" },
-  machineGun:        { name: "Machine Gun",          range: 10, price: "In", damage: 30, type: "S", rate: 1, shots: 20, material: "Gd", notes: "Bursts, military, not one-handed" },
-  flamethrower:      { name: "Flamethrower",         range: 2,  price: "In", damage: 30, type: "E", rate: 1, shots: 5, material: "Ty/Gd", notes: "Military, scatter, burns In(40) first round then 10/round for 1-10 rounds" },
-  bazooka:           { name: "Bazooka",              range: 4,  price: "In", damage: 40, type: "S", rate: "1 per 2", shots: 1, material: "Gd", notes: "Military, two men to fire" },
-  law:               { name: "LAW",                  range: 4,  price: "Am", damage: 40, type: "S", rate: 1, shots: 6, material: "Gd", notes: "Military, one man to fire" },
-  lightArtillery:    { name: "Light Artillery",      range: 10, price: "Am", damage: 40, type: "S", rate: 1, shots: 20, material: "Ex", notes: "Military, two men to operate" },
-  stunCannon:        { name: "Stun Cannon",          range: 10, price: "Am", damage: null, type: "stun", rate: 1, shots: 10, material: "Rm", notes: "Two men, one-man at -1CS, In Intensity stunning, bursts, power pack" },
-  concussionCannon:  { name: "Concussion Cannon",    range: 15, price: "Am", damage: 40, type: "F", rate: 1, shots: 10, material: "Rm", notes: "Power pack, stationary" },
-  laserCannon:       { name: "Laser Cannon",         range: 20, price: "Am", damage: 30, type: "E", rate: 1, shots: 10, material: "Ex", notes: "Power pack, stationary" },
-  heavyArtillery:    { name: "Heavy Artillery",      range: 40, price: "Mn", damage: 50, type: "S", rate: 1, shots: 30, material: "Rm", notes: "Military, two men to fire, scatter" },
-  superHeavy:        { name: "Superheavy Artillery",  range: 80, price: "Un", damage: 50, type: "S", rate: 1, shots: 30, material: "In", notes: "Stationary, military, two men to fire" },
-  missileLauncher:   { name: "Missile Launcher",     range: null, price: "In", damage: null, type: "missile", rate: 1, shots: 10, material: "Rm", notes: "Fires missiles, military; range varies by missile (LAW-class to Heavy Artillery equivalents)" },
-
-  // Bows
-  regularBow:        { name: "Regular Bow",          range: 5,  price: "Pr", damage: 6,  type: "S", rate: 1, shots: 1, material: "Pr", notes: "Two-handed, -1CS without Bow talent" },
-  longBow:           { name: "Long Bow",             range: 6,  price: "Ty", damage: 10, type: "S", rate: 1, shots: 1, material: "Ty", notes: "Two-handed, -1CS without Bow talent" },
-  compoundBow:       { name: "Compound Bow",         range: 7,  price: "Ex", damage: 15, type: "S", rate: 1, shots: 1, material: "Gd", notes: "Two-handed, -1CS without Bow talent" },
-  crossbow:          { name: "Crossbow",             range: 3,  price: "Gd", damage: 10, type: "S", rate: "1 per 2", shots: 1, material: "Ty", notes: "One-handed at -2CS, -1CS without Bow talent" }
-};
-
-export const MELEE_WEAPONS = {
-  knife:      { name: "Knife",          price: "Fe", damage: 10, type: "EA,ET", material: "Ex", notes: "Blade up to 12 inches, may be thrown" },
-  sword:      { name: "Sword",          price: "Pr", damage: 10, type: "EA",    material: "Ex", notes: "One-handed, blade over 12 inches" },
-  greatSword: { name: "Great Sword",    price: "Gd", damage: 15, type: "EA",    material: "Ex", notes: "Two-handed, one-handed at -2CS" },
-  axe:        { name: "Axe",            price: "Gd", damage: 5,  type: "EA",    material: "Gd", notes: "One-handed chopping weapon" },
-  greatAxe:   { name: "Great Axe",      price: "Ex", damage: 15, type: "EA",    material: "Gd", notes: "Two-handed" },
-  spear:      { name: "Spear",          price: "Fe", damage: 10, type: "EA,ET", material: "Gd", notes: "Handle over 1ft, normally thrown or two-handed" },
-  club:       { name: "Club",           price: "Fe", damage: 10, type: "BA,BT", material: "Gd", notes: "Includes makeshift weapons (chairs, tables)" },
-  shuriken:   { name: "Shuriken",       price: "Fe", damage: 10, type: "ET",    material: "Ex", notes: "Throwing stars, max range 3 areas" },
-  boomerang:  { name: "Boomerang",      price: "Pr", damage: 10, type: "BT",    material: "Gd", notes: "Returns only with Throwing talent" },
-  whipLeather:{ name: "Whip (leather)", price: "Pr", damage: 0,  type: "Gp,Gb", material: "Ty", notes: "Grapple/Grab at range, effective Str = material strength" },
-  whipMetal:  { name: "Whip (metal)",   price: "Gd", damage: 10, type: "Gp,Gb", material: "Gd", notes: "Grapple/Grab at range, effective Str = material strength" }
-};
 
 // Melee damage rules:
 // Blunt Attack: damage = Str or material strength (whichever less).
@@ -1173,53 +545,6 @@ export const AMMUNITION = {
   }
 };
 
-export const GRENADES = {
-  fragment:    { cost: "Ex", damage: "Rm (30) EA", effect: "Scatter, all in area" },
-  smoke:       { cost: "Gd", damage: null, effect: "Ex Intensity smoke, -2CS FEATs in area" },
-  tearGas:     { cost: "Ex", damage: null, effect: "Ty Intensity tear gas" },
-  knockoutGd:  { cost: "In", damage: null, effect: "Gd Intensity KO gas" },
-  knockoutEx:  { cost: "Am", damage: null, effect: "Ex Intensity KO gas" },
-  knockoutRm:  { cost: "Mn", damage: null, effect: "Rm Intensity KO gas" },
-  flash:       { cost: "Ex", damage: null, effect: "Am Intensity flash, affects those facing" },
-  concussive:  { cost: "Rm", damage: "40 BA", effect: "All in area" },
-  sonic:       { cost: "In", damage: "20 Energy", effect: "All in area + Ex Intensity stunning" }
-};
-
-export const GASES = {
-  smoke:      { intensity: "Excellent", effect: "-2CS on all FEATs in smoke-filled area" },
-  tearGas:    { intensity: "Typical",   effect: "Endurance FEAT or no actions (movement only) until leaving + 1 round" },
-  knockoutGas:{ intensities: "Various (Fe through Un)", effect: "Endurance FEAT or KO 1-10 rounds. Health unaffected." },
-  costs: {
-    smoke: "Gd", tearGas: "Ex",
-    knockoutFe: "Ex", knockoutPr: "Rm", knockoutTy: "Rm", knockoutGd: "In",
-    knockoutEx: "In", knockoutRm: "Am", knockoutIn: "Am", knockoutAm: "Mn",
-    knockoutMn: "Mn", knockoutUn: "Un"
-  }
-};
-
-export const MISSILES = {
-  types: {
-    standard:  { body: "Ex", control: "Rm", speed: "Ex" },
-    highTech:  { body: "Ex", control: "In", speed: "Ex" },
-    highSpeed: { body: "Ex", control: "In", speed: "Am" }
-  },
-  // No control device: straight line to target location at firing, Shift 0 column to hit.
-  controlSystems: {
-    wireGuided:     "Wire (Fe material) from tail. Controller Agility to hit. Sever = no control. Max 10 areas, no range penalty.",
-    teleGuided:     "Nose camera, operator up to 5 miles. Lesser of Control or controller Agility.",
-    computerGuided: "Programmed for target. Pr ability to distinguish similar targets.",
-    radioLinked:    "Homing, tracks wavelength. Destroy tracer = out of control.",
-    heatSeeking:    "Locks on hottest flame source in path. Only sidetracked by higher heat."
-  },
-  payloads: {
-    standard:              { damage: 40,  type: "EA", area: "all in target area" },
-    concentratedExplosive: { damage: 40,  type: "EA", area: "target only" },
-    highExplosive:         { damage: 70,  type: "EA", area: "all in target, 20pts adjacent" },
-    incendiary:            { damage: 40,  type: "E",  area: "all in area, burns Gd Intensity/round" },
-    gas:                   { damage: null, type: null, area: "Am Intensity tear/KO gas, all in area" }
-  }
-};
-
 // ── WEAPON RULES SUMMARY ──
 // Range penalty: -1CS per area beyond first (weapons only, not powers).
 // Bursts: up to 3 adjacent targets, single roll.
@@ -1236,510 +561,11 @@ export const MISSILES = {
 // Heroes may rent, buy, or build HQs. Buildings defined by size, cost
 // (rent/buy), and material strength. Room packages outfit the interior.
 
-// ── BUILDING TABLE ──
-// Cost format: "rent/buy" (rent is monthly). Size categories:
-//   Small (2-3 rooms/areas) — 1-2 heroes
-//   Mid-sized (up to 5 rooms) — 2-3 heroes or office space
-//   Large (10+ rooms, 2 floors) — team HQ
-//   Deluxe (20+ rooms, 3+ floors, vehicle bays, trophy rooms)
-//
-// Location modifiers: +1CS cost for Manhattan or rich suburbs; -1CS for
-// secluded locations (Colorado ranch, island). Floors support material
-// strength +2CS sustained load; higher peak for temporary loads.
-export const HQ_BUILDINGS = {
-  apartment1BR:    { size: "Small",     rent: "Fe", buy: "Ex", material: "Gd" },
-  apartment2BR:    { size: "Small",     rent: "Pr", buy: "Ex", material: "Gd" },
-  apartment3BR:    { size: "Small",     rent: "Gd", buy: "Rm", material: "Gd" },
-  cottage:         { size: "Small",     rent: "Pr", buy: "Gd", material: "Pr", rooms: 2 },
-  smallHouse:      { size: "Small",     rent: "Ty", buy: "Ex", material: "Ty", rooms: 4 },
-  mediumHouse:     { size: "Mid-sized", rent: "Ty", buy: "Rm", material: "Ty", rooms: 8 },
-  largeHouse:      { size: "Mid-sized", rent: "Ex", buy: "In", material: "Gd", rooms: 12 },
-  smallManor:      { size: "Large",     rent: "Rm", buy: "Am", material: "Ex", rooms: 18 },
-  largeManor:      { size: "Deluxe",    rent: "In", buy: "Mn", material: "Ex", rooms: 24 },
-  mansion:         { size: "Deluxe",    rent: "Am", buy: "Mn", material: "Ex", rooms: "30+" },
-  office:          { size: "Mid-sized", rent: "Gd", buy: "Rm", material: "Ex", rooms: 3 },
-  storefront:      { size: "Small",     rent: "Ty", buy: "Rm", material: "Gd", rooms: 4 },
-  officeSuite:     { size: "Mid-sized", rent: "Ex", buy: "In", material: "Ex", rooms: 6 },
-  officeFloor:     { size: "Mid-sized", rent: "Rm", buy: "Am", material: "Ex", rooms: 12 },
-  twoOfficeFloors: { size: "Large",     rent: "In", buy: "Mn", material: "Ex", rooms: 24 },
-  brownstone:      { size: "Mid-sized", rent: "Ex", buy: "Rm", material: "Gd" },
-  officeBldg4:     { size: "Large",     rent: "Rm", buy: "Am", material: "Ex", floors: 4 },
-  officeBldg8:     { size: "Deluxe",    rent: "In", buy: "Mn", material: "Rm", floors: 8 },
-  officeBldg12:    { size: "Deluxe",    rent: "Am", buy: "Un", material: "Rm", floors: 12 },
-  officeBldg20:    { size: "Deluxe",    rent: "Mn", buy: "ShX",material: "Rm", floors: 20 },
-  officeBldg30:    { size: "Deluxe",    rent: "Un", buy: "ShZ",material: "Rm", floors: "30+" },
-  smallWarehouse:  { size: "Mid-sized", rent: "Ty", buy: "Rm", material: "Ty" },
-  mediumWarehouse: { size: "Large",     rent: "Gd", buy: "In", material: "Ty" },
-  largeWarehouse:  { size: "Deluxe",    rent: "Ex", buy: "Am", material: "Gd" },
-  smallFactory:    { size: "Mid-sized", rent: "Gd", buy: "In", material: "Rm" },
-  mediumFactory:   { size: "Large",     rent: "Ex", buy: "Am", material: "Rm" },
-  largeFactory:    { size: "Deluxe",    rent: "Rm", buy: "Mn", material: "In" }
-};
-
-// ── ROOM PACKAGES ──
-// Costs come in tiers; each tier adds contents or capability.
-// "Rooms" = how many building rooms/areas the package occupies.
-// Same-type rooms must be purchased separately (back-ups allowed).
-export const HQ_ROOM_PACKAGES = {
-  livingRoom: {
-    rooms: 1,
-    tiers: {
-      Gd: "Sofa, 2 easy chairs, 2 end tables, coffee table, 2 lamps",
-      Ex: "As Gd + television, stereo, or piano",
-      Rm: "As Gd + all three"
-    }
-  },
-  diningRoom: {
-    rooms: 1,
-    tiers: {
-      Gd: "Table, 4 chairs, ceiling lamp",
-      Ex: "Large table, bureau, 4 more chairs",
-      Rm: "China cabinet, set of china and sterling tableware"
-    }
-  },
-  kitchen: {
-    rooms: 1,
-    tiers: {
-      Gd: "Sink, stove, 4 cabinets, dishware, stainless tableware, counterspace (standard residential)",
-      Ex: "Add refrigerator, dishwasher, or microwave + fire extinguisher",
-      Rm: "All three + freezer"
-    }
-  },
-  library: {
-    rooms: 1,
-    tiers: {
-      Ex: "2 easy chairs, table, desk, straight chair, up to 5 bookcases of general texts",
-      Rm: "Add globe, microfiche/microfilm reader, computer terminal (if computer room present or networked). Rare volumes separate."
-    }
-  },
-  computerRoom: {
-    rooms: 1,
-    tiers: {
-      Rm: "Computer + terminal OR terminal with comms to external computer. Ex ability at simple tasks (calculation, retrieval, monitoring).",
-      In: "Computer with Rm ability at those tasks. Higher-ability and AI machines are unique designs."
-    }
-  },
-  communications: {
-    rooms: 1,
-    tiers: {
-      Rm: "Chair, short-wave monitor, computer network tap-in, police band",
-      In: "National security alert equipment + visual display screens"
-    }
-  },
-  crimeFiles: {
-    rooms: 1,
-    tiers: {
-      Ex: "Specialized info-processing computer at Rm ability. Terminal, chairs, lights."
-    },
-    notes: "Hero groups on good terms often share crime files."
-  },
-  workshop: {
-    rooms: "1+",
-    tiers: {
-      Rm: "Lathes, drills, saws, metal/wood tools, fire extinguisher",
-      In: "Adds laser-guided instruments",
-      Am: "Automatic processing (effectively an automatic factory for simple goods)"
-    }
-  },
-  laboratory: {
-    rooms: "1+",
-    tiers: {
-      Rm: "Scales, sinks, common chemicals, microscope",
-      In: "Add computer with In analysis ability OR clean room",
-      Am: "Both + poison analysis and serum dispenser (Ex effects, known poisons only). Specialized instruments (electron microprobe, stellar mass detector) sold separately at In rank."
-    }
-  },
-  office: {
-    rooms: "1+",
-    tiers: {
-      Gd: "Desk, 3 chairs, 2 lamps",
-      Ex: "Double material + file cabinet, typewriter",
-      Rm: "Add computer terminal, double again, hanging plants, decorative art"
-    }
-  },
-  recRoom: {
-    rooms: "1+",
-    tiers: {
-      Ex: "Unmatched sofa, easy chairs, pool table OR ping pong OR TV",
-      Rm: "All of the above + video and/or pinball machines (hot tub optional, California only)",
-      Am: "All of the above + computer-assisted holographic entertainment projector"
-    }
-  },
-  gym: {
-    rooms: "1+",
-    tiers: {
-      Ex: "Typical weight-lifting equipment, universal gym, lockers",
-      Rm: "Add rings, parallel bars (even and uneven), short horse",
-      In: "Add separate locker and steam rooms (+2 rooms), diagnostic displays",
-      Am: "Add boxing area, robotic opponents, 100-ton electronic weights. Must occupy 3+ areas."
-    }
-  },
-  pool: {
-    rooms: "2+",
-    notes: "Extends 1 floor downward. Standard Olympic pool, diving boards, sun room (or retractable sun roof).",
-    tiers: {
-      Rm: "Outdoor",
-      In: "Indoor"
-    }
-  },
-  dangerRoom: {
-    rooms: "3+",
-    notes: "Duplicates Rm Gym package + active dangers and security systems.",
-    tiers: {
-      In: "Threats up to In strength/intensity/damage",
-      Am: "Threats up to Am + limited holographic illusion at Ex (original X-Men style; Hellions use this tier). Current X-Men room is unique Shi'ar hybrid."
-    }
-  },
-  conferenceRoom: {
-    rooms: 1,
-    tiers: {
-      Rm: "Large table + 10 chairs, OR platform/speaker/30 chairs (for news conferences)",
-      In: "Add wood paneling"
-    }
-  },
-  medical: {
-    rooms: 1,
-    tiers: {
-      Rm: "Emergency-room equivalent, no heavy equipment, standard antidotes and medication",
-      In: "Add X-ray, clean room, operating room, pathology (additional rooms)",
-      Am: "Add cryogenics. Auto-docs and similar life-saving devices are generally experimental (X-Men's is Shi'ar hybrid, Ex healing cap)."
-    }
-  },
-  powerRoom: {
-    rooms: 1,
-    tiers: {
-      Rm: "Back-up generator, 12-hour supply",
-      In: "24-hour supply + automatic cut-in 2 rounds after external power fails",
-      Am: "Solar cells, no external power needed in normal conditions"
-    },
-    notes: "Buildings normally draw from external power. Needed for Mn-strength ray-guns and similar high-draw equipment."
-  },
-  garage: {
-    rooms: 1,
-    tiers: {
-      Gd: "Service 1 ground vehicle + fire extinguisher + repair facilities",
-      Ex: "Up to 3 ground vehicles",
-      Rm: "Up to 12 ground vehicles"
-    }
-  },
-  hangar: {
-    rooms: "1 area per vehicle",
-    tiers: {
-      Ex: "Service 1 air vehicle + repair facilities. Each different vehicle needs its own hangar."
-    }
-  },
-  dock: {
-    rooms: "3 areas per vehicle",
-    tiers: {
-      Rm: "Service 1 sea or sub vehicle + drydock. Each vehicle needs its own dock."
-    }
-  },
-  trophyRoom: {
-    rooms: 1,
-    tiers: {
-      Ex: "Showcase, lighting, frames to display mementos; may double as reception hall/gallery",
-      Rm: "Add handling capability for potentially dangerous exhibits at In level"
-    }
-  },
-  imprisonment: {
-    rooms: 1,
-    tiers: {
-      Ex: "Standard restraints; bars of Rm material",
-      Rm: "Restraints of In strength",
-      In: "Am-strength restraints + Ex-strength inhibitor restraints"
-    }
-  },
-  fireProtection: {
-    rooms: 0,
-    tiers: {
-      Ex: "Sprinkler system, up to 10 rooms, Gd protection from fire",
-      Rm: "Foam projectors, Ex protection, 10 rooms"
-    },
-    notes: "Auto-activates on heat or smoke. MUST be modified to avoid extinguishing flaming heroes."
-  }
-};
-
-// ── SECURITY & DEFENSE PACKAGES ──
-// Security: alarms and detection. Defense: active countermeasures.
-export const HQ_SECURITY = {
-  tiers: {
-    Gd: "Hand-set burglar alarms on windows/doors + mechanical locks. One package per door or window.",
-    Ex: "Automatic alarms with computer-code or card identification",
-    Rm: "Automatic alarms with palm-print scan; can activate defense systems",
-    In: "Full-body scan with benign-identification program; can activate defense systems"
-  },
-  rooms: 0
-};
-
-export const HQ_DEFENSE = {
-  tiers: {
-    Ex: "Pre-set defenses (tentacles, nets, lasers, stun rifles, concussive rifles, or pit traps) — max Rm strength/intensity",
-    Rm: "Defenses activated by Security package — one type at In strength",
-    In: "As above, Am intensities"
-  },
-  notes: "Multiple defense mechanisms may protect the same installation. Custom/specialized packages designed on request."
-};
-
-// ══════════════════════════════════════════════════════════════
-// OTHER EQUIPMENT
-// ══════════════════════════════════════════════════════════════
-// Items not covered by weapons/vehicles/HQ. Rules-bearing items have
-// structured fields; pure cost items have cost + brief notes.
-export const OTHER_EQUIPMENT = {
-  // Fire & Flame
-  fireExtinguisher: { cost: "Ty", rule: "Gd Intensity vs fire. Green FEAT: extinguishes up to Ty Intensity in area. Yellow: up to Gd. Red: up to Ex. Vs flaming heroes (Human Torch): target makes FEAT vs Gd Intensity or loses flame." },
-  fireHose:         { cost: "Ex", rule: "10 pts Blunt Attack at 1 area range, fire-burst. Vs fire/flaming heroes: Rm Intensity." },
-
-  // Weapon accessories
-  silencer:     { cost: "Gd", rule: "Attaches to shooting-table pistol/rifle (not gyro-jet, laser, stun, or concussion). -1 rank max range. Listeners make Intuition FEAT to hear shot and locate it." },
-  sniperSight:  { cost: "Gd", rule: "Eliminates range penalty for missile weapons. User automatically has initiative roll of 10 (fires last). Illegal (Other Crime) except on sniper rifle and target pistol where built-in." },
-  infraRedSight:{ cost: "Gd", rule: "For any missile weapon. See up to 5 areas in dark." },
-  tripod:       { cost: "Ty", rule: "Steady rifle/automatic/assault/machine gun (incl. laser/stun/concussion variants). +1CS to hit when weapon rests on tripod on ground or steady surface." },
-
-  // Light & vision
-  flashlight:        { cost: "Fe", rule: "2 area range" },
-  halogenFlashlight: { cost: "Gd", rule: "3 area range, brighter bulb, more concentrated beam, stronger blinding" },
-  infraRedGoggles:   { cost: "Ex", rule: "Normal vision up to 5 areas in dimly lit conditions" },
-  polarizedLenses:   { cost: "Gd", rule: "Gd resistance to light attacks. Darken 1 round on bright light, then lighten." },
-
-  // Gas & close-range
-  mace:    { cost: "Ty", rule: "Single adjacent target. No Agility FEAT to hit. Target makes Endurance FEAT vs Ty Intensity tear gas or suffers effects." },
-  gasMask: { cost: "Ty", rule: "Breathe/act normally in smoke, tear gas, or KO gas. Vision not clear — movement only is normal." },
-
-  // Protective suits / armor
-  asbestosSuit:  { cost: "Ex", rule: "Rm protection from heat/fire. Gd material." },
-  flakJacket:    { cost: "Ex", rule: "Gd Body Armor vs physical damage" },
-  betaCloth:     { cost: "Rm", rule: "Ty Body Armor vs physical; Ex protection from heat and radiation. Light-weight (S.H.I.E.L.D. agent standard)." },
-  radiationSuit: { cost: "In", rule: "In protection against radiation. Gd material, lead-lined." },
-
-  // Misc devices
-  flarePistol:     { cost: "Gd", rule: "Lights sky (all areas within 3) OR signal (10 floors straight up). As weapon: 2 area range, Gd damage, incendiary (ignites flammables)." },
-  camera:          { cost: "Gd", rule: "Standard photographer tool. Film = Fe, flash = as flashlight, telephoto lens = Gd." },
-  personalComputer:{ cost: "Gd", rule: "Pr Reason for problem-solving/analysis (smart as its data). +Ex for modem." },
-  caltrops:        { cost: "Ty", rule: "Pr Edged Attack on those stepping on them (non-lethal, no Kill results). Vs tired vehicles: Ex Edged Attack + immediate forced Control FEAT." },
-  handcuffs:       { cost: "Ty", rule: "Ex material restraints; standard police gear" },
-
-  // Rules-bearing restraints / anti-power tech
-  inhibitorBands: {
-    cost: "Rm",
-    rule: "Suppress natural abilities (mutants, altered humans). -5CS on physical abilities (FASE); -7CS on Powers and mental abilities. Talents unaffected. No ability drops below Feeble. Tech and magical powers NOT affected."
-  },
-  nullifierBands: {
-    cost: "In",
-    rule: "Interfere with hi-tech power suits the way inhibitors affect mutants. When suit-wearer's Strength drops to Feeble, suit freezes and wearer is immobilized."
-  },
-  stasisRay: {
-    cost: "Mn",
-    rule: "Projects Mn Intensity stunning ray. Holds targets immobile as long as ray is maintained. Rarely portable — massive power drain. (Kang, Arcade-tier villain tech.)"
-  },
-  mutantAnalyzer: {
-    cost: "In",
-    rule: "Portable mutant-detection device. 1 area range. Detects presence only, NOT specific identity. X-Men's Cerebro is the large-scale version; portable attachments function as listed. Sentinels and Forge carry similar devices."
-  },
-  mutantNeutralizer: {
-    cost: "Un",
-    rule: "Removes inborn abilities. 3 area range. Target makes Endurance FEAT to avoid. Effect: 1-10 rounds without power (abilities drop to Ex, no superhuman powers). Talents and Contacts unaffected. Forge developed a potentially-permanent version; only prototype destroyed by Jim Rhodes (Iron Man II)."
-  },
-
-  // Sport/utility
-  spearGun:    { cost: "Gd", rule: "As crossbow. Fires bolts underwater at full distance without penalty." },
-  scubaGear:   { cost: "Gd", rule: "2 hours breathing. Hoses/mask Gd material, tanks Rm material. Punctured tanks explode for Rm damage to all in area." },
-  rollerSkates:{ cost: "Ty", rule: "Move as if Endurance were 3 ranks higher" },
-  rocketPack:  { cost: "Rm", rule: "Fly at Ex speed (belt or back-pack). All flight limitations apply. Agility FEATs at -1CS." }
-};
-
-// ── ROBOT TIERS ──
-// Preprogrammed, simplistic devices. Does not include robot PCs (Vision)
-// or free-willed AIs (Ultron). Custom robots: see Building Things.
-export const ROBOTS = {
-  standard: {
-    cost: "In",
-    allAbilities: "Typical",
-    rule: "Simple tasks only, no special abilities beyond recording and simple routines. H.E.R.B.I.E. was a modified standard."
-  },
-  sentry: {
-    cost: "In",
-    allAbilities: "Good",
-    armament: "Gd Strength lasers (may be additionally armed)",
-    rule: "Programmed to identify and open fire on hostile threats (anything not in its allow-list)."
-  },
-  talent: {
-    cost: "Am",
-    oneAbility: "Remarkable",
-    otherAbilities: "Excellent",
-    rule: "Specifically-designed for one purpose. One ability at Rm, rest at Ex. Examples: Avengers' fire-fighting robots, Black Knight's robotic sparring opponent."
-  }
-};
-
-// ── EXOTIC MATERIALS ──
-// Two-isotope substances with significant in-universe rules effects.
-export const EXOTIC_MATERIALS = {
-  vibraniumWakandan: {
-    cost: "Am (6 oz)",
-    material: "Incredible",
-    rule: "Sound absorber. 6 oz absorbs all sound in one area. Sonic attacks reduced by 5 ranks for effect. Gun silencer: totally silenced. Rarely available — Wakandan secret, controlled by T'Challa."
-  },
-  vibraniumAntarctic: {
-    cost: "Un (6 oz)",
-    material: "Incredible",
-    rule: "Weakens metal atomic bonds. 6 oz liquefies all metal in one area (material strength FEAT to avoid). Slightly less rare since Savage Land's destruction."
-  },
-  adamantiumTrue: {
-    cost: "ShX (1 lb)",
-    material: "Class 1000",
-    rule: "Chemical resin mixture; U.S. government secret. Resists atomic weapons."
-  },
-  adamantiumSecondary: {
-    cost: "Un (1 lb)",
-    material: "Unearthly",
-    rule: "Less expensive than true adamantium; destructible by high-end heroes."
-  },
-  capShield: {
-    material: "Stronger than true adamantium",
-    rule: "Adamantium/vibranium alloy, creation and exact consistency unknown"
-  },
-  unstableMolecules: {
-    cost: "In",
-    rule: "Reed Richards invention. Clothing/uniforms that adapt to wearer's abilities and size. No additional protection, but allows superpower use without destroying the garment. FF, Wasp, original New X-Men uniforms."
-  }
-};
-
-// ── SPECIALTY GEAR ──
-export const SPECIALTY_GEAR = {
-  translationDevice: {
-    cost: "In",
-    rule: "Handles most known international and galactic languages. Instant for known, 10+1-10 rounds for unknown. Advanced model (+1CS cost) analyzes unknown tongues."
-  },
-  mysticTexts: {
-    cost: "In",
-    rule: "Lesser magical books. Not the Darkhold or Book of the Vishanti, but may contain a usable spell. Found in old collections, wizards' effects — not commercial."
-  },
-  underwaterBreathingPills: {
-    cost: "In",
-    rule: "Reed Richards invention. Air-breathers breathe water for up to 4 hours. Allows inborn flame-users to flame underwater."
-  }
-};
-
-// ── SALARIES ──
-// Monthly cost of retaining support staff.
-export const SALARIES = {
-  butler:            "Ty",
-  housekeeper:       "Ty",
-  secretary:         "Ty",
-  pilot:             "Gd",
-  lawyer:            "Gd",
-  bodyguard:         "Ty",
-  mechanic:          "Ty",
-  computerSpecialist:"Ex",
-  scientist:         "Ex",
-  cook:              "Ty",
-  groundskeeper:     "Ty",
-  workers10:         "Ex",
-  workers50:         "Rm",
-  workers100:        "In",
-  workers150:        "Am"
-};
-
-// ── SUNDRIES (lifestyle costs) ──
-export const SUNDRIES = {
-  nightOnTheTown:      "Gd",
-  broadwayTickets:     "Ex",
-  dinnerAndMovie:      "Ty",
-  respectableClothing: "Pr",
-  rentedTux:           "Ty",
-  purchasedTux:        "Gd",
-  halstonOriginal:     "Rm",
-  furCoat:             "In",
-  twentyComics:        "Ty",
-  originalArt:         "Gd"
-};
-
 
 // Magic in FASERIP duplicates super-human Powers from a magical base.
 // Power ranks generated normally = Spell rank.
 // Casting uses Psyche to determine success; effects use Power rank.
 // Example: Ex Psyche + Rm Mind Control → cast on Ex column, Rm Intensity to break.
-
-// ── ENERGY TYPES ──
-export const MAGIC_ENERGY_TYPES = {
-  personal: {
-    description: "Derives from caster's spirit, mind, body. Affects only caster or willing/mystically-linked target.",
-    feat: "Green Psyche FEAT (Red if target restrained but unwilling)",
-    requirements: "No chanting or gestures needed",
-    cost: "1 Health point per turn of use. Health 0 = unconscious (no Endurance FEAT)."
-  },
-  universal: {
-    description: "Ambient energies of caster's home dimension. Illusions, most attacks, teleportation.",
-    feat: "Spells affecting target Psyche/abilities: target gets Psyche FEAT vs caster Psyche as Intensity",
-    failPenalty: "If target resists: caster Psyche reduced 1 rank for 1-10 turns. Below Good = cannot cast.",
-    requirements: "Gesture or chant required (hands and mouth free)"
-  },
-  dimensional: {
-    description: "Energies from other dimensions, granted by powerful beings or native to those dimensions.",
-    feat: "Popularity FEAT treating caster Psyche as Popularity",
-    requirements: "Both chanting and gestures required. Automatic initiative roll of 1.",
-    contactRelationship: {
-      friendly: "Listed as Contact. Failed FEAT: spell goes off at -3CS power rank.",
-      neutral: "Not listed. Failed FEAT: spell fails, nothing happens.",
-      unfriendly: "Judge decides: 1-7 = Neutral, 8-10 = Hostile.",
-      hostile: "Retribution. Gate opened, opponent aided, caster teleported to hostile dimension, etc."
-    }
-  }
-};
-
-// ── SPELL CASTING COLUMN SHIFTS ──
-export const MAGIC_CASTING_SHIFTS = {
-  penalties: [
-    { cs: -1, condition: "Target from different dimension than caster" },
-    { cs: -1, condition: "Caster is in astral form" },
-    { cs: -2, condition: "Target more than 30ft or occupies more than one area" }
-  ],
-  bonuses: [
-    { cs: +1, condition: "Spell cast in area familiar to mage or invoked Powers (home turf)" },
-    { cs: +2, condition: "Spell cast in ceremony" },
-    { cs: +2, condition: "Spell from ancient book/tome found during campaign" },
-    { cs: +3, condition: "Target is willing (dimensional and universal energies)" }
-  ],
-  // Ceremony: established ritual, takes rounds equal to spell rank number.
-  // Universal and Dimensional energies only.
-  // All shifts are cumulative. May reduce spell below Feeble to Shift 0 = impossible.
-};
-
-// ── ELDRITCH BOLTS & SHIELDS ──
-// Any starting mage may choose these instead of random Powers.
-// Initial rank = caster's Psyche rank and rank number.
-export const ELDRITCH_SPELLS = {
-  bolt: {
-    description: "Bolt of magical power (Bolt of Bedevilment, etc.)",
-    range: "Per spell range table",
-    damage: "Power rank. May reduce Health OR Karma (target's choice or caster's).",
-    type: "If attacking Health, treat as Force attack."
-  },
-  shield: {
-    description: "Shield of mystical energy",
-    protection: "Body Armor equal to caster's rank number. Proof against magical attacks.",
-    breaking: "If attacker targets shield: treat as breaking attempt (attacker bolt = Str, shield = material).",
-    broken: "Caster takes no damage that round but no shield until raised next round.",
-    limit: "Protects from all magic up to caster's Psyche rank."
-  }
-};
-
-// ── MAGIC KARMA & ADVANCEMENT ──
-export const MAGIC_KARMA = {
-  gains: "Standard rate",
-  losses: "2x standard rate (mages more aware of karmic consequences)",
-  powerStuntCost: {
-    personalUniversal: 10,  // vs 100 for normal heroes
-    dimensional: 50
-  },
-  newSpells: {
-    advancement: "Normal advancement costs halved in Karma",
-    foundSpell: "500 Karma first time cast, regardless of effect. Then added to repertoire.",
-    sources: "Mystic texts, ancient ruins, taught by higher-ability individuals",
-    warning: "Written spells are vague about power level. May have unknown requirements or curses."
-  },
-  dimensionalContacts: "2x normal Contact Karma cost. Must have existing contact with plane."
-};
 
 // ── MAGICAL POWERS BY ENERGY TYPE ──
 export const MAGIC_POWERS = {
@@ -1854,54 +680,6 @@ export const SPELL_EFFECTS = {
 //   Robots: all listed abilities + Power ranks
 //   Other: material strength + Power ranks involved
 
-export const HARDWARE_WEAPON_RANGE_RANKS = {
-  "Touch":  null,  // -1CS to effective cost
-  "1":      "Poor",
-  "2":      "Typical",
-  "3-4":    "Good",
-  "5-6":    "Excellent",
-  "7-8":    "Remarkable",
-  "9-11":   "Incredible",
-  "12-20":  "Amazing",
-  "21-40":  "Monstrous",    // ~1 mile
-  "41-60":  "Unearthly",
-  "61-80":  "Shift X",      // ~2 miles
-  "81-160": "Shift Y",      // ~4 miles
-  "161-400":"Shift Z",      // ~10 miles
-  "10-100mi":"Class 1000",
-  "intercontinental": "Class 3000",
-  "interplanetary":   "Class 5000"
-};
-
-export const HARDWARE_EFFECTIVE_COST_MODIFIERS = {
-  weapons: {
-    touchOnly: -1,        // weapon must touch target to inflict damage
-    thrown: 0             // thrown items (grenades, shuriken) ignore range modifier, no touch bonus
-  },
-  vehicles: {
-    multiArea: +1,        // occupies more than one area (compartmented = always multi-area)
-    noProtection: -1,     // craft offers no protection
-    gev: +1               // ground effect vehicle
-  },
-  powerSuits: {
-    perPowerAdded: +1,    // each Power added (if Power rank >= highest stat, becomes applicable rank instead)
-    // Power Suit CS Option: +1CS per column shift to a primary ability (instead of setting fixed values)
-    perAbilityCS: +1      // per CS modifier to a primary ability
-  },
-  robots: {
-    humanoid: -1,
-    imitateSpecific: +1   // duplicates a specific individual
-    // NPC robots: no Intuition/Psyche. Typical Reason (limited), Good Reason (can talk).
-  },
-  other: {
-    unreproducibleTech: "Monstrous", // additional applicable rank if tech doesn't exist in 1980s
-    invisible: +2,        // device cannot normally be seen
-    pocketSized: +1,
-    portable: +1,
-    multiArea: +1         // occupies more than one area
-  }
-};
-
 // ── SPECIAL REQUIREMENTS ──
 // Effective cost < Remarkable: rarely needs special requirement.
 // Effective cost Remarkable+: may have one special requirement.
@@ -1919,25 +697,6 @@ export const HARDWARE_EFFECTIVE_COST_MODIFIERS = {
 //   Working straight through: time halved again (but -1CS on success roll)
 //   NPC-built (from hero's designs): always maximum time
 // Hero may only work on one project at a time.
-
-// ── INVENTION SUCCESS (Reason FEAT) ──
-export const HARDWARE_SUCCESS = {
-  modifiers: {
-    assistant: +1,        // max +1, assistant no less than 1 rank lower
-    perTalent: +1,        // max +3CS from applicable talents
-    rushedTime: -1,       // shortened by working straight through
-    perSpecialReq: -1,    // max -3CS
-    priorExistence: +1    // device existed from failed experiment or kit-bash
-  },
-  // If effective cost > inventor Reason (after shifts): read result one color lower.
-  results: {
-    white: "Missed something. Start again. No new Resource FEAT, same time, +1 special requirement added.",
-    green: "Works but fails in 1-10 turns. May destroy/damage. Repairs as White result.",
-    yellow: "Working prototype. -1CS all abilities until fine-tuned (1-10 additional days).",
-    red: "Success! Device works exactly as designed."
-  },
-  karma: "May add Karma before roll, but amount must be decided before rolling."
-};
 
 // ── KIT-BASHING ──
 // Emergency rapid construction. 10 Karma = 1 day compressed to 1 round.
@@ -1962,21 +721,6 @@ export const HARDWARE_SUCCESS = {
 //   Restriction rank (usually Excellent, sensitive = Rm+).
 //   Access: Green Reason FEAT if passwords known, Red if not.
 // Robots: reprogram with Reason FEAT. Time = restriction rank number in turns.
-
-// ── REPAIRS ──
-export const HARDWARE_REPAIRS = {
-  repairCenter: {
-    cost: "Equal to effectiveness rank",
-    process: "Restores 1 rank per Reason FEAT (Reason of person or center value, whichever lower)",
-    time: "Effective cost rank number in HOURS (not days)",
-    automatic: "If center rank > device rank, repair is automatic. Otherwise FEAT needed."
-  },
-  fieldRepair: {
-    feat: "Reason FEAT, Intensity = original stat being repaired",
-    duration: "Lasts 1-10 hours, then damage returns +1 additional rank",
-  },
-  beyondRepair: "Abilities reduced below Feeble cannot be repaired. Materials salvageable for new inventions (bonus to success roll)."
-};
 
 // ══════════════════════════════════════════════════════════════
 // POWERS
@@ -2158,89 +902,6 @@ export const POWERS = {
 // Scientific Talents not cumulative with each other.
 // New Talent cost: 1000 Karma from NPC, 2000 from PC. Student: 800/1000.
 
-export const TALENTS = {
-
-  // ── WEAPON SKILLS ──
-  weaponSkills: {
-    guns:             { desc: "+1CS Agility when firing handguns, rifles, submachine guns (including laser/stun/concussion)." },
-    thrownWeapons:    { desc: "+1CS Agility for weapons designed to be thrown (spears, daggers, shuriken, disks)." },
-    bows:             { desc: "+1CS to hit with all bows/crossbows. Without talent: -1CS. Fire and reload in 1 round. May fire multiple arrows on Agi FEAT." },
-    bluntWeapons:     { desc: "+1CS to hit with weapons using Blunt Attacks column." },
-    sharpWeapons:     { desc: "+1CS to hit with weapons using Edged Attack column (swords, daggers, spears). Not claws/natural extensions." },
-    orientalWeapons:  { desc: "+1CS Fighting or Agility with shuriken, crossbows, sais, oriental swords/daggers (katana, kris)." },
-    marksman:         { desc: "+1CS to hit with any line-of-sight distance weapon. No range penalties." },
-    weaponsMaster:    { desc: "+1CS to hit with any weapon requiring Fighting FEAT." },
-    weaponsSpecialist:{ desc: "+2CS with single weapon of choice (missile or melee). +1 initiative with that weapon." }
-  },
-
-  // ── FIGHTING SKILLS ──
-  // Cumulative with each other and with Weapon Talents where applicable.
-  fightingSkills: {
-    martialArtsA: { desc: "Can Stun/Slam opponent regardless of comparative Str/End (judo/karate style)." },
-    martialArtsB: { desc: "+1CS Fighting in unarmed combat (boxing style)." },
-    martialArtsC: { desc: "+1CS Str for Grappling (including damage), +1CS Str for Escaping, +1CS Agi for Dodging." },
-    martialArtsD: { desc: "Ignore Body Armor (not FF) for Stun/Slam results. No damage needed to force check. Must study target 2 rounds first." },
-    martialArtsE: { desc: "+1 initiative in unarmed combat." },
-    wrestling:    { desc: "+2CS Grappling attacks (no damage bonus). Stacks with MA-B for +3CS hit, +1CS damage." },
-    thrownObjects:{ desc: "+1CS Throwing attacks (Edged and Blunt) and Catching. Stacks with Thrown Weapons for +2CS on thrown weapons." },
-    acrobatics:   { desc: "+1CS when dodging, evading, and escaping." },
-    tumbling:     { desc: "Agility FEAT to land feet-first after any non-damaging fall." }
-  },
-
-  // ── PROFESSIONAL SKILLS ──
-  // May increase initial Resources through employment.
-  professionalSkills: {
-    medicine:          { desc: "Revive Shift 0 characters up to 20 turns. Restore 1 End rank/week beyond natural healing. +1CS Reason for medical/poison/surgery." },
-    law:               { desc: "+1CS all FEATs involving law/legal procedure. May pass bar (Gd Reason FEAT). Without: more frequent Reason FEATs." },
-    lawEnforcement:    { desc: "Includes Gun and Law talents. May legally carry gun and make arrests if active member." },
-    pilot:             { desc: "+1CS all FEATs involving controlled aircraft (Control, Agi, Reason). May extend to spacecraft with appropriate background." },
-    military:          { desc: "+1CS all FEATs in military matters. May take armed services Contact." },
-    businessFinance:   { desc: "Min Resources = Good. +1CS FEATs involving money. Gains Professional Contact." },
-    journalism:        { desc: "+2 additional Contacts (media-connected: newspapers, radio/TV, law enforcement sources, political, criminal snitches)." },
-    engineering:       { desc: "+1CS all FEATs involving building things, including Resource FEAT for construction." },
-    criminology:       { desc: "+1CS Reason and Intuition for criminal practices. Gains Contact in police or crime." },
-    psychiatry:        { desc: "+1CS all FEATs involving the mind. +1CS on Mental Control, Domination, Hypnosis, Emotion Control, Mental Probe FEATs." },
-    detectiveEspionage:{ desc: "+1CS to discover crime clues. Gains Contact in crime, law enforcement, law, or espionage." }
-  },
-
-  // ── SCIENTIFIC SKILLS ──
-  // +1CS Reason FEATs in specialty. Only one scientific talent applies at a time.
-  scientificSkills: {
-    chemistry:    { desc: "+1CS chemistry: formulas, inorganic poison cures, identify chemicals by smell/touch/taste." },
-    biology:      { desc: "+1CS biology: animal/plant ID, organic poison cures, disease research." },
-    geology:      { desc: "+1CS earth science: volcanic activity, surrounding geology, rock types, mineral ID." },
-    genetics:     { desc: "+1CS genetics: new life forms, mutant understanding, disease research." },
-    archaeology:  { desc: "+1CS past: paleontology, historical records, ancient myths/legends." },
-    physics:      { desc: "+1CS physics/astrophysics: motion, flight, planets, stars." },
-    computers:    { desc: "+1CS computers, computer-controlled equipment, artificial intelligences." },
-    electronics:  { desc: "+1CS electronic devices, creation and repair." }
-  },
-
-  // ── MYSTIC AND MENTAL SKILLS ──
-  mysticMentalSkills: {
-    trance:            { desc: "Self-induced trance. Appears dead (Int FEAT to check). Minimal food/water needs. Regain End ranks at 1/day." },
-    mesmerismHypnosis: { desc: "Primitive Mind Control at Power rank = Reason. Info as Mental Probe. Post-hypnotic suggestions. Breaks if forced to act against nature. Fades 1-10 hours." },
-    sleightOfHand:     { desc: "Palm small items, appear/disappear at Agi +1CS." },
-    resistDomination:  { desc: "Psi-Screen at Psyche +1CS. Passive only, no other benefit." },
-    occultLore:        { desc: "+1CS Reason FEATs involving magical items, societies, antiquities, runes, forgotten lore." },
-    mysticBackground:  { desc: "Potential for magical Powers. Initial Powers may be spells (Personal/Universal/Dimensional). Requires Judge approval." }
-  },
-
-  // ── OTHER TALENTS ──
-  otherTalents: {
-    artist:         { desc: "Create art (painting, sculpting, writing). 1-10 weeks per work. Earns 10 Karma × weeks spent." },
-    languages:      { desc: "+1 language at start. Additional languages at half Talent cost (500 Karma). Required before learning other languages." },
-    firstAid:       { desc: "Halt End rank loss immediately. Recover 1 rank immediately (once per situation). Stabilize Shift 0 up to 5 rounds after reaching it." },
-    repairTinkering:{ desc: "+1CS Reason FEATs for repair/modification of existing items (not building new). Cumulative with other talents (e.g., Engineering)." },
-    trivia:         { desc: "+1CS Reason FEATs on one specific subject (old movies, military history, sports, etc.). Must be specific, not general." },
-    performer:      { desc: "Acting, singing, dancing, etc. Earns 10 Karma per week of performance." },
-    animalTraining: { desc: "Train animals via Reason FEAT. If hero has Animal Empathy or Animal Comm/Control, those Powers +1CS." },
-    heirToFortune:  { desc: "Min Resources = Remarkable. Generation-only talent. Cannot be gained later." },
-    student:        { desc: "Generation-only. No other initial Talents. New Talents at discount: 1000 from PC, 800 from NPC. May maintain Talent advancement alongside other advancement." },
-    leadership:     { desc: "Karma Pool gains +50 bonus if recognized as team leader. Max 1 leader per pool. Points deducted if leader leaves (not returned to leader)." }
-  }
-};
-
 // ══════════════════════════════════════════════════════════════
 // CONTACTS
 // ══════════════════════════════════════════════════════════════
@@ -2248,45 +909,6 @@ export const TALENTS = {
 // More powerful contacts = more likely to request favors/missions.
 // Contact addition cost: 500 + 10 × Contact's Resource rank#.
 // Dimensional contacts: 2× normal cost.
-
-export const CONTACTS = {
-
-  professional: {
-    medicine:        { resources: "Varies",     desc: "Medical advice/services, free or affordable. Doctor, clinic, or researcher." },
-    law:             { resources: "Varies",     desc: "Legal assistance at reduced fee, free advice. Lawyer on retainer or personal friend." },
-    lawEnforcement:  { resources: "Up to Rm",   desc: "Police contact. Patrolman (Ex knowledge), Detective (Rm investigation), Captain/Commissioner (Rm Resources)." },
-    military:        { resources: "Up to Am",   desc: "Armed services contact, sergeant through Joint Chiefs." },
-    businessWorld:   { resources: "Up to In",   desc: "Business/finance contact, accountant through captain of industry." },
-    journalism:      { resources: "Pr",         desc: "Media contact. Rm knowledge in their field. Poor Resources (except equipment vans)." },
-    crime:           { resources: "Up to Rm+",  desc: "Criminal underworld. Street snitch to Maggia hierarchy. WARNING: Karma-losing situations likely. High-level may manipulate hero." },
-    engineering:     { resources: "Varies",     desc: "Builder/constructor, independent or corporate. May aid in device construction." },
-    psychiatry:      { resources: "Varies",     desc: "Psychiatry/psychoanalysis professional." },
-    espionage:       { resources: "Up to In/Am",desc: "FBI, CIA, NSA, KGB, Interpol, MI5, SHIELD, HYDRA. Info up to Rm. Equipment: In (Am for SHIELD/HYDRA). Will request return favors." },
-    heroGroup:       { resources: "Varies",     desc: "Connection to super-hero team. Use equipment, call for emergency, use HQ, training. Enemies of group become your enemies." }
-  },
-
-  scientific: {
-    // All scientific contacts: Good to Rm Resources, min Excellent Reason, have listed Talent.
-    desc: "Chemistry, Biology, Geology, Genetics, Archaeology, Physics, Computers, Electronics. Also Acting, Performing.",
-    resources: "Gd to Rm",
-    reason: "Min Excellent"
-  },
-
-  political: {
-    local:          { resources: "Varies",     desc: "Alderman, mayor, councilman. Info on neighborhood." },
-    state:          { resources: "Up to Rm",   desc: "Governor's office, state rep, state agency. Good services/info." },
-    national:       { resources: "Up to Mn",   desc: "Congressional aide, congressman, Executive Branch, agencies. More powerful = more favors called in." },
-    otherNational:  { resources: "Up to Mn",   desc: "Foreign government. May create difficulties with other political contacts if known." },
-    international:  { resources: "Up to Mn",   desc: "UN or multi-national organization." },
-    planetary:      { resources: "Up to Un+",  desc: "Alien characters only. Rulers/inhabitants of another planet." }
-  },
-
-  mystic: {
-    mysticArts:  { desc: "Contact aware of extra-dimensional powers." },
-    occultLore:  { desc: "Scholar of darker arts, Rm Reason in mystic matters. Advice on writings, spells, curses. Likely a professor, not a true mage." },
-    mythology:   { desc: "Similar to Occult Lore but focused on recognized mythology (Olympians, Asgardians, etc.). Specializes in one pantheon." }
-  }
-};
 
 // ══════════════════════════════════════════════════════════════
 // KARMA (FULL RULES)
@@ -2302,158 +924,11 @@ export const CONTACTS = {
 // Group awards: split evenly (drop fractions). Individual awards to individual.
 // Group awards may go directly into Karma Pool.
 
-// ── COMPLETE KARMA SUMMARY TABLE ──
-export const KARMA_TABLE = {
-  // Heroic Actions — Gains
-  heroicGains: {
-    violentCrimeStop:         30,  violentCrimeArrest:         15,
-    destructiveCrimeStop:     20,  destructiveCrimeArrest:     10,
-    theftStop:                10,  theftArrest:                 5,
-    robberyStop:              20,  robberyArrest:              10,
-    misdemeanorStop:           5,  misdemeanorArrest:           5,
-    nationalOffenseStop:      20,  nationalOffenseArrest:      10,
-    localConspiracyStop:      30,  localConspiracyArrest:      15,
-    nationalConspiracyStop:   40,  nationalConspiracyArrest:   20,
-    globalConspiracyStop:     50,  globalConspiracyArrest:     25,
-    otherCrimeStop:           15,  otherCrimeArrest:            5,
-    rescue:                   20,  // per life saved, max 100 per action
-    defeatRemarkableFoe:      30,  // = highest rank# of foe (Rm+ only)
-    defeatIncredibleFoe:      40,
-    defeatAmazingFoe:         50,
-    defeatMonstrousFoe:       75,
-    defeatUnearthlyFoe:      100
-  },
-
-  // Heroic Actions — Losses
-  heroicLosses: {
-    commitViolentCrime:      -60,  // 2× listed values
-    commitDestructiveCrime:  -40,
-    commitTheft:             -20,
-    commitMisdemeanor:       -10,
-    commitNationalOffense:   -40,
-    commitOtherCrime:        -10,
-    publicDefeat:            -40,  // 3+ witnesses
-    privateDefeat:           -20,  // no witnesses
-    permitViolentCrime:      -15,  // = arrest value
-    permitDestructiveCrime:  -10,
-    permitTheft:              -5,
-    permitRobbery:           -10,
-    permitMisdemeanor:        -5,
-    permitNationalOffense:   -10,
-    permitOtherCrime:         -5,
-    propertyDestruction:      -5,  // per area damaged
-    death:               "ALL",   // all Karma to 0
-    nobleDeath:              -50,  // per hero
-    mysteriousDeath:         -50,  // per hero
-    selfDestruction:         -50   // per hero
-  },
-
-  // Personal Karma
-  personalKarma: {
-    makeCommitment:            5,  // show up for date, meeting, etc.
-    failCommitment:          -10,
-    leaveCommitmentEarly:     -5,
-    weeklyAward:              10,  // max, for fulfilling daily life obligations
-    charityAppearance:    "Pop rank# (max 20)", // 1 per week, Red Pop FEAT to arrange
-    charityAct:           "10-40", // auto=10, green=20, yellow=30, red=40
-    charityDonation:      "Resource FEAT rank# (min 10 if no FEAT needed)",
-    negativePopUse:       "-Pop rank#"  // each time negative Pop used to influence
-  },
-
-  // Gaming Awards
-  gamingAwards: {
-    rolePlay:                 10,  // max, for good character portrayal
-    stumpTheJudge:            15,  // max, for creative Power/stunt use (once per stunt)
-    humor:                     5   // for stopping play with a good joke/pun
-  }
-};
-
-// ── SPENDING KARMA ──
-export const KARMA_SPENDING_RULES = {
-  dieRolls: {
-    minimum: 10,        // must commit at least 10 (or remaining if < 10)
-    method: "Declare before rolling. After roll, add spent amount to result. Must declare intent, not amount.",
-    cannotModify: ["Resource FEATs", "Popularity FEATs", "Blindsided/unexpected attack FEATs"]
-  },
-  combatResults: {
-    cost: 50,           // reduce result by one color (red→yellow, etc.)
-    when: "Immediately after roll, before any other die rolls",
-    note: "For attacks that cannot voluntarily reduce effect (Edged, Shooting, Energy)"
-  },
-  powerStunts: {
-    cost: 100,          // 10 for mage personal/universal, 50 for dimensional
-    method: "Describe stunt to Judge. Judge determines if possible and FEAT needed. Spend 100 then roll."
-  },
-  building: {
-    method: "Karma added to invention success roll. Amount must be declared BEFORE rolling (not just intent).",
-    default: 10         // if amount not declared, 10 is assumed
-  },
-  advancement: {
-    method: "Set aside Karma into separate fund for specific purpose. Untouchable by normal use or negative modifiers.",
-    timing: "End of adventures/sessions only. Never during combat or active adventure.",
-    restriction: "May only have ONE advancement fund active at a time. After purchase, may move remainder to new purpose."
-  }
-};
-
-// ── KARMA POOLS ──
-export const KARMA_POOLS = {
-  formation: "2+ consenting PC heroes contribute up to current Karma",
-  use: "Any member may use pool Karma for die rolls and building. NOT for advancement.",
-  types: {
-    temporary: "Formed at adventure start, disbanded at end. Normal for pickup groups.",
-    permanent: "Heroes who adventure together over multiple sessions. Tracked by one player. Members may draw even if others absent."
-  },
-  adding: "Group awards may go directly to pool or be split. Individual awards go to individual first, may voluntarily contribute.",
-  losses: {
-    individual: "Individual losses taken from individual first, then pool if individual runs out.",
-    group: "Group loss (everyone defeated) may be taken from pool as one character.",
-    death: "If member kills: BOTH individual Karma AND entire pool reduced to 0."
-  },
-  leaving: "Take equal share (pool ÷ number of members). May only belong to one pool.",
-  dissolving: "Unanimous vote or all members leave. Karma returns in equal shares. Cannot reform until next session.",
-  leadership: "Leader with Leadership talent: pool gets +50 bonus. Max 1 leader. Deducted if leader leaves.",
-  locked: "(Optional) All members agree. Karma in pool cannot be withdrawn, only used for die rolls. Dissolve by unanimous vote only."
-};
-
 // ══════════════════════════════════════════════════════════════
 // POPULARITY (FULL RULES)
 // ══════════════════════════════════════════════════════════════
 // Measure of reputation and public image. Depends on public actions and press.
 // Awarded day-by-day. Can go negative (unlike Karma).
-
-export const POPULARITY_RULES = {
-  awards: {
-    defeatNormalVillains:     0,   // goons, thugs, no ability/Power > Excellent
-    defeatCostumedVillain:   +2,
-    defeatedInPublic:        -5,
-    accusedOfCrime:       "−half total", // by organized/respected government agency
-    clearedOfCharges:       +10,  // may exceed earlier total
-    foundGuilty:        "all to 0", // even if actually innocent (frame)
-    mediaAttack:             -5,
-    charityWork:             +1,   // publicly reported
-    rescue:                  +2
-  },
-
-  secretID: {
-    desc: "May keep separate Popularity for hero and civilian personas.",
-    awards: "Ascribed to persona that performed the action.",
-    revealed: "If secret ID becomes public, Popularity = lower of the two values."
-  },
-
-  negativePopularity: {
-    desc: "All contacts become Neutral (not Friendly). Any Popularity FEAT use costs Karma = Pop rank#.",
-    note: "FEATs still work (people obey out of fear), but each use costs Karma."
-  },
-
-  mutantPenalty: {
-    desc: "All Popularity awards/penalties reduced by 1 for recognized/declared mutants.",
-    examples: "No Pop gain from charity. Only +1 for catching criminals. Only -4 for public defeat."
-  },
-
-  selfPromotion: {
-    desc: "PR campaigns via Karma advancement + good deeds. Charity tied to self-promotion only fulfills advancement requirement, no additional Pop gain."
-  }
-};
 
 // ══════════════════════════════════════════════════════════════
 // ADVANCEMENT (FULL COSTS)
@@ -2461,92 +936,11 @@ export const POPULARITY_RULES = {
 // Only one advancement fund active at a time. After purchase, remainder may move.
 // Karma set aside is untouchable by normal use or negative modifiers.
 
-export const ADVANCEMENT_COSTS = {
-  ability: {
-    perPoint: "10× current rank number",
-    cresting: 400,   // additional cost to cross into next rank
-    rationale: "Up to Excellent: no explanation needed. Beyond Excellent or +1 rank above original: must explain."
-  },
-  resource: {
-    perPoint: "10× current rank number",
-    cresting: 200
-  },
-  popularity: {
-    perPoint: "10× current rank number",
-    cresting: 0,     // no cresting cost
-    requirement: "Must have performed 1 publicized charity act in past 3 weeks."
-  },
-  power: {
-    perPoint: "20× current rank number",
-    cresting: 500,
-    rationale: "Beyond first increase: must explain."
-  },
-  powerAddition: {
-    cost: "3000 + 40× starting rank number",
-    robot: "3000 + 10× starting rank number (requires someone capable of modification)",
-    rationale: "Always required for new Powers."
-  },
-  talentAddition: {
-    fromNPC: 1000,
-    fromPC: 2000,
-    student: { fromNPC: 800, fromPC: 1000 },
-    rationale: "Must find someone to teach. Must have rationale."
-  },
-  contactAddition: {
-    cost: "500 + 10× Contact's Resource rank number",
-    requirement: "Contact must be Friendly or Neutral (not Unfriendly/Hostile).",
-    regainLost: "Half the cost of buying that Contact."
-  }
-};
-
 // ══════════════════════════════════════════════════════════════
 // RESOURCES (FULL RULES)
 // ══════════════════════════════════════════════════════════════
 // Resource FEAT: 1× per week. Cannot be modified by Karma.
 // Determines if character can afford something.
-
-export const RESOURCE_RULES = {
-  feat: {
-    frequency: "Once per week",
-    karmaModifiable: false,
-    difficulty: {
-      auto: "3+ ranks below item cost",
-      green: "1-2 ranks below item cost",
-      yellow: "Equal to item cost",
-      impossible: "Above item cost"
-    },
-    bankLoan: "+1 rank to Resources for purchase (must be repaid)"
-  },
-  popularityFEAT: {
-    desc: "When borrowing or requesting aid, Popularity FEAT determines reaction.",
-    friendly: "green", neutral: "yellow", unfriendly: "red", hostile: "impossible"
-  },
-  csModifiers: {
-    targetBenefits: +2,   // item benefits the target
-    danger: -3,           // dangerous situation
-    goodValue: -1,
-    remarkableValue: -2,
-    wontReturn: -2,       // won't be returned
-    unique: -3            // unique/irreplaceable item
-  },
-  negativePopularity: "Always yellow FEAT regardless of relationship.",
-  combinedResources: "Two characters within 1 rank of each other may combine for a single FEAT at the higher rank.",
-  contacts: "May use Contact's Resources if persuaded (Popularity FEAT). Contact may have restrictions/requirements."
-};
-
-// ── CRIME CATEGORIES (for Karma reference) ──
-export const CRIME_CATEGORIES = {
-  violent:       "Murder, assault, kidnapping. Attacking hero in secret ID.",
-  destructive:   "Arson, bombings, riots, vandalism, attacks on super-powered heroes, rampages.",
-  theft:         "Removal of property without threat. Shoplifting, pickpocketing, break-ins, embezzling.",
-  robbery:       "Theft with violence or implied violence. Mugging, bank robbery, stick-ups.",
-  misdemeanor:   "Minor crimes: gambling, concealed weapons, drug possession, driving offenses.",
-  nationalOffense:"Treason, hijacking, terrorism, drug/weapon smuggling.",
-  localConspiracy:"Plot affecting one company, city, or region.",
-  nationalConspiracy:"Plot to take over a country.",
-  globalConspiracy:"Plot directed against entire world.",
-  otherCrimes:   "Selling drugs, forgery, counterfeiting, fraud."
-};
 
 // ══════════════════════════════════════════════════════════════
 // FEAT RULES (FULL)
@@ -2562,39 +956,12 @@ export const CRIME_CATEGORIES = {
 // Popularity FEATs: social interaction, use Popularity rank, modified by Contacts.
 // Resource FEATs: credit check, use Resource rank. 1× per week. Cannot be Karma-modified.
 
-// ── INTENSITY & DIFFICULTY ──
-export const FEAT_INTENSITY_RULES = {
-  // Compare requisite ability rank vs Intensity rank to determine FEAT color needed:
-  automatic: "Ability 3+ ranks above Intensity (Judge's permission). No roll needed.",
-  green:     "Ability 1-2 ranks above Intensity.",
-  yellow:    "Ability equal to Intensity.",
-  red:       "Intensity 1 rank above Ability.",
-  impossible:"Intensity 2+ ranks above Ability. (Optional rule: Judge may allow red at 1 rank above only.)",
-  unstated:  "If no Intensity given, any colored result = success. Judge may declare Typical as default."
-};
-
 // ── COLUMN SHIFTS ──
 // +CS = shift right (easier). -CS = shift left (harder).
 // Cannot shift below Shift 0 or above Shift Z.
 // Class 1000+ columns cannot be shifted except in specific listed circumstances.
 // Shifts may make FEATs automatic or impossible.
 
-// ── LIFTING (Strength FEAT) ──
-export const WEIGHT_INTENSITY = {
-  "Feeble":      "Up to 50 lbs",
-  "Poor":        "Up to 100 lbs",
-  "Typical":     "Up to 200 lbs",
-  "Good":        "Up to 400 lbs",
-  "Excellent":   "Up to 800 lbs",
-  "Remarkable":  "Up to 2000 lbs (1 ton)",
-  "Incredible":  "Up to 10 tons",
-  "Amazing":     "Up to 50 tons",
-  "Monstrous":   "Up to 80 tons",
-  "Unearthly":   "Up to 100 tons",
-  "Shift X":     "Up to 250 tons",
-  "Shift Y":     "Up to 500 tons",
-  "Shift Z":     "Up to 1000 tons"
-};
 // Auto if weight 3+ ranks below Str. Green if 1-2 below. Yellow if equal. Red if 1 above. Impossible if 2+ above.
 
 // ── BREAKING THINGS (Strength FEAT vs Material Strength) ──
@@ -2780,50 +1147,6 @@ export function getPowerDerivations(type, rank, value) {
 // Turn = 6 seconds. 10 turns/minute. 600 turns/hour.
 // Turns only matter when time is crucial (combat, chases, bombs, etc.).
 
-export const COMBAT_ROUND_SEQUENCE = {
-  step1: "Judge determines NPC actions (notes privately).",
-  step2: "Players declare hero actions. May perform multiple actions (with difficulty increase).",
-  step3: "Roll Initiative. Only matters when actions interfere with each other.",
-  step4: "Pre-Action rolls: defensive actions (dodge, block, evade), planned events (explosions). Changing Actions resolved here.",
-  step5: "Winning side's actions resolve.",
-  step6: "Losing side's actions resolve."
-};
-
-export const INITIATIVE_RULES = {
-  roll: "Each side rolls d10. Higher roll wins initiative (acts first). All of one side acts before the other.",
-  modifier: {
-    desc: "Add modifier based on highest Intuition rank number on each side.",
-    table: {
-      "0-10": 0, "11-20": 1, "21-30": 2, "31-40": 3,
-      "41-50": 4, "51-75": 5, "76+": 6
-    },
-    note: "A roll of 1 is always 1 (modifier does not apply to natural 1)."
-  },
-  reroll: "Roll again each round as long as 2+ combatants have interfering actions.",
-  ties: "Tied initiative totals result in automatic reroll.",
-  changingActions: {
-    desc: "After initiative roll, may change declared action.",
-    feat: "Yellow Agility FEAT (resolved in pre-action phase).",
-    penalty: "-1CS on all FEATs after changing."
-  },
-  negatedActions: "Losing initiative may negate actions (e.g., knocked out before acting). Lost actions cannot be performed that turn.",
-  holdingFire: "Initiative winner may hold attack until opponent is in best range (acts when opponent about to strike).",
-  // Powers/talents that affect initiative
-  initiativeBonuses: {
-    martialArtsE: "+1 initiative in unarmed combat.",
-    weaponsSpecialist: "+1 initiative with weapon of specialty.",
-    combatSense: "Power rank replaces Intuition for initiative modifier if higher.",
-    enhancedSenses: "Power rank replaces Intuition for initiative modifier if higher.",
-    note: "Talent bonuses: highest bonus on each side applies to that side's roll. Power replacements: highest effective Intuition on each side determines modifier."
-  },
-  // RAW turn phases (optional structured play)
-  turnPhases: {
-    declare: "Declaration Phase: Judge notes NPC actions, players declare hero actions. Multiple actions declared here.",
-    preaction: "Pre-Action Phase: Defensive actions (dodge, block, evade) resolve. Changing Actions FEAT rolled. Planned events (explosions) trigger.",
-    actions: "Action Phase: Winning side acts, then losing side acts."
-  }
-};
-
 // ══════════════════════════════════════════════════════════════
 // COMBAT (FULL RULES)
 // ══════════════════════════════════════════════════════════════
@@ -2859,91 +1182,7 @@ export const INITIATIVE_RULES = {
 //   Physical weapons lose momentum through material (as movement).
 //   Any weapon through intervening structure: -2CS to hit.
 
-export const RANGED_ATTACK_TYPES = {
-  shooting: {
-    desc: "Projectile weapons (handguns, rifles, etc.)",
-    results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-    pullDamage: false, pullEffect: false,
-    missNote: "Missile continues; Judge may roll to see if it hits another target in area/path."
-  },
-  edgedThrowing: {
-    desc: "Thrown sharp weapons (knife, shuriken)",
-    results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-    pullDamage: true, pullEffect: false,
-    damage: "Always minimum listed; max = min(Str, material strength) for powerful wielders"
-  },
-  bluntThrowing: {
-    desc: "Thrown blunt objects (rock, bus, shield)",
-    results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-    pullDamage: true, pullEffect: true,
-    damage: "Str or material strength (whichever less) — NO next-rank bump (melee only)"
-  },
-  energy: {
-    desc: "Energy Powers (fire blast, lightning, radiation). No physical component.",
-    results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-    pullDamage: true, pullEffect: false
-  },
-  force: {
-    desc: "Physical energy manifestation (repulsors, force fields, ice ram)",
-    results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-    pullDamage: true, pullEffect: false
-  }
-};
-
 // Bullseye: hit specific part of target (<1ft square). Nature/result up to Judge. Never fatal.
-
-// ── RANGE MODIFIERS ──
-// Weapons: -1CS to hit per area of range.
-// Powers: no penalty within Power rank range. -1CS per area beyond. Cannot reduce below Shift 0.
-// Thrown items: max range by Strength rank (see table). LOS for Class 1000+.
-export const THROWING_RANGE = {
-  "Shift-0": 0, "Feeble": 1, "Poor": 1, "Typical": 1, "Good": 2,
-  "Excellent": 3, "Remarkable": 4, "Incredible": 5, "Amazing": 6,
-  "Monstrous": 7, "Unearthly": 8, "Shift X": 10, "Shift Y": 15, "Shift Z": 20,
-  "Class 1000": "LOS", "Class 3000": "LOS", "Class 5000": "LOS"
-};
-
-// ── VEHICLE/FLIGHT SPEED TABLE ──
-export const SPEED_TABLE = {
-  //              Land(area/rnd, MPH)    Air(area/rnd, MPH)
-  "Feeble":    { land: { areas: 1,  mph: 15  }, air: { areas: 2,   mph: 30   } },
-  "Poor":      { land: { areas: 2,  mph: 30  }, air: { areas: 4,   mph: 60   } },
-  "Typical":   { land: { areas: 3,  mph: 45  }, air: { areas: 6,   mph: 90   } },
-  "Good":      { land: { areas: 4,  mph: 60  }, air: { areas: 8,   mph: 120  } },
-  "Excellent": { land: { areas: 5,  mph: 75  }, air: { areas: 10,  mph: 150  } },
-  "Remarkable":{ land: { areas: 6,  mph: 90  }, air: { areas: 15,  mph: 225  } },
-  "Incredible":{ land: { areas: 7,  mph: 105 }, air: { areas: 20,  mph: 300  } },
-  "Amazing":   { land: { areas: 8,  mph: 120 }, air: { areas: 25,  mph: 375  } },
-  "Monstrous": { land: { areas: 9,  mph: 135 }, air: { areas: 30,  mph: 450  } },
-  "Unearthly": { land: { areas: 10, mph: 150 }, air: { areas: 40,  mph: 600  } },
-  "Shift X":   { land: { areas: 12, mph: 180 }, air: { areas: 50,  mph: 750  } },
-  "Shift Y":   { land: { areas: 14, mph: 210 }, air: { areas: 100, mph: 1500 } },
-  "Shift Z":   { land: { areas: 16, mph: 240 }, air: { areas: 200, mph: 3750 } },
-  "Class 1000": { land: { areas: 32, mph: 480 }, air: "Interplanetary" },
-  "Class 3000": { land: { areas: 50, mph: 750 }, air: "Near-Light" },
-  "Class 5000": { land: { areas: 100, mph: 1500 }, air: "Teleportation" }
-};
-
-// ── LEAPING TABLE ──
-export const LEAPING_TABLE = {
-  //              Up(ft/floors)    Across(ft/areas)  Down(ft/floors)
-  "Feeble":    { up: "2/0",       across: "2/0",     down: "3/0" },
-  "Poor":      { up: "4/0",       across: "4/0",     down: "8/0" },
-  "Typical":   { up: "6/0",       across: "6/0",     down: "9/0" },
-  "Good":      { up: "10/0",      across: "10/0",    down: "15/1" },
-  "Excellent": { up: "20/1",      across: "20/0",    down: "30/2" },
-  "Remarkable":{ up: "30/2",      across: "30/0",    down: "45/3" },
-  "Incredible":{ up: "40/2",      across: "40/0",    down: "60/4" },
-  "Amazing":   { up: "50/3",      across: "50/0",    down: "75/5" },
-  "Monstrous": { up: "75/5",      across: "75/.5",   down: "105/7" },
-  "Unearthly": { up: "100/6",     across: "100/1",   down: "150/10" },
-  "Shift X":   { up: "150/10",    across: "150/1",   down: "225/15" },
-  "Shift Y":   { up: "200/13",    across: "200/2",   down: "300/20" },
-  "Shift Z":   { up: "500/33",    across: "500/4",   down: "750/50" },
-  "Class 1000":{ up: "1000/60",   across: "1000/8",  down: "1500/100" },
-  "Class 3000":{ up: "3000/180",  across: "3000/25", down: "4500/300" },
-  "Class 5000":{ up: "5000/300",  across: "5000/40", down: "7500/500" }
-};
 
 // ── POWERS IN COMBAT ──
 // Body Armor: reduces damage by rank#. Energy attacks: rank# - 20. If damage < BA, no Slam/Stun/Kill.
@@ -2957,100 +1196,6 @@ export const LEAPING_TABLE = {
 //   Shred works on artificial BA, not natural BA or FF.
 // Growth: +1CS to be hit at 18ft, +2CS at 22ft, +3CS over 22ft. Same bonus to Str FEATs/damage.
 // Shrinking: down to 1"=-1CS to hit/+1CS attacking, 1/4"=-2/+2, smaller=-3/+3. Slugfest/Missile only.
-
-// ── COMBAT TACTICS (FULL) ──
-export const COMBAT_TACTICS = {
-  nonAdjacentWeapon: "Attacker/target within 1 area if using large object. Must be able to lift it. If target BA/material > weapon, weapon may shatter.",
-  holdingFire: "Initiative winner may hold attack until opponent is in best range (acts when opponent about to strike).",
-  pullingPunches: {
-    reduceDamage: ["Blunt Attack", "Throwing Blunt", "Throwing Edged", "Energy", "Force", "Grappling", "Charging"],
-    reduceEffect: ["Blunt Attack", "Throwing Blunt", "Grappling", "Charging"],
-    note: "Energy/Force: specific attack descriptions say effect CANNOT be reduced despite summary listing them. Throwing Edged: can reduce damage per description."
-  },
-  multipleTargets: {
-    singleRoll: "All targets adjacent. -4CS. Applies to: Blunt Slugfest, Escaping, Energy, Force.",
-  },
-  multipleAttacks: {
-    preFeat: "Fighting FEAT in pre-action phase.",
-    twoAttacks: "Remarkable Intensity FEAT",
-    threeAttacks: "Amazing Intensity FEAT",
-    penalty: "-1CS to hit on all attacks. Fail = 1 attack at -3CS.",
-    allowedTypes: "Slugfest and Shooting only. Some Powers may permit as Power Stunts."
-  },
-  entangling: "Agility FEAT to hit. Target: Agility FEAT vs material strength or enmeshed. Escape: Str FEAT to break, or slip with applicable abilities.",
-  groundstrike: "Energy vs ground. Damage on Force table. Target takes material strength damage. May open hole (Agi FEAT to avoid).",
-  shootToNeutralize: "Requires Bullseye result. Kill treated as Bullseye. Only for disarming.",
-  shootToStun: "Bullseye result treated as Stun. Kill is still Kill.",
-  combinedAttack: "2+ attackers, damages within 10 points of each other. Higher raised to next rank minimum (e.g. 88 for Un) if lower makes Agi FEAT; higher scores normal hit. Slugfest, Charging, Energy, Force.",
-  doubleTeam: "Hold/Partial Hold + second attacker at +1CS. Miss may hit holder (second roll).",
-  fastballSpecial: "Strong character throws weaker as missile. Thrower Agi or thrown Fighting to hit. Damage = thrown's Endurance or Slugfest + Charging speed bonuses.",
-  shockwave: "Str 2+ ranks above ground material. Strike ground. 2 areas. Charge at Str. No damage but Stun/Slam possible.",
-  blindsiding: {
-    bonus: "+2CS to hit",
-    restriction: "Target cannot add Karma to Slam/Stun/Kill FEATs",
-    conditions: "Unaware from behind, distracted, attacker playing possum, attack from ally/friend.",
-    immune: "Extraordinary senses (Daredevil) or danger sense (Spider-Man) — except special circumstances."
-  },
-  shielding: {
-    initial: "Shield as initial action: may perform another action. Changed action: no other actions.",
-    penalty: "-2CS all FEATs unless common shield item for hero.",
-    protection: "Material strength of item as BA. Physical attacks only (Slugfest, Throwing, Shooting, Charging). Not Grappling/Grabbing.",
-    bodyShield: "Put own body between attacker and target. Must be closer to target than attacker. Shooting/Throwing/Charging only. Hero becomes target."
-  },
-  flightCombat: {
-    slam: "Flying character can be slammed regardless of End (not moored).",
-    powerDive: "+4CS charging (flight only, straight down). Not for leaping/jumping/falling (+3CS max).",
-    movingTarget: { upTo5areas: -1, upTo10areas: -2, faster: -4, chargingAtYou: "no penalty" }
-  },
-  ambush: "+1CS to hit. Set up against specific location. Triggers when any character enters. Karma spent at setup, not attack.",
-  aiming: "(Optional) Spend 1 turn not firing = +1CS to hit next round. Shooting/Throwing/Powers.",
-  pointBlank: { nonFighting: "+3CS (adjacent, not engaged)", fighting: "-3CS (engaged in Slugfest/Wrestling)" },
-  luring: "Opponent gets +2CS. Defender pulls defensive move at moment of attack. Miss hits whatever behind luring character."
-};
-
-// ── LIFE, DEATH, AND HEALTH ──
-export const HEALTH_AND_DEATH = {
-  zeroHealth: {
-    desc: "Unconscious 1-10 rounds. Roll Endurance FEAT on Kill column.",
-    noEffect: "Stunned 1-10 rounds, regain consciousness. Health = Endurance rank# on waking.",
-    enduranceLoss: "Dying. Lose 1 Endurance rank per turn until Shift 0 = death."
-  },
-  stabilization: {
-    karma50: "Stabilize Endurance for 1 round (stopgap).",
-    karma200: "Gain another Endurance FEAT when slipping a rank. Success = unconscious (alive).",
-    aid: "Any aid (first aid, summoning help, pulling to safety, checking on them) halts Endurance loss. Unconscious 1-10 hours.",
-    medicine: "Medicine Talent: revive Shift 0 characters up to 20 turns after.",
-    firstAid: "First Aid Talent: stabilize Shift 0 up to 5 rounds after."
-  },
-  regainingConsciousness: {
-    stun: "Regain in 1-10 turns, act normally.",
-    zeroHealth: "Unconscious 1-10 turns, then Endurance FEAT. Fail = still unconscious (check again 1-10 turns). Success = conscious, Health = Endurance rank#."
-  },
-  recovery: {
-    desc: "10 turns after last damage (no further damage), regain Endurance rank# Health.",
-    frequency: "Once per day.",
-    condition: "Must not be unconscious. Must not take further damage in the 10 turns."
-  },
-  healing: {
-    desc: "Endurance rank# Health per hour after last damage.",
-    doubled: "Bedrest and medical supervision (doctors/hospitals).",
-    condition: "Timer resets if character takes further damage."
-  },
-  impaired: {
-    desc: "-2CS on all actions until Endurance restored to original.",
-    healRate: "1 Endurance rank per week (normal). 1 per day (hospital/doctor).",
-    cap: "Cannot heal Endurance above pre-damage rank number."
-  },
-  disabilities: {
-    desc: "Character at Shift 0 Endurance: roll Green FEAT for each physical ability above Good.",
-    fail: "Ability reduced to next lowest printed number (e.g., Mn(61) → Am(50)).",
-    permanent: "May only be raised by advancement (Karma spending)."
-  },
-  robots: {
-    desc: "0 Health + all Endurance lost = deactivated (not dead). May be rebuilt if parts/personality retained.",
-    reactivation: "Reason FEAT at Intensity = highest ability/Power rank. Takes highest Power rank# days. Returns with no Karma."
-  }
-};
 
 // ── KARMA IN COMBAT ──
 // Announce Karma spending before rolling. Auto-spend 10 minimum.

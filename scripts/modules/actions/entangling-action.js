@@ -11,8 +11,7 @@ import {
   buildResultBadge,
   buildContentBox,
   buildCardShell,
-  buildAbilitySection,
-  shiftRank
+  buildAbilitySection
 } from "./action-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 

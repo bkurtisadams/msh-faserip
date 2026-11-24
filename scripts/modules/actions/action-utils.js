@@ -203,23 +203,20 @@
 // v1.0.0: Mode selector now uses FASERIP traffic light colors (Manual=Red, Semi=Yellow, Full=Green)
 
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
-import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { absorptionFlagData, afterAbsorptionEvent, getAbsorptionPool } from "../effects/absorption-pool.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { powerGearState } from "../../equipment-link.mjs";
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { getRollMode } from "../dice/roll-mode.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
 import { inferArmorNature } from "../effects/defense-effects.js";
 import {
-  RANKS_ORDERED as RANKS, RANK_VALUES, RANK_RANGES,
-  rankValue, valueToRank, shiftRank, normalizeRank
+  RANKS_ORDERED as RANKS, RANK_VALUES, rankValue, valueToRank, shiftRank, normalizeRank
 } from "../../rules/rules-reference.js";
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
 import { applyDamageToVehicle } from "./vehicle-damage.js";
-import { safeActorUpdate, safeActorCreateEffect, safeActorDeleteEffects, safeActorSetFlag } from "../../gm-utils.js";
+import { safeActorCreateEffect, safeActorDeleteEffects, safeActorSetFlag } from "../../gm-utils.js";
 import { bluntDamage as kernelBluntDamage, meleeWeaponDamage as kernelMeleeWeaponDamage } from "../../lib/faserip-rules/faserip-damage.js";
 import { rankDistance as kernelRankDistance, rankForNumber as kernelRankForNumber } from "../../lib/faserip-rules/faserip-kernel.js";
 import { resolveAttack as kernelResolveAttack } from "../../lib/faserip-rules/faserip-effects.js";

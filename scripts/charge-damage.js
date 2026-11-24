@@ -7,12 +7,9 @@
 
 import { 
   resolveSlamFeat, 
-  resolveStunFeat, 
-  getGrandSlamDistance 
+  resolveStunFeat 
 } from './modules/combat/damage-resolution.js';
 // At the top of charge-damage.js with other imports
-import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
-import { applyDamageToTargets } from "./modules/actions/action-utils.js";
 export function initializeSlamHandlers() {
     if (game.msh?.slamHandlersInstalled) return;
     game.msh ??= {};

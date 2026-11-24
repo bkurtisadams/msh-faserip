@@ -309,7 +309,7 @@ import {
 import { 
   getStrengthInfo, shiftRank, getAbilityInfo,
   rollWithKarmaAndHistory, buildActionsBox, bannerColors,
-  getTargetingContext, getBodyArmorValues, applyDamageToTargets,
+  getBodyArmorValues, applyDamageToTargets,
   debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay,
   buildCollapsibleSlamSection, buildCollapsibleStunSection, buildCollapsibleBreakingSection
 } from "./action-utils.js";
@@ -318,8 +318,7 @@ import { executeBreakingFeat } from "./breaking-feat.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { maDOpensEffectsGate } from "./ma-d.js";
-import { ACTION_LABELS } from "./action-config.js";
-import { ACTION_EFFECTS, ACTION_COLUMNS } from "./action-config.js";
+import { ACTION_COLUMNS } from "./action-config.js";
 import { RANK_ABBR, valueToRank } from "../../rules/rules-reference.js";
 import { rankDistance as kernelRankDistance, requiredColor as kernelRequiredColor, colorAtLeast as kernelColorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
 import { resolveAttack, reduceEffectColor, effectForColor } from "../../lib/faserip-rules/faserip-effects.js";
@@ -327,8 +326,8 @@ import { kernelKeyFor } from "../../kernel/adapter.js";
 import { announceTableRoll } from "../dice/universal-table.js";
 import { applyArmorPiercingCS } from "../../rules/mitigation.js";
 import { deductKarma, getAvailableKarma } from "../dice/dice-roller.js";
-import { SCOPE, getFlagScope } from "./flags.js";
-import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
+import { SCOPE } from "./flags.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
 // RAW (Blindside): the attacker gets +2CS to hit; the target may not dodge.

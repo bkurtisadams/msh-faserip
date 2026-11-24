@@ -105,11 +105,11 @@
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
 import { RANKS_ORDERED, RANK_ABBR, valueToRank, rankValue } from "./rules/rules-reference.js";
-import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
+import { computeKarmaAward, getGroupAwardMode } from "./karma-multipliers.js";
 import { computeKarmaTotals } from "./karma-rules.js";
 import {
   CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS, SPECIAL_DEATH_LOSS,
-  ADVANCEMENT, rescueAward, foeDefeatAward
+  rescueAward, foeDefeatAward
 } from "./lib/faserip-rules/faserip-karma.js";
 import { spendCost, advancementCost, SPEND_TYPE_KIND, TALENT_SOURCES } from "./karma-costs.js";
 import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";

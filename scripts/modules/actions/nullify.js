@@ -11,7 +11,7 @@
 //         stopAura restores caster's powers via effect deletion hook.
 // Foundry v13 helpers for the Nullification power (ES module)
 
-import { applyEffect, applyNullified } from "../effects/effect-engine.js";
+import { applyNullified } from "../effects/effect-engine.js";
 import { AreaTemplate } from "./area-template.js";
 import { universalColor } from "./action-utils.js";
 import { removeAllAuraEffects, drawAuraVisual, refreshAllAuraVisuals } from "./nullify-aura.js";

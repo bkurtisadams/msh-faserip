@@ -96,7 +96,7 @@
 // The mitigation pipeline reads protection values from AE flags.
 
 import { applyEffect } from "./effect-engine.js";
-import { rankValue as getRankValue, valueToRank, stepRank } from "../../rules/rules-reference.js";
+import { rankValue as getRankValue, stepRank } from "../../rules/rules-reference.js";
 import { defenseValue } from "../../lib/faserip-rules/faserip-damage.js";
 import { resistanceTypesOf } from "../../power-sheet-view.mjs";
 

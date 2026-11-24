@@ -82,7 +82,6 @@ import {
   showDiceAnimation,
   buildModeSelector, setupModeSelector
 } from "./action-utils.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 import { showFaseripDialog, showFaseripConfirm } from "./dialog-shim.js";

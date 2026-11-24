@@ -1,0 +1,154 @@
+{
+  "id": "msh-faserip",
+  "title": "Marvel Super Heroes (FASERIP)",
+  "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v14.",
+  "version": "2.55.52",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14.360"
+  },
+  "authors": [
+    {
+      "name": "bk-adams"
+    }
+  ],
+  "socket": true,
+  "relationships": {
+    "requires": [
+      {
+        "id": "socketlib",
+        "type": "module"
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/init.js",
+    "scripts/modules/actions/nullify.js",
+    "scripts/modules/actions/check-action.js",
+    "scripts/modules/actions/energy-action.js",
+    "scripts/modules/actions/chat-hooks.js",
+    "scripts/modules/actions/action-dispatcher.js",
+    "scripts/actor.js",
+    "scripts/item.js",
+    "scripts/actorSheet.js",
+    "scripts/itemSheet.js",
+    "scripts/vehicle-actor-sheet.js",
+    "scripts/gm-utils.js",
+    "scripts/karma.js",
+    "scripts/karmaPool.js",
+    "scripts/karma-rules.js",
+    "scripts/karma-multipliers.js",
+    "scripts/teamSheet.js"
+  ],
+  "styles": [
+    "styles/power-sheet-v2.css",
+    "styles/power-chat-card.css",
+    "styles/global.css",
+    "styles/actor-sheet.css",
+    "styles/actor-sheet-enhanced.css",
+    "styles/item-sheet.css",
+    "styles/faserip-initiative.css",
+    "styles/team-tracker.css",
+    "styles/chargen.css",
+    "styles/hq-sheet.css",
+    "styles/talent-sheet.css",
+    "styles/contact-sheet.css",
+    "styles/combat-panel.css",
+    "styles/gm-tools.css",
+    "styles/action-dialog.css",
+    "styles/vehicle-sheet.css",
+    "styles/compact-mode.css",
+    "styles/universal-table-tab.css",
+    "styles/hardware-tab.css",
+    "styles/equipment-sheet-redesign.css",
+    "styles/actor-sheet-dark.css",
+    "styles/dialog-dark.css",
+    "styles/item-sheet-dark.css",
+    "styles/vehicle-sheet-dark.css",
+    "styles/karma-sheet-dark.css",
+    "styles/chat-dark.css",
+    "styles/actor-sheet-comic.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "packs": [
+    {
+      "name": "powers",
+      "label": "Powers",
+      "system": "msh-faserip",
+      "path": "packs/powers",
+      "type": "Item"
+    },
+    {
+      "name": "talents",
+      "label": "Talents",
+      "system": "msh-faserip",
+      "path": "packs/talents",
+      "type": "Item"
+    },
+    {
+      "name": "contacts",
+      "label": "Contacts",
+      "system": "msh-faserip",
+      "path": "packs/contacts",
+      "type": "Item"
+    },
+    {
+      "name": "equipment",
+      "label": "Equipment",
+      "system": "msh-faserip",
+      "path": "packs/equipment",
+      "type": "Item"
+    },
+    {
+      "name": "vehicles",
+      "label": "Vehicles",
+      "system": "msh-faserip",
+      "path": "packs/vehicles",
+      "type": "Item"
+    },
+    {
+      "name": "headquarters",
+      "label": "Headquarters",
+      "system": "msh-faserip",
+      "path": "packs/headquarters",
+      "type": "Item"
+    },
+    {
+      "name": "vehicle-weapons",
+      "label": "Vehicle Weapons",
+      "system": "msh-faserip",
+      "path": "packs/vehicle-weapons",
+      "type": "Item"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "hero": {},
+      "villain": {},
+      "npc": {},
+      "vehicle": {}
+    },
+    "Item": {
+      "power": {},
+      "talent": {},
+      "contact": {},
+      "equipment": {},
+      "vehicle": {},
+      "headquarters": {}
+    },
+    "RegionBehavior": {
+      "areaHazard": {}
+    }
+  },
+  "primaryTokenAttribute": "attributes.health",
+  "grid": {
+    "distance": 44,
+    "units": "yards"
+  }
+}

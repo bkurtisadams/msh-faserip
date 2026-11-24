@@ -45,8 +45,7 @@ import { FaseripActorSheet } from "./actorSheet.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";
 import { openVehicleControl, vehicleSpeedInfo, usesAirColumn } from "./modules/actions/vehicle-control.js";
 import {
-  RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
-  stepRank, rankValue as rankVal
+  RANKS_ORDERED as RANK_ORDER, stepRank, rankValue as rankVal
 } from "./rules/rules-reference.js";
 function lesserRank(a, b) {
   return rankVal(a) <= rankVal(b) ? a : b;

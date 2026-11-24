@@ -86,7 +86,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 //import { rollUniversalTable } from "../dice/universal-table.js";
 import * as Effects from "../effects/effect-engine.js";
 import * as Nullify from "./nullify.js";
-import { resolveSlamFeat, getGrandSlamDistance } from "../combat/damage-resolution.js";
+import { getGrandSlamDistance } from "../combat/damage-resolution.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
 import { GRAND_SLAM_AREAS } from "../../rules/rules-reference.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";

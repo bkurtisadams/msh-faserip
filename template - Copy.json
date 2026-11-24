@@ -1,0 +1,780 @@
+{
+  "Actor": {
+    "types": [
+      "hero",
+      "villain",
+      "npc",
+      "vehicle"
+    ],
+    "templates": {
+      "base": {
+        "identity": "",
+        "identityType": "secret",
+        "player": "",
+        "group": "",
+        "base": "",
+        "age": "",
+        "origin": "",
+        "description": "",
+        "race": "",
+        "sex": "",
+        "nationality": "",
+        "handedness": "",
+        "height": "",
+        "weight": "",
+        "eyeColor": "",
+        "hairColor": "",
+        "dob": "",
+        "legalStatus": "",
+        "occupation": "",
+        "maritalStatus": "",
+        "history": "",
+        "details": {
+          "isDead": false,
+          "isDeactivated": false
+        }
+      },
+      "abilities": {
+        "abilities": {
+          "fighting": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "agility": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "strength": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "endurance": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "reason": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "intuition": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "psyche": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          }
+        },
+        "combatMods": {
+          "attackShift": 0,
+          "defenseShift": 0,
+          "defenseShiftRanged": 0,
+          "abilityShifts": {
+            "fighting": 0,
+            "agility": 0,
+            "strength": 0,
+            "endurance": 0,
+            "reason": 0,
+            "intuition": 0,
+            "psyche": 0
+          },
+          "movementMult": 1,
+          "selfPenaltyCS": 0,
+          "canAct": true,
+          "canMove": true
+        }
+      },
+      "derived": {
+        "attributes": {
+          "health": {
+            "value": 40,
+            "max": 40
+          },
+          "karma": {
+            "value": 30,
+            "max": 30
+          },
+          "resources": {
+            "rank": "Typical",
+            "value": 6,
+            "points": 0
+          },
+          "popularity": {
+            "hero": {
+              "value": 10,
+              "max": 100,
+              "isNegative": false
+            },
+            "secretId": {
+              "value": 0,
+              "max": 100,
+              "isNegative": false
+            }
+          }
+        }
+      },
+      "movement": {
+        "movement": {
+          "run": null,
+          "swim": null,
+          "fly": 0,
+          "teleport": 0,
+          "leap": null,
+          "other": []
+        }
+      },
+      "progress": {
+        "karma": {
+          "advancement": 0,
+          "advancementPurpose": "",
+          "advancementDetail": "",
+          "pool": 0,
+          "poolName": "",
+          "poolMembers": [],
+          "lifetime": 0,
+          "history": [],
+          "dailyKarmaUsed": 0,
+          "dailyKarmaMax": 0
+        }
+      }
+    },
+    "hero": {
+      "templates": [
+        "base",
+        "abilities",
+        "derived",
+        "movement",
+        "progress"
+      ],
+      "characterType": "player",
+      "powerOrigin": "altered human",
+      "isMutant": false,
+      "resistances": [],
+      "stunts": [],
+      "chargen": {
+        "originRoll": "",
+        "resourcesBaseRank": "",
+        "resourcesModRoll": "",
+        "resourcesModShift": "",
+        "popularityBase": "",
+        "powersRoll": "",
+        "powersInitial": "",
+        "powersMax": "",
+        "talentsRoll": "",
+        "talentsInitial": "",
+        "talentsMax": "",
+        "contactsRoll": "",
+        "contactsInitial": "",
+        "contactsMax": "",
+        "alteredBonusAbility": "",
+        "log": []
+      }
+    },
+    "villain": {
+      "templates": [
+        "base",
+        "abilities",
+        "derived",
+        "movement",
+        "progress"
+      ],
+      "characterType": "npc-villain",
+      "powerOrigin": "altered human",
+      "isMutant": false,
+      "resistances": [],
+      "stunts": [],
+      "chargen": {
+        "originRoll": "",
+        "resourcesBaseRank": "",
+        "resourcesModRoll": "",
+        "resourcesModShift": "",
+        "popularityBase": "",
+        "powersRoll": "",
+        "powersInitial": "",
+        "powersMax": "",
+        "talentsRoll": "",
+        "talentsInitial": "",
+        "talentsMax": "",
+        "contactsRoll": "",
+        "contactsInitial": "",
+        "contactsMax": "",
+        "alteredBonusAbility": "",
+        "log": []
+      }
+    },
+    "npc": {
+      "templates": [
+        "base",
+        "abilities",
+        "derived",
+        "movement",
+        "progress"
+      ],
+      "characterType": "civilian",
+      "resistances": []
+    },
+    "vehicle": {
+      "templates": [
+        "base"
+      ],
+      "type": "Road",
+      "cost": "Typical",
+      "control": "Typical",
+      "speed": "Typical",
+      "body": "Typical",
+      "protection": "Typical",
+      "compartmented": false,
+      "features": "",
+      "description": "",
+      "driver": "",
+      "driverUuid": "",
+      "passengers": "",
+      "passengerUuids": [],
+      "seatingCapacity": 5,
+      "bodyHP": 20,
+      "bodyHPMax": 20,
+      "bodyCSLoss": 0,
+      "speedCSLoss": 0,
+      "controlCSLoss": 0,
+      "currentSpeed": 0,
+      "outOfControl": false,
+      "damageLog": [],
+      "resources": {
+        "body": {
+          "value": 20,
+          "max": 20
+        }
+      }
+    }
+  },
+  "Item": {
+    "types": [
+      "power",
+      "talent",
+      "contact",
+      "equipment",
+      "vehicle",
+      "headquarters"
+    ],
+    "templates": {
+      "base": {
+        "description": ""
+      },
+      "ranked": {
+        "rank": "Typical",
+        "value": 6
+      }
+    },
+    "power": {
+      "templates": [
+        "base",
+        "ranked"
+      ],
+      "isActive": true,
+      "activationType": "activated",
+      "isStarred": false,
+      "source": "natural",
+      "replacesAbility": "",
+      "depoweredRank": "",
+      "category": "",
+      "isBonus": false,
+      "bonusFrom": "",
+      "initialRoll": "",
+      "initialRank": "",
+      "initialValue": "",
+      "categoryRoll": "",
+      "limitationRequired": false,
+      "limitationDetail": "",
+      "preLimitationRank": "",
+      "range": "",
+      "customRange": "",
+      "area": 0,
+      "duration": "",
+      "customDuration": "",
+      "isAttackPower": false,
+      "battleEffectsColumn": "",
+      "damageSource": "rank",
+      "damage": 0,
+      "canPullPunch": false,
+      "canReduceEffect": false,
+      "armorPiercing": false,
+      "ignoresNaturalArmor": false,
+      "ignoresArtificialArmor": false,
+      "bypassForceField": false,
+      "continuingDamage": false,
+      "continuingDamageRounds": 3,
+      "ensnaringStrength": "",
+      "requiresSave": false,
+      "save": {
+        "ability": "endurance",
+        "ability2": "",
+        "intensity": "power-rank",
+        "fixedRank": "",
+        "onFail": {
+          "effect": "stunned",
+          "duration": "1-10",
+          "notes": ""
+        },
+        "onHit": "",
+        "multiTargetCS": 0,
+        "rerollOnKarmaLoss": false,
+        "rerollOnLifeThreat": false
+      },
+      "isDefensePower": false,
+      "defenseType": "bodyArmor",
+      "armorNature": "natural",
+      "armorAgilityTrade": false,
+      "stuntParentId": "",
+      "stuntShift": 0,
+      "bodyArmorType": "both",
+      "protectionValue": 0,
+      "hardware": {
+        "enabled": false,
+        "status": "design",
+        "itemClass": "other",
+        "applicableRanks": [],
+        "modifiers": {
+          "invisible": false,
+          "pocketSized": false,
+          "portable": false,
+          "multiArea": false,
+          "meleeTouch": false,
+          "noProtection": false,
+          "gev": false,
+          "humanoid": false,
+          "imitatesIndividual": false,
+          "beyondTech": false
+        },
+        "customCS": 0,
+        "specialReqCount": 0,
+        "effectiveCost": "",
+        "derivation": "",
+        "time": {
+          "daysRequired": 0,
+          "daysElapsed": 0,
+          "assistant": "none",
+          "roundTheClock": false
+        },
+        "mode": "invention",
+        "mod": {
+          "kind": "abilityBoost",
+          "target": "",
+          "fromRank": "Typical",
+          "toRank": "Good",
+          "newPowerRank": "Good"
+        },
+        "kitBashed": false,
+        "salvaged": false,
+        "resourceFeat": {
+          "made": false,
+          "funding": "solo",
+          "gameDate": ""
+        },
+        "successFeat": {
+          "rolled": false,
+          "color": "",
+          "talentsCS": 0,
+          "rebuild": false,
+          "gameDate": "",
+          "fineTuneDays": 0,
+          "failTurns": 0
+        },
+        "startedGameDate": "",
+        "notes": ""
+      },
+      "forceFieldPersonal": false,
+      "forceFieldCoverage": 0,
+      "resistanceType": "",
+      "resistanceIsInvulnerability": false,
+      "isLimited": false,
+      "limitation": {
+        "usesPerDay": 0,
+        "usesPerScene": 0,
+        "rankBonus": 0,
+        "maxRank": ""
+      },
+      "limitations": "",
+      "countsAsTwoPowers": false,
+      "grantedByEquipment": false,
+      "damageType": "",
+      "extraAttacks": false,
+      "extraBodyParts": [],
+      "specialStrengthType": "",
+      "clawMaterialStrength": "",
+      "telekinesisStrength": "",
+      "isBodyArmor": false,
+      "armorPhysical": 0,
+      "armorPhysicalCustom": false,
+      "calculatedRange": "",
+      "regenerationRate": 0,
+      "resistanceSpecific": "",
+      "resistanceValue": 0,
+      "armorEnergy": 0,
+      "armorEnergyCustom": false,
+      "isForceField": false,
+      "forceFieldType": "personal",
+      "isResistance": false,
+      "resistanceEffect": "damageReduction",
+      "resistanceIsConductive": false,
+      "resistanceMinRank": "",
+      "isEnergyReflection": false,
+      "energyReflectionType": "",
+      "energyReflectionRank": "full",
+      "isSensePower": false,
+      "isAbilitySubstitution": false,
+      "isMovementPower": false,
+      "isControlPower": false,
+      "isMentalPower": false,
+      "isTransformPower": false,
+      "detection": {
+        "enhancedSense": "",
+        "protectedSense": "",
+        "detectionType": "",
+        "infravisionRange": 0,
+        "combatSense": false,
+        "cosmicAwareness": false,
+        "computerLinks": false,
+        "canTrack": false
+      },
+      "abilitySubstitution": {
+        "fighting": {
+          "enabled": false,
+          "context": ""
+        },
+        "agility": {
+          "enabled": false,
+          "context": ""
+        },
+        "strength": {
+          "enabled": false,
+          "context": ""
+        },
+        "endurance": {
+          "enabled": false,
+          "context": ""
+        },
+        "reason": {
+          "enabled": false,
+          "context": ""
+        },
+        "intuition": {
+          "enabled": false,
+          "context": ""
+        },
+        "psyche": {
+          "enabled": false,
+          "context": ""
+        }
+      },
+      "movement": {
+        "type": "",
+        "teleportCarry": "touch",
+        "appliesTo": "",
+        "areasPerRound": 0,
+        "useRankSpeed": false,
+        "leavesTunnel": false
+      },
+      "control": {
+        "controlType": "",
+        "controlSpecific": "",
+        "luck": "",
+        "manipulateExisting": false,
+        "generateNew": false,
+        "useAsShield": false,
+        "useAsWeapon": false,
+        "createConstructs": false,
+        "animateObjects": false
+      },
+      "mental": {
+        "telepathy": false,
+        "mentalProbe": false,
+        "mindControl": false,
+        "emotionControl": false,
+        "empathy": false,
+        "psiScreen": false,
+        "imageGeneration": false,
+        "possession": false,
+        "astralProjection": false,
+        "psionicAttack": false,
+        "transferral": false,
+        "animateDrawings": false,
+        "precognition": false,
+        "postcognition": false,
+        "mechanicalIntuition": false,
+        "emotionType": "",
+        "singleEmotionBonus": false
+      },
+      "bodyDefensive": {
+        "pheromones": false
+      },
+      "isWaterBreathing": false,
+      "transformation": {
+        "affects": "self",
+        "transformType": "",
+        "scope": "",
+        "alwaysOn": false,
+        "targetMaterial": "",
+        "targetResistsWith": "",
+        "duration": "concentration",
+        "touchRequired": false,
+        "retainsMental": true,
+        "retainsPowers": false
+      },
+      "healingType": "",
+      "regenerationType": "",
+      "absorptionType": "",
+      "absorptionSpecific": "",
+      "hasRecoveryPower": false,
+      "isDamageTransfer": false,
+      "isHealingPower": false,
+      "isHealthDrain": false,
+      "isParalyzingTouch": false,
+      "isBlindingTouch": false,
+      "isImmortality": false,
+      "isLifeSupport": false,
+      "isMagic": false,
+      "magic": {
+        "energyType": "",
+        "castCost": 0,
+        "successAbility": "psyche",
+        "chant": false,
+        "gesture": false,
+        "usesCeremony": false,
+        "sourceEntity": ""
+      },
+      "hasBonusPowers": false,
+      "bonusPowers": [],
+      "sfx": {
+        "hit": "",
+        "miss": "",
+        "hitVolume": 80,
+        "missVolume": 80
+      },
+      "vfx": {
+        "enabled": true,
+        "preset": "",
+        "color": "",
+        "asset": "",
+        "impact": "",
+        "scale": 1,
+        "duration": 0,
+        "impactDelay": 600
+      },
+      "specialMechanics": ""
+    },
+    "talent": {
+      "templates": [
+        "base"
+      ],
+      "bonus": "+1CS",
+      "abilityModified": "",
+      "type": "",
+      "specialty": "",
+      "rankOverride": "",
+      "isCumulative": false,
+      "isWeaponTalent": false,
+      "notes": "",
+      "category": "",
+      "categoryRoll": "",
+      "grantsContact": ""
+    },
+    "contact": {
+      "templates": [
+        "base"
+      ],
+      "type": "",
+      "disposition": "Friendly",
+      "specialties": [],
+      "location": "",
+      "notes": "",
+      "resourceRank": "",
+      "services": []
+    },
+    "equipment": {
+      "templates": [
+        "base",
+        "ranked"
+      ],
+      "category": "gear",
+      "materialStrength": "Typical",
+      "description": "",
+      "notes": "",
+      "price": "Poor",
+      "legality": "legal",
+      "weaponType": "",
+      "attackType": "",
+      "range": "",
+      "damage": "",
+      "damageType": "",
+      "armorPiercing": 0,
+      "armorPiercingCS": 0,
+      "apMode": "cs",
+      "bypassForceField": false,
+      "rate": "1",
+      "shots": "",
+      "shotsRemaining": "",
+      "broken": false,
+      "noRangePenalty": false,
+      "oneHandedUse": "normal",
+      "throwable": false,
+      "entangling": false,
+      "sfx": {
+        "hit": "",
+        "miss": "",
+        "empty": "",
+        "reload": "",
+        "hitVolume": 80,
+        "missVolume": 80,
+        "emptyVolume": 80,
+        "reloadVolume": 80
+      },
+      "vfx": {
+        "enabled": true,
+        "preset": "",
+        "color": "",
+        "asset": "",
+        "impact": "",
+        "scale": 1,
+        "duration": 0,
+        "impactDelay": 600
+      },
+      "variantType": "standard",
+      "specialAmmo": {
+        "mercy": false,
+        "ap": false,
+        "rubber": false,
+        "explosive": false,
+        "canister": false,
+        "heatSeeker": false,
+        "powerPack": false
+      },
+      "attackModes": [],
+      "burstScatter": "none",
+      "canisterSubType": "gas",
+      "stunIntensity": "",
+      "continuingDamage": "",
+      "continuingDamageRounds": "",
+      "requiresTwoOperators": false,
+      "protection": "",
+      "coverage": "partial",
+      "powerRank": "Typical",
+      "linkedAbility": "reason",
+      "powerType": "",
+      "powerRange": "",
+      "customAbilities": [],
+      "powers": [],
+      "deviceFunctions": [],
+      "isGrenade": false,
+      "grenadeType": "",
+      "grenadeRadius": 1,
+      "isMissile": false,
+      "missileType": "Standard",
+      "missileBody": "",
+      "missileControl": "",
+      "missileSpeed": "",
+      "guidanceSystem": "",
+      "payload": "",
+      "payloadDamage": "",
+      "duration": 0,
+      "durationUnit": "hour",
+      "rechargeLabel": "",
+      "intensityRank": "",
+      "intensityDescription": "",
+      "intensityEffect": "",
+      "intensityDuration": "",
+      "areaRadius": 0,
+      "resistances": [],
+      "gearType": "",
+      "sensoryType": "",
+      "sensoryRange": "",
+      "movementType": "",
+      "movementSpeed": "",
+      "abilityModifiers": [],
+      "protectionValue": 0
+    },
+    "vehicle": {
+      "templates": [
+        "base"
+      ],
+      "type": "Road",
+      "cost": "Typical",
+      "control": "Typical",
+      "speed": "Typical",
+      "body": "Typical",
+      "protection": "Typical",
+      "compartmented": false,
+      "features": "",
+      "description": "",
+      "driver": "",
+      "driverUuid": "",
+      "passengers": "",
+      "passengerUuids": [],
+      "seatingCapacity": 5,
+      "bodyHP": 20,
+      "bodyHPMax": 20,
+      "bodyCSLoss": 0,
+      "speedCSLoss": 0,
+      "controlCSLoss": 0,
+      "damageLog": [],
+      "resources": {
+        "body": {
+          "value": 20,
+          "max": 20
+        }
+      }
+    },
+    "headquarters": {
+      "templates": [
+        "base"
+      ],
+      "buildingType": "",
+      "location": "",
+      "size": "",
+      "materialStrength": "Typical",
+      "ownership": "owned",
+      "purchaseCost": "",
+      "rentCost": "",
+      "isRichArea": false,
+      "locationModifier": "normal",
+      "packages": [],
+      "staff": [],
+      "features": "",
+      "notes": "",
+      "rentLastPaid": "",
+      "rentLastPaidGameDate": "",
+      "loanPaymentRank": "",
+      "loanPaymentsRemaining": 0,
+      "loanPaymentsTotal": 0,
+      "loanLastPaid": "",
+      "loanLastPaidGameDate": ""
+    }
+  }
+}

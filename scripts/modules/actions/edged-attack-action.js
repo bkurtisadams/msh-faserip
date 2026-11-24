@@ -87,14 +87,8 @@ import {
   isEdgedCapable,
   computeEdgedDamage,
   derivePowerDamage,
-  rollWithKarmaAndHistory,
-  buildResultGrid,
-  bannerColors,
-  applyDamageToTargets,
   applyCapabilitiesToDialog,
-  buildInlineFeatDisplay,
   debugLog,
-  buildActionsBox,
   getTargetData,
   getBodyArmorValues,
   getEffectiveArmor as _getEffectiveArmor,
@@ -102,7 +96,6 @@ import {
   getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
-import { canEffectsApply } from "../../rules/effects-gate.js";
 import { executePenetrationFeat } from "./breaking-feat.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";

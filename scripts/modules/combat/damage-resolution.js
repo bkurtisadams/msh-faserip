@@ -13,7 +13,6 @@
  * Extracted from charge-damage.js and consolidated for reusability
  */
 
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { GRAND_SLAM_AREAS, RANK_RANGES } from "../../rules/rules-reference.js";
 
 /**

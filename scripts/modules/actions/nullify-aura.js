@@ -7,7 +7,7 @@
 
 import { applyNullified } from "../effects/effect-engine.js";
 import { universalColor } from "./action-utils.js";
-import { getNullifyRange, RANKS, rIdx, requiredColorFromDelta, meetsThreshold } from "./nullify-utils.js";
+import { getNullifyRange, rIdx, requiredColorFromDelta, meetsThreshold } from "./nullify-utils.js";
 
 const SCOPE = () => globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 

@@ -60,7 +60,6 @@ import {
   applyCapabilitiesToDialog,
   showDiceAnimation,
   getTargetData,
-  getBodyArmorValues,
   resolveKernelAttack
 } from "./action-utils.js";
 import { compareRankNames } from "../../kernel/adapter.js";

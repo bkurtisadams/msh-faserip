@@ -37,14 +37,12 @@
 // v1.3.2: Store originalEndurance in Dying effect flags and actor flags for recovery tracking
 import { BaseAction } from "./base-action.js";
 import {
-  RANKS,
   shiftRank,
   getAbilityInfo,
   bannerColors,
   showDiceAnimation,
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { safeActorCreateEffect, safeActorDeleteEffects, safeActorSetFlag } from "../../gm-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 import { computeDuration } from "../effects/effect-engine.js";

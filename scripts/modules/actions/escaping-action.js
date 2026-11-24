@@ -45,7 +45,7 @@ import {
 } from "./action-utils.js";
 import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment, setupKarmaControlHandlers } from "../dice/dice-roller.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
-import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
+import { getAttackShiftBreakdown } from "../effects/effect-modifiers.js";
 import { applyEscaped, applyReversed } from "../effects/effect-engine.js";
 
 import { showFaseripDialog } from "./dialog-shim.js";

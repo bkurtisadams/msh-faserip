@@ -16,7 +16,6 @@ import { GrapplingAction } from "./grappling-action.js";
 import { GrabbingAction } from "./grabbing-action.js";
 import { EscapingAction } from "./escaping-action.js";
 import { DeathSaveAction } from "./death-save-action.js";
-import { ManualModeDialog } from "./manual-mode-dialog.js";
 import { debugLog } from "./action-utils.js";
 import { MentalPowerAction } from "./mental-power-action.js";
 import { GrenadeAction } from "./grenade-action.js";

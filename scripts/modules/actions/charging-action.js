@@ -77,7 +77,6 @@
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
-  generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
   getAvailableKarma
@@ -89,13 +88,11 @@ import {
   effectsFor,
   bannerColors,
   getAbilityInfo,
-  getStrengthInfo,
   rollWithKarmaAndHistory,
   debugLog,
   applyCapabilitiesToDialog,
   showDiceAnimation,
   getTargetData,
-  getBodyArmorValues,
   applyDamageToTargets,
   resolveKernelAttack
 } from "./action-utils.js";

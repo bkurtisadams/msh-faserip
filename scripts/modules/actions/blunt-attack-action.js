@@ -94,7 +94,6 @@
 // scripts/modules/actions/blunt-attack-action.js
 import { AttackAction } from "./attack-action.js";
 import { 
-  generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
   getAvailableKarma,
@@ -104,13 +103,10 @@ import {
   RANKS, shiftRank, getAbilityInfo, getStrengthInfo,
   effectsFor, labelFor,
   isBluntCapable, isEdgedCapable, computeBluntDamage,
-  rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
-  getTargetData, getBodyArmorValues, applyDamageToTargets,
-  attachModeSelectorHandlers, debugLog,
-  applyCapabilitiesToDialog, buildInlineFeatDisplay, getDeclaredMultiAttackState
+  getTargetData, getBodyArmorValues, debugLog,
+  applyCapabilitiesToDialog, getDeclaredMultiAttackState
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
-import { canEffectsApply } from "../../rules/effects-gate.js";
 import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";
 import { RANK_ABBR, RANK_RANGES, RANKS_ORDERED, rankValue, valueToRank } from "../../rules/rules-reference.js";
 import { requiredColor as kernelRequiredColor } from "../../lib/faserip-rules/faserip-kernel.js";
