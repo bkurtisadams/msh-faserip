@@ -436,9 +436,4 @@ export class StuntRoller {
     if (success) await runStuntMechanic(this.actor, stunts[stuntIndex]);
   }
 
-  async _incrementStuntUsage(stuntIndex) {
-    const stunts = foundry.utils.deepClone(this.actor.system.stunts);
-    stunts[stuntIndex].timesUsed += 1;
-    await this.actor.update({ "system.stunts": stunts });
-  }
 }

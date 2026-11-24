@@ -956,10 +956,6 @@ export class KarmaSheet {
     });
   }
 
-  _onAbilityAdvancement() {
-    return this._onAdvancement("ability");
-  }
-
   /**
    * Advancement sub-dialog for ability / power / resource / popularity.
    * Cost from the kernel step walker (advancementCost): multiplier × current

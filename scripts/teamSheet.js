@@ -1337,11 +1337,6 @@ export class TeamSheet extends LegacyAppV2 {
     this.render(false);
   }
 
-  _onEncFieldChange(ev, field, value) {
-    const idx = Number(ev.currentTarget.dataset.encIdx);
-    this._updateEncField(idx, field, value);
-  }
-
   _onEncNumericChange(ev, field) {
     const idx = Number(ev.currentTarget.dataset.encIdx);
     this._updateEncField(idx, field, Math.max(0, Number(ev.currentTarget.value) || 0));
@@ -2175,24 +2170,6 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         });
       }
     });
-  }
-
-  async _addEncounter(villains, presentHeroIds) {
-    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
-    encounters.push({
-      id: `enc_${Date.now()}`,
-      villains,
-      presentHeroIds: presentHeroIds || [],
-      crimes: [],
-      rescues: 0, losses: 0, bonuses: [],
-      awarded: false,
-      gameDate, gameTime, realDate: new Date().toLocaleDateString(),
-      timestamp: new Date().toISOString()
-    });
-    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    this._expandedEncounters.add(encounters.length - 1);
-    this.render(true);
   }
 
   async _onDeleteFoe(ev) {

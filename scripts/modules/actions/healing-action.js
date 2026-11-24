@@ -40,6 +40,7 @@
 
 import { showFaseripDialog } from "./dialog-shim.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { colorBg, colorFg } from "./card-kit.js";
 import { deductKarma, getAvailableKarma } from "../dice/dice-roller.js";
 import { resolveFeat } from "../../rules/feat-core.js";
 import {
@@ -52,26 +53,6 @@ import {
 import { splitHealth } from "../effects/absorption-pool.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
-
-function colorBg(c) {
-  switch ((c || '').toLowerCase()) {
-    case 'white':  return '#f5f5f0';
-    case 'green':  return '#4CAF50';
-    case 'yellow': return '#FFC107';
-    case 'red':    return '#F44336';
-    default:       return '#ddd';
-  }
-}
-
-function colorFg(c) {
-  switch ((c || '').toLowerCase()) {
-    case 'white':  return '#1a1a1a';
-    case 'green':  return '#fff';
-    case 'yellow': return '#1a1a1a';
-    case 'red':    return '#fff';
-    default:       return '#1a1a1a';
-  }
-}
 
 // Flag keys may not contain dots (Foundry expands them into nested objects).
 const capKey = (uuid) => String(uuid || "").replace(/\./g, "_");

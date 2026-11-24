@@ -71,8 +71,9 @@
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
-import { RANK_ABBR, RANKS_ORDERED, shiftRank as sharedShiftRank } from "../../rules/rules-reference.js";
-import { determineFeatRequirement, checkFeatSuccess } from "./ability-feat-dialog.js";
+import { RANK_ABBR, RANKS_ORDERED } from "../../rules/rules-reference.js";
+import { determineFeatRequirement, checkFeatSuccess, applyCS, buildNeedPill, setNeedPill } from "./ability-feat-dialog.js";
+import { colorFg } from "./card-kit.js";
 
 const RANKS = RANKS_ORDERED; // slice 3: shared kernel-backed order
 
@@ -88,11 +89,6 @@ const ABILITIES = [
   { key: "psyche",    label: "Psyche"    }
 ];
 
-// slice 3: shared kernel-backed shift (clamps Shift-0..Shift-Z; Class 1000+ unshiftable)
-function applyCS(rank, shift) {
-  return sharedShiftRank(rank, shift);
-}
-
 function colorBg(c) {
   switch ((c || '').toLowerCase()) {
     case 'white':  return '#ffffff';
@@ -101,47 +97,6 @@ function colorBg(c) {
     case 'red':    return '#ee1e25';
     default:       return '#ddd';
   }
-}
-
-function colorFg(c) {
-  switch ((c || '').toLowerCase()) {
-    case 'white':  return '#1a1a1a';
-    case 'green':  return '#fff';
-    case 'yellow': return '#1a1a1a';
-    case 'red':    return '#fff';
-    default:       return '#1a1a1a';
-  }
-}
-
-function buildNeedPill(id, initialLabel = 'ANY COLOR') {
-  return `<span class="frp-need-line"><span class="frp-need-label">Needs:</span><span id="${id}" class="frp-feat-pill is-white">${initialLabel}</span></span>`;
-}
-
-function setNeedPill($el, requirement, { impossible = false, automatic = false } = {}) {
-  if (!$el?.length) return;
-  const classes = 'frp-feat-pill is-white is-green is-yellow is-red is-auto is-impossible';
-  $el.removeClass(classes);
-
-  if (impossible) {
-    $el.addClass('frp-feat-pill is-impossible').text('IMPOSSIBLE');
-    return;
-  }
-  if (automatic) {
-    $el.addClass('frp-feat-pill is-auto').text('AUTOMATIC');
-    return;
-  }
-
-  const key = String(requirement || '').toLowerCase();
-  const map = {
-    'white': ['is-white', 'WHITE'],
-    'green': ['is-green', 'GREEN'],
-    'yellow': ['is-yellow', 'YELLOW'],
-    'red': ['is-red', 'RED'],
-    'any color': ['is-white', 'ANY COLOR'],
-    'any': ['is-white', 'ANY COLOR']
-  };
-  const [klass, label] = map[key] || ['is-white', String(requirement || 'ANY COLOR').toUpperCase()];
-  $el.addClass(`frp-feat-pill ${klass}`).text(label);
 }
 
 export async function showGenericFeatDialog(actor, opts = {}) {

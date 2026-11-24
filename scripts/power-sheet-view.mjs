@@ -223,3 +223,15 @@ export function buildPowerSheetView(sys = {}, flags = {}) {
     isBonus: sys.isBonus === true || flags.isBonusPower === true
   };
 }
+
+export function isResistanceMatch(baseType, resType, fullDmgType) {
+  if (!resType) return false;
+  if (resType === baseType) return true;
+  if (resType === "physical" && (fullDmgType.includes("physical") || fullDmgType.includes("blunt") || fullDmgType.includes("edged"))) return true;
+  if (resType === "energy" && fullDmgType.includes("energy")) return true;
+  if ((resType === "fire" || resType === "heat") && (baseType === "fire" || baseType === "heat")) return true;
+  if ((resType === "cold" || resType === "ice") && (baseType === "cold" || baseType === "ice")) return true;
+  if ((resType === "electricity" || resType === "electric") && (baseType === "electricity" || baseType === "electric")) return true;
+  if (resType === "radiation" && baseType === "light") return true;
+  return fullDmgType.includes(resType);
+}

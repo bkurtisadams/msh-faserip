@@ -108,7 +108,7 @@ import {
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { hasMartialArtsD, hasMartialArtsA, getStudyStatus, recordStudy } from "./ma-d.js";
-import { RANK_ABBR, RANK_RANGES, RANKS_ORDERED, rankValue, valueToRank } from "../../rules/rules-reference.js";
+import { RANK_ABBR, getCombinedNextRank as getCombinedPromotion } from "../../rules/rules-reference.js";
 import { requiredColor as kernelRequiredColor } from "../../lib/faserip-rules/faserip-kernel.js";
 import { kernelKeyFor } from "../../kernel/adapter.js";
 import { buildCSRow, wireCSPanel, talentCSSeed, forgetTalentSeededCS } from "./cs-modifiers.js";
@@ -118,18 +118,6 @@ import {
   mountDialogFrame, wireRollKeys, wireRowToggle, wirePrefToggles
 } from "./attack-dialog-kit.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
-
-function getCombinedPromotion(damage) {
-  const n = Number(damage) || 0;
-  if (n <= 0) return null;
-  const currentRank = valueToRank(n);
-  const idx = RANKS_ORDERED.indexOf(currentRank);
-  if (idx < 0 || idx >= RANKS_ORDERED.length - 1) return null;
-  const nextRank = RANKS_ORDERED[idx + 1];
-  const nextMin = RANK_RANGES[nextRank]?.[0] ?? rankValue(nextRank);
-  if (!Number.isFinite(nextMin) || nextMin <= n) return null;
-  return { currentRank, nextRank, nextMin, bonus: nextMin - n };
-}
 
 function isCombinedAssistCurrent(assist) {
   if (!assist || assist.type !== "blunt") return false;

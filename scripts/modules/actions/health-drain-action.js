@@ -22,6 +22,7 @@
 import { showFaseripDialog } from "./dialog-shim.js";
 import { getRollMode } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { colorBg, colorFg } from "./card-kit.js";
 import {
   generateKarmaControlsHTML,
   setupKarmaControlHandlers,
@@ -34,26 +35,6 @@ import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/ef
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
-
-function colorBg(c) {
-  switch ((c || '').toLowerCase()) {
-    case 'white':  return '#f5f5f0';
-    case 'green':  return '#4CAF50';
-    case 'yellow': return '#FFC107';
-    case 'red':    return '#F44336';
-    default:       return '#ddd';
-  }
-}
-
-function colorFg(c) {
-  switch ((c || '').toLowerCase()) {
-    case 'white':  return '#1a1a1a';
-    case 'green':  return '#fff';
-    case 'yellow': return '#1a1a1a';
-    case 'red':    return '#fff';
-    default:       return '#1a1a1a';
-  }
-}
 
 export async function showHealthDrainDialog(hero, item) {
   if (!hero || !item) {

@@ -343,10 +343,6 @@ export class FaseripInitiative {
     return game.settings.get("msh-faserip", "initiativeMode") === this.MODE_SIDE;
   }
 
-  static _isIndividualMode() {
-    return game.settings.get("msh-faserip", "initiativeMode") === this.MODE_INDIVIDUAL;
-  }
-
   static _getSideLabels() {
     const key = game.settings.get("msh-faserip", "sideLabels");
     switch (key) {
@@ -1016,14 +1012,6 @@ export class FaseripInitiative {
     }
     ui.notifications.warn("Cannot update combat declaration — no GM connection available.");
     return false;
-  }
-
-  static async _clearCombatantFlag(combatant, flag) {
-    if (!combatant) return;
-    if (game.user.isGM) return combatant.unsetFlag("msh-faserip", flag);
-    if (game.msh?.runAsGM) {
-      return game.msh.runAsGM({ operation: "setCombatantFlags", combatId: combatant.parent?.id, combatantId: combatant.id, flags: { [flag]: null } });
-    }
   }
 
   static _firstEligibleTurnIndexForSide(combat, side) {

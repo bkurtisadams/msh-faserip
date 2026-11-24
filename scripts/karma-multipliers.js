@@ -158,12 +158,6 @@ export function getCombatAwardScope() {
   return game.settings.get("msh-faserip", "fullKarmaEachHero") ? "individual" : "split";
 }
 
-/** Optional rule: Karma is spent in increments of 5. */
-export function karmaIncrement() {
-  try { return game.settings.get("msh-faserip", "karmaIncrementFive") ? 5 : 1; }
-  catch (_) { return 1; }
-}
-
 /** Optional rule: the locking team pool. */
 export function isKarmaPoolLocked() {
   try { return game.settings.get("msh-faserip", "karmaPoolLocked") === true; }
@@ -267,20 +261,3 @@ export async function migrateKarmaSettings() {
   console.log("[FASERIP] Karma settings migrated (v1)");
 }
 
-export const CATEGORY_LABELS = {
-  combat: "Combat / Heroic",
-  rescue: "Rescue",
-  personal: "Personal",
-  gaming: "Gaming",
-  penalty: "Penalty"
-};
-
-export const GROUP_MODE_LABELS = {
-  split: "Split (RAW)",
-  pool: "To karma pool"
-};
-
-export const COMBAT_SCOPE_LABELS = {
-  split: "Split (RAW)",
-  individual: "Individual (full to each hero)"
-};

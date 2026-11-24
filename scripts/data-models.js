@@ -204,11 +204,6 @@ class FaseripHeadquartersData extends PermissiveDataModel {
   ];
 }
 
-// No-op retained for init.js import compatibility; the registered
-// TypeDataModels replace the previous core-method monkey-patch.
-export function installActorDeltaV14Shim() {}
-export const installTokenDeltaSanitizer = installActorDeltaV14Shim;
-
 // Flip to true to re-register the TypeDataModels (see v2.4.2 note).
 const REGISTER_DATA_MODELS = false;
 

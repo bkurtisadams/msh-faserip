@@ -29,8 +29,4 @@ export class RangedAttackAction extends AttackAction {
 
   _getPowerRangeInAreas(rank) { return powerRangeInAreas(rank); }
   _getThrowingRangeInAreas(rank) { return throwingRangeInAreas(rank); }
-  _rangeLabel(areas) { return rangeLabel(areas); }
-  _weaponRangePenalty(distance, maxRange) { return weaponRangePenalty(distance, maxRange); }
-  _thrownRangePenalty(distance, strengthRank) { return thrownRangePenalty(distance, strengthRank); }
-  _powerRangePenalty(powerRank, distance) { return powerRangePenalty(powerRank, distance); }
 }

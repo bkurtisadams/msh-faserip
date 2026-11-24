@@ -98,7 +98,7 @@
 import { applyEffect } from "./effect-engine.js";
 import { rankValue as getRankValue, stepRank } from "../../rules/rules-reference.js";
 import { defenseValue } from "../../lib/faserip-rules/faserip-damage.js";
-import { resistanceTypesOf } from "../../power-sheet-view.mjs";
+import { resistanceTypesOf, isResistanceMatch } from "../../power-sheet-view.mjs";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -806,20 +806,3 @@ export function getResistanceFromEffects(actor, damageType = "physical-blunt") {
   };
 }
 
-/**
- * Check if a resistance type matches a damage type.
- */
-function isResistanceMatch(baseType, resType, fullDmgType) {
-  if (!resType) return false;
-  if (resType === baseType) return true;
-
-  // Broad matches
-  if (resType === "physical" && (fullDmgType.includes("physical") || fullDmgType.includes("blunt") || fullDmgType.includes("edged"))) return true;
-  if (resType === "energy" && fullDmgType.includes("energy")) return true;
-  if ((resType === "fire" || resType === "heat") && (baseType === "fire" || baseType === "heat")) return true;
-  if ((resType === "cold" || resType === "ice") && (baseType === "cold" || baseType === "ice")) return true;
-  if ((resType === "electricity" || resType === "electric") && (baseType === "electricity" || baseType === "electric")) return true;
-  if (resType === "radiation" && baseType === "light") return true;
-
-  return fullDmgType.includes(resType);
-}

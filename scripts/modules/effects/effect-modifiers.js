@@ -185,63 +185,6 @@ export function getAbilityShift(actor, ability) {
 }
 
 /**
- * Build a summary string of active modifiers for display
- * @param {Actor} actor 
- * @returns {string} Summary text
- */
-export function getModifierSummary(actor) {
-  const mods = getActiveModifiers(actor);
-  const parts = [];
-  
-  if (mods.attackShift !== 0) {
-    parts.push(`Attack: ${mods.attackShift > 0 ? '+' : ''}${mods.attackShift}CS`);
-  }
-  if (mods.defenseShift !== 0) {
-    parts.push(`Defense: ${mods.defenseShift > 0 ? '+' : ''}${mods.defenseShift}CS`);
-  }
-  if (!mods.canAct) {
-    parts.push("Cannot Act");
-  }
-  if (mods.selfPenaltyCS !== 0) {
-    parts.push(`Self Penalty: ${mods.selfPenaltyCS}CS (all FEATs)`);
-  }
-  if (!mods.canMove) {
-    parts.push("Cannot Move");
-  } else if (mods.movementMult < 1) {
-    parts.push(`Movement: ${Math.round(mods.movementMult * 100)}%`);
-  }
-  
-  // Ability shifts
-  for (const [ability, shift] of Object.entries(mods.abilityShifts)) {
-    if (shift !== 0) {
-      const abilityName = ability.charAt(0).toUpperCase() + ability.slice(1);
-      parts.push(`${abilityName}: ${shift > 0 ? '+' : ''}${shift}CS`);
-    }
-  }
-  
-  return parts.length > 0 ? parts.join(", ") : "No modifiers";
-}
-
-/**
- * Debug helper - log all active modifiers for an actor
- * @param {Actor} actor 
- */
-export function debugActorModifiers(actor) {
-  const mods = getActiveModifiers(actor);
-  const effects = actor.effects?.filter(e => !e.disabled)?.map(e => ({
-    name: e.name,
-    changes: e.changes
-  })) || [];
-  
-  console.log(`[FASERIP] Active Modifiers for ${actor.name}:`, {
-    combatMods: actor.system?.combatMods,
-    computed: mods,
-    activeEffects: effects
-  });
-  return mods;
-}
-
-/**
  * Check if attacker has an evasion bonus against a specific target
  * This is used when the attacker previously evaded the target and got yellow/red
  * The bonus only applies in the round AFTER the evasion was made (cannot be saved)

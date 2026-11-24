@@ -884,40 +884,6 @@ export function universalColor(rankName, total) {
   return game.msh.rollUniversalTable(rankName, total); // uses your existing table resolver
 }
 
-// Roll + Karma spending (uses lifetime karma only)
-export async function rollWithKarma(actor, actionLabel, requestedKarma = 0) {
-  const roll = await (new Roll("1d100")).evaluate();
-  let cappedTotal = roll.total;
-  let karmaUsed = 0;
-
-  const k = Math.max(0, Number(requestedKarma||0));
-  if (k > 0) {
-    karmaUsed = k;
-    cappedTotal = Math.min(100, roll.total + karmaUsed);
-
-    // Create history entry for karma spending
-    const historyEntry = {
-      timestamp: new Date().toISOString(),
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -karmaUsed,
-      type: "Die Roll",
-      description: `Spent karma on ${actionLabel}`
-    };
-    
-    const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-    currentHistory.push(historyEntry);
-
-    await game.msh.runAsGM({
-      operation: 'update',
-      targetActorUuid: actor.uuid,
-      args: [{ "system.karma.history": currentHistory }]
-    });
-  }
-
-  return { roll, cappedTotal, totalKarmaUsed: karmaUsed };
-}
-
 // Item filters
 export const isBluntCapable = (it) => {
   const s = it.system || {};

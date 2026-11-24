@@ -79,7 +79,7 @@ import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, 
 
 import { showFaseripDialog, isDialogDetached } from "./dialog-shim.js";
 import { executeAsGM } from "../../gm-utils.js";
-import { RANK_ABBR, rankValue, RANK_RANGES, RANKS_ORDERED, valueToRank, shiftRank as sharedShiftRank } from "../../rules/rules-reference.js";
+import { RANK_ABBR, rankValue, RANKS_ORDERED, shiftRank as sharedShiftRank, getCombinedNextRank } from "../../rules/rules-reference.js";
 import { kernelKeyFor } from "../../kernel/adapter.js";
 import { requiredColor as kernelRequiredColor, colorAtLeast as kernelColorAtLeast } from "../../lib/faserip-rules/faserip-kernel.js";
 
@@ -148,20 +148,8 @@ export function checkFeatSuccess(resultColor, requirement) {
 }
 
 // slice 3: shared kernel-backed shift (clamps Shift-0..Shift-Z; Class 1000+ unshiftable)
-function applyCS(rank, shift) {
+export function applyCS(rank, shift) {
   return sharedShiftRank(rank, shift);
-}
-
-function getCombinedNextRank(damage) {
-  const n = Number(damage) || 0;
-  if (n <= 0) return null;
-  const currentRank = valueToRank(n);
-  const idx = RANKS_ORDERED.indexOf(currentRank);
-  if (idx < 0 || idx >= RANKS_ORDERED.length - 1) return null;
-  const nextRank = RANKS_ORDERED[idx + 1];
-  const nextMin = RANK_RANGES[nextRank]?.[0] ?? rankValue(nextRank);
-  if (!Number.isFinite(nextMin) || nextMin <= n) return null;
-  return { currentRank, nextRank, nextMin, bonus: nextMin - n };
 }
 
 function getCombinedFeatContext(actor) {
@@ -242,7 +230,7 @@ function colorFg(c) {
   return (lo === "white" || lo === "yellow") ? "#333" : "white";
 }
 
-function buildNeedPill(id, initialLabel = "ANY COLOR") {
+export function buildNeedPill(id, initialLabel = "ANY COLOR") {
   return `<span class="frp-need-line"><span class="frp-need-label">Needs:</span><span id="${id}" class="frp-feat-pill is-white">${initialLabel}</span></span>`;
 }
 
@@ -281,7 +269,7 @@ function buildChatNeedPill(requirement, { impossible = false, automatic = false 
   return `<span style="display:inline-block;vertical-align:middle;margin-left:4px;padding:1px 8px;border-radius:8px;border:1px solid ${border};background:${bg};color:${fg};font-family:'Oswald',sans-serif;font-size:.92em;font-weight:700;letter-spacing:.03em;line-height:1.2;text-transform:uppercase;">${label}</span>`;
 }
 
-function setNeedPill($el, requirement, { impossible = false, automatic = false } = {}) {
+export function setNeedPill($el, requirement, { impossible = false, automatic = false } = {}) {
   if (!$el?.length) return;
   const classes = 'frp-feat-pill is-white is-green is-yellow is-red is-auto is-impossible';
   $el.removeClass(classes);

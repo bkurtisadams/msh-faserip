@@ -197,6 +197,19 @@ export function rankIndex(name) {
   return i >= 0 ? i : 0;
 }
 
+/** Next rank above a damage total: { currentRank, nextRank, nextMin, bonus }, or null at the top of the ladder. */
+export function getCombinedNextRank(damage) {
+  const n = Number(damage) || 0;
+  if (n <= 0) return null;
+  const currentRank = valueToRank(n);
+  const idx = RANKS_ORDERED.indexOf(currentRank);
+  if (idx < 0 || idx >= RANKS_ORDERED.length - 1) return null;
+  const nextRank = RANKS_ORDERED[idx + 1];
+  const nextMin = RANK_RANGES[nextRank]?.[0] ?? rankValue(nextRank);
+  if (!Number.isFinite(nextMin) || nextMin <= n) return null;
+  return { currentRank, nextRank, nextMin, bonus: nextMin - n };
+}
+
 // Turn=6sec, 10 turns/min, 600 turns/hr
 export const TIME = { turnSeconds: 6, turnsPerMinute: 10, turnsPerHour: 600 };
 

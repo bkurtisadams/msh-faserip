@@ -127,6 +127,7 @@
 import { getBodyArmorValues, applyArmorPiercingCS } from "../modules/actions/action-utils.js";
 import { defenseValue } from "../lib/faserip-rules/faserip-damage.js";
 import { planAbsorption } from "../modules/effects/absorption-pool.js";
+import { isResistanceMatch as isResMatch } from "../power-sheet-view.mjs";
 export { applyArmorPiercingCS };
 
 export function calculateMitigation(rawDamage, targetActor, options = {}) {
@@ -731,18 +732,6 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     absorption: { rank: absRank, rankLabel: absRankLabel, aeId: absAeId, itemId: absItemId, matchedType: absMatched, specific: absSpecific },
     reflection: { threshold: reflThreshold, rank: reflRank, rankValue: reflRankValue, aeId: reflAeId, matchedType: reflMatched },
   };
-}
-
-function isResMatch(baseType, resType, fullDmgType) {
-  if (!resType) return false;
-  if (resType === baseType) return true;
-  if (resType === "physical" && (fullDmgType.includes("physical") || fullDmgType.includes("blunt") || fullDmgType.includes("edged"))) return true;
-  if (resType === "energy" && fullDmgType.includes("energy")) return true;
-  if ((resType === "fire" || resType === "heat") && (baseType === "fire" || baseType === "heat")) return true;
-  if ((resType === "cold" || resType === "ice") && (baseType === "cold" || baseType === "ice")) return true;
-  if ((resType === "electricity" || resType === "electric") && (baseType === "electricity" || baseType === "electric")) return true;
-  if (resType === "radiation" && baseType === "light") return true;
-  return fullDmgType.includes(resType);
 }
 
 

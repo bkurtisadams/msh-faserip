@@ -48,7 +48,6 @@ const SIZE_FLAG = "dotOrigSize"; // stashed {w,h} before dot-mode shrink
 const DOT_SIZE_SETTING = "dotSize"; // world setting: "small" | "medium" | "large"
 const LABEL_SETTING = "dotLabels"; // world setting: "auto" | "custom" | "off"
 const HOVER_DELAY = 300; // ms before portrait appears
-const PORTRAIT_SIZE = 36; // px — rendered portrait thumbnail size
 
 // Dot radius as fraction of smaller token dimension, keyed by setting
 const DOT_RATIOS = { small: 0.12, medium: 0.20, large: 0.30 };

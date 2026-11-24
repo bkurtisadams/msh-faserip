@@ -347,7 +347,6 @@ export async function appendRecoveryLog(actor, entry) {
 }
 
 const _TERMINAL_RECOVERY_EVENTS = new Set(["wake-success", "dying-death", "fully-recovered"]);
-const _EPISODE_START_EVENTS = new Set(["dying-start", "unconscious-start"]);
 
 async function emitRecoverySummary(actor) {
   const log = actor.getFlag(SCOPE, "recoveryLog") || [];
@@ -773,34 +772,6 @@ export class RestSystem {
     if (game.settings.get(SCOPE, "debugMode")) {
       console.log(`FASERIP | Medical care ${enabled ? 'enabled' : 'disabled'} for ${actor.name}`);
     }
-  }
-
-  /**
-   * Get current rest status for an actor (for UI display)
-   * @param {Actor} actor - The actor to check
-   * @returns {Object} Status information
-   */
-  static getRestStatus(actor) {
-    const recoveryCheck = this.canAttemptRecovery(actor);
-    const healingCheck = this.canAttemptHealing(actor);
-    
-    const lastDamageTime = actor.getFlag(SCOPE, "lastDamageTime");
-    const lastRecoveryDate = actor.getFlag(SCOPE, "lastRecoveryDate");
-    const medicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
-    
-    return {
-      recovery: {
-        available: recoveryCheck.canRest,
-        reason: recoveryCheck.reason,
-        lastUsed: lastRecoveryDate
-      },
-      healing: {
-        available: healingCheck.canHeal,
-        reason: healingCheck.reason,
-        lastDamage: lastDamageTime,
-        medicalCare
-      }
-    };
   }
 
   /**

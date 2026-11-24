@@ -16,7 +16,7 @@
 // Bridge between Foundry rank/label conventions and @graycloak/faserip-rules.
 // All Foundry rank-string variants normalize here and nowhere else.
 
-import { rankByKey, rankForNumber, rankDistance } from '../lib/faserip-rules/faserip-kernel.js';
+import { rankByKey, rankDistance } from '../lib/faserip-rules/faserip-kernel.js';
 
 const NAME_TO_KEY = new Map();
 function reg(key, ...names) {
@@ -47,11 +47,6 @@ export function kernelKeyFor(name) {
   return NAME_TO_KEY.get(s) ?? NAME_TO_KEY.get(s.replace(/\s/g, '-')) ?? null;
 }
 
-export function kernelRankFor(name) {
-  const key = kernelKeyFor(name);
-  return key ? rankByKey(key) : null;
-}
-
 // style 'dash' -> "Shift-X"; style 'space' -> "Shift X". Non-shift names identical.
 export function foundryNameFor(key, style = 'space') {
   const r = rankByKey(key);
@@ -65,10 +60,6 @@ export function compareRankNames(a, b) {
   const ka = kernelKeyFor(a), kb = kernelKeyFor(b);
   if (!ka || !kb) return null;
   return Math.sign(rankDistance(kb, ka));
-}
-
-export function foundryRankForNumber(n, style = 'space') {
-  return foundryNameFor(rankForNumber(n).key, style);
 }
 
 // Result-token -> display label (attack/defense columns).

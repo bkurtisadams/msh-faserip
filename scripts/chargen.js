@@ -908,54 +908,6 @@ export class CharacterGenerator {
     return this.state;
   }
 
-  getLog() {
-    return this.state.log;
-  }
-
-  buildTextSummary() {
-    const s = this.state;
-    if (!s || !s.abilities) return "";
-
-    const a = s.abilities;
-    const primaryLines = Object.entries(a)
-      .map(([key, data]) => `${key.toUpperCase()} ${data.rank} (${data.value})`)
-      .join(" | ");
-
-    const powerLines = (s.powersData?.chosen || [])
-      .map(p => `• ${p.name} (${p.category}) ${p.rank} (${p.value})`)
-      .join("\n");
-
-    const talentLines = (s.talentsData?.chosen || [])
-      .map(t => `• ${t.name} (${t.category})`)
-      .join("\n");
-
-    const contactLines = (s.contactsData?.chosen || [])
-      .map(c => `• ${c.name} [${c.type}]`)
-      .join("\n");
-
-    return [
-      `Hero Origin: ${s.origin || "-"}`,
-      "",
-      "Primary Abilities:",
-      primaryLines,
-      "",
-      "Secondary:",
-      `Health: ${s.health}`,
-      `Karma: ${s.karma}`,
-      `Resources: ${s.resources.rank} (${s.resources.value})`,
-      `Popularity: ${s.popularity.hero}`,
-      "",
-      "Powers:",
-      powerLines || "• None",
-      "",
-      "Talents:",
-      talentLines || "• None",
-      "",
-      "Contacts:",
-      contactLines || "• None"
-    ].join("\n");
-  }
-
   buildShortLabel() {
     const s = this.state || {};
     const a = s.abilities || {};

@@ -31,14 +31,6 @@ import {
 
 /* ── Item classes ─────────────────────────────────────────────────────────── */
 
-export const HW_ITEM_CLASSES = {
-  weapon:    "Weapon",
-  vehicle:   "Vehicle",
-  powersuit: "Power Suit",
-  robot:     "Robot / Construct",
-  other:     "Other Device"
-};
-
 /* ── Standard applicable ranks per item class ─────────────────────────────── */
 
 export const HW_CLASS_RANKS = {
@@ -143,12 +135,6 @@ export function computeEffectiveCost(hw = {}) {
 }
 
 /* ── Modifications (RAW p.69) ─────────────────────────────────────────────── */
-
-export const HW_MOD_KINDS = {
-  abilityBoost:      "Improve an existing rank (one rank at a time)",
-  addCapabilityEasy: "Add capability, simple installation (e.g. artillery on a tank)",
-  addCapabilityHard: "Add capability, device must be altered (e.g. flight on a car)"
-};
 
 /** A modification may only raise a rank one step at a time. */
 export function validateModStep(fromRank, toRank) {

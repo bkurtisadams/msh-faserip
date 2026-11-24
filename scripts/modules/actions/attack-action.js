@@ -542,15 +542,6 @@ export class AttackAction extends BaseAction {
     this.pulled = false;
   }
 
-  // attack-action.js (base class)
-  getTargetCount() {
-    const t = this.targets;
-    if (Array.isArray(t)) return t.length;
-    if (t && typeof t.size === "number") return t.size; // Set/Map (e.g., User.targets)
-    // last resort: live selection
-    return Number(game?.user?.targets?.size ?? 1);
-  }
-
   /** First selected token, honoring an override if present */
   _selectPrimaryTarget() {
     const arr = Array.isArray(this?.targets)
@@ -558,19 +549,6 @@ export class AttackAction extends BaseAction {
       : Array.from(game?.user?.targets ?? []);
     return arr[0] ?? null;
   }
-
-  _computeEffectiveRank(baseRank, columnShift=0) {
-    return shiftRank(baseRank, columnShift);
-  }
-
-  _getAbilityTriplet() {
-    const ab = getAbilityInfo(this.actor, this.abilityName);
-    const colShift = Number(this.opts.shift ?? 0);
-    const effectiveRank = this._computeEffectiveRank(ab.rank, colShift);
-    return { base: ab, effectiveRank, columnShift: colShift };
-  }
-
-  _getStrength() { return getStrengthInfo(this.actor); }
 
   async _rollFightingFeat(actor, fightingAbility, intensity, attackCount) {
     const availableKarma = actor.system.attributes?.karma?.value || 0;

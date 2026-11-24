@@ -10,6 +10,9 @@
 
 import { showGenericFeatDialog } from "./generic-feat-dialog.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { postPassiveCard as postPassiveCardKit } from "./card-kit.js";
+
+const postPassiveCard = (actor, item, cfg) => postPassiveCardKit(actor, item, cfg, "Passive sense");
 
 const effLine = (html) => `<div style="padding:5px 10px;font-size:0.95em;text-align:center;">${html}</div>`;
 
@@ -86,22 +89,6 @@ const SENSE_CONFIG = {
   "computer links":     { kind: "passive", text: (r) => `Communicate with and retrieve from computers at ${r}. Breaking in: contest ${r} vs the computer's Reason.` },
   "combat sense":       { kind: "passive", text: (r) => `Used in place of Intuition (surprise), Fighting (block), Agility (dodge), or Strength (escape) — select the "Combat Sense" option on that ability's FEAT to roll the higher of the two.` }
 };
-
-function postPassiveCard(actor, item, cfg) {
-  const rank = item.system?.rank || "Typical";
-  const short = RANK_ABBR[rank] || rank;
-  ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: `
-      <div style="background-color:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.05em;color:#8b0000;">
-          <strong>${item.name}</strong><br>
-          <span style="font-size:0.85em;font-weight:400;">Passive sense (${short})</span>
-        </div>
-        <div style="padding:6px 10px;font-size:0.9em;">${cfg.text(rank)}</div>
-      </div>`
-  });
-}
 
 export async function showSenseFeat(actor, item) {
   if (!actor || !item) {
