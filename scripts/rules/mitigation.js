@@ -522,20 +522,28 @@ const EQUIP_RES_TYPE = { fireHeat: "fire", toxins: "toxin", corrosives: "corrosi
 /** Resistances from the actor's working armor and protective gear:
  *  [{ type, value, item }]. Custom entries are left out. */
 /** Best non-force-field armor equipment: { physical, energy, rank }.
- *  Same values getBodyArmorValues gives (full vs Physical, -20 vs Energy,
- *  unless the item sets its own). */
+ *  Same values getBodyArmorValues gives (full vs Physical, -20 vs Energy).
+ *  Items that set their own energy value are returned under `set`. */
 export function equipmentArmorValues(actor) {
   let best = { physical: 0, energy: 0, rank: "" };
+  const set = { physical: 0, energy: 0, rank: "" };
   for (const item of actor?.items ?? []) {
     const sys = item.system || {};
     if (item.type !== "equipment" || sys.category !== "armor" || !sys.protection || sys.broken === true || sys.isForceField === true) continue;
     const v = typeof sys.protection === "number" ? sys.protection : (Number(CONFIG.FASERIP?.rankValues?.[sys.protection]) || 0);
     const physical = sys.armorPhysical ? Number(sys.armorPhysical) : v;
-    const energy = sys.armorEnergy ? Number(sys.armorEnergy) : Math.max(0, v - 20);
-    if (physical > best.physical) best = { physical, energy: Math.max(best.energy, energy), rank: typeof sys.protection === "string" ? sys.protection : "" };
+    const rank = typeof sys.protection === "string" ? sys.protection : "";
+    if (Number(sys.armorEnergy) > 0) {
+      const own = Number(sys.armorEnergy);
+      if (physical > set.physical) { set.physical = physical; set.rank = rank; }
+      if (own > set.energy) set.energy = own;
+      continue;
+    }
+    const energy = Math.max(0, v - 20);
+    if (physical > best.physical) best = { physical, energy: Math.max(best.energy, energy), rank };
     else if (energy > best.energy) best.energy = energy;
   }
-  return best;
+  return { ...best, set };
 }
 
 export function equipmentResistances(actor) {
@@ -602,6 +610,8 @@ function getDefensesFromAEs(actor, dmgTypeLower, opts = {}) {
     const eq = equipmentArmorValues(actor);
     if (eq.physical > armorPhys) { armorPhys = eq.physical; armorPR = eq.rank; }
     if (eq.energy > armorEner) { armorEner = eq.energy; armorER = eq.rank; }
+    if (eq.set.physical > setPhys) { setPhys = eq.set.physical; setPR = eq.set.rank; }
+    if (eq.set.energy > setEner) { setEner = eq.set.energy; setER = eq.set.rank; }
   }
   const armorEnergyResolved = setPhys > 0 || setEner > 0;
   if (armorEnergyResolved) {
