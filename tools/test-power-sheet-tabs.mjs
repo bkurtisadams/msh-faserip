@@ -12,7 +12,7 @@ const header = tpl.slice(tpl.indexOf('class="ps2-header"'), tpl.indexOf('class="
 assert.ok(!header.includes('name="system.rank"') && !header.includes('name="system.value"'), 'Rank is not in the header');
 assert.ok(/Rank &amp; Identity[^]*?name="system\.rank"[^]*?name="system\.value"/.test(tpl), 'Rank and Value sit in Rank & Identity');
 for (const gone of ['system.isStarred', 'isStuntPower', 'isBonusPower', 'system.grantedByEquipment',
-  'system.limitation.usesPerDay', 'system.limitation.maxRank', 'system.control.useAsWeapon',
+  'system.limitation.usesPerDay', 'system.control.useAsWeapon',
   'system.mental.telepathy', 'system.isBodyArmor', 'system.isForceField', 'system.isResistance',
   'system.isEnergyReflection', 'targetResistsWith']) {
   assert.ok(!tpl.includes(`name="${gone}"`) && !tpl.includes(`name="flags.msh-faserip.${gone}"`), `${gone} has no control`);
@@ -21,6 +21,8 @@ for (const kept of ['system.save.ability2', 'system.countsAsTwoPowers', 'system.
   'system.movement.teleportCarry', 'system.continuingDamage', 'system.specialMechanics']) {
   assert.ok(tpl.includes(`name="${kept}"`), `${kept} has a control`);
 }
+assert.ok(/\{\{#if limit\.isCustom\}\}\s*<select name="system\.limitation\.maxRank">/.test(tpl), 'limitation Maximum is editable only for a Custom limitation');
+assert.equal(tpl.split('name="system.limitation.maxRank"').length - 1, 1, 'one Maximum control');
 assert.ok(tpl.includes('id="ps2-defense-kind"'));
 assert.ok(!/id="ps2-defense-kind"[^>]*name=/.test(tpl), 'Kind is not a submitted field');
 

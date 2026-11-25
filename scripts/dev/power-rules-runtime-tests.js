@@ -1,3 +1,5 @@
+// scripts/dev/power-rules-runtime-tests.js v2.2.0 - 2026-11-24
+// v2.2.0: Body Armor and a matching Resistance do not add (higher applies).
 // scripts/dev/power-rules-runtime-tests.js v2.1.0 - 2026-11-23
 // v2.1.0: Body Armor custom / physical-only energy values and an armor
 //         item's own Vs energy value.
@@ -598,6 +600,16 @@ async function equipmentTests(recorder, state) {
   recorder.equal(net(baPhys, 40, "energy-fire"), 40, "Body Armor: physical-only stops nothing vs energy (40 net 40)");
   recorder.equal(net(ownSuit, 50, "energy-fire"), 10, "Armor equipment: its own Vs energy 40 is used (50 net 10)");
   recorder.equal(net(ownSuit, 50, "physical-blunt"), 30, "Armor equipment: Excellent protection still stops 20 physical (50 net 30)");
+
+  // Body Armor and a Resistance covering the same attack do not add: the
+  // higher protection applies.
+  const heavy = await createActor(state, "Heavy Suit", { items: [{ name: "Heavy Suit", type: "equipment", system: { category: "armor", protection: "Incredible", broken: false, resistances: [
+    { type: "fireHeat", rank: "Good", value: 10, customLabel: "" },
+    { type: "electricity", rank: "Amazing", value: 50, customLabel: "" }
+  ] } }] });
+  recorder.equal(net(heavy, 70, "energy-fire"), 50, "Armor and resistance: the suit's 20 vs energy beats Good fire resistance, no adding (70 net 50)");
+  recorder.equal(net(heavy, 70, "energy-electricity"), 20, "Armor and resistance: Amazing electricity resistance beats the suit's 20, no adding (70 net 20)");
+  recorder.equal(net(heavy, 70, "physical-blunt"), 30, "Armor and resistance: the suit still stops 40 physical (70 net 30)");
 }
 
 async function karmaLedgerTests(recorder, state) {

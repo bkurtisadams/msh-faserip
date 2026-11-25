@@ -353,10 +353,17 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     // BA+FF stacking rule: personal FF replaces BA. Only apply BA if no personal FF,
     // or if FF is projected by a third party (which we don't enforce exclusion for).
     // "A personal force field is considered to replace Body Armor"
-    if (aeDefenses.hasArmor && !hasPersonalFF) {
-      const armorLayer = applyBodyArmorFromAE(currentDamage, aeDefenses.armor, {
-        isEnergyDamage, armorPiercing, armorPiercingCS, apMode
-      });
+    const armorLayer = (aeDefenses.hasArmor && !hasPersonalFF)
+      ? applyBodyArmorFromAE(currentDamage, aeDefenses.armor, { isEnergyDamage, armorPiercing, armorPiercingCS, apMode })
+      : null;
+    const resPreview = aeDefenses.hasResistance
+      ? applyResistanceFromAE(currentDamage, aeDefenses.resistance, { rawDamage })
+      : null;
+    const higher = higherOfArmorAndResistance(armorLayer, resPreview);
+
+    if (armorLayer && higher === "resistance") {
+      result.layers.push({ type: 'Body Armor', absorbed: 0, skipped: true, reason: `${resPreview.type} is higher` });
+    } else if (armorLayer) {
       _addCap(armorLayer);
       if (armorLayer.absorbed > 0) {
         currentDamage -= armorLayer.absorbed;
@@ -403,7 +410,9 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     }
 
     // Layer 3: Resistance (from AEs)
-    if (aeDefenses.hasResistance) {
+    if (aeDefenses.hasResistance && higher === "armor") {
+      result.layers.push({ type: resPreview.type, absorbed: 0, skipped: true, reason: 'Body Armor is higher' });
+    } else if (aeDefenses.hasResistance) {
       const resLayer = applyResistanceFromAE(currentDamage, aeDefenses.resistance, {
         rawDamage
       });
@@ -432,11 +441,16 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
 
     const armorData = getBodyArmorValues(targetActor, dmgTypeLower);
     
+    const legacyArmor = armorData.isForceField ? null
+      : applyBodyArmor(currentDamage, armorData, { isEnergyDamage, armorPiercing, armorPiercingCS, apMode });
+    const legacyRes = applyResistance(currentDamage, targetActor, { damageType: dmgTypeLower, rawDamage });
+    const higher = higherOfArmorAndResistance(legacyArmor, legacyRes);
+
     // Layer 1: Body Armor (not force fields)
-    if (!armorData.isForceField) {
-      const armorLayer = applyBodyArmor(currentDamage, armorData, {
-        isEnergyDamage, armorPiercing, armorPiercingCS, apMode
-      });
+    if (legacyArmor && higher === "resistance") {
+      result.layers.push({ type: 'Body Armor', absorbed: 0, skipped: true, reason: `${legacyRes.type} is higher` });
+    } else if (legacyArmor) {
+      const armorLayer = legacyArmor;
       _addCap(armorLayer);
       if (armorLayer.absorbed > 0) {
         currentDamage -= armorLayer.absorbed;
@@ -457,14 +471,18 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     }
     
     // Layer 3: Resistance (legacy)
-    const resistanceLayer = applyResistance(currentDamage, targetActor, {
-      damageType: dmgTypeLower, rawDamage
-    });
-    _addCap(resistanceLayer);
-    if (resistanceLayer.absorbed > 0 || resistanceLayer.immune) {
-      currentDamage = resistanceLayer.remainingDamage;
-      result.absorbed += resistanceLayer.absorbed;
-      result.layers.push(resistanceLayer);
+    if (higher === "armor") {
+      result.layers.push({ type: legacyRes.type, absorbed: 0, skipped: true, reason: 'Body Armor is higher' });
+    } else {
+      const resistanceLayer = applyResistance(currentDamage, targetActor, {
+        damageType: dmgTypeLower, rawDamage
+      });
+      _addCap(resistanceLayer);
+      if (resistanceLayer.absorbed > 0 || resistanceLayer.immune) {
+        currentDamage = resistanceLayer.remainingDamage;
+        result.absorbed += resistanceLayer.absorbed;
+        result.layers.push(resistanceLayer);
+      }
     }
   }
 
@@ -805,6 +823,16 @@ function isDefenseAEBackedByCurrentPower(actor, ae, scope) {
 }
 
 // ─── AE-based mitigation layers ──────────────────────────────────────────────
+
+// Body Armor and a Resistance that both apply to an attack do not add
+// together: the higher protection is used (ruled 2026-11-24; the book has no
+// stacking rule). Returns "armor", "resistance", or null when only one applies.
+function higherOfArmorAndResistance(armorLayer, resLayer) {
+  const armor = Number(armorLayer?.capacity) || 0;
+  const res = Number(resLayer?.capacity) || 0;
+  if (!(armor > 0 && res > 0)) return null;
+  return res > armor ? "resistance" : "armor";
+}
 
 // RAW Body Armor is 20 points less effective vs Energy attacks.
 // Some older/stale defense AEs stored energy equal to physical, so derive
