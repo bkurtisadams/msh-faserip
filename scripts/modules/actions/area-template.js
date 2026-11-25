@@ -13,7 +13,6 @@
 //   (smoke/gas/flash, GM markers).
 // v8.0.0: v14 port — MeasuredTemplate/canvas.templates gone in v14. Persisted doc is
 //   a Region with a single circle shape.
-// v7.0.0: Scroll-wheel resize during aim, scrollResize option.
 
 export class AreaTemplate {
   constructor(templateDoc, { chosenRadius, x, y, radiusPx, drawingId } = {}) {

@@ -3,39 +3,11 @@
 //         power's type as well as its name, so a renamed power (e.g. type
 //         Mind Control named "Puppet Strings") keeps its rules.
 //         mentalEffectDefaults() exported for tests.
-// scripts/modules/actions/mental-power-action.js v2.6.0 - 2026-11-18
 // v2.6.0: Nullifying Power / Nullifier Missile detection reads the power type as
 //         well as the name, and the aura toggle button is no longer shown on a
 //         Nullifier Missile card.
 // v2.5.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
-// v2.5.0: Telepathy dialog offers the book's Power Stunts (Telepathic Push,
-//         Mind Link, Mental Probe -2CS) — each runs through StuntRoller and
-//         the stunt tab (stunt-mechanics presets). opts.stuntPreset drives a
-//         stunt-based mental power (rank shift, save/effect defaults) and
-//         bypasses the name-based Telepathy branch.
-// scripts/modules/actions/mental-power-action.js v2.4.0 - 2026-09-03
-// v2.4.0: Telepathy tiers compare Psyche RANKS (RULED 2026-09-03), not rank
-//         numbers; the red tier fires on the presence of mental Powers or
-//         psionic screening (scanMentalDefenses.hasMentalDefense), including
-//         the inherent Psi-Screen every mental-Power holder has, not only when
-//         a defense outranks Psyche. Dialog and card name the screen source.
-// scripts/modules/actions/mental-power-action.js v2.3.3 - 2026-05-15
-// v2.3.3: Telepathy dialog constrained to 280px width. Drop redundant Power
-//         row (title shows it). Reminder block stacked one-rule-per-line.
-//         Dialog title simplified from "X - Telepathy" to "X".
-// v2.3.2: Telepathy dialog uses .frp-dlg + .frp-box compact layout
-//         (Barlow Condensed 13px, grid rows) to match other action dialogs.
-// v2.3.1: Telepathy: measure distance vs power range — out-of-range = auto-fail.
-//         Show Distance row on dialog and chat card. Result row replaces Roll
-//         row with descriptive content for auto/impossible/out-of-range cases.
-// v2.3.0: Telepathy uses contested Power rank FEAT (not Nullify save).
-//         Required color from Psyche comparison: willing/lower=auto,
-//         equal=yellow, mental defenses=red, higher unwilling=impossible.
-// v2.2.0: Nullifying Power auto-activates aura + self-suppresses caster's inborn powers.
-//         Adds Toggle Nullify Aura button to chat card. Sets isNullifyAura flag.
-//         Save ability defaults to Endurance for Nullifying Power.
-// v1.1.0: Unified chat card layout via buildCardShell/buildContentBox utilities
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 import { buildActionsBox, buildModeSelector, setupModeSelector, buildCardShell, buildActorTargetHtml, buildContentBox, rankValue, valueToRank, shiftRank, scanMentalDefenses, scanForceField, universalColor, measureAreasBetweenTokens } from "./action-utils.js";

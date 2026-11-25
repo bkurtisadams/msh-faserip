@@ -1,12 +1,7 @@
 // scripts/dev/kernel-blindside-diff.mjs v1.5.0 - 2026-11-11
 // v1.5.0: Shooting and Charging take the Blindside row from attack-dialog-kit.js.
-// scripts/dev/kernel-blindside-diff.mjs v1.4.0 - 2026-11-11
 // v1.4.0: Blunt and Edged melee take the Blindside row from attack-dialog-kit.js.
-// scripts/dev/kernel-blindside-diff.mjs v1.3.0 - 2026-11-10
 // v1.3.0: Throwing Edged / Blunt build theirs in thrown-weapon-action.js.
-// v1.2.0: Energy and Force build their dialog in power-blast-action.js over
-//         attack-dialog-kit.js; those sources are read with the dialog file.
-// v1.1.0: +2CS to-hit anchor (attack-action 1.16.0) replaces the GAP line.
 // Proof for the Blindside Karma refusal and to-hit bonus. Run from the system root:
 //   node scripts/dev/kernel-blindside-diff.mjs
 // The kernel says which FEATs Karma may not touch; this checks that the

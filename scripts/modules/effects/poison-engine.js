@@ -5,64 +5,12 @@
 //         failed exposure FEAT applied the KO and the rank loss, then threw
 //         before registering the poison effect, the Poisoned card and the
 //         re-FEAT window (the error was swallowed by the attack path).
-// scripts/modules/effects/poison-engine.js v1.3.0 - 2026-09-05
 // v1.3.0: Poisons onto the faserip-rules poisons kernel (PR1-PR5 now in the
 //         kernel ERRATA). Fixed-bug: when a poison halts with Endurance ranks
 //         still lost, an Impaired Endurance record is now created (no -2CS per
 //         PR2) so the ranks heal per Impaired Abilities — before, a halted
 //         poison left the lost ranks with no way back. Rank numbers follow the
 //         highest-of-rank rule via loseOneEnduranceRank (ongoing-engine v1.10.0).
-// scripts/modules/effects/poison-engine.js v1.2.0 - 2026-08-01
-// v1.2.0: Target Save panel is the authoring surface. Carrier detection
-//         reads requiresSave + save.onFail.effect "poisoned" (power; toxin
-//         intensity = save intensity, optional save.onFail.toxinId) or
-//         intensityEffect "poisoned" (equipment; intensityRank). The
-//         carrierToxin* fields and Venomous checkbox are removed.
-// scripts/modules/effects/poison-engine.js v1.1.1 - 2026-08-01
-// v1.1.1: Carrier detection is authored-only — the Venomous checkbox or
-//         explicit toxin fields on the power/equipment sheet. Name-convention
-//         (/venom|poison/) removed per design decision: the power editor is
-//         the single authoring surface.
-// scripts/modules/effects/poison-engine.js v1.1.0 - 2026-08-01
-// v1.1.0: applyCarrierToxinOnHit — auto-exposure when a venomous weapon
-//         deals penetrating damage. Authoring: carrierToxinId (catalog),
-//         carrierToxinIntensity[+Name] (custom), or /venom|poison/ name
-//         convention (intensity = weapon rank). System fields or item
-//         flags both read. Gate: damageDealt > 0.
-// scripts/modules/effects/poison-engine.js v1.0.3 - 2026-08-01
-// v1.0.3: Governor clock skew — endRankLossThisTurn accepts a `now` param;
-//         the re-FEAT failure path passes effectiveNow. During a pre-advance
-//         CTT hook, raw worldTime still equals the exposure stamp (elapsed 0)
-//         and false-capped poison's own second rank loss. Stamp stays on raw
-//         worldTime (dying's same-hook deferral check reads raw). Deferral
-//         path now posts a "Poison Held at Bay" chat card — no more silent
-//         FEAT failures.
-// scripts/modules/effects/poison-engine.js v1.0.2 - 2026-08-01
-// v1.0.2: THE bug — registerOngoingEffect creates AEs disabled:true by
-//         default (dying passes disabled:false; poison didn't). Every find
-//         filters !e.disabled, so the poison AE was never processed and no
-//         log could fire. Pass disabled:false in aeOverrides + force-enable
-//         in the post-create update (revives stale disabled AEs from
-//         earlier tests on re-exposure).
-// scripts/modules/effects/poison-engine.js v1.0.1 - 2026-08-01
-// v1.0.1: CTT clock fix — timeTracker.timeAdvanced fires BEFORE
-//         game.time.advance(), so processPoisonRound accepts pendingSeconds
-//         and evaluates/re-arms against effectiveNow = worldTime + pending.
-//         Waiting path now logs remaining seconds. featLine shows the
-//         Intensity rank name in chat cards.
-// scripts/modules/effects/poison-engine.js v1.0.0 - 2026-08-01
-// v1.0.0: Poisons & Toxins per Advanced Set RAW. Exposure FEAT vs toxin
-//         Intensity (Resistance to Toxins substitutes for Endurance and
-//         never drops); failure = unconscious 1d10 rounds + immediate
-//         Endurance rank loss; re-FEAT at lowered rank after 1d10 turns,
-//         success halts, failure loses another rank and re-arms the window.
-//         Endurance Shift-0 from poison = death (mirrors dying death branch).
-//         One-rank-per-turn governor shared with dying via endRankLoss flag;
-//         poison stamps take priority, processDyingRound defers (RAW: poison
-//         losses override other Endurance losses, max 1 rank/round).
-//         Halting requires the victim's own FEAT, or a treater with First
-//         Aid/Medicine talent AND an antitoxin item (administer-antitoxin
-//         chat button, wired in chat-hooks.js v1.7.4).
 
 import { applyUnconscious } from "./effect-engine.js";
 import { loseOneEnduranceRank, registerOngoingEffect, ensureImpairedEnduranceEffect } from "./ongoing-engine.js";

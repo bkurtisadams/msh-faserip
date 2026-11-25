@@ -20,19 +20,6 @@
 // v3.5.0: Hide the "+ Range N" CS-row term entirely when the penalty is 0
 //         (initial build and live recalc), so 0 no longer shows "+ Range 0".
 //         Affects every ranged dialog that shares buildCSRow.
-// v3.4.0: get() also returns the raw `reason` label so callers can persist
-//         it; the field repopulates on reopen when a dialog passes
-//         savedReason to buildCSRow.
-// v3.3.0: Optional "Reason" field under the CS input (shown only when CS != 0).
-//         Names a manual shift on the chat card via csNotes — e.g. typing
-//         "Ultimate Skill" with +4 yields the card line "Ultimate Skill: +4".
-//         Player still enters the number; nothing is auto-detected.
-// v3.2.0: Spell out full rank names: "Good → Remarkable" (not abbreviated).
-//         Footer CSS: frp-foot-checks wrapper for right-justified checkboxes.
-// v3.1.0: Show base rank abbreviation before arrow, effective rank after.
-//         Optional rangePenalty shown as read-only element between CS and arrow.
-//         wireCSPanel accepts getRangePenalty callback for live range updates.
-// v3.0.0: Strip all talent/power auto-detection. CS is fully manual.
 
 import { shiftRank } from "./action-utils.js";
 

@@ -5,89 +5,8 @@
 //         settings carry over from the old type. First type pick stays
 //         conservative (fills blanks only).
 // v2.2.0: Sonic resistance type (Sound Manipulation) reduces damage by rank#.
-// power-sheet-v2-logic.js v2.1.0 - 2026-11-13
 // v2.1.0: Tabs removed; back to the single scrolling form with Rank and
 //         Value in Rank & Identity. Field changes from v2.0.0 kept.
-// v2.0.0: Defense Kind dropdown replaces the four nested checkboxes; type
-//         blocks come from power-sheet-view.mjs, plus an "add section"
-//         picker for sections the category does not suggest. Legacy fields
-//         folded on first open: isStarred -> countsAsTwoPowers, isBonusPower
-//         flag -> isBonus, limitationDetail -> limitations. Source keeps
-//         grantedByEquipment in step.
-// power-sheet-v2-logic.js v1.12.0 - 2026-09-10
-// v1.12.0: Fixed-bug — matterControl had no "save" section anywhere in
-//          CATEGORY_SECTIONS, so it was UNREACHABLE from the UI (the
-//          whole section, header and toggle included, is hidden unless
-//          the category suggests it or the toggle is already checked —
-//          a closed loop for a hidden section). Found auditing Air
-//          Control (wind generation is an Endurance-vs-Intensity save,
-//          same shape IntensityAction already handles generically), but
-//          the book text confirms several other Matter Control powers
-//          need it too: Weather Control's heat prostration, Density
-//          Manipulation's Endurance-FEAT-or-unconscious loop, and Body/
-//          Animal Transformation's Psyche-or-Endurance resist FEAT.
-//          Added "save" to matterControl's CATEGORY_SECTIONS and
-//          CATEGORY_AUTO_EXPAND, matching distanceAttacks/mentalPowers/
-//          bodyAlterationsOffensive. requiresSave is still never auto-
-//          ticked (matches those three) — only reachability changed.
-// power-sheet-v2-logic.js v1.11.2 - 2026-07-02
-// v1.11.2: Preset layer extracted to power-presets.mjs (shared with the
-//          powers compendium build tool). Import populatePowerTypeOptions
-//          from the shared module — was previously unexported there, which
-//          broke sheet render with a ReferenceError.
-// v1.11.1: Tighten fire/invulnerability presets. Fire-like attack powers
-//          seed isEnergyAttack + specific fire/cold/etc. damage types, and
-//          Invulnerability now seeds the defense/resistance flags needed for
-//          defense AE creation once a resistance type is selected.
-// v1.11.0: Canonical power type picker + conservative engine presets.
-//          Selecting a power type now seeds only blank/default automation
-//          fields (attack/defense/save/movement/control/mental/etc.) so
-//          compendium powers and hand-created powers start wired to the
-//          game engine without overwriting custom edits.
-// v1.10.0: Slice N — data-driven section gating. Detection, Ability
-//          Substitution, Movement, Control, Mental, and Transformation now
-//          carry .ps2-section-check toggles bound to new flags (isSensePower,
-//          isAbilitySubstitution, isMovementPower, isControlPower,
-//          isMentalPower, isTransformPower). CATEGORY_FLAG_AUTO_TICK extended
-//          so senses/movement/matterControl/energyControl/bodyControl/
-//          mentalPowers auto-tick their primary section flag on category
-//          change. No new handler needed — the generic .ps2-section-check
-//          change handler covers them. Closes the Transformation-leak class
-//          of bug (sections were JS-suggested only, with no per-section flag).
-// v1.9.0: Slice I — Extra Body Parts structured field. #ps2-add-bodypart /
-//         .ps2-remove-bodypart add/remove handlers manage the
-//         system.extraBodyParts array ([{type, count, notes}]), mirroring
-//         the bonusPowers list pattern. UI block lives in the Attack
-//         section body; schema default [] added to template.json.
-// v1.8.0: Slice H — Resistance UX rewrite. RESISTANCE_TYPE_DEFAULTS maps
-//         resistance type -> { effect, minRank }. resistanceType change
-//         handler auto-sets resistanceEffect + resistanceMinRank from the
-//         map. resistanceEffect change handler keeps countsAsTwoPowers +
-//         resistanceIsInvulnerability in sync with the "invulnerability"
-//         option. Only sets values that are currently at defaults;
-//         explicit user choices preserved.
-// v1.7.1: Run section-visibility computation for read-only (compendium)
-//         sheets too. Previously the call from itemSheet._onRender was
-//         gated by isEditable, so compendium items leaked every section
-//         (data-hidden never got set). Visibility is now read-only-safe;
-//         the rest of the listener wiring is gated locally on
-//         sheet.isEditable instead.
-// v1.7.0: Category-driven section-flag auto-tick + sub-field defaults on
-//         category CHANGE only (not on render). CATEGORY_FLAG_AUTO_TICK
-//         maps category -> section flags to tick if currently unset.
-//         CATEGORY_FIELD_DEFAULTS sets sensible sub-field defaults (e.g.
-//         transformation.affects="self" for bodyControl) if currently
-//         unset. Explicit user values always win.
-// v1.6.0: Damage type auto-tick for ignoresNaturalArmor (touch-rotting) and
-//         ignoresArtificialArmor (touch-corrosive). New armor-bypass flag
-//         checkboxes in Attack section.
-// v1.5.0: Symmetric armorPhysicalCustom pattern — orange-dot badge + reset
-//         handler + manual-edit detection, mirroring armorEnergyCustom.
-//         Rank change no longer overwrites armorPhysical when custom flag set.
-// v1.4.1: Replace local RANK_VALUES with import from rules-reference.js
-// v1.4.0: Attack section always visible so any power can opt into combat routing.
-// v1.2.0: Collapsible Active Effects, Healing/Absorption toggle, bigger textareas
-// v1.1.0: Rank→Value auto-fill, special strength type change handler, field reorder support
 // Drop-in: call ps2ActivateListeners(html, itemSheet) from activateListeners
 
 // Rank → value lookup (canonical source: rules-reference.js)

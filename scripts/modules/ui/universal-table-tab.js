@@ -9,30 +9,6 @@
 //         postActionInfoCard (mirrors actorSheet._showActionInfo); pulses
 //         cells on msh-faserip.universalTableRoll; position saved on the
 //         user flag utHudWindowPos. Detach button removed in this window.
-// v1.1.2: Move detach button from floating corner (v1.1.1) into the empty
-//         upper-left corner cell of the action table header. Add explicit
-//         .ut-gap-row blue spacer div between action and rank tables to
-//         match GCC reference (margin-bottom was transparent against tab
-//         background and didn't read visually).
-// v1.1.1: Detach button promoted out of .ut-toolbar wrapper; positioned
-//         absolutely in top-right corner (superseded by v1.1.2).
-// v1.1.0: Add detach/popout feature via FaseripUniversalTableWindow
-//         (ApplicationV2). Detach icon in tab toolbar; click opens popout,
-//         in-tab content shows placeholder with "Return to tab" button.
-//         Roll highlights route to popout when detached, tab otherwise.
-//         Window position/size persisted per-actor via msh-faserip flag.
-//         Escape key closes popout. Popout auto-closes with sheet.
-//         Wiring methods (_wireHeaderClick, _wireCellHover,
-//         _wireColumnSelect, _clearColumnSelection, _paintColumnSelection,
-//         _highlightRollIn) now take plain DOM root elements instead of
-//         jQuery wrappers, so the same renderer drives both hosts.
-// v1.0.0: Data-driven Universal Table tab. Replaces 663 lines of
-//         hand-typed HTML in actor-sheet.html with three tables built
-//         from canonical sources (rankRows, ACTION_RESULT_LABELS,
-//         RANKS_ORDERED, RANK_VALUES, RANK_RANGES). Features: crosshair
-//         hover with tooltip, persistent rank-column select, action-header
-//         click → sheet._showActionInfo(id), external roll highlighting
-//         via highlightRoll().
 
 import {
   rankRows,

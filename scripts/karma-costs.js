@@ -1,11 +1,9 @@
 // scripts/karma-costs.js v1.1.1 - 2026-09-02
 // v1.1.1: RULED 2026-09-02 — Contact Addition flat 500 + 10× Resource number;
 //         extradimensional ×2 removed (no book source).
-// scripts/karma-costs.js v1.1.0 - 2026-09-02
 // v1.1.0: RULED 2026-09-02 — one rank number at a time, crest at the range
 //         boundary. "crest" mode removed; the kernel offers the crest only
 //         from a rank's top number and the step walker takes it there.
-// scripts/karma-costs.js v1.0.0 - 2026-09-02
 // Kernel slice 6b. Karma spend costs from faserip-karma. Pure — no Foundry
 // globals — so the node proof (scripts/dev/kernel-karma-diff.mjs) can import it.
 

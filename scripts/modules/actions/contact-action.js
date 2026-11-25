@@ -9,12 +9,10 @@
 //         dlg.setPosition in render, and re-assert inside recompute()
 //         since every trigger (disposition, shift, all six request
 //         checkboxes) already funnels through it.
-// contact-action.js v1.2.0 - 2026-09-05
 // v1.2.0: RULED 2026-09-05 — Karma may not manipulate Popularity FEATs (Karma
 //         chapter). Karma controls and the post-roll Karma decision removed;
 //         the die stands. Negative-Popularity Karma cost kept (it is the Karma
 //         chapter's rule, kernel negativePopularityLoss).
-// contact-action.js v1.1.0 - 2026-09-05
 // v1.1.0: Popularity FEATs onto the faserip-rules popularity kernel. Required
 //         colour and column come from popularityFeat(): Friendly green,
 //         Neutral yellow, Suspicious (book: Unfriendly) red, Hostile impossible;
@@ -25,7 +23,6 @@
 //         column regardless of disposition, with only the benefit modifier
 //         (was: disposition bumped one step). Kept, not in this passage: the
 //         mutant -1CS and the negative-Popularity Karma cost.
-// contact-action.js v1.0.0 - 2026-03-18
 // Migrated from actorSheet.js inline contact-roll handler and rolls.js FaseripRolls.rollContact.
 // Standalone contact popularity FEAT dialog.
 

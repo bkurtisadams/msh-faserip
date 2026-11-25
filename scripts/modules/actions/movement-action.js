@@ -1,6 +1,5 @@
 // scripts/modules/actions/movement-action.js v1.1.0 - 2026-11-19
 // v1.1.0: Looks the power up by its type before its name (renamed powers).
-// scripts/modules/actions/movement-action.js v1.0.0 - 2026-07-03
 // Movement group (powers audit Step #6, slice 6a). Same data-driven shape as
 // sense-action.js: MOVEMENT_CONFIG has one entry per power. Two movement
 // powers make a Power FEAT (Teleportation, Dimensional Travel) and resolve

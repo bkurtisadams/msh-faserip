@@ -2,7 +2,6 @@
 // v1.1.0: Delete dead legacy .calculate-slam-collision handler body (was
 //         return-gated; caused "unreachable code" console warning). Live
 //         handler is chat-hooks.js:712.
-// charge-damage.js v1.0.1 - 2025-12-23
 // v1.0.1: Disable legacy .calculate-slam-collision handler (now handled by chat-hooks.js + collision-damage.js)
 
 import { 

@@ -11,37 +11,6 @@
 //         enforceResourceLockout; GM proceeds with a notice). A missed loan
 //         payment is recorded on the HQ item (flags.msh-faserip.loanMissed);
 //         repossession stays the Judge's call.
-// headquartersSheet.js v3.1.0 - 2026-09-05
-// v3.1.0: HQ purchase Resource FEAT onto the faserip-rules resources kernel.
-//         Purchase colour via purchaseColor; bank-loan terms via bankLoan —
-//         fixed-bugs: monthly payment is two ranks below the ITEM (was two
-//         below Resources) for as many months as the item's rank NUMBER (was
-//         rank index + 1); the loan purchase itself has no FEAT (RULED
-//         2026-09-05, was a house yellow FEAT).
-// headquartersSheet.js v3.0.3 - 2026-05-06
-// v3.0.3: Apply locationModifier (Rich +1CS / Secluded -1CS) to purchase cost as well
-//         as rent. Per the rulebook ("Cost is presented in two values..."), the modifier
-//         applies symmetrically to both the rent and buy values listed in the Building
-//         Types table. Previously only rent display + Pay Rent button honored the
-//         modifier; the Resource FEAT (purchase) button rolled against the unadjusted
-//         base rank. _prepareContext now exposes purchaseDisplayCost + purchaseModified
-//         and the template renders an inline "→ <adjusted>" hint next to the FEAT
-//         button when active.
-// v3.0.2: Fix edit persistence regression — hq-sheet.html had a top-level <form>
-//         wrapper that nested inside ItemSheetV2's auto-supplied <form>. Browsers
-//         break nested forms apart, leaving inputs outside the form V2 listens to,
-//         so submitOnChange never fired for fields without a manual handler (name,
-//         system.location, system.locationModifier, system.ownership, system.notes).
-//         Existing manual change/blur handlers on building-type, rent date, etc. were
-//         masking the issue. Template now uses <div> at root; V2 supplies the form.
-//         Also wire img[data-edit] click → FilePicker explicitly so clicking the
-//         portrait image (in addition to the .hq-img-btn button) opens the picker.
-// v3.0.1: Drop deprecated CONST.CHAT_MESSAGE_TYPES.OTHER on two chat
-//         cards (the first card emitter and the rent-due whisper).
-//         Removed in v13 (replaced by CHAT_MESSAGE_STYLES). Default
-//         non-roll style is OTHER already.
-// v3.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
-// v2.0.1 - 2026-04-03
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { RANKS_ORDERED as RANKS } from './rules/rules-reference.js';

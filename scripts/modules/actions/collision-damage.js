@@ -2,11 +2,9 @@
 // v2.0.3: Read the defender's armor number from getBodyArmorValues().applicable
 //         (the return object's fields are physical/energy/applicable; the
 //         debug log prints them under other names). Diagnostics removed.
-// collision-damage.js v2.0.1 - 2026-09-02
 // v2.0.1: Defender BA value set explicitly in the render hook and derived from
 //         the rank at Calculate time when the box is empty/0 (the prefilled
 //         value attribute was not surviving to the click).
-// collision-damage.js v2.0.0 - 2026-09-02
 // v2.0.0: Kernel slice 5g follow-up. Slammed character's Body Armor read via
 //         getBodyArmorValues (equipment/override/force-field aware; was a
 //         power-name match). Character obstacle prefilled from the targeted
@@ -14,9 +12,6 @@
 //         applied (defenderActorUuid was never passed before). Damage via
 //         kernel chargeDamageParts + resolveChargeImpact; material examples
 //         from kernel MATERIAL_EXAMPLES; private rank array retired.
-// collision-damage.js v1.1.1 - 2025-12-23
-// v1.1.1: Fix apply damage - use apply-collision-damage action with target-uuid
-// v1.1.0: Compact dialog layout, default to Good (brick) material
 import { applyDamageToActorUuid, debugLog, getBodyArmorValues } from "./action-utils.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 import { RANKS_ORDERED as RANKS } from "../../rules/rules-reference.js";

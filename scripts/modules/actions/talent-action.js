@@ -2,7 +2,6 @@
 // v1.3.0: Combat dispatch passes the talent as opts.talentItem (not opts.item,
 //         which attack dialogs read as the weapon/power source) and passes
 //         talentRankOverride so the dialog's CS Reason names the override.
-// talent-action.js v1.2.1 - 2026-09-09
 // v1.2.1: Fixed-bug — the v1.2.0 picker-skip for unambiguous Fighting
 //         Skill talents (Wrestling, MA-A/B/C/D/E, Acrobatics, Thrown
 //         Objects) never checked rankOverride, so an Ultimate Skill
@@ -12,7 +11,6 @@
 //         forces the dialog, where the override math and â chip
 //         already work correctly (Weapon Skill talents were never
 //         affected â they always show the picker).
-// talent-action.js v1.2.0 - 2026-05-16
 // v1.2.0: Picker-skip — rollTalent now routes unambiguous combat talents
 //         (Fighting Skill with recognized specialty: Wrestling, MA-A/B/C/D/E,
 //         Acrobatics, Thrown Objects) directly to the attack-action dialog,
@@ -21,12 +19,6 @@
 //         talents (Professional/Scientific/Mystic), or when saved overrides
 //         exist (extraShift, intensity, ability override, custom action
 //         type). Pass options.forcePicker=true to override.
-// v1.1.0: getTalentBonus now suppresses to-hit CS bonus for MA-A,
-//         MA-D, MA-E (RAW: those talents grant no Fighting bonus
-//         to hit; benefits are Stun/Slam-side or initiative-side,
-//         not roll-side). Prevents misconfigured talent items from
-//         leaking a phantom +1 CS into attack rolls launched from
-//         the talents tab.
 // Migrated from rolls.js FaseripRolls.rollTalent.
 // Combat actions route through ActionDispatcher; Ability FEATs handled inline.
 

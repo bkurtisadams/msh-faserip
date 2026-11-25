@@ -5,41 +5,15 @@
 //         heading; Art Facing, Special Features and Description move to a
 //         Details tab; the window opens at 420 high. vehicleSpeedInfo moved
 //         to modules/actions/vehicle-control.js.
-// scripts/vehicle-actor-sheet.js v3.6.0 - 2026-11-20
 // v3.6.0: Current Speed shows areas/round beside the rank, against the safe
 //         maximum (Speed after CS losses), with mph in the hover text; each
 //         Cur.Speed option carries its areas. Figures come from the kernel's
 //         Long Distance Movement table: Air column for Air, Space and GEV,
 //         Land/Water for the rest.
-// scripts/vehicle-actor-sheet.js v3.5.0 - 2026-11-20
 // v3.5.0: Control FEAT button in the condition strip. It opens the shared
 //         Vehicle Control dialog (modules/actions/vehicle-control.js) with
 //         the crew's driver; Out of Control and Current Speed on the sheet
 //         follow the result.
-// scripts/vehicle-actor-sheet.js v3.4.0 - 2026-11-11
-// v3.4.0: MSHVehicleActorSheet is no longer a V1 sheet (its base class
-//         FaseripActorSheet left the V1 framework). It holds the vehicle
-//         data preparation and listeners for MSHVehicleActorSheetV2.
-//         defaultOptions is gone; an Actor dropped outside a crew slot is
-//         ignored.
-// scripts/vehicle-actor-sheet.js v3.3.1 - 2026-11-11
-// v3.3.1: Fixed-bug: an actor dropped on a crew slot of the V2 vehicle sheet
-//         did nothing. The V2 sheet now hands Actor drops to the crew logic
-//         in MSHVehicleActorSheet._onDropActor.
-// scripts/vehicle-actor-sheet.js v3.3.0 - 2026-11-11
-// v3.3.0: MSHVehicleActorSheetV2, the registered vehicle sheet. It is the same
-//         V2 shell the character sheet uses, pointed at the vehicle template
-//         and at MSHVehicleActorSheet for data and listeners. The V1 class
-//         below is no longer registered as a sheet.
-// scripts/vehicle-actor-sheet.js v3.2.0 - 2026-09-26
-// v3.2.0: Art Facing select (flags.msh-faserip.artFacing) drives headlight/vision cone offset
-// v3.1.0: Unlinked tokens as crew — "Selected" buttons add controlled canvas tokens by
-//         synthetic-actor UUID; token names shown for token crew; shared _addCrew path
-// v3.0.1: Fix button inline layout, horizontal tabs, clamp CS loss to 0+
-// v3.0.0: Compact layout, effective ranks, current speed, OOC flag, FEAT/charging display, repair button
-// v2.1.0: Use Foundry v13 _onDropActor API instead of custom _onDrop parsing
-// v2.0.0: Crew linking via actor UUID drag-drop, seating capacity, agility display
-// v1.0.0: Initial vehicle actor sheet
 
 import { FaseripActorSheet } from "./actorSheet.js";
 import { FaseripActorSheetV2 } from "./actor-sheet-v2.js";

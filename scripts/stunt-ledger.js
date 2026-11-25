@@ -1,7 +1,6 @@
 // scripts/stunt-ledger.js v1.1.0 - 2026-11-19
 // v1.1.0: stuntKarmaCost honours the power's own Karma-to-develop-a-stunt
 //         field (system.stuntKarmaCost) before the book default.
-// scripts/stunt-ledger.js v1.0.0 - 2026-11-13
 // v1.0.0: Shared Power Stunt helpers for the Stunts tab, the Edit Power
 //         sheet and the stunt roller: attempt cost by parent power (Weather
 //         Control 50, else 100), FEAT status by successes, live-rank table

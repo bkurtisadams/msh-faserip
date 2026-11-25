@@ -8,7 +8,6 @@
 //         fired and edits never persisted. Template now uses <div> at root; V2 supplies
 //         the form. Fix lives in templates/contact-sheet.html, no JS change needed here.
 // v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
-// v1.0.0: Standalone contact item sheet extending ItemSheet directly (like headquartersSheet.js, talentSheet.js)
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;

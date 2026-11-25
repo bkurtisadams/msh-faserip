@@ -3,24 +3,6 @@
 // v1.8.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.7.3: Strip side comes from FaseripInitiative._getCombatantSide (override ??
 //         automatic rule), not the cached flag / raw disposition.
-// combat-panel.js v1.7.2 - 2026-09-03
-// v1.7.2: Context menu gains "Swap Side" / "Reset Side (automatic)" (GM), routed
-//         through FaseripInitiative so the tracker and the panel agree.
-// combat-panel.js v1.7.1 - 2026-08-21
-// v1.7.1: Fix hook unregistration (Hooks.off needs hook name + id; ids alone were
-//         silently ignored, leaking render hooks after close). Pip side coloring
-//         now uses the initiative side flag. Status durations read v14 remaining.
-// combat-panel.js v1.7.0 - 2026-03-06
-// v1.7.0: Separate active (gold) vs selected (cyan) pip states. Click selects/inspects
-//         without changing turn. Turn buttons advance active. Context menu "Set as Active Turn".
-//         Use combatant.name for numbered token names.
-// v1.6.0: Fix defeated toggle (skull overlay via toggleStatusEffect), split hide into
-//         tracker vs map, side-aware reroll initiative, add hide-token-on-map option.
-// v1.5.0: Pip hover highlight, right-click context menu (ping/defeated/hidden/reroll/remove),
-//         skip defeated on advance, end combat button, auto-scroll strip to active pip.
-// v1.4.0: Thinner pip borders, init button, click-to-pan, Ctrl+Wheel zoom, name cap.
-// v1.3.0: Add combatant portrait strip and turn/round controls.
-// v1.2.0: Delegate ability FEAT rolls to shared ability-feat-dialog.js module.
 // GM-only combat panel that follows the active combatant.
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";

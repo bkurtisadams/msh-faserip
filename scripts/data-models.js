@@ -1,38 +1,9 @@
 // scripts/data-models.js v2.4.8 - 2026-11-19
 // v2.4.8: Power KEYS equipmentId, equipmentName (equipment-granted powers).
-// scripts/data-models.js v2.4.7 - 2026-11-19
 // v2.4.7: Power KEYS densityMode, raiseLowest, resistanceTypes,
 //         stuntKarmaCost, ultimateSkillTalentId (Edit Power new fields).
-// scripts/data-models.js v2.4.6 - 2026-09-09
 // v2.4.6: absorptionConvertsToHealth / absorptionCanRedirect keys removed
 //         from the power model (retired with RAW Absorption, 2026-09-09).
-// scripts/data-models.js v2.4.5 - 2026-08-02
-// v2.4.5: intensityDuration on equipment KEYS (dormant; template.json now
-//         carries the live default alongside the other intensity fields).
-// scripts/data-models.js v2.4.4 - 2026-08-01
-// v2.4.4: carrierToxin* keys removed — poison authoring lives in the save
-//         object (save.onFail.toxinId nests under the existing AnyField).
-// scripts/data-models.js v2.4.3 - 2026-08-01
-// v2.4.3: carrierToxin/Id/Intensity/Name keys on power + equipment models
-//         (dormant while REGISTER_DATA_MODELS is off; template.json carries
-//         the live defaults).
-// scripts/data-models.js v2.4.2 - 2026-05-23
-// v2.4.2: Disabled model registration via REGISTER_DATA_MODELS flag. Foundry
-//         core fixed the unlinked-token ActorDelta crash in 14.363 (it was a
-//         14.360 prototype regression, not this system), so template.json — still
-//         valid during its V14 deprecation period — governs again. Classes kept
-//         intact; flip the flag to true to re-register if a schema requirement
-//         resurfaces. Avoids the AnyField-passthrough KEYS maintenance footgun.
-// v2.4.1: Character actor types (hero/villain/npc) now share one superset key
-//         list, union of all three types' template + audited keys across two
-//         console runs. A second audit revealed npc documents carrying hero-only
-//         drift (isMutant, etc.) that a single per-type sample missed. Vehicle
-//         and item types keep their own template+audited unions.
-// v2.4.0: Register real per-subtype TypeDataModels so unlinked-token ActorDeltas
-//         resolve system/items/effects/flags. AnyField per top-level key so
-//         existing nested data passes through untouched. Replaces the empty-
-//         schema approach (which read the deprecated game.system.template and
-//         wiped data) and the core-method monkey-patch shim.
 
 const SYSTEM_ID = "msh-faserip";
 

@@ -2,33 +2,16 @@
 // v1.4.1: incapacitated/immobilized hazard effects nest flags under the
 //   msh-faserip scope (top-level primitive flags are mangled to {} by
 //   v14's DocumentFlagsField and invisible to the scoped readers).
-// scripts/modules/regions/area-hazard-behavior.js v1.4.0 - 2026-08-02
 // v1.4.0: Cross-source dedupe — a token already suffering the hazard's
 //   effect (from another region or a canister) skips the save entirely.
 //   The per-region-id guard alone let a second grenade re-gas everyone,
 //   creating duplicate status-providing AEs (core warned "already has
 //   'Tear Gas (12s)' providing that status" but the -CS changes stacked).
-// scripts/modules/regions/area-hazard-behavior.js v1.3.0 - 2026-08-02
 // v1.3.0: Entry saves honor FEAT difficulty vs Intensity (was white-only
 //   fail): green/yellow/red requirement by rank gap via
 //   determineFeatRequirement, automatic at 3+ above, impossible at 2+ below.
 //   Karma offered via resolveResistFeat (owner-client prompt, 10s
 //   auto-decline) — applies to both the initial blast and later walk-ins.
-// scripts/modules/regions/area-hazard-behavior.js v1.2.0 - 2026-07-23
-// v1.2.0: Fix double save on grenade detonation. v14 fires TOKEN_ENTER for
-//   tokens already inside when the behavior is created, racing the manual
-//   initial-blast loop in grenade-action.js. Added synchronous per-token
-//   in-flight guard (_resolvedTokenIds), cleared on TOKEN_EXIT.
-// v1.1.0: Declare `static events` map so Foundry's Region event dispatcher
-//   actually routes TOKEN_ENTER / TOKEN_EXIT to this behavior. v14 gates
-//   dispatch on `eventName in behavior.system.constructor.events` BEFORE
-//   calling _handleRegionEvent — without an entry in the static map,
-//   overriding _handleRegionEvent has no effect because it's never called.
-//   Converted instance handlers _onTokenEnter/_onTokenExit to static methods
-//   _onRegionEnter/_onRegionExit invoked via handler.call(instance, event)
-//   by the base class dispatcher. Instance context (this.saveOnEntry,
-//   this.resolveForToken, etc.) still works inside static handlers.
-// v1.0.0: Initial Layer A — persistent intensity hazard Region behavior.
 // v14 Region Behavior: persistent intensity hazard (smoke, gas, flash, KO).
 //
 // Attaches to a Region created by a lingering grenade (or manual GM placement).

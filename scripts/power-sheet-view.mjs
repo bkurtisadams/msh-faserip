@@ -1,12 +1,10 @@
 // power-sheet-view.mjs v1.2.0 - 2026-11-19
 // v1.2.0: Protected Senses covers one or more senses (protectedSensesOf).
-// power-sheet-view.mjs v1.1.0 - 2026-11-19
 // v1.1.0: New per-type fields: Density Manipulation Others mode, Body
 //         Transformation Others non-living, Animal Transformation Self form,
 //         Emotion Control scope + two emotions, Flight method, Enhanced Senses
 //         multi-sense, Invulnerability attack forms, Ultimate Skill and Raise
 //         Lowest Ability blocks, Karma costs.
-// power-sheet-view.mjs v1.0.0 - 2026-11-13
 // v1.0.0: Pure view model for the tabbed power sheet (Details-tab type
 //         blocks, Defense kind, rank-derived read-only values).
 import { RANK_VALUES, RANKS_ORDERED, POWER_RANGE, shiftRank } from "./rules/rules-reference.js";

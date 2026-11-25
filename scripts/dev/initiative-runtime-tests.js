@@ -5,11 +5,6 @@
 //         token proves the disposition fall-through.
 // v1.0.2: [CERT] Dodging text (2026-09-09): a dodger may perform one other
 //         action that turn including an attack — asserted, no longer OPEN.
-// v1.0.1: the actions-begun Change Action check uses the pure rule with a
-//         clean combatant (the hero's resolved Dodge was refusing first);
-//         the Dodge-then-attack assertion is marked OPEN pending the
-//         Judge's read of the Dodging text; cleanup waits for in-flight
-//         death-save hooks so deleted actors are not looked up afterwards.
 // Foundry VTT runtime suite for the RAW initiative FLOW (Declare → Ready →
 // roll → Actions, declared defences, Change Action window, the combat-action
 // budget, round reset, single-side rounds, side assignment). It drives real

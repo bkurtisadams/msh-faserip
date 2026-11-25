@@ -9,21 +9,6 @@
 //         dispatcher. Per-button CSS override scopes the smaller font
 //         to data-action="generic-feat" only.
 // v3.2.0 - 2026-04-25
-// v3.2.0: Replace title-bar shortcut tooltip (giant blob obscured the HUD)
-//         with a "?" header control button that opens a small Shortcuts
-//         popover. Mirrors the existing settings popover pattern.
-// v3.1.0: Right-click per-button context menu (Hide, Reorder, Reset, Settings).
-//         Header cog opens in-HUD settings popover — retires UI-layer
-//         settings from Foundry Configure Settings panel. New actionHudHidden
-//         setting replaces actionHudShowDefenses/Effects group toggles with
-//         per-button hide. Shortcuts surfaced via title tooltip, control
-//         labels, context menu, and popover Help section. Reset uses DialogV2.
-//         Dropped Shift+R keybind (redundant with three other access paths
-//         for a destructive rare action). Added Esc to dismiss popover and
-//         context menu.
-// v3.0.0: Migrate localStorage to game.settings. Add configurable columns,
-//         display style, lock position, show/hide defense & effect buttons.
-//         Ctrl+Wheel zoom writes to game.settings.
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 

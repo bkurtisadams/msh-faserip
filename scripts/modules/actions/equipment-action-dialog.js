@@ -1,46 +1,13 @@
 // equipment-action-dialog.js v1.7.1 - 2026-08-02
 // v1.7.1: MECHANIC_LABEL gains "Stun" → STUN chip (stun-weapon primary attack
 //         buttons rendered with an empty mechanic tag).
-// equipment-action-dialog.js v1.7.0 - 2026-06-12
 // v1.7.0: Suppress the standalone "Intensity Attack" button when the item has an
 //         attack action — the intensity now rides the hit (attack-action
 //         _applyIntensityOnHit). Pure intensity items (no attack) still show it.
-// equipment-action-dialog.js v1.6.0 - 2026-06-12
 // v1.6.0: Refine skip-hub: pass straight to the attack dialog when there is
 //         exactly one ROLLABLE action, even alongside Reload (which has its own
 //         .reload-weapon button on the row). Removes the double dialog for ammo
 //         weapons. Toggle/template still keep the hub; multi-mode weapons too.
-// v1.5.1 - 2026-06-11
-// v1.5.1: Any weapon-category item now always offers an Attack action. The gate
-//         previously required attackType/damageType/weaponType to be set, so a
-//         half-configured weapon (all blank) silently offered no attack at all.
-//         _resolveAttackType() supplies a fallback (defaults to "shooting").
-// v1.5.0: Chain Resistance FEAT after attack-mode damage when the active mode declares a
-//         resistRank. After the primary attack ActionDispatcher.roll resolves, dispatch
-//         IntensityAction with the same attackMode passed via opts. The intensity dialog
-//         is gated by its own "Use" button so the player can cancel if the attack missed.
-//         Powers e.g. Air Pistol: Laughing Gas (Incredible vs Psyche), Paralysis Gas
-//         (Remarkable vs Endurance), Gravity Enhancer (Excellent vs Strength).
-// v1.4.0: Redesign action picker dialog (.frp-dlg structure matching Contact/Talent).
-//         Adds: header banner with category chip, compressed stat-chip strip,
-//         collapsible description, action buttons grouped by Combat/Powers/State,
-//         right-side mechanic tag per button, low-ammo warning on Reload,
-//         consolidated device function chip ("FUNCTIONS: N").
-// v1.3.0: Skip hub when the item has exactly one rollable action and nothing else
-//         (no toggle, reload, or template). Items with multiple rollable actions —
-//         or any combination of rollable + state-change actions — still show the hub.
-//         Passing the single-action case through directly removes a wasted click for
-//         plain weapons (sword → click → attack dialog, no intermediate hub).
-// v1.2.0: Attack modes no longer replace the primary attack — they are additional buttons.
-//         Previously, a spear with Haft/Thrown modes lost its primary Edged Attack entirely.
-//         Primary button now labels by resolved attack type (e.g. "Edged") when modes exist.
-// v1.1.0: Route Device custom abilities through ActionDispatcher combat pipeline.
-//         Custom abilities with damageType resolve to proper attack actions (BA→blunt, EA→edged, E→energy, etc).
-//         Custom abilities without damageType use standalone FEAT roller (teleportation, utility, etc).
-//         Add Granted Powers (sys.powers) to action button list.
-//         Improve button icons/labels with rank and damage type info.
-// v1.0.0: Unified equipment action hub. Inspects item fields and presents contextual action buttons.
-//         Replaces fragmented click handlers with a single dialog opened from the equipment roll button.
 import { AreaTemplate } from "./area-template.js";
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 

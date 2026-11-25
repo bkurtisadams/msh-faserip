@@ -1,7 +1,6 @@
 // scripts/modules/actions/fire-modes.js v1.1.0 - 2026-11-19
 // v1.1.0: Compact: one options row (Shots/Barrels, Burst, Scatter,
 //         Reloading) styled like the Multi row; details in tooltips.
-// scripts/modules/actions/fire-modes.js v1.0.0 - 2026-11-19
 // v1.0.0: Weapon Rate, bursts and scatter (Players Book ch. 4, Shooting
 //         Weapons): "Multiple shots require separate die rolls, but are
 //         taken at the same time in the combat phase. Certain weapons fire

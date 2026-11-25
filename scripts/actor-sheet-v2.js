@@ -2,7 +2,6 @@
 // v1.7.0: Light or dark comes from Foundry's own setting through
 //         modules/ui/sheet-theme.js, not from the removed "Character Sheet
 //         Colors" system setting.
-// scripts/actor-sheet-v2.js v1.6.0 - 2026-11-11
 // v1.6.0: The legacy class this sheet wraps is now a plain class, not a V1
 //         sheet, so everything it needs comes through the adapter: getData
 //         is called through it, and it supplies title. The adapter no longer
@@ -10,51 +9,10 @@
 //         drag-drop reset is gone. Adds _rollVehicleControl, which the
 //         vehicle-control hotbar macros call on actor.sheet and which was
 //         missing from this sheet.
-// scripts/actor-sheet-v2.js v1.5.1 - 2026-11-11
 // v1.5.1: An Actor dropped on the sheet goes to _onDropActor (a no-op here,
 //         overridden by the vehicle sheet for its crew slots). It used to be
 //         discarded, which is why crew drops stopped working on the V2
 //         vehicle sheet.
-// scripts/actor-sheet-v2.js v1.5.0 - 2026-11-11
-// v1.5.0: Three things a subclass can now set, so the vehicle sheet can use
-//         this shell: the tab selectors (TABS_SHIM), the full-size window
-//         (NORMAL_SIZE) and the legacy class the adapter wraps
-//         (_createLegacySheet). No behaviour change for character sheets.
-// scripts/actor-sheet-v2.js v1.4.0 - 2026-11-11
-// v1.4.0: The History field uses Foundry's V2 rich-text element
-//         (<prose-mirror>, toggled) instead of the V1 {{editor}} helper. It
-//         is a form field, so Save goes through this sheet's normal submit.
-//         That removes the last use of the V1 base's editor machinery: the
-//         legacy editor activation and the adapter's editor-save shim are
-//         gone. A sheet that is not editable shows the enriched text with
-//         no editor.
-// scripts/actor-sheet-v2.js v1.3.0 - 2026-11-11
-// v1.3.0: The adapter marks itself (_isV2Adapter) so the legacy class skips
-//         the V1 base listeners, which had been running against this sheet's
-//         form on every render (a second form-submit handler, a second
-//         editor activation, a second portrait binding). The one thing they
-//         did that nothing else covered, disabling the controls of a sheet
-//         that is not editable, is now done here.
-// scripts/actor-sheet-v2.js v1.2.1 - 2026-11-11
-// v1.2.1: This is now the only registered character sheet (init.js v1.20.0);
-//         the opt-in setting is gone. No code change.
-// scripts/actor-sheet-v2.js v1.2.0 - 2026-11-11
-// v1.2.0: Two gaps against the V1 sheet closed. (1) Form submits now run the
-//         same normalisation the V1 sheet applies in _updateObject (rank /
-//         number coherence, Resources sync, and the guard that stops an
-//         effect-shifted display rank being saved), via the shared
-//         actor-sheet-submit.js; the V2 sheet had been saving the raw form.
-//         (2) close() now runs the V1 teardown (Universal Table hook, world
-//         time and CTT hooks, detached table popout) before dropping the
-//         adapter; those hooks were being left registered.
-// scripts/actor-sheet-v2.js v1.1.2 - 2026-10-01
-// v1.1.2: Portrait edit and sheet-level drop listeners were guarded by
-//         instance flags but bound to this.element, which ApplicationV2
-//         discards on close; after close/reopen neither listener existed.
-//         Portrait click now binds on the img each render; drop guard is
-//         keyed to the element it was bound on.
-// v1.1.0: Preserve focused core-stat fields across submitOnChange renders so
-//         keyboard Tab navigation survives ApplicationV2 PART replacement.
 // FASERIP ActorSheetV2 — Slice 1 (scaffolding).
 // Wraps the existing actor-sheet.html template as a single PART and delegates
 // both data preparation and listener binding to the legacy v1 sheet via an

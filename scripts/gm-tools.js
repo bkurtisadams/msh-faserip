@@ -2,39 +2,11 @@
 // v1.6.0: The GM Tools window is a V2 application (LegacyAppV2); the two
 //         places that treated this.element as a jQuery handle use the
 //         element directly.
-// gm-tools.js v1.5.0 - 2026-11-11
 // v1.5.0: The 9 V1 confirmations here open as V2 dialogs through
 //         dialog-shim.js. The GM Tools window itself is still a V1
 //         Application.
-// gm-tools.js v1.4.4 - 2026-09-03
 // v1.4.4: Advance Time "round" uses TURN_SECONDS (turnSeconds setting retired).
-// gm-tools.js v1.4.3 - 2026-08-01
-// v1.4.3: Poison dialog — capture button/form refs before awaits
-//         (ev.currentTarget is nulled after handler yields); button shows
-//         Applied state instead of fragile auto-close.
-// gm-tools.js v1.4.2 - 2026-08-01
-// v1.4.2: Poison button on Effects tab — opens toxin-picker dialog
-//         (TOXINS catalog + custom intensity + source) → applyPoisonExposure.
-// v1.4.1: Move the ability-rank test controls into the template (State tab,
-//         six non-Endurance ability rows via _snapshotState.abilityRanks);
-//         drop the activateListeners DOM injection. De-dup Endurance: the
-//         native End ▼/▲ is now Health-aware (lose/restoreOneEnduranceRank),
-//         so there's one Endurance control that sets originalEndurance.
-// v1.4.0 - 2026-07-03: (superseded) injected Ability Ranks panel.
-// gm-tools.js v1.3.0 - 2026-04-29
 // GM Tools dialog: backups, effects, action runner, token finder, state quick-set.
-// v1.3.0: Tokens tab — list every token across scope (current/all), filter,
-//         locate (scene-switch + pan + ping + select), bring-to-viewport
-//         (cross-scene supported via clone+delete), center-on-scene, toggle
-//         hidden, delete; bulk reveal-hidden + rescue-off-canvas.
-//         State tab — health quick-set (Full/Half/1/0/-1, ±10), endurance
-//         step+set (uses shiftRank/RANKS_ORDERED), karma quick-set + ±10,
-//         time-jumper (+round/min/10min/hour/day) via CTT timeEngine when
-//         active, falls back to game.time.advance.
-// v1.2.1: Compact dialog (460×500); reorder tabs Combat→Effects→Backups;
-//         Bronze Age palette on effect buttons; v14 text-shadow override.
-// v1.2.0: tabbed dialog. Effects + Combat tabs.
-// v1.1.0: embed actor portrait as base64 in snapshots for GCC import
 
 import {
   applyStun, applySlam, applyProne, applyGrappled, applyHeld,

@@ -5,7 +5,6 @@
 //         canChangeAction: the Change Action window closes once any combatant
 //         has used a combat action this round (RAW: the change roll belongs to
 //         the pre-action phase). Ready state helpers for the Declare window.
-// scripts/rules/raw-combat-state.js v2.0.0 - 2026-08-21
 // v2.0.0: Two-state model (declare / actions). Pre-Action is a per-character
 //         gate inside the actions state, not a phase; winner/loser sub-phases
 //         removed (side initiative values already order the tracker). Missing

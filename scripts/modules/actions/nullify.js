@@ -1,14 +1,10 @@
 // scripts/modules/actions/nullify.js v3.0.1 - 2026-07-31
 // v3.0.1: Fix auto-fail comment (intensity 2+ ranks above Endurance, not 3+).
-// scripts/modules/actions/nullify.js v3.0.0 - 2026-03-22
 // v3.0.0: Region-based aura. startAura/stopAura create/destroy a Scene Region
 //         that moves with the caster token. Tokens entering/exiting the region
 //         automatically roll saves and gain/lose the Nullified effect.
 // v2.0.0: Area-effect nullification via AreaTemplate with scroll-wheel resize.
 //         activateNullifyArea places AoE, rolls Endurance saves for all targets.
-// v1.1.0: Use applyNullified from effect-engine for power suppression.
-//         startAura now self-suppresses caster's inborn powers.
-//         stopAura restores caster's powers via effect deletion hook.
 // Foundry v13 helpers for the Nullification power (ES module)
 
 import { applyNullified } from "../effects/effect-engine.js";

@@ -6,21 +6,9 @@
 //         Power rank FEAT per day), matching the "retry tomorrow" card text.
 // v2.1.0: (reverted in v2.2.0 as non-RAW) A successful Recovery cleared a dying
 //         state via RestSystem.stabilizeDying.
-// scripts/modules/actions/recovery-action.js v2.0.1 - 2026-07-03
 // v2.0.1: Lock the intensity dropdown (Recovery has no target intensity — RAW
 //         any colored result succeeds) and add an explanatory hint, via the
 //         new lockIntensity/intensityHint opts.
-// scripts/modules/actions/recovery-action.js v2.0.0 - 2026-07-03
-// v2.0.0: Migrate onto the shared Power FEAT engine (powers audit Step #5,
-//         slice 5a). Preconditions (once-per-day gate, restore-needed) stay
-//         here; the roll / color / success / card now run through
-//         showGenericFeatDialog({ power, ... }). Effect (Endurance restore +
-//         daily flag) is applied in onResult, which returns the card's effect
-//         line. Replaces the ~170-line bespoke dialog from v1.x.
-// v1.0.1: Fix render-callback signature. (superseded)
-// v1.0.0: Initial. RAW: "Recover lost End ranks: 1/day, Power rank FEAT."
-//         Success on green/yellow/red; white = failure. Once-per-day enforced
-//         via actor flag keyed by game date.
 
 import { showGenericFeatDialog } from "./generic-feat-dialog.js";
 import { restoreOneEnduranceRank, getCurrentGameDate } from "../effects/ongoing-engine.js";

@@ -5,36 +5,11 @@
 //          Stunned 1d10 rounds (Judge reading 2026-10-01: rolled separately,
 //          out until the longer ends, then the Endurance wake FEAT). Sets the
 //          awaitingWake flag so the wake path no longer relies on Health 0.
-// scripts/modules/actions/death-save-action.js v1.11.1 - 2026-08-20
 // v1.11.1: Unconscious duration now uses shared computeDuration so active
 //          combat always counts RAW rounds, even when CTT is enabled.
-// scripts/modules/actions/death-save-action.js v1.11.0 - 2026-08-02
 // v1.11.0: Death-save card's stabilize line is now live buttons
 //          (dying-stabilize-50 / dying-refeat-200 / dying-aid), handled in
 //          chat-hooks.js v1.8.0.
-// scripts/modules/actions/death-save-action.js v1.10.0 - 2026-08-02
-// v1.10.0: Defender Karma on the Kill/Death Endurance FEAT (RAW two-phase,
-//         routed). Both roll sites (auto fast-path from applyDamageToTargets
-//         and the dialog path) roll through _rollDeathSaveWithKarma →
-//         resolveResistFeat: the owning player's client gets the declaration
-//         prompt with a 30s auto-decline window (highest-stakes roll in the
-//         game — longer than the 10s check saves), Phase-2 amount dialog,
-//         deduction under their ownership; local GM prompts for NPC deaths
-//         countdown 30s too. Card roll box shows "+ N Karma = total". The
-//         50-Karma stabilize / 200-Karma re-roll options remain informational
-//         text pending a ruling on their interactive flow.
-// scripts/modules/actions/death-save-action.js v1.9.6 - 2026-03-20
-// v1.9.6: Pass mshReplacing option when deleting existing unconscious effects in _createStunnedEffect
-//         so rest-system deleteActiveEffect hook doesn't trigger premature consciousness attempt.
-// v1.9.5: Fix _buildEnduranceLadder rank format: "Shift X" → "Shift-X" to match actor data
-// v1.9.4: Add canAct:false to Unconscious effect changes so existing canActorAct guard blocks attacks.
-// v1.7.0: Restyle card to match attack/check card layout (gray card, flex header, color badge, white result box)
-//         Drop <details> collapsible, embed duration roll in card, remove emoji from console.log
-// v1.6.0: _createDyingEffect delegates to ongoing-engine.applyDyingOngoing.
-// v1.5.2: Add fromDeathSave flag to Unconscious effect for wake-up health restoration
-// v1.5.0: Apply IMMEDIATE first Endurance rank loss when dying (per rules)
-// v1.4.0: Separate Kill Save (conscious) from Death Save (unconscious from 0 HP)
-// v1.3.2: Store originalEndurance in Dying effect flags and actor flags for recovery tracking
 import { BaseAction } from "./base-action.js";
 import {
   shiftRank,

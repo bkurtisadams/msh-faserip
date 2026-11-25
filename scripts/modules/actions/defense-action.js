@@ -8,7 +8,6 @@
 //         mystery-man icon regardless of which .svg was named. The
 //         already-chosen icons (shield/windmill/hazard/combat/upgrade)
 //         now actually render.
-// scripts/modules/actions/defense-action.js v2.3.0 - 2026-09-09
 // v2.3.0: Dodge/Evade/Block/Catch header was a leftover dark green
 //         gradient (#2e8b2e→#1a6b1a) from before the rest of the dialog
 //         system's v3.10.0 header redesign; the shared --ink text color
@@ -16,54 +15,7 @@
 //         it. Lightened to a pale green gradient so the existing ink and
 //         gold text colors both read clearly, keeping the green identity
 //         Kurt wants for this dialog type.
-// scripts/modules/actions/defense-action.js v2.2.0 - 2026-09-05
-// v2.2.0: opts.blindside refuses the Karma offer. RAW: FEATs resulting
-//         from a Blindside or an unexpected attack may not be modified by
-//         Karma unless the character was forewarned. The dialog replaces
-//         the Karma row with a Blindside notice, and when the caller does
-//         not know, the roller may declare it with a Blindside checkbox that
-//         closes the Karma controls. _readDialog forces the amount to zero
-//         either way.
-// scripts/modules/actions/defense-action.js v2.1.0 - 2026-09-03
-// v2.1.0: opts.autoRoll skips the dialog: roll with the saved CS, no Karma,
-//         dice shown, evadeTarget from the declaration. Used by the tracker to
-//         resolve declared Dodge/Block/Evade at initiative (RAW step 4).
-// scripts/modules/actions/defense-action.js v2.0.4 - 2026-08-21
-// v2.0.4: Return tracker-consumable defense results and honor selfPenaltyCS on
-//         Pre-Action FEATs; support declared Evade target prefill.
-// scripts/modules/actions/defense-action.js v2.0.3 - 2026-04-19
-// v2.0.3: Scope evading effect to attacks only. Removed canAct:false from
-//         the Evading effect's changes array. Attack blocking is handled by
-//         the existing isEvading flag check in attack-action.js (which also
-//         produces a more informative "cannot attack — currently evading X"
-//         chat card). Evaders can now freely move, use non-attack powers,
-//         roll FEATs, and defend against other opponents — matching RAW
-//         "makes no attacks that round" (narrower than "cannot act").
-// v2.0.2: Catch RAW eligibility gate — pre-roll confirm dialog when actor's
-//         Agility is below the RAW minimum for the scenario (bullet/Unearthly,
-//         arrow/Amazing, thrown/Remarkable). Falling objects have no gate.
-//         Cancel aborts the action; confirm proceeds, letting the GM override.
-// v2.0.1: Fix directed-catch — apply -3CS to effective rank when "Directed at you"
-//         is checked. Previously the chat card claimed -3CS was applied, but the
-//         roll was made at unshifted rank. Shift display now composes CS panel +
-//         directed penalty with a breakdown tooltip.
 // 
-// v2.0.0: Restyle dialog to frp-dlg system — color-coded header (green),
-//         wireCSPanel, frp-fx-grid with hover tooltips, frp-foot, mode selector in titlebar
-// v1.5.1: Fix dodge — only write defenseShiftRanged (not defenseShift) so dodge has
-//         no effect on adjacent Slugfest/Wrestling per rules
-// v1.5.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
-// v1.4.1: Always use compact badge layout — drop buildInlineRollDisplay widget from defense cards
-// v1.3.8: Fix dodge movementMult and selfPenaltyCS not wired as AE changes (only in flags); ruler now enforces half speed
-// v1.3.7: Add canAttack:false to blocking effect; blocking now prevents attacks per rules
-// v1.3.6: Wire dodge CS penalty and half movement to Active Effect changes array
-// v1.3.4: Fix evasion bonus duration - use 2 rounds to survive round-change expiration; usability controlled by createdRound check
-// v1.3.3: Fix evasion bonus duration - 1 round starting next round, cannot be saved
-// v1.3.2: Split evasion into two effects - "Evading" (blocks attacks, 1 round) and "Evasion Bonus" (+CS, 2 rounds)
-// v1.3.1: Fix evasion duration - yellow/red get 2 rounds for next-round bonus, track createdRound
-// v1.3.0: Fix evasion - track evadeSuccessful for green/yellow/red results, attacks check this to miss
-// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
-// v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
 import { 
   extractKarmaFromDialog, 

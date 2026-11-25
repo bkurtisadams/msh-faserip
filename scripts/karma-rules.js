@@ -1,15 +1,12 @@
 // karma-rules.js v1.3.0 - 2026-11-19
 // v1.3.0: startingKarmaHistory(src) for characters created, or found at
 //         startup, with Karma but an empty ledger (no spends).
-// karma-rules.js v1.2.0 - 2026-11-19
 // v1.2.0: withKarmaBaseline(actor, history) seeds a Starting Karma entry
 //         before the first spend on a ledger with no earned entries.
-// karma-rules.js v1.1.1 - 2026-09-05
 // v1.1.1: Parked sweep — permitCrime no longer auto-sets -5. The permit
 //         loss equals the arrest award and so varies by crime class;
 //         -5 is correct only for theft, misdemeanors and other crimes.
 //         Now null (context-dependent), matching stopCrime/arrestCriminal.
-// karma-rules.js v1.1.0 - 2026-07-23
 // RAW category catalog for karma award line items. Each rule maps to a
 // category from the Advanced Set karma rules, with base amount, allowed
 // scopes, and optional caps. UI uses this to auto-set amounts and

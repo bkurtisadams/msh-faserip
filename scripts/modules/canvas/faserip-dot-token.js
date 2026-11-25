@@ -12,32 +12,6 @@
 //          from the active GM only, batched. Dot drawn beneath bars/effects/nameplate.
 //          Portraits: fix stale map entry blocking re-show, hide when token not
 //          visible, clear on canvas teardown. "V" is now a rebindable keybinding.
-// v1.12.0: Facing offset from the actor's Art Facing (flags.msh-faserip.artFacing: 0 Up,
-//          90 Right, 180 Down, 270 Left; default Up = no offset). Token flag facingOffset
-//          still overrides. Light/vision rebuilt when either changes.
-// v1.11.0: Facing offset for vehicle light/vision cones and facing tick.
-// v1.10.0: Robustness — _isDotMode honors only strict boolean flag values;
-//          non-booleans (e.g. stale "off"/"on"/"default" strings from older
-//          scene saves) fall through as "no override". preUpdateScene now
-//          handles both expanded and flattened change shapes so the
-//          string-to-boolean translation always runs. Adds
-//          game.msh.scrubDotFlags() to clean stale string flags across all
-//          scenes + tokens in one shot.
-// v1.9.0: Auto-resize tokens to 0.5x0.5 on dot-mode entry, restore original size on exit.
-//         Stashes original dimensions in dotOrigSize flag. Removed Ctrl+click resize.
-//         New world setting "dotSize" (Small/Medium/Large) controls dot radius for all tokens.
-// v1.8.0: DOM portrait in #hud overlay, positioned via canvas.clientCoordinatesFromCanvas()
-//         (v13 API). Constant screen size, no rotation, tracks token drag/pan/zoom.
-//         No name label, 36px thumbnail. Hit area = full token bounds (hoverToken hook).
-//         "V" hotkey toggles persistent portraits.
-// v1.7.0: Ctrl+click dot HUD button toggles token size between 1x1 and 0.5x0.5.
-// v1.6.1: Thicker facing tick (5px outline / 3px white) for better visibility on green dots.
-// v1.6.0: Facing tick (notch line at token rotation), plain hover portrait (48px, no Ctrl),
-//         fix top-of-screen clipping. Tick drawn at 0° with cheap pivot rotation sync.
-// v1.3.0: Per-scene dot mode — scene flag overrides world setting, injected into scene config
-// v1.2.0: Smaller dots (12%), Ctrl+hover for portrait (64px), vehicles draw as rectangles
-// v1.1.0: Add hover portrait popup — hovering a dot for 500ms shows token artwork
-// v1.0.0: Dot-mode token rendering for FASERIP area-based play.
 // Priority: per-token flag > per-scene flag > world setting.
 // In dot mode: token artwork hidden, colored shape drawn; snap disabled (free placement).
 // Vehicles render as rounded rectangles. Characters render as circles.

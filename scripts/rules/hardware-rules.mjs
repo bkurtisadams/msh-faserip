@@ -14,15 +14,6 @@
 // v1.1.0: Slice 2 — defaultHardware() gains resourceFeat / successFeat /
 //         startedGameDate blocks; fundingResourceRank() for solo / combined
 //         (two heroes within one rank, effective +1CS) / Contacts funding.
-// v1.0.0: Slice 1 — pure Hardware chapter rules (Advanced Set pp. 65-70).
-//         Effective cost (highest applicable rank, +2CS equal / +1CS one
-//         below / 2+ below free, situational CS modifiers, Beyond-1980s-tech
-//         Monstrous applicable rank), build time in days = cost rank number
-//         with assistant / round-the-clock reductions, success-FEAT CS
-//         modifiers with RAW caps, color degradation when cost > Reason,
-//         kit-bash Karma cost, weapon range→rank table.
-//         Pure module — no Foundry globals. Self-tests run via:
-//           node scripts/rules/hardware-rules.mjs
 // Source: "Hardware: Building, Modifying, and Alien Technology".
 
 import {

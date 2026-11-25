@@ -9,8 +9,6 @@
 //         doesn't stack duplicate wheel listeners (which would multiply the
 //         zoom step per tick). Added closest(".window-content") fallback and
 //         re-apply of the saved zoom on each call.
-// v1.2.0: Handle both V1 (.element is jQuery) and V2 (.element is HTMLElement)
-// v1.1.0: Show zoom % badge in window title bar
 // Ctrl+Wheel zoom for any Foundry Application sheet.
 // Usage: import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 //        then call initSheetZoom(sheet) in activateListeners or _onRender.

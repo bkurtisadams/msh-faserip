@@ -3,56 +3,10 @@
 //         of the two abilities is higher, via exported pickSaveAbility.
 //         resolveDuration gains "10-100" (1d10 x 10 turns), "concentration"
 //         and "hour" (600 turns).
-// intensity-action.js v4.7.0 - 2026-11-13
 // v4.7.0: resolveDuration exported (attack-action's power save on hit).
-// intensity-action.js v4.6.0 - 2026-11-13
 // v4.6.0: Power save block's Multiple Targets CS (save.multiTargetCS) shifts
 //         the Intensity when more than one target is selected (Sonic Stun:
 //         full rank vs one, -1CS vs several).
-// intensity-action.js v4.5.0 - 2026-08-02
-// v4.5.0: Save routed through resolveResistFeat (dice-roller): karma sequence
-//         on the owning player's client via socketlib executeAsUser, 10s
-//         auto-decline countdown; local GM/owner prompt fallback.
-// intensity-action.js v4.4.0 - 2026-08-02
-// v4.4.0: Karma on the save (RAW two-phase): promptKarmaDeclaration before
-//         the roll, min-10 commitment, amount via showKarmaDecisionDialog;
-//         roll routed through rollD100AndApplyKarma. Gated on available
-//         karma + GM/owner; skipped for automatic/impossible FEATs.
-// intensity-action.js v4.3.0 - 2026-08-02
-// v4.3.0: Target save honors FEAT difficulty vs Intensity (was: white = fail,
-//         any color = resist, regardless of relative ranks — a Feeble-Endurance
-//         mook resisted Amazing KO gas on any green). Route through
-//         determineFeatRequirement: green/yellow/red requirement by rank gap,
-//         Endurance 3+ ranks above = automatic resist, Intensity 2+ ranks
-//         above = impossible FEAT, auto-fail (FEAT_DIFFICULTY GM rulings
-//         2026-07-31). Matches attack-action's on-hit intensity path.
-// intensity-action.js v4.2.0 - 2026-08-01
-// v4.2.0: Poisoned save branch — targets of effect "poisoned" route to
-//         applyPoisonExposure (its FEAT is the save; no generic d100).
-//         resolveIntensityFields surfaces save.onFail.toxinId; EFFECT_LABELS
-//         gains poisoned.
-// intensity-action.js v4.1.3 - 2026-06-12
-// v4.1.3: _applyIntensityEffect now delegates to the shared applyIntensityEffect
-//         in effect-engine (no behavior change; de-duplicates the effect map).
-// intensity-action.js v4.1.2 - 2026-06-12
-// v4.1.2: Drop the removed Roll#evaluate({async:true}) option (use evaluate()).
-//         In v13+ it only logged a compatibility error and, when it interrupted
-//         the stun-intensity dispatch, could leave system.intensityRank stuck on
-//         a weapon (spurious "Intensity Attack" button).
-// v4.1.1: Split the Use button's label and icon (V14 DialogV2 escapes raw HTML in label,
-//         which rendered the <i class="fas fa-radiation"></i> as literal text). Use the
-//         shim's separate icon field instead.
-// v4.1.0: Per-attack-mode Resistance FEAT support. resolveIntensityFields() accepts an
-//         optional attackMode argument and returns its resist* fields when set, taking
-//         priority over item-level intensityRank and the power save block. Adds 2d10
-//         and 5d10 duration modes for Gravity-Enhancer-style 2-20 / 5-50 turn effects.
-//         IntensityAction.execute() reads opts.attackMode (passed by the equipment action
-//         hub when chaining a resist FEAT after a multi-mode weapon's damage attack).
-// v4.0.0: Support power items (save.intensity/onFail schema) alongside equipment items.
-//         Reads save.ability for target FEAT, handles duration modes (1d10, rank, fixed, scene, escape).
-// v3.0.0: Apply effects on failed Endurance FEAT — reads intensityEffect field,
-//         rolls 1d10 duration, calls effect-engine wrappers on target.
-// v2.0.0: Correct FASERIP logic — TARGET rolls Endurance FEAT vs item's Intensity Rank.
 import { BaseAction } from "./base-action.js";
 import {
   getTargetData,

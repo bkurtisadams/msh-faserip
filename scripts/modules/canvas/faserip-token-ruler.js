@@ -5,7 +5,6 @@
 // v1.3.1: v14 — foundry.canvas.tokens → foundry.canvas.placeables.tokens
 // v1.3.0: Fix combat tracker interference — track passedWaypoints cost so color coding
 //         accounts for prior movement this turn. Override refresh() to capture prior cost.
-// v1.2.0: Add flight sub-mode support (Full/Low Alt/Cruise) - resolves speed from MOVEMENT_DATA
 // Reads token.document.movementAction (V13 Token HUD selection)
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
 

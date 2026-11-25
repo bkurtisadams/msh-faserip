@@ -1,7 +1,6 @@
 // actor.js v1.8.0 - 2026-09-04
 // v1.8.0: MOVEMENT_DATA (land/air/leaping/rankNumbers) derived from the
 //         faserip-rules movement kernel instead of hand-copied tables.
-// actor.js v1.7.0 - 2026-08-01
 // v1.7.0: Resources use canonical standard rank numbers; preserve Shift-0
 //         value 0 and remove the conflicting local rank-range table.
 // v1.6.0: Fix pool double-subtract in availableLifetime (pool contributions
@@ -9,23 +8,6 @@
 //         spent math to computeKarmaTotals; remove _calculateTotalSpentLifetime
 //         and dead currentKarma getter. Fix getFlightInfo closest-match
 //         overshoot below Typical. Normalize ranks in movement getters.
-// actor.js v1.5.0 - 2026-07-23
-// actor.js v1.4.0 - 2026-05-15
-// v1.4.0: Karma reconciliation moved into prepareDerivedData. The displayed
-//         system.attributes.karma.value is now derived from karma.history
-//         every prep (formula: max(0, sumPositive - sumAbsNegative -
-//         advancement)). karma.lifetime is also re-synced to sumPositive.
-//         Empty-history actors are skipped to preserve the chargen baseline
-//         on legacy data; chargen now seeds a starting-karma history entry
-//         so new actors derive correctly from creation. Spend code paths
-//         no longer need to write attributes.karma.value alongside
-//         karma.history — history is the only source of truth.
-// actor.js v1.3.1 - 2026-04-03
-// v1.3.1: Replace local RANK_ORDER with import from rules-reference.js
-// v1.3.0: Fix karma display — max = R+I+P (computed), value = available lifetime karma (derived)
-// v1.2.1: Remove dead disposition code (now handled in preCreateActor hook)
-// v1.2.0: Remove daily karma system - karma now uses lifetime only
-// v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
 
 import { RANKS_ORDERED, normalizeRank, rankValueForStorage } from "./rules/rules-reference.js";
 import { RANKS as KERNEL_RANKS } from "./lib/faserip-rules/faserip-kernel.js";

@@ -3,33 +3,13 @@
 //         width setup, Enter-to-roll) now comes from attack-dialog-kit.js.
 //         The width is pinned through the position API like the other
 //         attack dialogs.
-// scripts/modules/actions/escaping-action.js v3.2.0 - 2026-09-02
 // v3.2.0: Kernel slice 5f. Result via resolveKernelAttack on the Es column
 //         with itemized shifts; hold removal, Escaped/Reversed effects and
 //         the Grapple Back button keyed on the effect token (escape /
 //         reverse) instead of colour; prefs written in ONE actor.update.
-// scripts/modules/actions/escaping-action.js v3.1.1 - 2026-05-24
 // v3.1.1: Drop the STR-contest third cell (escaping is a one-roll FEAT). Third
 //         cell reverts to DAMAGE (em-dash — escapes deal no damage); meta
 //         label reverts to Range:adjacent. Remove now-unused RANK_ABBR import.
-// scripts/modules/actions/escaping-action.js v3.1.0 - 2026-05-23
-// v3.1.0: Render the chat card on the shared attack-card.hbs shell, mirroring
-//         grappling: third cell is a STR-vs-STR contest (escapee vs holder,
-//         raw Strength), effect detail in the notes slot, buttons unchanged.
-//         _buildChatCard is now async (awaits renderTemplate).
-// scripts/modules/actions/escaping-action.js v3.0.0 - 2026-03-18
-// v3.0.0: Restyle dialog to frp-dlg system — blue header, wireCSPanel, frp-fx-grid with tooltips
-// v2.3.0: Apply post-escape effects — Yellow: half move + no actions. Red: half move + -2CS.
-//         Exclude selfPenaltyCS from escape rolls (escape is wrestling, not "normal action")
-// v2.2.0: Consistency fixes — add mode selector, fix remember settings to localStorage pattern
-// v2.1.0: Restyle chat card to match attack card pattern (inline badge, white result box, no color banner)
-// v2.0.0: Compact chat card format, CS notes, effect modifiers, Grapple Back chip on Reverse
-// v1.6.0: Add detailed logging for effect removal debugging
-// v1.5.0: Fix escape to only remove grappled on yellow/red (green is also Miss), fix karma default unchecked
-// v1.4.0: Remove grappled/held effects on successful escape
-// v1.3.0: Fix DiceSoNice animation in consolidated chat cards mode
-// v1.2.0: Accept prefill from opts for opponent name/strength
-// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
   getStrengthInfo, 

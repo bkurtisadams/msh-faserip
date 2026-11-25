@@ -6,26 +6,6 @@
 //         character they belong to.
 // v1.3.0: The vehicle actor sheet follows Foundry as well
 //         (styles/vehicle-sheet-dark.css). Only the tool windows stay light.
-// v1.2.0: The item sheets (power, stunt power, talent, equipment, contact,
-//         headquarters, vehicle item, plain item) follow Foundry the same way
-//         the character sheet does, their own Sheet Configuration theme
-//         included. Their palette is styles/item-sheet-dark.css. The vehicle
-//         actor sheet and the tool windows stay light.
-// v1.1.0: Dialogs follow Foundry too (modules/ui/dialog-theme.js): every shim
-//         dialog, every DialogV2 and the system's own "-dialog" windows take
-//         Foundry's Applications colour scheme, then the browser preference.
-//         Sheets other than the character sheet, and the tool windows, stay
-//         light. resolveFoundryTheme() is the part of the resolution that
-//         needs no document.
-// v1.0.0: Light or dark for the character sheet follows Foundry's own choice,
-//         replacing the "Character Sheet Colors" system setting. In order:
-//         a theme set for this one sheet in Foundry's Sheet Configuration,
-//         then Configure Settings > Core > UI > Applications, then the
-//         browser / OS preference when Foundry is left on its default.
-//         Open sheets switch at once when any of those change. Every other
-//         FASERIP window, the vehicle sheet included, stays on the light
-//         palette as before. game.msh.explainSheetTheme() prints what was
-//         resolved and why.
 
 import { isThemedDialog, applyDialogTheme, applyPalette, releaseDialogTheme, refreshDialogThemes, explainDialogTheme } from "./dialog-theme.js";
 

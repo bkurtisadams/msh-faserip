@@ -1,45 +1,9 @@
 // scripts/dev/power-rules-runtime-tests.js v2.2.0 - 2026-11-24
 // v2.2.0: Body Armor and a matching Resistance do not add (higher applies).
-// scripts/dev/power-rules-runtime-tests.js v2.1.0 - 2026-11-23
 // v2.1.0: Body Armor custom / physical-only energy values and an armor
 //         item's own Vs energy value.
-// scripts/dev/power-rules-runtime-tests.js v2.0.1 - 2026-11-19
 // v2.0.1: Healing records through recordHealingHealth (dotted ids); Density
 //         Self has one armor effect; Plasticity is physical-only armor.
-// v2.0.0: "Mechanics" section: Teleportation, Mind Control, Mental Probe,
-//         Energy Reflection, Healing, Density Manipulation (Self/Others).
-// scripts/dev/power-rules-runtime-tests.js v1.9.0 - 2026-11-19
-// v1.9.0: "Fire modes" section: Rate of fire, bursts, scatter, 1-per-2.
-// scripts/dev/power-rules-runtime-tests.js v1.8.0 - 2026-11-19
-// v1.8.0: "Range" section for the 2026-11-19 range-penalty ruling.
-// scripts/dev/power-rules-runtime-tests.js v1.7.0 - 2026-11-19
-// v1.7.0: "Karma ledger" section: Starting Karma on creation, existing
-//         ledgers untouched, direct spends no longer wipe Karma.
-// scripts/dev/power-rules-runtime-tests.js v1.6.0 - 2026-11-19
-// v1.6.0: Migration tests expect the old list cleared into Notes.
-// scripts/dev/power-rules-runtime-tests.js v1.5.1 - 2026-11-19
-// v1.5.1: Protected Senses test expects the sheet order (hearing, sight).
-// scripts/dev/power-rules-runtime-tests.js v1.5.0 - 2026-11-19
-// v1.5.0: Armor equipment resistances and protection beside defense powers.
-// scripts/dev/power-rules-runtime-tests.js v1.4.0 - 2026-11-19
-// v1.4.0: Migration of object-shaped lists with blank names; Protected
-//         Senses covering several senses.
-// scripts/dev/power-rules-runtime-tests.js v1.3.0 - 2026-11-19
-// v1.3.0: "Equipment powers" section: link, broken / missing item turns the
-//         power and its effects off, repair and unlink restore it, the sheets
-//         show it, and the granted-power-list migration.
-// scripts/dev/power-rules-runtime-tests.js v1.2.0 - 2026-11-19
-// v1.2.0: Karma per use now checks the balance (50 -> 40, Starting Karma
-//         baseline seeded). New "Talents" section checks the rebuilt talents
-//         compendium against Appendix B.
-// scripts/dev/power-rules-runtime-tests.js v1.1.0 - 2026-11-19
-// v1.1.0: "New power fields" section (2.55.14): multi-form Invulnerability,
-//         Ultimate Skill talent link, Raise Lowest Ability +20 effect, Karma
-//         per use, stunt cost, the linked-effects list and the new sheet rows.
-// scripts/dev/power-rules-runtime-tests.js v1.0.1 - 2026-11-19
-// v1.0.1: route() keeps watching for a window for 1.5s after rollPower
-//         returns: the Generic FEAT dialog opens without being awaited, so
-//         v1.0.0 missed it (and left it open) on the FEAT routes.
 // Foundry VTT runtime suite for the Nov 18-19 power-rules work (2.55.0x-2.55.11):
 // presets and the type reset, the rebuilt powers compendium, click routing
 // (Ultimate Skill, Sound/Light/Fire/Electrical/Darkforce/Weather/Transferral,

@@ -5,102 +5,14 @@
 //          the Reduce / result-cap row, Magical override, Stun aim, the
 //          Nullify guard and the corrosive Force Field bypass. No behaviour
 //          change.
-// energy-action.js v3.9.0 - 2026-09-09
 // v3.9.0: Fixed-bug — stunt-mechanics.js's deviceAbility opts carried a
 //         `touch` flag (Shocking Touch et al.) that nothing read; the
 //         dialog always defaulted/remembered a ranged distance instead.
 //         deviceAbility.touch now forces the range field to 0, bypassing
 //         the remembered lastEnergyRange, so a touch-only stunt resolves
 //         at 0 areas with no range penalty every time it's used.
-// energy-action.js v3.8.0 - 2026-09-05
 // v3.8.0: Blindside declaration carried to the target's Slam/Stun/Kill
 //         FEAT, which then refuses the Karma offer (RAW).
-// scripts/modules/actions/energy-action.js v3.7.0 - 2026-09-05
-// v3.7.0: Power range penalty via the range kernel (powerRangePenalty); LOS
-//         ranks show "LOS" instead of Infinity. Same arithmetic as before.
-// scripts/modules/actions/energy-action.js v3.6.0 - 2026-09-05
-// v3.6.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
-// scripts/modules/actions/energy-action.js v3.5.0 - 2026-09-02
-// v3.5.0: Kernel slice 5e. Energy Generation (name/type/canReduceEffect)
-//         resolves as choice.freeEffectReduction — the power-specific
-//         exception to "effect may not be reduced"; every other energy power's
-//         result cap is karma-gated in attack-action (50 per colour step).
-//         Power-rank to-hit value via rankValue (RANKS[rankName] on the name
-//         array always fell through to 30); Remember flags written in ONE
-//         actor.update instead of 17 sequential setFlag calls.
-// scripts/modules/actions/energy-action.js v3.4.4 - 2026-07-09
-// v3.4.4: Normalize equipment damage type E to energy and use derivePowerDamage()
-//         for initial, dropdown, preview, and roll damage so equipment energy
-//         weapons keep their authored system.damage.
-// scripts/modules/actions/energy-action.js v3.4.3 - 2026-07-04
-// v3.4.3: Use the shared action-utils derivePowerDamage() instead of the local
-//         inlined damageSource block (single source of truth; force/throwing
-//         now share it).
-// scripts/modules/actions/energy-action.js v3.4.2 - 2026-07-03
-// v3.4.2: Fix energy dialog ballooning to full width when a checkbox is
-//         toggled. AppV2 re-applied its default position.width ('auto') on
-//         form-input changes, which measured the long defensive-powers
-//         summary line and blew the window out. Lock position.width to 360
-//         via dlg.setPosition in render and re-assert it on the Multi/Magical
-//         toggles.
-// scripts/modules/actions/energy-action.js v3.4.1 - 2026-07-03
-// v3.4.1: Move the "Magical" override checkbox onto the existing Multi row
-//         (right-aligned) instead of adding a new option row, so the energy
-//         dialog keeps its original size. Multi/Magical dim independently via
-//         inline opacity (no shared .inactive class).
-// v3.4.0: Magical override toggle (powers audit Step #4 slice 4b wiring).
-//         Energy attack dialog gains a "Magical" checkbox; when checked it
-//         forces choice.isMagic=true (GM fiat) so a magical resistance
-//         reduces the damage. Unchecked leaves it unset, so the source
-//         power's system.isMagic auto-derive still governs. Persisted via
-//         lastEnergyMagical.
-// scripts/modules/actions/energy-action.js v3.3.5 - 2026-07-03
-// v3.3.5: Power damage derivation honors system.damageSource. fixed -> the
-//         fixed damage field; strength/endurance -> the actor's ability
-//         value; rank/material/blank -> power value with rank-table
-//         fallback. Previously any nonzero fixed field won regardless of
-//         the selector, so rank changes never reached the dialog damage.
-// scripts/modules/actions/energy-action.js v3.3.4 - 2026-07-02
-// v3.3.4: Infer specific energy damage types from selected power names/types
-//         when imported/legacy powers still have blank or generic damageType.
-//         Fire Generation now resolves as energy-fire so fire resistance and
-//         invulnerability can match in mitigation.
-// v3.3.3: Range penalty now itemized as "Range" in the to-hit breakdown
-//         instead of being lumped into "Manual".
-// v3.3.2: CS Reason field now persists across reopens (lastEnergyReason
-//         flag, gated by Remember), matching the other attack dialogs.
-// scripts/modules/actions/energy-action.js v3.3.1 - 2026-05-20
-// v3.3.1: Revert v3.3.0's ignoresNaturalArmor / ignoresArtificialArmor
-//         setters on choiceForAttack in execute(). Per
-//         DESIGN-material-strength.md rev 2 §6, corrosive and rotting
-//         use the normal damage pipeline (all armor soaks normally)
-//         and the shred mechanic is a separate FEAT. The
-//         damage-pipeline flag-stamping from v3.3.0 was based on a
-//         misread. The isRotting detection + reduce-lock in the
-//         dialog update() are correct and stay. bypassForceField
-//         on corrosive stays as pre-rev-1 (still §3 open question;
-//         corrosive vs FF interpretation pending).
-// v3.3.0: Rotting Touch parity with Corrosive Touch. Dialog update() now
-//         detects rotting alongside corrosive and applies the same reduce-
-//         lock + effect note. execute() sets ignoresNaturalArmor on the
-//         choice when corrosive (chews through inorganic BA), and
-//         ignoresArtificialArmor when rotting (directed against organic
-//         BA). bypassForceField remains corrosive-only per RAW. Consumed
-//         downstream by getBodyArmorValues + applyDamageToTargets +
-//         calculateMitigation.
-// v3.2.1: Fix Reduce row's Any/Ylw/Grn radios stacking vertically when
-//         Energy Generation triggers .result-cap-controls visibility.
-//         Show with display:inline-flex (was inline) so the wrapper span
-//         participates in the row's flex layout; paired CSS in
-//         action-dialog.css makes the inner labels inline-flex.
-// v3.2.0: Aim tactic — Bullseye-effect reinterpretation per RAW Tactics.
-//         New Aim row in options box: Neutralize (Red→Yellow, disarm chat
-//         note) or Stun (Yellow Bullseye → Stun chip via attack-action.js
-//         pipeline). Persisted via lastEnergyAim actor flag; resolution
-//         logic lives in attack-action.js v1.9.24.
-// v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
-//         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
-//         PwrHit toggle moved to checkbox, uses setAbilityRank().
 import { PowerBlastAction } from "./power-blast-action.js";
 import { pinDialogWidth } from "./attack-dialog-kit.js";
 import { isAuraMaintained } from "./nullify.js";

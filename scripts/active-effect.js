@@ -2,7 +2,6 @@
 // v1.1.0: Also suppressed while the power it comes from is granted by
 //         equipment that is broken or no longer on the character
 //         (equipment-link.mjs). gearBlock names the item and why.
-// active-effect.js v1.0.0 - 2026-11-19
 // FASERIP ActiveEffect document class. Overrides Foundry's isSuppressed
 // ("is there some system logic that makes this active effect ineligible for
 // application?") so circumstances, not the user's on/off switch, can take an

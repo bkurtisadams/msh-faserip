@@ -2,13 +2,11 @@
 // v1.6.0: stuntShift(stunt) exported for the Stunts tab and power sheet
 //         (the preset mechanic's column shift, else the stored one), and
 //         stuntUsesItem(stunt, name) for the stunt-power sheet.
-// scripts/modules/actions/stunt-mechanics.js v1.5.0 - 2026-11-13
 // v1.5.0: Sonic Stun stunt rolls the actor's "Sonic Stun" power item, built on
 //         the power sheet (Target Save: Endurance, Power Rank, Stunned, 1d10,
 //         Multiple Targets -1CS); info card if he has none. Preset stunts run
 //         the current preset mechanic, so stunts tagged under an older preset
 //         pick up corrections.
-// scripts/modules/actions/stunt-mechanics.js v1.4.0 - 2026-09-09
 // v1.4.0: Light Emission preset group (Illuminate, Blind). Illuminate
 //         is a new mechanic kind "grant-token-light" — creates a real
 //         faserip.token.light.* Active Effect (same custom-key
@@ -20,41 +18,6 @@
 //         now-generalized showBlindingTouchDialog(hero, item, opts)
 //         with ability:"agility", isRanged:true — Fighting-FEAT-touch
 //         and Protected Senses gating shared, not duplicated.
-// scripts/modules/actions/stunt-mechanics.js v1.3.0 - 2026-09-09
-// v1.3.0: elec-heal switched from an info card to a real one-shot heal
-//         (new kind "heal-now", calling ongoing-engine.healPointsNow at
-//         full Power rank — Judge clicks it when the table says he's near
-//         a current; not an auto-ticking effect). elec-shock's dead
-//         `touch` flag is now honoured: the attack() helper passes it
-//         through deviceAbility so energy-action.js (v3.9.0) forces range
-//         0 instead of the remembered ranged distance.
-// scripts/modules/actions/stunt-mechanics.js v1.2.0 - 2026-09-09
-// v1.2.0: RULED (Electrical Manipulation, 2026-09-09) — elec-absorb and
-//         elec-conduct were built on a too-literal reading of "as if
-//         possessing Resistance to Electricity at -2CS" (a passive
-//         damage-reduction effect for both). Corrected:
-//           elec-absorb  — new kind "grant-absorption" builds a manual
-//             defense AE (defenseType absorption, no powerItemId —
-//             mitigation.js keeps those for back-compat) at rank -2CS, so
-//             it runs the real Absorption pool/heal/redirect pipeline via
-//             absorption-pool.planAbsorption, not a standalone effect.
-//           elec-conduct — switched from apply-effect (self-buff) to
-//             kind energy-attack at -2CS: this is an attack on the target,
-//             conducting an external source through the hero, not a
-//             passive resistance to himself.
-//         elec-heal (heal N/round) and the elec-shock touch flag (never
-//         read by attack()) are known gaps, held for ongoing-engine.js and
-//         energy-action.js respectively — not built blind.
-// scripts/modules/actions/stunt-mechanics.js v1.1.0 - 2026-09-03
-// v1.1.0: Presets for Sound Generation, Air Control, Electrical Manipulation.
-//         Adopt-don't-duplicate: a preset first matches an existing tab stunt
-//         by presetKey, then by name alias, tagging it and repairing a missing
-//         or dangling parentPowerId; adoptPresets() runs from the router.
-//         Mechanic kinds: energy-attack / force-attack (optional -CS via the
-//         dialogs' deviceAbility ad-hoc mode), intensity-save, use-item,
-//         apply-effect, info. Presets flagged `mastered` start at mastery
-//         (RULED 2026-09-03: Air Control's starting stunt).
-// scripts/modules/actions/stunt-mechanics.js v1.0.0 - 2026-09-03
 // Power Stunt presets (book-listed stunts keyed by power flag) and the
 // mechanic that runs when a preset stunt succeeds or is mastered. The stunt
 // tab (system.stunts) stays the record of attempts; presets only create a

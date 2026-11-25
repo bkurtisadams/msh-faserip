@@ -4,47 +4,14 @@
 //         from the kernel thrownWeaponDamage (same numbers as before).
 //         Fixed-bug: the effect grid and Cap select named yellow "Hit" and
 //         green "Miss"; Blunt Throwing is Miss / Hit / Bullseye / Stun.
-// throwing-blunt-action.js v3.6.0 - 2026-11-10
 // v3.6.0: Dialog flow moved to the shared ThrownWeaponAction base
 //         (thrown-weapon-action.js) over attack-dialog-kit.js. This file
 //         keeps what is Blunt-specific: damage and the Pull row with its
 //         result cap. Remember flags are written in one actor.update (was
 //         11 setFlag calls) and the dialog width is pinned through the
 //         position API like the other attack dialogs.
-// throwing-blunt-action.js v3.5.0 - 2026-09-05
 // v3.5.0: Blindside declaration carried to the target's Slam/Stun/Kill
 //         FEAT, which then refuses the Karma offer (RAW).
-// scripts/modules/actions/throwing-blunt-action.js v3.4.0 - 2026-09-05
-// v3.4.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
-//         own area 0, via the range kernel (thrownRangePenalty); Strength
-//         range is the cap. Replaces the free first area.
-// scripts/modules/actions/throwing-blunt-action.js v3.3.0 - 2026-09-05
-// v3.3.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
-// scripts/modules/actions/throwing-blunt-action.js v3.2.5 - 2026-07-04
-// v3.2.5: Use shared action-utils derivePowerDamage() (honors damageSource;
-//         replaces the local ||-chain that ignored the Damage Source select).
-// v3.2.4: Range penalty is now -1CS per full area to the target (weapon rule,
-//         RAW); no free first area. Capped at the thrower's max range.
-// scripts/modules/actions/throwing-blunt-action.js v3.2.3 - 2026-05-23
-// v3.2.3: Thrown range now flows to the card (range added to choice) so the
-//         Target/Range line shows real areas, and the range penalty is
-//         itemized in the to-hit breakdown (shiftBreakdown.range).
-// scripts/modules/actions/throwing-blunt-action.js v3.2.2 - 2026-05-23
-// v3.2.2: CS Reason field now persists across reopens (lastThrowBluntReason
-//         flag, gated by Remember), matching the other attack dialogs.
-// scripts/modules/actions/throwing-blunt-action.js v3.2.1 - 2026-04-17
-// v3.2.1: Correct thrown-blunt damage per RAW — plain min(STR, MAT) with
-//         weapon-base floor, no bump-to-next-rank rule. Bump is melee-blunt
-//         only per Advanced Set Combat section (Aunt May pipe example is
-//         a drawing-room melee, not a throw). Replaces v3.2.0 which
-//         incorrectly reused melee computeBluntDamage.
-// v3.2.0: T4 — carried-weapon damage now auto-computes via computeBluntDamage
-//         (STR vs material with bump-to-next-rank-minimum rule and weapon-base
-//         floor), matching melee blunt behavior. Ad-hoc path unchanged — GM
-//         entered damage still used verbatim. Preview, resolve, and initial
-//         calc all route through the new local helper.
-// v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
-//         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 import { ThrownWeaponAction } from "./thrown-weapon-action.js";
 import { derivePowerDamage } from "./action-utils.js";
 import { pullDamageInputHtml } from "./attack-dialog-kit.js";

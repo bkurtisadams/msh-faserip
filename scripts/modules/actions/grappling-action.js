@@ -1,7 +1,6 @@
 // grappling-action.js v3.6.0 - 2026-11-11
 // v3.6.0: Dialog scaffolding (header, Karma row, effect grid, footer, titlebar
 //         and width setup, Enter-to-roll) now comes from attack-dialog-kit.js.
-// grappling-action.js v3.5.0 - 2026-09-09
 // v3.5.0: Fix dialog ballooning to full width on checkbox/select
 //         toggle — same bug and fix as energy-action.js v3.4.2,
 //         contact-action.js v1.3.0, force-action.js v3.7.0. The
@@ -11,43 +10,11 @@
 //         re-assert it via a delegated change/input listener on
 //         the dialog root so every control (including the Bonus/Karma toggles)
 //         keeps it pinned regardless of which internal handler fires.
-// scripts/modules/actions/grappling-action.js v3.4.0 - 2026-09-02
 // v3.4.0: Kernel slice 5f. Result via resolveKernelAttack on the Gp column
 //         with itemized shifts; hold application and buttons keyed on the
 //         effect token (partial / hold) instead of colour; target-movement
 //         rank compare via adapter compareRankNames (private rank array
 //         retired); prefs written in ONE actor.update.
-// scripts/modules/actions/grappling-action.js v3.3.2 - 2026-08-04
-// v3.3.2: Warn on silent hold-apply skips: Partial/Full result with no
-//         targetUuid (untargeted token, name typed in dialog) or an
-//         unresolvable target uuid now raises ui.notifications.warn
-//         instead of applying nothing without feedback.
-// scripts/modules/actions/grappling-action.js v3.3.1 - 2026-05-24
-// v3.3.1: Drop the STR-contest third cell (grappling is a one-roll FEAT, not
-//         an opposed contest). Third cell reverts to DAMAGE (the Full-Hold
-//         damage cap; em-dash otherwise); meta label reverts to Range:adjacent.
-//         The Partial-Hold movement note keeps the Strength comparison per RAW.
-// scripts/modules/actions/grappling-action.js v3.3.0 - 2026-05-23
-// v3.3.0: Render the chat card on the shared attack-card.hbs shell. The third
-//         cell becomes a STR-vs-STR contest (raw Strength, per RAW) in place of
-//         DAMAGE; effect detail moves to the notes slot, buttons unchanged.
-//         _buildChatCard is now async (awaits renderTemplate).
-// scripts/modules/actions/grappling-action.js v3.2.1 - 2026-05-23
-// v3.2.1: CS Reason now reaches the card (was discarded — choice resolved
-//         with csNotes:"") and persists across reopens (lastGrappleReason,
-//         gated by Remember), matching the other attack dialogs.
-// scripts/modules/actions/grappling-action.js v3.2.0 - 2026-03-17
-// v3.2.0: Footer reordered: [Roll] [Cancel] ... [Remember] [Skip dice].
-// v3.1.0: Manual CS only — remove talent chips, sit-tags, auto-detection.
-//         CS row is manual input + ? reference panel via cs-modifiers.js.
-//         Simpler dialog, no activeChips persistence, no talentFlags.
-// v3.0.0: Port to v3 compact dialog layout matching blunt/edged/shooting/energy/force
-// v2.4.0: Consistency fixes — replace local rankValues with game.msh.getRankValue
-// v2.3.0: Add support for weapon-based grappling (whips with GP damage type)
-// v2.2.0: Add opts.prefill support for Grapple Back from escape reverse
-// v2.1.0: Add Deal Hold Damage chip on Full Hold (red) result
-// v2.0.0: Compact chat card format matching blunt attack
-// v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
 import { AttackAction } from "./attack-action.js";
 import {
   getStrengthInfo, 

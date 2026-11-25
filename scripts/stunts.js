@@ -2,7 +2,6 @@
 // v1.4.0: Attempt cost from the parent power via stunt-ledger (Weather
 //         Control 50, else 100). Card reports Successes, not Times
 //         Attempted, and only advances on a success.
-// scripts/stunts.js v1.3.1 - 2026-11-10
 // v1.3.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
 // v1.3.0: Stunt mechanics: a stunt entry may carry `mechanic` (see
@@ -11,12 +10,6 @@
 //         lets a power dialog attempt a book-listed stunt through the tab.
 //         FEAT colour from kernel powerStuntRequiredColor (RULED 2026-09-03:
 //         mastery at 10 successes).
-// scripts/stunts.js v1.2.0 - 2026-07-23
-// scripts/stunts.js v1.1.0 - 2026-04-22
-// v1.1.0: v14 port — DialogV2 conversions; pre-roll karma declaration (RAW);
-//         min-10 karma commitment enforced; GM impossible refund button;
-//         parentPowerId link (dynamic rank from power item).
-// v1.0.0: Initial stunt roller.
 
 import { powerStuntRequiredColor, POWER_STUNT_MASTERY } from "./lib/faserip-rules/faserip-karma.js";
 import { runStuntMechanic, ensureStuntForPreset } from "./modules/actions/stunt-mechanics.js";

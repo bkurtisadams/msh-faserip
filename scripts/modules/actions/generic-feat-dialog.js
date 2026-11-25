@@ -1,68 +1,12 @@
 // generic-feat-dialog.js v1.6.0 - 2026-11-18
 // v1.6.0: opts.requiredColor ("green"|"yellow"|"red") — with no intensity,
 //         success needs at least that color (Transferral needs Red).
-// generic-feat-dialog.js v1.5.4 - 2026-07-05
 // v1.5.4: Fix FEAT card crash on core 14+. applyMode() was fed the legacy
 //         core.rollMode value (a roll mode, not a message mode), so it read
 //         .handler off an undefined mode entry and threw — killing Recovery and
 //         every other generic-dialog FEAT. Now reads core.messageMode and calls
 //         applyMode, with a core.rollMode + applyRollMode fallback for v13.
-// generic-feat-dialog.js v1.5.3 - 2026-07-03
 // v1.5.3: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
-// v1.5.2: Fix dialog ballooning to full width. Width was pinned only via CSS;
-//         AppV2 re-applied its default position.width ('auto') on re-measure,
-//         stretching to fit the widest line (e.g. a long intensityHint). Lock
-//         position.width via dlg.setPosition in render and re-assert on CS
-//         recalc. (Same class of bug/fix as energy-action.js v3.4.2.)
-// generic-feat-dialog.js v1.5.1 - 2026-07-03
-// v1.5.1: Power FEAT intensity guardrails (slice 5a follow-up).
-//           opts.lockIntensity  — disable the INTENSITY dropdown (value still
-//                                 shows and is read normally) so a power that
-//                                 dictates its intensity can't be mis-set.
-//           opts.intensityHint  — one-line caption under the intensity row
-//                                 explaining what the intensity means here.
-// generic-feat-dialog.js v1.5.0 - 2026-07-03
-// v1.5.0: Power FEAT support (powers audit Step #5, slice 5a). New opts turn
-//         the shared generic FEAT engine into the Power FEAT path:
-//           opts.power (Item)     — roll this power's rank as a FEAT; keeps
-//                                   intensity/CS/Karma; hides the ability picker.
-//           opts.label (string)   — card title (defaults to the power name).
-//           opts.intensity (rank) — preselect the INTENSITY dropdown.
-//           opts.onResult(result) — awaited after resolution; return an HTML
-//                                   string to append to the card as an effect
-//                                   line. result = { success, color, requirement,
-//                                   effectiveRank, roll, cappedTotal, karmaUsed,
-//                                   isAutomatic }. RAW: with no intensity a
-//                                   colored result (green/yellow/red) succeeds,
-//                                   white fails.
-//           opts.suppressCard     — skip the shared card entirely (caller posts
-//                                   its own).
-// generic-feat-dialog.js v1.4.1 - 2026-06-05
-// v1.4.1: Fix double FEAT roll when detached. Detaching re-runs the render
-//         callback, which was stacking a second click/keydown handler on the
-//         same (persisted) buttons. Bindings are now namespaced off()+on() so
-//         exactly one handler survives across any number of re-renders.
-// generic-feat-dialog.js v1.4.0 - 2026-06-05
-// v1.4.0: Single chat card per FEAT. Dropped the standalone roll.toMessage()
-//         d100 card; the d100 Roll is now attached to the FEAT result card
-//         via rolls[] (DSN still animates) and respects the active rollMode.
-//         Also skip the post-roll dlg.close() when the dialog is rendered in
-//         a Foundry v14 detached window, so a popped-out FEAT window survives
-//         a roll instead of tearing itself (and the window) down.
-// generic-feat-dialog.js v1.3.1 - 2026-05-25
-// v1.3.1: Render FEAT requirements as "Needs:" color pills using Universal Table colors.
-// v1.3.0: Base picker can now be a directly-chosen rank, not just an ability.
-//         Adds a "Manual Rank" optgroup (Feeble…Beyond); selecting one rolls
-//         that rank vs the chosen intensity with no actor ability involved.
-//         Remember round-trips a manual rank; box relabeled ABILITY → BASE.
-// generic-feat-dialog.js v1.2.0 - 2026-05-06
-// v1.2.0: Strip font/padding/color from select inline styles — moved to
-//         CSS rule .frp-dlg.frp-feat select for centralised tuning.
-//         Only layout (flex, min-width) remains inline.
-// v1.1.0: FEAT green theme — add frp-feat wrapper class, swap inline
-//         #6a0000 label color for var(--feat-deep). Functional FEAT-result
-//         red colors (IMPOSSIBLE, Red column) left intact.
-// v1.0.0 - 2026-04-30
 // Player-facing FEAT dialog with ability picker + optional context label.
 // Routed from the GF button on the Action HUD or game.msh.openGenericFeat().
 //

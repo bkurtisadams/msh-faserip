@@ -9,11 +9,9 @@
 //         the Crash button (openVehicleCrash). Current Speed options carry
 //         areas/round. openVehicleControl takes { maneuver, name,
 //         difficulty, speed } to preselect. vehicleSpeedInfo lives here now.
-// scripts/modules/actions/vehicle-control.js v1.1.0 - 2026-11-20
 // v1.1.0: Speeding. A Current Speed one rank over the vehicle's safe Speed
 //         makes the Control FEAT one colour harder (green to yellow, yellow
 //         to red); more than one rank over is refused.
-// scripts/modules/actions/vehicle-control.js v1.0.0 - 2026-11-20
 // v1.0.0: Vehicle Control FEAT, Out of Control and Crashes in one place, for
 //         a vehicle item on a character (Vehicles tab) and for a vehicle
 //         actor (vehicle sheet, driver from its crew). Moved out of

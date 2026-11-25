@@ -6,69 +6,6 @@
 //         grid, footer, titlebar and width setup, Enter-to-roll, Remember and
 //         Skip dice toggles) now comes from attack-dialog-kit.js. The width
 //         is pinned through the position API like the other attack dialogs.
-// edged-attack-action.js v3.7.0 - 2026-09-05
-// v3.7.0: Karma effect reduction. Edged results may not be pulled for
-//         free (Players Book, Modifying Results in Combat), so the
-//         dialog now offers a result cap that attack-action prices at
-//         EFFECT_REDUCTION_COST per colour through the kernel. The
-//         control is disabled below that cost. No damage pull: EA is
-//         reduceDamage false in the kernel.
-//         Also declares Blindside: a checked box marks the target as
-//         blindsided so its Slam/Stun/Kill FEAT refuses Karma (RAW).
-// edged-attack-action.js v3.6.1 - 2026-09-02
-// v3.6.1: Fix ReferenceErrors — weapon dropdown builder still called the
-//         retired local getArmorPiercing, and initialAPLabel still read the
-//         retired initialAP/initialAPMode; both on the CS field now.
-// edged-attack-action.js v3.6.0 - 2026-09-02
-// v3.6.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
-//         shifts). Weapon AP read through shared getItemArmorPiercingCS;
-//         local flat-AP normalizer, apMode and flat preview path retired.
-// edged-attack-action.js v3.5.0 - 2026-09-01
-// v3.5.0: Kernel slice 5b. Claws limitation +2CS via shared shiftRank (was an
-//         index clamp that could land on Beyond); Remember flags written in
-//         ONE actor.update instead of 13 sequential setFlag calls; dead
-//         universal-table import dropped.
-// edged-attack-action.js v3.4.0 - 2026-08-21
-// v3.4.0: Lock the Multi controls when the tracker Multiple Attacks FEAT is
-//         already resolved (rolled or Automatic) — no implied second roll.
-// edged-attack-action.js v3.3.3 - 2026-08-21
-// v3.3.3: Consume RAW Multiple Attacks from the combat tracker Pre-Action result.
-// edged-attack-action.js v3.3.2 - 2026-07-09
-// v3.3.2: Treat Claws powers as first-class edged sources. A power
-//         launched through power-router is now added to the damage-source
-//         picker, pre-selected, and resolves living-target damage from
-//         Power rank/value instead of the default Good natural weapon or
-//         the weapon STR/MAT formula.
-// edged-attack-action.js v3.3.1 - 2026-05-23
-// v3.3.1: CS Reason field now persists across reopens (lastEdgedReason flag,
-//         gated by Remember), matching the other attack dialogs.
-// v3.3.0: House rule — claws penetration FEAT vs natural BA. When
-//         (a) the source power is claws, (b) the world setting
-//         houseRules.clawsPenetrateNaturalBA is true, and (c) the
-//         primary target has natural BA, run executePenetrationFeat
-//         (claws material strength column vs target natural BA
-//         intensity) before the attack proceeds. On success, stamp
-//         choice.ignoresNaturalArmor = true for this attack so the
-//         damage pipeline skips the natural BA. Per
-//         DESIGN-material-strength.md §8 House Rule. Off by default.
-// v3.2.1: Revert v3.2.0's isClawsPower flag-stamping. Per
-//         DESIGN-material-strength.md rev 2 §6, claws use the
-//         normal damage pipeline (all armor soaks normally) and
-//         the shred mechanic is a separate FEAT, not a damage-
-//         pipeline filter. The natural-BA / FF bypass behavior
-//         from v3.2.0 was based on a misread of the rules.
-//         executeShredFeat (forthcoming) will consume the schema
-//         flags via its own path, not via this action.
-// v3.2.0: Claws-as-power source detection. When this.opts.item is a
-//         claws power (system.type or name matches /claws/i), the
-//         outgoing choice on both _executeSingleAttack call sites
-//         is stamped with ignoresNaturalArmor + bypassForceField.
-//         RAW: claws "work on artificial BA, not natural BA or FF."
-//         Material-strength shred vs non-living and the +2CS
-//         limitation bump are deferred to the breaking-FEAT helper
-//         (DESIGN-material-strength.md §5).
-// v3.1.0: Manual CS only — remove talent/power auto-detection, chip handlers,
-//         sit-tag handlers. CS row from shared cs-modifiers.js (manual + ? ref).
 
 import { AttackAction } from "./attack-action.js";
 import { 

@@ -2,39 +2,14 @@
 // v1.7.0: Movement FEAT dialogs (Run, Leap, Swim, Fly, Teleport) opened from
 //         the sheet's movement labels: each that opens must be a V2 dialog
 //         and close from Cancel, with no V1 window.
-// scripts/dev/actor-sheet-runtime-tests.js v1.6.0 - 2026-11-11
 // v1.6.0: Sheet dialogs. Opens the Delete Power confirmation (cancel, then
 //         delete), Talent Information, Equipment Information and Recovery &
 //         Rest from the sheet's own controls, and checks each is a V2 dialog
 //         and that no V1 window opens.
-// scripts/dev/actor-sheet-runtime-tests.js v1.5.0 - 2026-11-11
 // v1.5.0: Checks that neither legacy sheet class extends Foundry's V1
 //         framework, that opening a sheet logs no V1 deprecation warning,
 //         and that actor.sheet offers _rollVehicleControl for the
 //         vehicle-control hotbar macros.
-// scripts/dev/actor-sheet-runtime-tests.js v1.4.0 - 2026-11-11
-// v1.4.0: Checks that the edited field keeps keyboard focus through the
-//         re-render, drops an item on an item tab (the tab drop-zone path)
-//         as well as on the sheet body, and drops a passenger on the vehicle.
-// scripts/dev/actor-sheet-runtime-tests.js v1.3.0 - 2026-11-11
-// v1.3.0: Vehicle sheet: quick damage button, dropping an actor on the
-//         Driver slot and removing them again, and (on the V2 shell) that
-//         the window does not pick up the character sheet's window styling.
-// scripts/dev/actor-sheet-runtime-tests.js v1.2.0 - 2026-11-11
-// v1.2.0: The History editor steps work with both the old V1 editor block
-//         and the V2 <prose-mirror> element, report which one is on the
-//         sheet, and check that saving makes exactly one actor update.
-// scripts/dev/actor-sheet-runtime-tests.js v1.1.1 - 2026-11-11
-// v1.1.1: The History editor lives in the Bio panel, which is closed by
-//         default, so the first run skipped it. The suite now opens Bio,
-//         edits a Bio field, runs the editor steps and closes Bio again.
-//         Adds an explicit form submit (the Enter-key path) saving once.
-// scripts/dev/actor-sheet-runtime-tests.js v1.1.0 - 2026-11-11
-// v1.1.0: Covers what the next port steps touch, so there is a baseline
-//         before they change: one actor update per edit, the portrait file
-//         picker, the History rich-text editor (open, type, save), dropping
-//         an item onto the sheet, the read-only rendering of a sheet that is
-//         not editable, and the vehicle sheet (open, tabs, edit, close).
 // Foundry VTT runtime suite for the character sheet (FaseripActorSheetV2).
 // Replaces actor-sheet-parity-tests.js now that the V1 sheet is no longer
 // registered. On throwaway actors it checks which sheet class actors get,

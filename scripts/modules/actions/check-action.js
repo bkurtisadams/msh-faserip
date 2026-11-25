@@ -2,7 +2,6 @@
 // v1.15.0: Mental/stunt save failures named "Stunned" apply the real Stun
 //          effect (Effects.applyStun); the manual-roll path now routes
 //          "Unconscious" through Effects.applyUnconscious like the auto path.
-// scripts/modules/actions/check-action.js v1.14.0 - 2026-09-09
 // v1.14.0: Fix Slam/Stun/Kill dialog opening at full width — same class
 //         of bug as energy-action.js v3.4.2, contact-action.js v1.3.0,
 //         force-action.js v3.7.0, grappling/grabbing/charging-action.js,
@@ -12,62 +11,9 @@
 //         construction plus dlg.setPosition pin, and a delegated
 //         change/input listener re-asserting it on the shift/
 //         dmgThrough/borderline controls.
-// scripts/modules/actions/check-action.js v1.13.1 - 2026-09-03
 // v1.13.1: _mentalIntensityRank accepts fixedRank under any intensity mode
 //          (Full-Auto passes intensity "power-rank" with saveFixedRank) and
 //          opts.powerRank, so the Intensity threshold applies on both paths.
-// scripts/modules/actions/check-action.js v1.13.0 - 2026-09-03
-// v1.13.0: Mental power saves resolve as Intensity FEATs (kernel requiredColor
-//          thresholds via nullify-utils): intensity 2+ ranks above the defense
-//          = impossible, no roll, effect applies; 3+ below = automatic, no
-//          roll; otherwise the rolled colour must meet the required colour
-//          (red/yellow/green), not merely beat white. Psi-Screen / Mental
-//          Power substitution now sets the column rolled on (both paths) and
-//          prefills the semi dialog; intensity read from fixed-rank,
-//          powerRankName, or intensityRank opts. Cards show the needed colour.
-// scripts/modules/actions/check-action.js v1.12.1 - 2026-08-07
-// v1.12.1: Psionic Attack failed-save KO routes through
-//          Effects.applyUnconscious (statuses, canAct:false, defense
-//          shifts) instead of a cosmetic generic AE that the
-//          status-based dedup/refresh logic could not see.
-// scripts/modules/actions/check-action.js v1.12.0 - 2026-08-02
-// v1.12.0: Defender Karma on Slam/Stun/Kill checks (RAW two-phase, routed).
-//          Both roll sites (full-auto fast-path and the manual/semi dialog)
-//          roll through _rollCheckWithKarma → resolveResistFeat: an active
-//          owning player gets the declaration prompt (10s auto-decline) on
-//          their client with Phase-2 amount dialog; local GM prompts also
-//          countdown (localDeclareTimeoutMs) so full-auto NPC saves never
-//          park combat on an unattended dialog. Blindside gate honored per
-//          RAW ("target cannot add Karma to Slam/Stun/Kill FEATs") via
-//          prefill.blindside / opts.blindside — nothing sets it yet; the
-//          +2CS blindside attack option is a future slice. karmaUsed is
-//          threaded into result payloads for card display.
-// scripts/modules/actions/check-action.js v1.11.0 - 2026-04-16
-// v1.11.0: Check-action rules fixes and cleanup.
-//          - CA2: _strengthToAreas now reads GRAND_SLAM_AREAS from rules-reference,
-//            with Beyond falling back to Class 5000. Removed inline duplicate table.
-//          - CA3: Slam-fallback text in _extraExplanationHtml now uses
-//            attackerStrengthRank (from prefill) instead of defender's Endurance
-//            rank for the Grand Slam distance preview. Added attackerStrengthRank
-//            parameter to _extraExplanationHtml and threaded through both call sites.
-//          - CA4: Manual/semi path now applies getAbilityShift to the effective
-//            rank — matches auto path. Previously only selfPenaltyCS was added
-//            in manual mode, so active-effect ability shifts (impaired, conditional
-//            boosts) silently didn't apply. Shift display now breaks out
-//            Manual / Effects / Self components.
-// v1.10.0: Replace inline mental defense scan with shared scanMentalDefenses() from action-utils.
-//          Accept "power-save" action type alongside legacy "save-nullify".
-// v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
-// v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
-// v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
-// v1.6.0: Restyle stun/slam/kill check cards to match attack card style (gray card, inline roll badge, white result box)
-// v1.5.2: Fix slam explanation text in _extraExplanationHtml - was completely backwards (White↔Red, Green↔Yellow)
-// v1.5.0: Add returnResultOnly mode for inline embedding in attack cards (collapsible sections)
-// v1.4.1: Show stun duration with hover text for die type
-// v1.4.0: Change stun duration from "d10 + cap" to configurable die (stunDurationDie setting)
-// v1.3.0: Show when stun duration was capped by maxStunDuration setting in chat card
-// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
-// v1.1.0: Integrate effect modifiers for ability FEAT shifts
 import { BaseAction } from "./base-action.js";
 import {
   RANKS,

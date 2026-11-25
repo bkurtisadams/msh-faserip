@@ -1,63 +1,16 @@
 // throwing-edged-action.js v3.8.2 - 2026-11-11
 // v3.8.2: Effect cap row and its toggle come from attack-dialog-kit.js.
-// throwing-edged-action.js v3.8.1 - 2026-11-11
 // v3.8.1: Fixed-bug: after Slashing Missile had been selected, switching to
 //         a weapon left the Effect checkbox disabled and the cap select
 //         blank, so the paid Effect cap could not be taken until the dialog
 //         was reopened. The Effect checkbox now follows the Karma test again
 //         and the cap select follows the Effect checkbox (it was tied to the
 //         Pull checkbox).
-// throwing-edged-action.js v3.8.0 - 2026-11-10
 // v3.8.0: Dialog flow moved to the shared ThrownWeaponAction base
 //         (thrown-weapon-action.js) over attack-dialog-kit.js. This file
 //         keeps what is Edged-specific: damage, armor piercing, the paid
 //         Effect cap and the Slashing Missile lock. The dialog width is now
 //         pinned through the position API like the other attack dialogs.
-// throwing-edged-action.js v3.7.0 - 2026-09-05
-// v3.7.0: RULED 2026-09-05 — thrown edged counts as an Edged Attack for
-//         Modifying Results in Combat, so the effect may be pulled only
-//         by spending EFFECT_REDUCTION_COST per colour. Fixed-bug: the
-//         Slashing Missile guard already reached for [name="resultCap"]
-//         but no such control was ever rendered and the dialog resolved
-//         with a hardcoded "none", so the cap could never be taken. The
-//         control now exists and is disabled below the cost; the damage
-//         pull stays free (TE is reduceDamage true).
-//         Also declares Blindside: a checked box marks the target as
-//         blindsided so its Slam/Stun/Kill FEAT refuses Karma (RAW).
-// scripts/modules/actions/throwing-edged-action.js v3.6.0 - 2026-09-05
-// v3.6.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
-//         own area 0, via the range kernel (thrownRangePenalty); Strength
-//         range is the cap. Replaces the free first area.
-// scripts/modules/actions/throwing-edged-action.js v3.5.0 - 2026-09-05
-// v3.5.0: Automatic situational modifiers prefill the CS row (cs-modifiers v3.6.0).
-// scripts/modules/actions/throwing-edged-action.js v3.4.0 - 2026-09-02
-// v3.4.0: AP-CS slice (RULED 2026-09-02: armor piercing is always column
-//         shifts). Weapon AP read through shared getItemArmorPiercingCS and
-//         previewed through getEffectiveArmor (the preview subtracted the AP
-//         number from armor as flat points); flat/apMode plumbing retired.
-// scripts/modules/actions/throwing-edged-action.js v3.3.0 - 2026-09-02
-// v3.3.0: Kernel slice 5c. Remember flags written in ONE actor.update instead
-//         of 9 sequential setFlag calls. Damage already via the kernel-backed
-//         computeEdgedDamage; TE offers no result cap (kernel: no effect
-//         reduction on Throwing Edged).
-// scripts/modules/actions/throwing-edged-action.js v3.2.4 - 2026-07-04
-// v3.2.4: Use shared action-utils derivePowerDamage() (honors damageSource;
-//         replaces the local ||-chain that ignored the Damage Source select).
-// v3.2.3: Range penalty is now -1CS per full area to the target (weapon rule,
-//         RAW); no free first area. Capped at the thrower's max range.
-// scripts/modules/actions/throwing-edged-action.js v3.2.2 - 2026-05-23
-// v3.2.2: Thrown range now flows to the card (range added to choice) so the
-//         Target/Range line shows real areas, and the range penalty is
-//         itemized in the to-hit breakdown (shiftBreakdown.range).
-// scripts/modules/actions/throwing-edged-action.js v3.2.1 - 2026-05-23
-// v3.2.1: CS Reason field now persists across reopens (lastThrowEdgedReason
-//         flag, gated by Remember), matching the other attack dialogs.
-// v3.2.0: T4 — carried-weapon damage now auto-computes via computeEdgedDamage
-//         (max(min(STR, MAT), weaponBase)), matching melee edged behavior.
-//         Ad-hoc path unchanged. Preview, resolve, and initial calc all
-//         route through the new local helper.
-// v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
-//         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 import { ThrownWeaponAction } from "./thrown-weapon-action.js";
 import { RANKS, computeEdgedDamage, derivePowerDamage, getItemArmorPiercingCS } from "./action-utils.js";
 import { pullDamageInputHtml, paidEffectRowHtml, wirePaidEffectToggle } from "./attack-dialog-kit.js";

@@ -7,103 +7,10 @@
 //         time recorded, then save order (KarmaSheet.sortHistory), in every
 //         view, edit, delete and drag. Dragging within a day rewrites that
 //         day's timestamps to keep the chosen order.
-// karma.js v2.5.0 - 2026-11-11
 // v2.5.0: KarmaSheet no longer extends Foundry's V1 DocumentSheet. It is a
 //         plain class holding the Karma window's data preparation, listeners
 //         and Karma-event helpers; KarmaSheetV2 is the window. The pool
 //         button opens KarmaPoolSheetV2.
-// karma.js v2.4.0 - 2026-11-11
-// v2.4.0: The nine V1 dialogs here (Set Karma Multiplier, Clear All Karma
-//         Data, Add Karma, Spend Karma, the advancement sub-dialog, Import
-//         Karma History, Edit Karma Entry and the two delete confirmations)
-//         open as V2 dialogs through dialog-shim.js. A V2 dialog is itself a
-//         form, so the <form> wrappers inside their content became <div>.
-// karma.js v2.3.1 - 2026-10-04
-// v2.3.1: "R+I+P Bonus" history entries (Team Tracker house-rule bonus)
-//         get the R+I+P pill and the session-award styling.
-// karma.js v2.3.0 - 2026-09-05
-// v2.3.0: Parked sweep — Defeated Foe gate. The award is the opponent's
-//         highest rank NUMBER and is paid only for an ability or Power of
-//         Remarkable or higher; the dialog now asks for that rank, derives
-//         the amount through the kernel's foeDefeatAward, and refuses to
-//         record small fry. Previously the row's base amount was a flat 0
-//         with the number typed by hand and no threshold anywhere.
-// karma.js v1.15.0 - 2026-09-03
-// v1.15.0: Kernel slice 6c. Power / Resource / Popularity Advancement use the
-//          Ability Advancement sub-dialog (_onAdvancement(kind)): target picker
-//          (ability / power item / Resources / hero or secret-ID Popularity),
-//          target number, kernel step walker via advancementCost (crest at the
-//          boundary, RULED 2026-09-02), rationale (RAW warning when required),
-//          editable Amount marked "(adjusted from N)" in the history entry,
-//          value + rank written to the actor or power item on Advance. The
-//          Spend dialog's advancement calc row is retired.
-// karma.js v1.14.2 - 2026-09-02
-// v1.14.2: RULED 2026-09-02 — Contact Addition flat 500 + 10× Resource number.
-//          "Extradimensional" checkbox removed from the Spend calc row.
-// karma.js v1.14.1 - 2026-09-02
-// v1.14.1: RULED 2026-09-02 — advancement one rank number at a time, crest at
-//          the boundary. "Crest to next rank" checkbox removed from Spend.
-// karma.js v1.14.0 - 2026-09-02
-// v1.14.0: Kernel slice 6b. Spend Karma amounts computed from the kernel via
-//          karma-costs.js: Power/Resource/Popularity advancement (multiplier ×
-//          current number per point, crest fee on crossing a rank), Power
-//          Addition (3000 + 40× starting number, 10× for robots), Talent
-//          Addition (by source), Contact Addition (500 + 10× resource number,
-//          ×2 extradimensional), Die Roll / Reduce Effect / Power Stunt
-//          constants. A calc row under the type select takes the inputs; the
-//          Amount stays editable.
-// karma.js v1.13.0 - 2026-09-02
-// v1.13.0: Kernel slice 6a. Award base amounts derived from faserip-karma
-//          (CRIME_KARMA, COMMITMENT_KARMA, GAMING_AWARDS, DEFEAT_LOSS,
-//          SPECIAL_DEATH_LOSS): Commit Robbery -40 (was -20), Commit Other
-//          Crime -10 per RULED 2026-08-31 (was -20), Commit/Permit rows added
-//          for Local/National/Global Conspiracy. Ability advancement per-point
-//          and crest costs from ADVANCEMENT.ability. _getNewRank via
-//          valueToRank (private threshold table retired).
-// karma.js v1.12.0 - 2026-07-23
-// karma.js v1.11.0 - 2026-04-17
-// v1.11.0: Compact column layout for karma history. Real Date and
-//          Game Date columns merged into a single stacked "Date"
-//          cell (real-date bold on top, game-date subtle below).
-//          Event Type column removed; the label now renders as a
-//          compact color-coded pill at the start of the Description
-//          cell, reusing the row's existing event-type CSS class.
-//          Description column gains ~170px. CSV export unchanged —
-//          still emits Real Date and Game Date as separate columns
-//          for spreadsheet analysis. Edit dialog unchanged too.
-// v1.10.0: Replace v1.9.0 up/down arrows with a drag handle. Arrows
-//          required select → click → re-render flow that deselected
-//          checkboxes and felt clumsy. HTML5 drag-and-drop on a
-//          grip icon lets GM grab a row and drop it anywhere within
-//          the same realDate cluster. Cross-date drops are rejected
-//          with a notification (edit the realDate to move across
-//          days). Visual states: source row 50% opacity during drag,
-//          target row shows a red top-border indicating insertion
-//          point.
-// v1.9.0: (superseded) Up/down arrows in Actions column let GM reorder
-//         entries that share a realDate. Replaced by drag handle.
-// v1.8.0: History sort prefers user-editable realDate over internal
-//         timestamp. Previously `timestamp || realDate || 0` short-
-//         circuited on timestamp (always set at creation), so editing
-//         an entry's realDate changed the displayed string but not
-//         the sort position. New `_historyEntryDate` helper uses
-//         realDate first, falling back to timestamp only when realDate
-//         is empty/unparseable. Applied to all four sort call sites
-//         (getData, edit, delete, bulk delete).
-// v1.7.0: Category-based karma multipliers (combat/rescue/personal/gaming/penalty)
-//         and group award mode (split/full/pool) via karma-multipliers.js helper.
-//         Legacy karmaMultiplier setting preserved as global fallback when a
-//         category multiplier is unset. Losses only multiplied if penalty
-//         category multiplier > 1. Calc display now shows category tag.
-// v1.6.4: Spend Karma dialog now closes when user picks Ability Advancement.
-//         Previously it lingered behind the advancement sub-dialog in a useless state.
-// v1.6.3: Fix Ability Advancement cost formula. Per RAW (Potato Salad Man example),
-//         each +1 point costs 10× the CURRENT numeric value, not 10× the Standard
-//         Rank Number. e.g. Good(14)→Good(15) = 140 karma, not 100. Cresting +400
-//         still triggers on crossing a rank's range boundary (e.g. 7→8, 15→16).
-// v1.6.2: Fix _getNewRank thresholds to use book Rank Ranges.
-// v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
-// v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
 import { RANKS_ORDERED, RANK_ABBR, valueToRank, rankValue } from "./rules/rules-reference.js";
 import { computeKarmaAward, getGroupAwardMode } from "./karma-multipliers.js";
 import { computeKarmaTotals } from "./karma-rules.js";

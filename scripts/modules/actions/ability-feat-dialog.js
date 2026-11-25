@@ -3,76 +3,15 @@
 //         fixed required colors; transient rolls start clean instead of inheriting
 //         remembered manual CS/skip-dice state. Honor selfPenaltyCS for all
 //         ordinary ability FEATs so RAW Change Action penalties propagate.
-// ability-feat-dialog.js v1.9.0 - 2026-08-14
 // v1.9.0: Add Agility Combined FEAT for blunt teamwork. Helper targets the
 //         primary attacker; helper/primary bare-hand damage must be within
 //         10 points and helper may not exceed primary. A Green+ Agility FEAT
 //         banks a one-round Combined Assist flag on the primary attacker,
 //         storing helper damage so the Blunt dialog can auto-fill the exact
 //         next-rank-minimum bonus. Uses GM socket update for cross-owner help.
-// ability-feat-dialog.js v1.8.2 - 2026-07-05
 // v1.8.2: Fix ability-FEAT card crash on core 14+. Same applyMode() fix as
 //         generic-feat-dialog v1.5.4 — read core.messageMode (not the legacy
 //         rollMode) and fall back to applyRollMode for v13.
-// ability-feat-dialog.js v1.8.1 - 2026-07-03
-// v1.8.1: ChatMessage.applyRollMode -> applyMode (deprecated in core 14).
-// v1.8.0: Combat Sense FEAT-substitution (audit Step #7 slice 7b). Extends the
-//         slice-4a substitution to a sense power: on Intuition/Fighting/
-//         Agility/Strength FEATs, an owned Combat Sense adds a category radio
-//         (labelled with the RAW context — surprise/block/dodge/escape) that
-//         rolls the higher of the ability vs Combat Sense rank. Card
-//         substitution line generalized (was "Resistance:"-prefixed).
-// ability-feat-dialog.js v1.7.0 - 2026-07-03
-// v1.7.0: Resistance FEAT substitution (powers audit Step #4, slice 4a).
-//         Endurance/Intuition/Psyche FEATs gain TYPE radios for owned
-//         "featReplace" resistance powers (Toxin/Disease, Emotion,
-//         Mental/Magical). Selecting a category rolls the resistance rank
-//         instead of the ability; Standard rolls the ability as normal.
-//         Magical rolls the higher of Psyche vs the magical resistance
-//         rank (RAW: the resistance may be lower than Psyche). Damage
-//         reduction for Magical is separate (slice 4b, mitigation.js).
-// ability-feat-dialog.js v1.6.1 - 2026-06-05
-// v1.6.1: Fix double FEAT roll when detached. Detaching re-runs the render
-//         callback, which was stacking a second click/keydown handler on the
-//         same (persisted) buttons. Bindings are now namespaced off()+on() so
-//         exactly one handler survives across any number of re-renders.
-// ability-feat-dialog.js v1.6.0 - 2026-06-05
-// v1.6.0: Single chat card per FEAT. Dropped the standalone roll.toMessage()
-//         d100 card; the d100 Roll is now attached to the FEAT result card
-//         via rolls[] (DSN still animates) and respects the active rollMode.
-//         Also skip the post-roll dlg.close() when the dialog is rendered in
-//         a Foundry v14 detached window, so a popped-out FEAT window survives
-//         a roll instead of tearing itself (and the window) down.
-// ability-feat-dialog.js v1.5.2 - 2026-05-25
-// v1.5.2: Render FEAT requirements as "Needs:" color pills using Universal Table colors.
-// v1.5.1: Fix Remember checkbox forcing itself back on — it was hardcoded
-//         `checked`. Now renders from a saved flag (last<Ability>SaveSettings)
-//         and persists its own state unconditionally so turning it OFF sticks,
-//         matching generic-feat-dialog's behavior.
-// ability-feat-dialog.js v1.5.0 - 2026-05-06
-// v1.5.0: Strip font/padding/color from select inline styles — moved to
-//         CSS rule .frp-dlg.frp-feat select for centralised tuning.
-//         Only layout (flex, min-width) remains inline.
-// v1.4.0: NEED color readouts inside Lifting/Breaking/Multi-Attack sub-
-//         panels (previously hidden because intensityRow.hide() also hid
-//         #required-feat-text). updateFeatRequirement now writes to all
-//         four targets in a single jQuery selector; only visible ones
-//         are seen.
-// v1.3.0: FEAT green theme — add frp-feat wrapper class, swap inline
-//         #6a0000 label color for var(--feat-deep). Functional FEAT-result
-//         red colors (IMPOSSIBLE, Red column) left intact.
-// v1.2.1: Drop CS reference panel — that's a combat-modifier list (Surprise,
-//         Cover, Blindside) which doesn't apply to ability FEATs. Inline
-//         the CS row instead of using buildCSRow + wireCSPanel.
-// v1.2.0: Compact frp-dlg + frp-header-v3 layout matching Blunt Attack style.
-//         Header banner replaces "Ability Rank" row. FEAT Type radios
-//         become single-line opt-row. Lifting/Breaking/Multiattack panels
-//         collapse to compact frp-box rows. Intensity + Required FEAT
-//         on one line. CS row inlined with live effective-rank recalc.
-//         Roll/Cancel + Remember/Skip dice in single frp-foot.
-//         Switched showFaseripButtonDialog → showFaseripDialog so the
-//         framework footer is hidden; buttons live in content.
-// v1.1.0 - 2026-03-21
 // Standalone ability FEAT dialog. Fighting supports Multiple Combat Actions pre-action FEAT.
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma, setupKarmaControlHandlers } from '../dice/dice-roller.js';

@@ -10,7 +10,6 @@
 //         behavior, so Blinding Touch's own call site is unchanged. The
 //         protected-senses rank gate and Slam/Stun requirement are
 //         unchanged and now shared by both.
-// scripts/modules/actions/blinding-touch-action.js v1.2.0 - 2026-09-09
 // v1.2.0: Fixed-bug — hasProtectedSenses() was a flat "has the item =
 //         total immunity" check, but rules-reference.js's own
 //         protectedSenses desc is "Ignore damaging attacks < rank
@@ -20,12 +19,10 @@
 //         compared against Blinding Touch's own rank: negated only when
 //         this attack's rank is strictly below the target's Protected
 //         Senses rank.
-// scripts/modules/actions/blinding-touch-action.js v1.1.0 - 2026-05-15
 // v1.1.0: Auto-apply target/attacker effect-state shifts to the Fighting
 //         FEAT (mirrors attack-action.js:594 + Health-Drain v1.2.0 +
 //         Paralyzing v1.2.0). Effect shift folded into totalShift alongside
 //         manual CS; breakdown surfaced in info box and chat card.
-// v1.0.0: Touch attack dialog for the Blinding Touch power.
 // RAW: "Blind unprotected target 1-10 rounds. Must achieve Stun or Slam
 //       result. No avoidance unless Protected Senses or helmet."
 // Flow: Fighting FEAT to touch (CS + karma). Color result:

@@ -3,75 +3,8 @@
 //         penetrating damage" block, ignoreDamageGate passed to the check.
 // v1.8.5: battle report revise buttons (br-revise / br-revise-cancel /
 //         br-revise-save).
-// chat-hooks.js v1.8.4 - 2026-10-01
 // v1.8.4: battle report card buttons (br-award / br-edit / br-undo) wired to
 //         apps/battle-report.js.
-// chat-hooks.js v1.8.3 - 2026-10-01
-// v1.8.3: dying-refeat-200 rolls at -2CS while Endurance is impaired
-//         (selfPenaltyCS; RAW Impaired Abilities).
-// chat-hooks.js v1.8.2 - 2026-10-01
-// v1.8.2: stun-recovery-roll chat button handler (house rule
-//         houseRules.stunRecoveryFeat); logic in effects/stun-recovery.js.
-// chat-hooks.js v1.8.1 - 2026-09-03
-// v1.8.1: Full-Auto power-save auto-run passes the card's effective power
-//         rank (powerRankName, fixedRank fallback) and a defender prefill so
-//         CheckAction resolves the save as an Intensity FEAT.
-// chat-hooks.js v1.8.0 - 2026-08-02
-// v1.8.0: Live dying-option buttons (Life, Death, and Health p.31):
-//         dying-stabilize-50 (owner/GM; 50 Karma, +1 stabilizedRounds,
-//         repeatable), dying-refeat-200 (owner/GM; 200 Karma, Endurance
-//         FEAT at current reduced rank — non-white ends dying and applies
-//         Unconscious 1d10 rounds per RAW "If you succeed, you are
-//         unconscious"; white = karma spent, still dying), dying-aid
-//         (GM; halts loss, Unconscious 1d10 HOURS = d10*600 rounds).
-//         Handlers re-validate dying state/ownership/karma per click.
-// chat-hooks.js v1.7.4 - 2026-08-01
-// v1.7.4: administer-antitoxin chat button handler (3b). Treater = selected
-//         token; poison-engine validates First Aid/Medicine + antitoxin item.
-// v1.7.3: Fix automatic-nullification card text (Endurance 2+ ranks below
-//         intensity, not 3+) per adopted Impossible FEATs rule.
-// chat-hooks.js v1.7.2 - 2026-07-03
-// v1.7.2: apply-damage handler reads data-is-magic and forwards isMagic so
-//         a magical resistance reduces magical damage on the manual path
-//         (powers audit Step #4 slice 4b wiring).
-// chat-hooks.js v1.7.1 - 2026-07-02
-// v1.7.1: reflect-attack validates the button's data-bank-id against the
-//         live pendingReflect bank. Stale prompt cards (superseded by a
-//         newer bank or already consumed) now report that plainly instead
-//         of the generic no-pending warning.
-// chat-hooks.js v1.7.0 - 2026-07-02
-// v1.7.0: Energy Reflection redirect handler (Step #3 slice 2). reflect-attack
-//         button consumes the pendingReflect flag (validating the same-round
-//         window), rolls a direct Agility FEAT via rollUniversalTable (no
-//         Karma hooks per RAW), and on green+ routes the banked damage to the
-//         user's target (falling back to the original attacker's token)
-//         through applyDamageToTargets so the new target defends normally.
-// chat-hooks.js v1.6.0 - 2026-04-30
-// v1.6.0: Deal Hold Damage and Escape Attempt dialogs wrapped in frp-dlg + frp-header-v3.
-//         Hold Damage now resolves attackerUuid → name for the header banner;
-//         slider/target/armor boxes converted to frp-box pattern. Escape Attempt
-//         uses blue header gradient (matches escaping-action.js standalone),
-//         compact CS row, fx-grid effect preview, frp-foot checkboxes.
-// v1.5.9: Drop deprecated CONST.CHAT_MESSAGE_TYPES.OTHER on the damage
-//         chat card. Removed in v13 (replaced by CHAT_MESSAGE_STYLES).
-//         Default non-roll style is OTHER already.
-// v1.5.8: Remove chat button click handlers and dead code
-// v1.5.6: Fix Apply Damage and Resolve Slam buttons not working in semi mode - canDriveAutoSaves bail was blocking all button handler registration for non-owners
-// v1.5.7: Fix reload - prefer token actor over world actor (unlinked tokens have separate item copies)
-// v1.5.6: Fix reload handler - use pointerEvents/opacity disable for <a> tag (disabled prop is button-only)
-// v1.5.5: Fix reload handler - resolve synthetic token actors via canvas.tokens
-// v1.5.4: Add reload button handler for out-of-ammo chat card
-// v1.5.3: Fix dodge reapply - add movementMult and selfPenaltyCS to AE changes (was missing same as defense-action.js)
-// v1.5.2: Fix createEvadingEffect - pass evadeSuccessful/autoHit to applyEvade for proper flag tracking
-// v1.5.1: Wire dodge CS penalty to Active Effect changes (defenseShift/defenseShiftRanged)
-// v1.5.0: Add grapple-back handler for Reverse escape result
-// v1.4.0: Add hold-damage handler for Full Hold grappling damage
-// v1.3.0: Add detailed logging for escape effect removal debugging
-// v1.2.0: Fix escape karma default unchecked, add grappled effect removal on successful escape
-// v1.1.0: Add kill-save handler (conscious dying), update death-save to pass fromZeroHealth
-// v1.0.4: Add apply-collision-damage handler that applies directly to UUID
-// v1.0.3: Add stopImmediatePropagation to collision handlers to prevent duplicate dialogs
-// v1.0.2: Add .calculate-slam-collision handler for slam result collision buttons (both standalone and collapsible)
 // scripts/modules/actions/chat-hooks.js
 import { ActionDispatcher } from "./action-dispatcher.js";
 import { resolveCombatMode } from "./action-dispatcher.js";

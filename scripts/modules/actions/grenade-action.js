@@ -9,44 +9,13 @@
 //   only when Remember is ticked). A range beyond the Strength maximum is
 //   refused with the dialog left open (it used to cancel the throw).
 //   Roll, range penalty, scatter, blast and saves are unchanged.
-// scripts/modules/actions/grenade-action.js v3.5.0 - 2026-09-05
 // v3.5.0: RULED 2026-09-05 thrown range penalty: -1CS per area to the target,
 //   own area 0, via the range kernel (thrownRangePenalty); Strength range is
 //   the cap. Replaces the free first area. LOS caps render as "LOS".
-// scripts/modules/actions/grenade-action.js v3.4.0 - 2026-08-02
 // v3.4.0: Initial-blast saves resolve in PARALLEL (Promise.all) so each
 //   caught hero's karma declaration window (area-hazard-behavior v1.3.0,
 //   10s auto-decline) opens simultaneously on the owning players' clients
 //   instead of stacking serially. Dedupe unchanged (_resolvedTokenIds).
-// scripts/modules/actions/grenade-action.js v3.3.0 - 2026-04-22
-// v3.3.0: Intensity grenades now place a visible Drawing overlay alongside the
-//   Region (v14 Regions are only visible on the Regions layer, so without
-//   an overlay the hazard was logically functional but invisible on canvas).
-//   Per-type fillColor via resolveHazardVisual: smoke=gray, tear gas=yellow-
-//   green, KO=violet, flash=bright yellow. AreaTemplate.create returns the
-//   drawing id in addition to the region; dismiss() cleans up both.
-// v3.2.0: Intensity grenades now attach the "msh-faserip.areaHazard" Region
-//   behavior (v14) to the persistent Region they create. The behavior
-//   automatically rolls saves on token entry/exit and applies/removes status
-//   effects. The initial blast (tokens already inside when the Region is
-//   placed) is handled by calling behavior.resolveForToken on each caught
-//   token — tokenEnter doesn't fire retroactively for pre-existing tokens.
-//   Per-grenade-type config (smoke = blinded-while-inside, tear gas = 1-round
-//   residual on exit, KO gas = fixed-duration effect, flash = one-shot) is
-//   resolved in resolveHazardBehaviorConfig() below.
-// v3.1.0: Scatter on miss, per Judge's Book.
-//   - Read unified item fields (system.areaRadius/damage/damageType/intensityRank)
-//     with grenadeRadius/grenadeDamage/grenadeDamageType/grenadeIntensity fallback.
-//     Delete the GRENADE_TYPES hardcoded table — mechanics come from item data.
-//   - One-phase AreaTemplate placement (v9.0.0). Persistent Region only for lingering
-//     hazards (smoke/gas/flash); ephemeral for damage grenades (no stuck Region on hit).
-//   - Shake profile resolved via DAMAGE_TYPE_SHAKE map in action-utils; one line instead
-//     of per-grenade-type baked-in values.
-//   - Smoke/gas/flash (effectType === "intensity") delegate to IntensityAction — no more
-//     parallel effect pipeline in this file.
-// v2.4.0: v14 screen shake on hit via chat-message flag.
-// v2.3.0: Fix range penalty off-by-one. Fix Kill result logic for frag/energy.
-// v2.2.0: Template placement happens BEFORE roll.
 
 import { RangedAttackAction, thrownRangePenalty, rangeLabel } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";

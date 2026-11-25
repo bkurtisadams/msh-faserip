@@ -2,7 +2,6 @@
 // v3.4.0: Dialog scaffolding (header, Karma and Blindside rows, effect grid,
 //         footer, titlebar and width setup, Enter-to-roll) now comes from
 //         attack-dialog-kit.js.
-// charging-action.js v3.3.0 - 2026-09-09
 // v3.3.0: Fix dialog ballooning to full width on checkbox/select
 //         toggle — same bug and fix as energy-action.js v3.4.2,
 //         contact-action.js v1.3.0, force-action.js v3.7.0. The
@@ -13,68 +12,8 @@
 //         the dialog root so every control (Pull Punch, Blindside,
 //         etc.) keeps it pinned regardless of which internal handler
 //         (updatePreview or otherwise) fires.
-// charging-action.js v3.2.0 - 2026-09-05
 // v3.2.0: Blindside declaration carried to the target's Slam/Stun/Kill
 //         FEAT, which then refuses the Karma offer (RAW).
-// scripts/modules/actions/charging-action.js v3.2.0 - 2026-09-05
-// v3.2.0: Automatic situational modifiers — Higher Ground pre-selected in the
-//         sit dropdown when the tokens justify it (cs-modifiers v3.6.0).
-// scripts/modules/actions/charging-action.js v3.1.0 - 2026-09-02
-// v3.1.0: Kernel slice 5g. Character target: Ch column via the shared
-//         _executeSingleAttack kernel gate (Slam / Stun tokens, cap allowed).
-//         To-hit movement bonus via kernel chargeToHitShift (+1CS/area, max
-//         +3). Shift-Z cap block retired — shared shiftRank already clamps at
-//         Shift-Z and leaves Class ranks unshifted. Object target: result via
-//         resolveKernelAttack, impact via kernel resolveChargeImpact — the
-//         material absorbs min(damage, material) and that amount rebounds
-//         through the attacker's BA on every hit (was: rebound only when
-//         material > damage, and it returned the full material value).
-//         Remember flags written in ONE actor.update.
-// scripts/modules/actions/charging-action.js v3.0.5 - 2026-04-19
-// v3.0.5: Gate character-target rebound on isHit && color !== "white". Move
-//         the rebound block into a postHitCallback so it only fires when the
-//         attack actually connects. Previously fired unconditionally after
-//         _executeSingleAttack returned — rebound was generating phantom
-//         damage cards on evaded/dodged/missed charges (e.g. Rhino charges
-//         Counter-Strike, Counter-Strike evades, rebound card still fires).
-//         No contact = no absorption = no rebound. Object path already
-//         gated correctly (line 844) — unchanged.
-// v3.0.4: Attacker BA lookup now honors armorPhysical override (mirrors v3.0.3
-//         target-side fix). Fixes attacker-side rebound absorption and
-//         charging damage base when attacker has armorPhysical ≠ value.
-// v3.0.3: Target BA auto-populate now honors armorPhysical override on the
-//         Body Armor power (mirrors getBodyArmorValues() fallback order).
-//         Previously read system.value only, causing a rebound-vs-mitigation
-//         mismatch when armorPhysical ≠ value (e.g. Wartorn: value 14,
-//         armorPhysical 16 — rebound used 14, mitigation used 16).
-// v3.0.2: Fix rebound to match RAW + book example.
-//         Rebound fires whenever target has BA > 0 (not only when target
-//         fully absorbs the charge). Rebound amount = min(damage, targetBA),
-//         the portion absorbed by the target's armor. Attacker takes
-//         max(0, rebound - attackerBA). Matches Advanced Set example:
-//         Gd End 10-speed (30 dmg) vs Ex BA (20) + Gd attacker BA → target
-//         takes 10, attacker takes 10.
-// v3.0.1: Fix rebound calculation — rebound amount is the attacker's rejected
-//         damage (rawDamage), not the target's BA value. Previous formula
-//         dramatically over-rebounded against high-BA targets (Thing, Hulk).
-// v3.0.0: Port to v3 compact dialog layout matching blunt/edged/grappling
-//         - frp-dlg wrapper, frp-header-v3 banner, titlebar mode buttons, 360px
-//         - Movement box (orange), damage box (red), target type toggle (blue)
-//         - CS box with situational dropdown, sit tags auto-build csNotes
-//         - Pull/Karma in frp-opts-box, frp-fx-grid, frp-foot
-// v2.0.1: Fix damageType "physical-blunt" → "physical-charging" so blocking armor
-//         exclusion and other charging-specific rules apply correctly
-// v2.0.0: Refactor - dialog only, delegates character target resolution to _executeSingleAttack.
-//         Object targets get a simple card. Rebound handled post-pipeline.
-// v1.5.0: Add inline Slam/Stun results and auto-trigger effects in Full Auto mode
-// v1.4.4: Fix rebound button to use apply-collision-damage handler, move mode checks earlier
-// v1.4.3: Add more debug logging, pass targetUuid to actions box, simplify conditions
-// v1.4.2: Fix damage application - only auto-apply in Full mode, add debug logging
-// v1.4.1: Fix damage application - actually apply damage to targets
-// v1.4.0: Compact chat card matching modern attack-action format
-// v1.3.0: Compact dialog layout matching blunt attack, fix CS persistence bug
-// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
-// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
   setupKarmaControlHandlers, 

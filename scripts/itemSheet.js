@@ -1,40 +1,14 @@
 // itemSheet.js v2.8.0 - 2026-11-19
 // v2.8.0: Power context equipLink (From equipment dropdown and status);
 //         submit stores the linked item's name beside its id.
-// itemSheet.js v2.7.0 - 2026-11-19
 // v2.7.0: Context for the new Edit Power fields (power-sheet-actor-view.mjs):
 //         Ultimate Skill talent picker, Raise Lowest Ability, Karma costs and
 //         the Active Effects list. Submit maps the Emotion Control radio to
 //         singleEmotionBonus and keeps resistanceType = first Invulnerability
 //         form. After save: the chosen talent's Rank Override is set (the
 //         previous one cleared) and the Raise Lowest +20 effect is kept in step.
-// itemSheet.js v2.6.0 - 2026-11-19
 // v2.6.0: Power sheet context gains `rankCheck` (power-validation.mjs): the
 //         minimum rank resolved against the actor, with a below-minimum warning.
-// itemSheet.js v2.5.0 - 2026-11-19
-// v2.5.0: Power sheet context gains `limit` (power-limitations.mjs) for the
-//         rebuilt Limitation section and its character-wide warnings.
-// itemSheet.js v2.4.1 - 2026-11-13
-// v2.4.1: Fixed-bug — the Stunt Power toggle saved with render:false, so the
-//         actor sheet never redrew and the Powers tab badge stayed stale.
-// itemSheet.js v2.4.0 - 2026-11-13
-// v2.4.0: Stunt powers (flag isStuntPower) open the short
-//         stunt-power-sheet.html: parent power and shift, Attack, Target
-//         Save, effects and description, with the Stunts-tab status. The
-//         Stunt Power box toggles between the two sheets. Sheets refresh
-//         when the owner's stunts change.
-// itemSheet.js v2.3.0 - 2026-11-13
-// v2.3.0: context.ps2 carries the power sheet view model from
-//         power-sheet-view.mjs.
-// itemSheet.js v2.2.0 - 2026-11-11
-// v2.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
-// v2.1.2: carrierToxinOptions feeds the Target Save panel's Poisoned toxin
-//         dropdown; carrierToxinRanks removed with the Venomous block.
-// itemSheet.js v2.1.1 - 2026-08-01
-// v2.1.1: carrierToxinOptions (TOXINS catalog) + carrierToxinRanks in the
-//         power sheet context for the Venomous fields.
-// itemSheet.js v2.1.0 - 2026-04-25
-// v2.1.0: V2 form-snapshot bug workaround
 //
 //   ItemSheetV2 passes _prepareSubmitData a `form` argument that is a
 //   different DOM node than the on-screen form — same input count, but
@@ -53,14 +27,6 @@
 //   upstream, the live-form rescan becomes redundant overhead.
 //   See NOTES.md for the diagnostic trail.
 //
-// v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
-// v1.14.0: Power sheet v2 layout redesign — reorder fields, rank→value auto-fill, 520px width, conditional special strength
-// v1.13.0: Power sheet v2 — single scrollable form, HQ-style, category-driven sections
-// v1.12.0: Add Effects tab to power sheet with ActiveEffect presets and management
-// v1.11.0: Extract contact sheet to standalone contactSheet.js
-// v1.9.0: Redesign talent sheet to HQ-style with fieldsets, auto-fill from specialty data, rule summary
-// v1.8.0: Add SFX preview buttons and volume controls to power sheet
-// v1.7.0: Power Sheet layout reorganization
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 import { buildPowerSheetView } from "./power-sheet-view.mjs";

@@ -7,7 +7,6 @@
 //         { key: new foundry.data.operators.ForcedDeletion() } with a
 //         same-shape "-=key"/null fallback if that class isn’t present.
 //         Deletion targets are unchanged.
-// scripts/absorption-migration.js v1.0.0 - 2026-09-09
 // One-shot world migration for RAW Absorption (dataMigrationVersion 3):
 //   - removes the never-executed absorptionTemp.* ongoing records and their
 //     AEs (mitigation v3.1.x temp-HP model)

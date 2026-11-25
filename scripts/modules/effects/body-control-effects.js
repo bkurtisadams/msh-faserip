@@ -3,7 +3,6 @@
 //         psychic damage), Invisibility + Blending (invisible status badge;
 //         sensing left to GM per Kurt, no auto sense-gate). Density Shift-0
 //         immunity still deferred to the mass-choice UI.
-// scripts/modules/effects/body-control-effects.js v1.0.0 - 2026-07-04
 // Auto-build state Active Effects from body-control powers (audit Step #8,
 // slice 8a-i), mirroring defense-effects.js. Toggled by the power's isActive
 // (the sheet's bolt); synced from the item create/update/delete hooks in

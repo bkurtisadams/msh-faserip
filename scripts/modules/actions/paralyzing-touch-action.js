@@ -9,19 +9,6 @@
 //         hardcoded color:#fff on the white-result background (#f5f5f0),
 //         making the text invisible. Use colorFg(resultColor) like the
 //         RESISTED block already does.
-// v1.1.2: Replace deprecated game.settings.get("core","rollMode") with v14's
-//         "messageMode" via getRollMode() helper (with v13 fallback).
-// v1.1.1: Fix applyColumnShifts return shape. The helper returns
-//         { index, name, totalCS } not a bare rank string; rollUniversalTable
-//         was being called with the object, producing "[object Object] not
-//         found in universal table". Unwrap via .name.
-// v1.1.0: Add standard combat-dialog elements to match Blunt Attack pattern:
-//         CS row with reference panel for Fighting FEAT (other-target path),
-//         karma checkbox with post-roll decision dialog for both Fighting
-//         and self-End FEATs. Karma not added to target's resistance End
-//         FEAT (separate scope — target-side decision, GM-managed for v1).
-// v1.0.1: Dialog layout normalized to match Health-Drain Touch.
-// v1.0.0: Initial. Save-or-KO touch dialog.
 
 import { showFaseripDialog } from "./dialog-shim.js";
 import { getRollMode } from "./action-utils.js";

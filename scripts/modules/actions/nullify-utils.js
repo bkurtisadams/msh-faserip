@@ -1,7 +1,6 @@
 // scripts/modules/actions/nullify-utils.js v1.0.1 - 2026-07-31
 // v1.0.1: Fix requiredColorFromDelta comments — thresholds unchanged; auto-fail
 //         is intensity 2+ ranks above ability per adopted Impossible FEATs rule.
-// scripts/modules/actions/nullify-utils.js v1.0.0 - 2026-03-22
 // Shared utilities for nullify.js and nullify-aura.js.
 // Extracted to break circular import dependency.
 

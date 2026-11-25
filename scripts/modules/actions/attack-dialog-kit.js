@@ -1,16 +1,8 @@
 // scripts/modules/actions/attack-dialog-kit.js v1.5.0 - 2026-11-11
 // v1.5.0: footerHtml rollLabel (the grenade dialog's button reads Throw).
-// scripts/modules/actions/attack-dialog-kit.js v1.4.0 - 2026-11-11
 // v1.4.0: paidEffectRowHtml cap labels (Shooting caps at Bullseye, not Stun).
-// scripts/modules/actions/attack-dialog-kit.js v1.3.0 - 2026-11-11
 // v1.3.0: headerHtml verb / statLabel / statText; footerHtml ids option;
 //         fxGridHtml hover tips (grapple-family dialogs).
-// scripts/modules/actions/attack-dialog-kit.js v1.2.0 - 2026-11-11
-// v1.2.0: paidEffectRowHtml / wirePaidEffectToggle (the Karma-paid Effect cap
-//         shared by the edged melee and thrown edged dialogs).
-// scripts/modules/actions/attack-dialog-kit.js v1.1.0 - 2026-11-10
-// v1.1.0: headerHtml titles option (thrown dialogs render no hover titles);
-//         pullDamageInputHtml.
 // Shared pieces of the v3 compact attack dialogs: prefs and remembered flags,
 // target summary, header / option rows / footer markup, dialog frame setup
 // and the common control wiring. Markup matches what the per-type dialogs

@@ -7,7 +7,6 @@
 //          - processOngoingEffects runs rest-system processAutoRecovery per
 //            actor before the ongoing effects (automatic Recovery).
 //          - Reaching Shift-0 while dying runs rest-system checkDisabilities.
-// scripts/modules/effects/ongoing-engine.js v1.14.0 - 2026-10-01
 // v1.14.0: Healing/regeneration audit.
 //          - restoreOneEnduranceRank now maintains the Impaired Endurance
 //            record: renames it on a partial restore and deletes it at cap
@@ -25,7 +24,6 @@
 //            hourly Healing now runs for a Solar character and only pauses
 //            while Solar is the one healing.
 //          - processOneEffect: dead `ae || dyingAE` reference removed.
-// scripts/modules/effects/ongoing-engine.js v1.13.0 - 2026-09-09
 // v1.13.0: healPointsNow() — a one-shot heal for stunts adjudicated by the
 //         Judge at the table (e.g. Electrical Manipulation's heal-via-
 //         absorption stunt: up to Power rank per round, only while he's
@@ -34,134 +32,6 @@
 //         write back real+pool) as a single call with no ongoing-effect
 //         registration — deliberately not an auto-ticking timer, since
 //         nothing here can detect "is he touching a live current".
-// scripts/modules/effects/ongoing-engine.js v1.12.0 - 2026-09-09
-// v1.12.0: Absorption onto the powers kernel. applyAbsorptionTempHPOngoing
-//          removed — it registered a stat.loss/health record that
-//          executeEffect never dispatched (fixed-bug: the temp HP never
-//          decayed); the pool now lives in absorption-pool.js with its own
-//          clock. executeHealthHeal heals REAL Health (health.value minus the
-//          held pool) so Regeneration keeps working while a pool is held
-//          instead of seeing value >= max and disabling itself.
-// scripts/modules/effects/ongoing-engine.js v1.11.0 - 2026-09-05
-// v1.11.0: RULED 2026-09-05 — max Health tracks Endurance by DELTA (relative),
-//          replacing the absolute F+A+S+E recompute in every lose/restore path
-//          (_recalcMaxHealth -> relativeMaxHealth, exported for rest-system).
-// v1.10.0: Poisons onto the kernel. loseOneEnduranceRank (poison / Healing-
-//          power failure path) now takes the reduced rank's HIGHEST number
-//          from enduranceLossStep and records originalEndurance /
-//          originalEnduranceValue on the first loss, so the Impaired Endurance
-//          heal path can restore it. New export ensureImpairedEnduranceEffect
-//          (shared creation of the Impaired Endurance record; penaltyCS 0 for
-//          poison per PR2, -2 for dying).
-// scripts/modules/effects/ongoing-engine.js v1.9.0 - 2026-09-05
-// v1.9.0: Slice 7b — dying spiral onto faserip-rules damage. RULED
-//         2026-09-05: a reduced Endurance rank's number is the HIGHEST of
-//         that rank (Ex -> Gd counts as 15, not 10) — applyDyingOngoing and
-//         _processDyingRoundInner take the number from enduranceLossStep;
-//         restoreOneEnduranceRank and executeEnduranceGain step via
-//         enduranceRestoreStep (intermediate ranks highest, original rank
-//         gets its pre-damage number back from the new originalEnduranceValue
-//         actor flag). Health/max-Health recomputation unchanged (ERRATA OPEN).
-// v1.7.9: Poison integration. processOneEffect hard-skips "poison" (owned by
-//         poison-engine.js processPoisonRound). _processDyingRoundInner defers
-//         its rank step when the endRankLoss flag shows poison already took
-//         this turn's rank (RAW: poison losses override, max 1 rank/round).
-// v1.7.8: loseOneEnduranceRank export — mirror of restoreOneEnduranceRank.
-//         Reduces End rank by one step, recalcs max Health, drops current HP
-//         by the delta. Returns belowFeeble flag for the RAW "healer dies"
-//         case (caller decides death pipeline integration). Used by Healing
-//         power on End-rank-mode FEAT failure.
-// v1.7.7: restoreOneEnduranceRank export — reusable one-shot rank-step
-//         helper for Recovery power FEAT and any future End-restore caller.
-//         getCurrentGameDate export for oncePerDay gating outside this file.
-// v1.7.6: applyAbsorptionTempHPOngoing — cliff decay at round+10 for temp HP
-//         granted by Absorption power. Per-source AE keying so independent
-//         absorptions decay on their own clocks. stat.loss type, capAtMax:false
-//         so the strip succeeds even when current HP is above max.
-// v1.7.5: Regen reliability — noDamage gate now accepts simultaneous
-//         lastDmgWT === startedAt as "before start" (was strict <,
-//         silently stalled when recordDamage and timer-init landed on
-//         the same worldTime second). executeHealthHeal stamps
-//         autoDisabledAtCap when disabling an at-cap effect, and
-//         interruptOngoingEffects re-arms (enables + nulls startedAt)
-//         any AE carrying that flag on fresh damage, so resting after
-//         a full-heal-then-new-damage cycle no longer requires a
-//         manual AE toggle. User-disabled effects (no flag) untouched.
-// scripts/modules/effects/ongoing-engine.js v1.7.4 - 2026-04-19
-// v1.8.0: Dying tick + Shift-0 warning messages carry the RAW option
-//         buttons (50-Karma stabilize / 200-Karma re-FEAT / Aid) via
-//         _dyingButtonsHtml; handlers in chat-hooks.js v1.8.0. Removed the
-//         half-built reFeatOnSlip flag stub (nothing ever set it; the
-//         button flow replaces it, correctly rolling at the reduced rank
-//         and applying RAW's unconscious-on-success price).
-// v1.7.4: Migrate legacy `icon:` to `img:` on the processDyingRound
-//         Impaired Endurance creation site (line ~731). The sibling
-//         applyDyingOngoing creation site (line ~1124) already used img.
-//         In v14 the AE field was renamed icon → img; token HUD reads
-//         img at creation time, and CTT's icon→img migration shim fires
-//         too late to affect the initial badge render. Rare in practice
-//         — applyDyingOngoing fires first and this branch only creates
-//         when no existing impaired effect is found on a dying round —
-//         but worth the hygiene fix.
-// v1.7.3: Add duration:{expiry:"roundEnd"} to Impaired Endurance AE
-//         creations (processDyingRound missing-effect branch + the
-//         applyDyingOngoing immediate-loss branch). Required for v14's
-//         isTemporary rule `!!duration.expiry || Number.isFinite(
-//         duration.value)` — without it the token HUD badge does not
-//         render. No auto-expiration because there's no duration.value;
-//         our healImpairedEndurance path removes the AE rank-by-rank
-//         once Endurance is restored. Third site fixed in rest-system.js
-//         v1.4.3 at the same time.
-// v1.7.2: applyDyingOngoing now disables any active Healing AE on the
-//         actor as it begins dying. Healing has interruptOnDamage:false
-//         (it's re-registered on each damage event rather than disabled)
-//         so interruptOngoingEffects leaves it alone — but a dying
-//         character should not have an active hourly Healing timer.
-//         Defensive safety net paired with rest-system.js v1.4.1 which
-//         prevents the registration at the source. Also clears the
-//         ongoing.healing.startedAt flag so a future re-registration
-//         starts its clock fresh.
-// v1.7.1: Fix Impaired Endurance `lastHealed` initialized with Date.now()
-//         (wall-clock ms) at AE creation in two spots: processDyingRound's
-//         missing-effect branch (~line 710) and applyDyingOngoing's
-//         immediate-loss branch (~line 1078). Every read and every other
-//         write uses game.time.worldTime (game seconds), so the mismatch
-//         made `game.time.worldTime - lastHealed` produce a huge negative
-//         number — `elapsed >= required` never true → rank never heals.
-//         In the normal dying → stabilize flow, rest-system.js overwrites
-//         `lastHealed` at stabilization, which papered over the bug; but
-//         any path that checked the heal before stabilization would fail.
-//         Both sites now use game.time.worldTime for consistency.
-// v1.7.0: RAW rules fixes for impaired endurance and stat.loss/stat.gain health sync.
-//         - OE1: Impaired Endurance effect now uses selfPenaltyCS: -2 (applies
-//           to all FEATs per RAW "-2CS on all actions"). Previously used
-//           attackShift: -2 which only penalized attacks.
-//           Fixed in both applyDyingOngoing (initial rank loss) and
-//           processDyingRound (subsequent rank losses).
-//         - OE9: executeEnduranceLoss now drops current health alongside
-//           max health when a rank step happens. Also applies to the
-//           non-rank-step branch (clamp current HP to new max).
-//         - OE10: executeEnduranceGain now reads the canonical RANKS_ORDERED
-//           instead of an inline rank list (which had "Shift X" with space
-//           and no Class ranks). Clamps to originalEndurance per RAW
-//           "cannot heal above pre-damage rank." Restores max HP and adds
-//           the delta to current HP so Endurance healing actually restores
-//           Health (per Health = F+A+S+E).
-// v1.6.0: Dying updates pass { mshDyingTick: true } so init.js updateActor hook skips
-//         spurious DAMAGE DETECTED processing for endurance rank loss HP changes.
-//         Health reduction is correct per rules: Health = F+A+S+E, so both current and
-//         max Health drop when Endurance rank drops during dying.
-// v1.5.0: Robot origin check — death treated as deactivation (reactivatable, no karma loss).
-// v1.4.0: Consolidated dying initiation into applyDyingOngoing (immediate first rank loss,
-//         Impaired Endurance, HP reduction, chat). All callers now use this single entry point.
-//         Removed duration from dying AE (lifecycle managed by engine, not expiry).
-//         processDyingRound handles subsequent rank losses (1 per FASERIP turn via combatRound hook).
-// v1.3.0: Active-scene-only processing (getActiveSceneActors replaces getAllTokenActors).
-//         processOneEffect hard-skips "dying" effectId — dying only via processDyingRound.
-//         Legacy migration sets combatOnly: true, no immediate processing.
-// v1.2.0: Legacy dying AE migration: auto-registers ongoing config, strips duration.
-// v1.1.0: Full dying mechanics via processDyingRound() — stabilization, HP reduction,
-//         Impaired Endurance effect, Shift-0 warning/death, re-FEAT, combat mods.
 // Generic periodic effect engine for FASERIP.
 // Handles Regeneration, Solar Regeneration, Recovery, Dying, Absorption decay,
 // Corrosive damage, and any future timed effects via a declarative config schema.

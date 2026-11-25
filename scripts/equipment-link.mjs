@@ -1,18 +1,10 @@
 // equipment-link.mjs v1.2.0 - 2026-11-19
 // v1.2.0: Migration no longer makes power items: it clears the old list and
 //         keeps its entries as a line in the item's Notes (version 3).
-// equipment-link.mjs v1.1.0 - 2026-11-19
 // v1.1.0: Migration reads lists saved as objects ("0", "1"...) and names a
 //         nameless entry after its equipment; rerun as migration version 2.
-// equipment-link.mjs v1.0.1 - 2026-11-19
 // v1.0.1: Fixed-bug: migration called flatMap on the scenes collection
 //         (not an array); now uses .contents.
-// equipment-link.mjs v1.0.0 - 2026-11-19
-// v1.0.0: Powers granted by equipment. A power whose Source is Equipment
-//         stores the granting item's id (system.equipmentId) and name
-//         (system.equipmentName). While that item is broken or no longer on
-//         the character the power can't be used and its effects are
-//         suppressed (FaseripActiveEffect.isSuppressed).
 
 const CATEGORY_LABEL = {
   weapon: "Weapon", other: "Weapon", armor: "Armor", gear: "Gear", device: "Device",

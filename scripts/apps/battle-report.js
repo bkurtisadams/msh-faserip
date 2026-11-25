@@ -6,11 +6,9 @@
 //         Editor adds foes by name and rank (no token needed) and lists
 //         awards and penalties: shared, each hero, or one named hero, with a
 //         label and amount (negative for a penalty).
-// scripts/apps/battle-report.js v1.1.1 - 2026-10-03
 // v1.1.1: Crime editor layout: "+ Crime" sits under the Crimes label, each
 //         crime takes two rows (type dropdown with its remove button, then
 //         Stopped and Arrested) so the dropdown shows the full crime name.
-// scripts/apps/battle-report.js v1.1.0 - 2026-10-01
 // v1.1.0: Karma UI slice 2 — the card edits in place, retiring the pop-out
 //         encounter editor. Edit (GM) opens an edit view on the card: name,
 //         heroes present, foe counts (0 removes) and "Add selected tokens",
@@ -20,7 +18,6 @@
 //         re-applied on render). openBattleReportEditor posts a fresh card in
 //         edit mode and removes older cards for the same encounter, so each
 //         encounter has one live card; the Ledger's Edit and Add/Import use it.
-// v1.0.0: Battle report chat card (karma UI refactor, slice 1).
 
 const SCOPE = "msh-faserip";
 const FLAG = "battleReport";

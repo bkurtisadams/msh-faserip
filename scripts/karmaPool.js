@@ -2,18 +2,12 @@
 // v2.4.0: KarmaPoolSheet no longer extends Foundry's V1 DocumentSheet. It is
 //         a plain class used by KarmaPoolSheetV2 (karma-sheet-v2.js), which
 //         is the window.
-// karmaPool.js v2.3.0 - 2026-11-11
 // v2.3.0: The ten V1 dialogs here (Contribute, Use, Withdraw, Add Hero,
 //         Remove, the four GM tools and Dissolve) open as V2 dialogs through
 //         dialog-shim.js; <form> wrappers inside their content became <div>.
-// karmaPool.js v2.2.0 - 2026-10-01
 // v2.2.0: Optional rule "Locking Pool" (karmaPoolLocked): withdrawals refused,
 //         Use Pool Karma limited to die rolls, dissolving requires the
 //         members' unanimous vote (confirmed by the GM).
-// karmaPool.js v2.1.0 - 2026-07-22
-// v2.1.0: Karma recompute sites delegate to computeKarmaTotals (karma-rules.js).
-// karmaPool.js v2.0.0 - 2026-02-28
-// v2.0.0: Rewrite - fix double-deduct, consistent karma calc, add GM award to pool, clean UI
 import { computeKarmaTotals } from "./karma-rules.js";
 import { isKarmaPoolLocked } from "./karma-multipliers.js";
 import { showFaseripButtonDialog, showFaseripConfirm } from "./modules/actions/dialog-shim.js";

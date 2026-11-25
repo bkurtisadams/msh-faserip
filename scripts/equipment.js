@@ -2,7 +2,6 @@
 // v2.5.0: Granted Powers section: the character's powers linked to this item
 //         (Open / Unlink / Link). Replaces the unused name-and-rank list and
 //         its dead add/remove listeners.
-// equipment.js v2.4.0 - 2026-11-11
 // v2.4.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v2.3.0: v14 crash fixes + dead code removal. Bare duplicate() → foundry.utils.duplicate
 //         (global removed in v14; add/remove-granted-power and remove-custom-ability threw
@@ -12,24 +11,6 @@
 //         _normalizeDamageType + .roll-equipment listener): checked nonexistent
 //         system.modes, applied damage on a Miss, used removed evaluate({async:true});
 //         actorSheet/init route through equipment-action-dialog, so nothing called it.
-// v2.2.0: Fix empty Material/Price selects (rankListMortal was never set in context;
-//         rank-options.hbs iterated undefined and emitted zero options). Port live-form
-//         rescan into _prepareSubmitData so V2's partial formData no longer drops the
-//         Damage/Damage-Type and other combat-section fields on submitOnChange (same
-//         workaround itemSheet.js v2.1.0 applies).
-// v2.1.0: Per-attack-mode Resistance FEAT fields (resistRank/resistAbility/resistEffect/
-//         resistDuration/resistDescription). Multi-mode weapons can now declare an
-//         intensity-style FEAT-to-resist alongside their damage attack — e.g. Air Pistol
-//         with Laughing Gas (Incredible vs Psyche), Paralysis Gas (Remarkable vs Endurance),
-//         Gravity Enhancer (Excellent vs Strength) modes. New mode default seeds blank
-//         resist fields. _prepareSubmitData reconstructs the new fields when expandObject
-//         turns the indexed form names into a numeric-keyed object.
-// v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
-//         _updateObject → _prepareSubmitData. Manual tab wiring for .sheet-tabs nav.
-// v1.5.0: Expanded categories (gear subtypes, device, armor resistances). Computed display flags
-//         in getData() — no duplicate form fields. Array reconstruction in _updateObject.
-// v1.4.0: Rewrite effects to use standard changes[] — system.* for mechanics, faserip.token.* for visuals
-// v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { showFaseripButtonDialog } from "./modules/actions/dialog-shim.js";
 import { buildGrantedPowersView, linkPowerToEquipment, unlinkPower } from "./equipment-link.mjs";

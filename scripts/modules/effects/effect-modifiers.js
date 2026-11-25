@@ -2,9 +2,6 @@
 // v1.4.0: getAttackShiftBreakdown now includes selfPenaltyCS (Dodging -2CS) in attack shift total and breakdown
 // v1.3.3: Fix evasion bonus - only applies in exactly createdRound + 1, expires after that
 // v1.3.2: Update getEvasionAttackBonus to look for isEvasionBonus effect (not isEvading)
-// v1.3.1: Fix evasion bonus - check createdRound so bonus only applies in next round, better target matching
-// v1.3.0: Add getEvasionAttackBonus and consumeEvasionAttackBonus for evasion next-round bonus
-// v1.2.0: Add getAttackShiftBreakdown and getDefenseShiftBreakdown for effect name display
 // Effect modifier system for FASERIP combat
 // Reads combat modifiers from actor.system.combatMods (populated by Active Effects)
 

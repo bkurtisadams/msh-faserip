@@ -1,7 +1,6 @@
 // grabbing-action.js v2.2.0 - 2026-11-11
 // v2.2.0: Dialog scaffolding (Karma row, effect grid, footer, titlebar and
 //         width setup, Enter-to-roll) now comes from attack-dialog-kit.js.
-// grabbing-action.js v2.1.0 - 2026-09-09
 // v2.1.0: Fix dialog ballooning to full width on checkbox/select
 //         toggle — same bug and fix as energy-action.js v3.4.2,
 //         contact-action.js v1.3.0, force-action.js v3.7.0. The
@@ -11,28 +10,8 @@
 //         re-assert it via a delegated change/input listener on
 //         the dialog root so every control (including the CS toggles)
 //         keeps it pinned regardless of which internal handler fires.
-// scripts/modules/actions/grabbing-action.js v2.0.1 - 2026-09-02
 // v2.0.1: Third cell is a proper COMPARATOR cell via the template's
 //         thirdCellHtml slot (was squeezed into the red DAMAGE cell).
-// scripts/modules/actions/grabbing-action.js v2.0.0 - 2026-09-02
-// v2.0.0: Chat card on the shared attack-card.hbs template (banner, ROLL /
-//         STRENGTH / COMPARATOR cells, effect block, actions) — matches the
-//         Grappling and Escaping cards; hand-built HTML retired. Break block
-//         text follows the RAW second roll (material column, white = breaks).
-// v1.8.0: Kernel slice 5f. Result via resolveKernelAttack on the Gb column
-//         with itemized shifts (take / grab / break tokens); comparator
-//         rank check via adapter compareRankNames (RANKS index compare
-//         retired).
-// scripts/modules/actions/grabbing-action.js v1.7.0 - 2026-03-11
-// v1.7.0: Consistency fixes — add effect modifiers, mode selector, replace local rankValues
-//         with game.msh.getRankValue, fix remember settings to localStorage pattern,
-//         remove unused rollUniversalTable import, add applyCapabilitiesToDialog
-// v1.6.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
-// v1.5.0: Restyle chat card to match attack card pattern (flex header, inline badge, no buildResultGrid/banner)
-// v1.4.0: Add support for weapon-based grabbing (whips with Gb damage type use material strength)
-// v1.3.0: Fix karma checkbox to always default unchecked (not persisted)
-// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
-// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
   getStrengthInfo,

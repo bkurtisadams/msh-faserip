@@ -1,7 +1,6 @@
 // scripts/unconscious-roster.js v1.2.0 - 2026-11-11
 // v1.2.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.1.0: Show KO timers, Dying Endurance state/next tick, and GM Aid action.
-// scripts/unconscious-roster.js v1.0.0 - 2026-04-24
 // GM dialog: list all KO'd/dying actors grouped by scene.
 // Wired into scene controls (token layer) as "Unconscious Roster" button.
 // Rationale: off-scene recovery is now silent by default (see rest-system.js

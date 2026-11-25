@@ -2,23 +2,11 @@
 // v1.5.0: Grenade throw dialog (compact layout). The dialog is checked and
 //         then cancelled; a real throw needs a landing-zone click on the
 //         canvas, so the blast itself is not exercised here.
-// scripts/dev/attack-dialog-runtime-tests.js v1.4.0 - 2026-11-11
 // v1.4.0: Charging and Shooting dialogs.
-// scripts/dev/attack-dialog-runtime-tests.js v1.3.0 - 2026-11-11
 // v1.3.0: Grappling, Grabbing and Escaping. These resolve themselves (roll,
 //         card, hold effects), so they run for real against the throwaway
 //         actors with Skip dice ticked; their result cards are captured
 //         instead of posted.
-// scripts/dev/attack-dialog-runtime-tests.js v1.2.0 - 2026-11-11
-// v1.2.0: Blunt and Edged melee dialogs; broken armor no longer protects;
-//         thrown dropdown shows computed damage.
-// scripts/dev/attack-dialog-runtime-tests.js v1.1.0 - 2026-11-11
-// v1.1.0: Throwing Blunt: listed-minimum damage ruling (2026-11-11) and the
-//         Bullseye labels.
-// scripts/dev/attack-dialog-runtime-tests.js v1.0.1 - 2026-11-11
-// v1.0.1: The Energy Generation cap check expected a computed display of
-//         inline-flex; a browser reports flex for a child of a flex row.
-//         It now asserts the controls are not hidden.
 // Foundry VTT runtime suite for the shared attack dialogs (Energy, Force,
 // Throwing Edged, Throwing Blunt). It builds a throwaway attacker and two
 // targets with tokens on the current scene, opens each real dialog, drives

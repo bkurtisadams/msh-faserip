@@ -2,7 +2,6 @@
 // v1.15.1: Combat round durations stay round-based even when CTT is active;
 //          CTT calendar advances must not shorten RAW combat effects. Rules-
 //          critical callers may force round timing even under seconds-only.
-// scripts/modules/effects/effect-engine.js v1.15.0 - 2026-08-02
 // v1.15.0: applyIntensityEffect incapacitated/immobilized/nullified cases
 //          wrote flags at TOP LEVEL (flags.effectType = "..."). v14's
 //          DocumentFlagsField treats top-level keys as package scopes and
@@ -11,45 +10,9 @@
 //          Nullified-via-intensity was invisible to the nullify machinery.
 //          All three now nest under the msh-faserip scope like the applyX
 //          wrappers always have.
-// scripts/modules/effects/effect-engine.js v1.14.1 - 2026-06-25
 // v1.14.1: applySlam — guard existing slam-marker delete with canWriteEffectsOn +
 //          executeAsGM("deleteActiveEffects") fallback so non-owner players don't
 //          throw "lacks permission to delete ActiveEffect" on auto-triggered slams.
-// scripts/modules/effects/effect-engine.js v1.15.0 - 2026-08-01
-// v1.15.0: Defensive "poisoned" case in applyIntensityEffect — delegates to
-//          applyPoisonExposure with a console warning; callers should branch
-//          to the poison engine before rolling the generic save.
-// scripts/modules/effects/effect-engine.js v1.14.0 - 2026-06-12
-// v1.15.0: v14 badge fix — applyEntangled/applyDying/applyNullified set
-//          duration.expiry="roundEnd" when no finite rounds so indefinite
-//          effects register as isTemporary and token badges render
-//          (matches applyGrappled/applyHeld v14 pattern).
-// v1.14.0: Add exported applyIntensityEffect(target, effect, {rounds,originUuid,desc})
-//          — shared effect dispatcher used by both the Intensity action and the
-//          on-hit intensity hook in attack-action.
-// scripts/modules/effects/effect-engine.js v1.13.0 - 2026-04-19
-// v1.13.0: computeDuration now converts rounds→seconds when CTT is active
-//          with sync enabled, regardless of combat state. The previous
-//          "rounds-in-combat, seconds out-of-combat" split assumed time
-//          was advancing via Foundry's combatRound hook, but when time is
-//          driven by CTT's worldTime (advanceTime), rounds-based
-//          durations have no countdown source and the AE persists
-//          indefinitely. Symptom: Slammed / Stunned / Grabbed / Blinded /
-//          etc. stuck on tokens long after combat ended, because
-//          intensity-action routes all of them through applyEffect →
-//          computeDuration. Narrow fix guards on !cttActive so users
-//          without CTT keep their rounds-based durations as before.
-// v1.12.0: Fix nullify health bug — clamp current health to new max on nullification,
-//          preserve damage taken and restore health correctly when nullification ends.
-// v1.11.0: Add applyNullified / restoreNullifiedPowers — suppress inborn powers on nullification,
-//          restore on effect removal. Stores suppressed power IDs in effect flags.
-// v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
-//         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
-// v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
-// v1.3.0: Duplicate effect handling - stun keeps longer duration, slam keeps more severe
-// v1.2.1: Reduce console logging verbosity
-// v1.2.0: Improved debug logging for effect creation and duration tracking
-// v1.1.0: Add proper Foundry changes arrays to effect wrappers
 // Centralized Active Effect helpers for FASERIP on Foundry v13
 
 import { TURN_SECONDS } from "../recovery-timing.js";

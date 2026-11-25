@@ -1,84 +1,11 @@
 // power-router.js v1.22.0 - 2026-11-19
 // v1.22.0: Transformations done to others (affects "others" + save) go to
 //          the save dialog instead of the self-transformation card.
-// power-router.js v1.21.0 - 2026-11-19
 // v1.21.0: A power whose granting equipment is broken or gone shows a
 //          notice instead of rolling (equipment-link.mjs).
-// power-router.js v1.20.0 - 2026-11-19
 // v1.20.0: Karma per use (system.karmaCost) is checked and spent before the
 //          power routes. Ultimate Skill rolls the talent picked on the Edit
 //          Power sheet (ultimateSkillTalentId) before any Rank Override search.
-// power-router.js v1.19.0 - 2026-11-19
-// v1.19.0: Fire Control (intensify / reduce / fire shield), Electrical
-//          Manipulation (resistance card), Darkforce and Gravity Manipulation
-//          (Power stunt FEAT) no longer route to an attack. Type-based routes
-//          skip stunt powers, which route by their own attack settings.
-// v1.18.0: Claws / Rotting Touch / Corrosive Touch ask Attack or Shred armor
-//          (DESIGN-material-strength.md §5 step 6); Attack continues the
-//          normal route via rollPower(..., { skipShredChoice: true }).
-// v1.17.0: RAW Power FEAT routes — Transferral (hero needs Red; failure KOs
-//          the hero 1-10 rounds), Animal Communication and Control (Popularity
-//          FEAT at Power rank), Weather Control (stunts roll the Power rank),
-//          Mechanical Intuition (invention roll at Unearthly, no modifiers).
-// power-router.js v1.16.0 - 2026-11-18
-// v1.16.0: Nullify route matches the power type as well as the name.
-//          Light Manipulation is not a damage attack: it opens the intensity
-//          (blinding) FEAT regardless of any stale attack column.
-// v1.15.0: Sound Manipulation early-route — not an attack; opens the
-//          Dampen / Raise noise dialog regardless of any stale attack column.
-// power-router.js v1.14.0 - 2026-11-18
-// v1.14.0: Ultimate Skill early-route — the power is not an attack; it opens
-//          the roll for the talent carrying the Unearthly rank override
-//          (asks which when there are several) instead of dispatching by its
-//          Battle Effects column at the plain ability rank.
-// power-router.js v1.13.1 - 2026-09-03
-// v1.13.1: rollPower tags existing tab stunts that match book presets for the
-//          power (stunt-mechanics adoptPresets) before dispatch.
-// power-router.js v1.13.0 - 2026-09-03
-// v1.13.0: Psi-Screen early-route (system.mental.psiScreen or name) to
-//          psi-screen-action.js (protect others) instead of the generic mental
-//          save dialog. Delivered LF.
-// power-router.js v1.12.0 - 2026-07-05
-// v1.12.0: Body-defense early-route (audit: bodyAlterationsDefensive passive
-//          leftovers) — bodyAlterationsDefensive-category powers without a
-//          dedicated dialog dispatch to body-defense-action.js (info cards) before
-//          the non-attack bail. Recovery / Healing / Damage Transfer route earlier.
-// power-router.js v1.11.0 - 2026-07-05
-// v1.11.0: Body-control early-route (audit Step #8, slice 8b) — bodyControl-
-//          category / isTransformPower powers dispatch to body-control-action.js
-//          (Shape-Shifting / Imitation / Animal Transformation Power FEATs +
-//          passive state info cards) before the non-attack bail.
-// power-router.js v1.10.0 - 2026-07-03
-// v1.10.0: Movement early-route (audit Step #6) — movement-category /
-//          isMovementPower powers dispatch to movement-action.js (Teleport /
-//          Dimensional Travel Power FEATs + passive info cards).
-// power-router.js v1.9.0 - 2026-07-03
-// v1.9.0: Senses early-route (audit Step #7) — senses-category / isSensePower
-//         powers dispatch to sense-action.js (detection Power FEATs + passive
-//         info cards) before the non-attack bail.
-// power-router.js v1.8.0 - 2026-05-15
-// v1.8.0: Blinding Touch early-route — dedicated dialog (was previously in
-//         ENERGY_TYPES list, misrouted to EnergyAction as energy damage).
-//         Matches by name or isBlindingTouch flag.
-// v1.7.0: Paralyzing Touch early-route — dedicated dialog (was previously
-//         in ENERGY_TYPES list, misrouted to EnergyAction as energy damage).
-//         Matches by name or isParalyzingTouch flag. Self-target permitted
-//         per RAW "user can be KO'd by own touch".
-// v1.6.0: Health-Drain Touch early-route — dedicated dialog (was previously
-//         in ENERGY_TYPES list, misrouted to EnergyAction). Removes
-//         "health-drain touch" from ENERGY_TYPES; matches by name or by
-//         isHealthDrain flag.
-// v1.5.0: Damage Transfer early-route — detects by name or isDamageTransfer
-//         flag. Opens showDamageTransferDialog (two-target conduit touch).
-// v1.4.0: Healing power early-route — detects by name or isHealingPower
-//         flag (with regenerationType/absorptionType absent, since those
-//         share the same template section). Opens showHealingDialog
-//         (two-mode: Health / Endurance rank).
-// v1.3.0: Recovery power early-route — detects by hasRecoveryPower flag or
-//         name match before the NON_ATTACK_TYPES bail; opens
-//         showRecoveryFeatDialog (Power-rank FEAT, oncePerDay).
-// v1.2.0: Wire battleEffectsColumn as explicit action type override.
-// v1.1.0: Route "psionic attack" through mental-power action (was intensity).
 // Shared power routing logic extracted from actorSheet.js .power-roll handler.
 // Determines the correct action type for a power and dispatches through ActionDispatcher.
 

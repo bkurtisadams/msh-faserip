@@ -5,69 +5,11 @@
 //         The book’s own contrast (“considered Unearthly … as opposed to
 //         modifying … +1 or +2CS”) is now in the desc: Ultimate Skill
 //         replaces the talent’s own CS, it does not stack with it.
-// rules-reference.js v2.1.2 - 2026-09-05
 // v2.1.2: POISON_RULES no longer restates Judge rulings PR1-PR5 in prose;
 //         the block points at the kernel ERRATA entries that now hold
 //         them. Display strings unchanged.
-// rules-reference.js v2.1.1 - 2026-09-05
 // v2.1.1: TOXINS.spiderVenom Typical -> Excellent per the Judge's Book Intensity
 //         Table (RULED 2026-09-05: a black widow is deadly).
-// rules-reference.js v2.1.0 - 2026-09-04
-// v2.1.0: getInitiativeModifier delegates to the kernel initiative module
-//         (initiativeModifier); same values, 75 → +5 ruling now in ERRATA.
-// rules-reference.js v2.0.1 - 2026-09-02
-// v2.0.1: No code change. ATTACK_EFFECTS.force.pullEffect is false again via
-//         the re-vendored kernel (RULED 2026-09-02: the Force Attack section
-//         does forbid effect reduction — the v2.0.0 note below was wrong).
-// rules-reference.js v2.0.0 - 2026-09-01
-// v2.0.0: Rank machinery, ATTACK_RESULTS, and ATTACK_EFFECTS now derive from
-//         the vendored @graycloak/faserip-rules kernel (slice 2a). Behavior
-//         changes, all per certified kernel / GM rulings 2026-08-31:
-//         - throwingBlunt.yellow "Hit" -> "Bullseye" (RULED: prose over table)
-//         - ATTACK_EFFECTS.force.pullEffect false -> true (Pulling Punches
-//           lists Force; no contradicting section, unlike Energy)
-//         - Class 5000 range is now 5000+ (finite); Beyond is Infinity only
-//           (RULED, supersedes the 2026-07-31 5000-exact/5001+ split). Any
-//           actor stored with the old Beyond sentinel 5001 now reads as
-//           Class 5000 and should be re-saved; storage sentinel is now
-//           BEYOND_STORAGE_SENTINEL (Number.MAX_SAFE_INTEGER).
-//         - Laser Rifle type "S" -> "E" (RULED: lasers are Energy attacks)
-// rules-reference.js v1.7.0 - 2026-08-02
-// v1.7.0: SHOOTING_WEAPONS price/range columns corrected against the printed
-//         table (pp.42-43). The rank-letter column is PRICE (prose anchor:
-//         Concussion Pistol "listed value of Incredible"); the numeric column
-//         is RANGE in areas. Previous data had the price ranks in `range` and
-//         fabricated `price` values (prior audit artifact). Range now numeric.
-//         Laser Rifle type left "S" as printed, with a note: prose says lasers
-//         use the Energy column — GM ruling pending.
-// rules-reference.js v1.6.0 - 2026-08-01
-// v1.6.0: Correct Beyond standard rank number to Infinity and add
-//         rankValueForStorage() for document-safe persistence.
-// v1.5.1: PR5 ruling — carrier toxins require penetrating damage; Target
-//         Save panel is the authoring surface; exposure FEAT is the save.
-// rules-reference.js v1.5.0 - 2026-08-01
-// v1.5.0: POISON_RULES + TOXINS catalog (Advanced Set poisons & toxins,
-//         GM rulings PR1-PR4 inline). Consumed by poison-engine.js.
-// v1.4.0: valueToRank now walks the printed Rank Range table (8 = Good).
-//         RANK_RANGES verified against the book and extended with upper
-//         tiers per GM ruling: ShZ 351-999, Cl1000 1000-2999, Cl3000
-//         3000-4999, Cl5000 = 5000, Beyond 5001+. Initiative modifier
-//         bands book-verified (rank number, 75 → +5).
-// rules-reference.js v1.3.0 - 2026-07-31
-// v1.3.0: Remove corrupted UNIVERSAL_TABLE grid, UNIVERSAL_TABLE_RANK_INDEX,
-//         and lookupUniversalTable (zero callers; non-monotonic bands; live
-//         resolver is modules/dice/universal-table.js). Fix
-//         ATTACK_RESULTS.grappling.red "Full" -> "Hold" per Gp column. Fix
-//         Es column header comment (G=Miss). Simplify normalizeRank.
-// rules-reference.js v1.2.0 - 2026-04-21
-// v1.2.0: Added POWER_DERIVATIONS table, resolveRange() and getPowerDerivations()
-//         helpers for the power chat card stat strip.
-// v1.1.0: Canonical rank data — normalized to hyphen format (Shift-X not "Shift X"),
-//         added Beyond rank, exported RANK_VALUES/RANKS_ORDERED helpers,
-//         added rankValue/valueToRank/shiftRank/normalizeRank utility functions.
-//         All other files should import rank data from here instead of redeclaring.
-// v1.0.1: Fix WRESTLING.escaping.green (was "Escape", should be "Miss" per Es column),
-//         fix ATTACK_RESULTS.throwingBlunt.yellow (was "Bullseye", should be "Hit" per TB column)
 // Canonical FASERIP rules reference. All mechanics data in one place.
 // Source: Marvel Super Heroes (TSR) Advanced Set / Ultimate Powers Book.
 

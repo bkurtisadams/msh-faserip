@@ -3,7 +3,6 @@
 //         Foundry expands dotted flag keys into nested objects, so the old
 //         "Actor.abc" key was saved as {Actor:{abc:...}} and never read back:
 //         the per-target daily limit never applied. Helpers exported for tests.
-// scripts/modules/actions/healing-action.js v2.1.0 - 2026-10-01
 // v2.1.0: Health mode heals REAL Health through healPointsNow (splitHealth;
 //         fixed-bug: the raw min(max, value + amount) write wiped a held
 //         Absorption pool and the pre-flight "missing HP" counted the pool).
@@ -11,13 +10,11 @@
 //         Impaired Endurance entry (ensureImpairedEnduranceEffect, -2CS) so
 //         the lost rank heals per Impaired Abilities (fixed-bug: it never
 //         healed back).
-// scripts/modules/actions/healing-action.js v2.0.2 - 2026-07-03
 // v2.0.2: End-mode death threshold fix (Kurt ruling): the healer perishes only
 //         when Endurance drops BELOW Shift-0 (i.e. already at Shift-0 and the
 //         failed FEAT forces another loss) — surviving AT Shift-0. Was firing
 //         on reaching Shift-0 (belowFeeble); now keys off loseOneEnduranceRank
 //         atFloor. Panel/card wording updated.
-// scripts/modules/actions/healing-action.js v2.0.1 - 2026-07-03
 // Two-mode dialog for the Healing power. Restores lost Health/End to others
 // (not self). Power rank = max Health per target per day (the daily cap only).
 // RAW (rulebook): BOTH modes make an ENDURANCE FEAT (the healer's Endurance),
@@ -27,15 +24,6 @@
 //   End-rank mode: 1 rank/day per target; Endurance FEAT; the TARGET's rank is
 //                restored regardless of the FEAT; on FAILURE the HEALER loses
 //                one Endurance rank (below Shift-0 -> healer perishes, RAW).
-// v2.0.1: Lock dialog width (was ballooning to full width on the long End-mode
-//         panel line, same AppV2 position.width 'auto' bug as the other
-//         dialogs) and fix the window-title arrow (&rarr; -> → ; titles are
-//         plain text, not HTML).
-// v2.0.0: Route both rolls through the shared headless resolver
-//         (rules/feat-core.js, powers audit Step #5 fork C(b)) and FIX RAW:
-//         End-rank mode now rolls Endurance (was Power rank) and heals the
-//         target regardless of success; add the no-Karma gate on Health mode.
-// v1.0.0: Initial two-mode dialog. (End-rank FEAT base + gating were wrong.)
 // Target selection via game.user.targets (must be exactly one, not self).
 
 import { showFaseripDialog } from "./dialog-shim.js";

@@ -4,31 +4,6 @@
 // v1.10.0: V1 dialogs here open as V2 dialogs through dialog-shim.js.
 // v1.9.1: Roll visibility read via getRollMode() (core.messageMode on v14;
 //         core.rollMode is deprecated and removed in v16).
-// v1.9.0: Slice 7a — movement FEATs onto the faserip-rules kernel. Colours via
-//         kernel colorForRoll, column shifts via the shared kernel shiftRank.
-//         Fixed against faserip-movement v0.7.2: extended leap is +1 area
-//         (132'), not double distance; exhaustion ladder (green/yellow/red/rest
-//         at 1x/2x/3x/4x Endurance turns, rest 1-10/2-20/3-30); Speed FEAT
-//         white = trip (Slam, continues forward); drowning ladder
-//         (green/yellow/red on successive turns past breath hold); teleport
-//         passengers keyed on prior trips (red/yellow/green), failure =
-//         unconscious 1-10 rounds; teleport into solid = material strength
-//         damage x1 (RULED 2026-08-31), success = bounce clear + unconscious
-//         1-10, failure = unconscious + Endurance loss.
-// v1.8.0: Add Swim Speed +1 FEAT (Yellow Strength) mirroring the Run dialog —
-//         new radio option plus Strength-based resolution and +1-area result.
-// v1.7.1: Fix teleport distance table to use Air speed (areas = max teleport distance)
-// v1.7.0: Add Teleport dialog with power rank dropdown, disorientation/passenger/solid object checks
-// v1.6.0: Add Swim dialog with Swimming power dropdown, add Lightning Speed dropdown to Run dialog
-// v1.5.3: Add hover text (title attributes) to compact dialog elements
-// v1.5.2: Fix speed links (use spans not anchors to prevent navigation)
-// v1.5.1: Fix karma controls (restore generateKarmaControlsHTML), use text links for speed quick-fill
-// v1.5.0: Compact dialog layouts - 4-col stats, 2-col FEATs, inline modifiers/options
-// v1.4.0: Add current speed input with Max/Cruising quick-fill buttons for Fly and Run
-// v1.3.1: Fix Normal Flight/Run to show cruising speed (not max) in chat card
-// v1.3.0: Add Run FEAT dialog (Normal, Speed FEAT, Exhaustion Check)
-// v1.2.0: Simplify Leaping - dropdown with Strength default + manual rank selection for Leaping power
-// v1.1.0: Leap dialog dropdown shows ALL powers, user selects leaping source
 // Movement FEAT dialogs for Leap, Fly, Run, Swim, Teleport
 // Extracted from actorSheet.js to reduce file size
 

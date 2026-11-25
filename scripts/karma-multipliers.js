@@ -1,43 +1,13 @@
 // karma-multipliers.js v1.3.2 - 2026-10-04
 // v1.3.2: "R+I+P Bonus" entries count as gaming awards.
-// karma-multipliers.js v1.3.1 - 2026-10-03
 // v1.3.1: fixed-bug: wrapUpLastWeekly registered with default null threw in
 //         Foundry v14 (an Object setting may not default to null), which
 //         stopped init before karmaMultiplier, defeatedVillains and the rest
 //         registered, so battle report cards could not be edited. Default {}.
-// karma-multipliers.js v1.3.0 - 2026-10-03
 // v1.3.0: Hidden wrap-up settings: wrapUpLastWeekly (world time and game
 //         date of the last weekly award) and wrapUpAwardedCommitments
 //         (calendar commitment ids already paid). R+I+P hint no longer says
 //         "at session end".
-// karma-multipliers.js v1.2.0 - 2026-10-01
-// v1.2.0: Karma settings cleanup. All karma settings register here
-//         (registerKarmaSettings, called from init.js) so they sit together
-//         in the settings window; migrateKarmaSettings carries old worlds over.
-//         - Enable Team Karma Pool is the one pool switch: it routes encounter
-//           karma to the pool (groupAwardMode retired, kept hidden for the
-//           migration).
-//         - Full Karma to Each Hero is a checkbox (fullKarmaEachHero);
-//           combatAwardScope kept hidden for the migration.
-//         - Multipliers are labelled house rules and default to 1 (RAW). A
-//           category multiplier now multiplies ON TOP of the overall one;
-//           losses use only the Penalty multiplier, and any value applies
-//           (the old "only if > 1" special case is gone).
-//         - Optional rules from the Karma chapter: spend in increments of 5,
-//           and the locking pool.
-//         - teamKarmaAwards / pendingKarmaAwards removed (never read).
-// karma-multipliers.js v1.1.1 - 2026-09-02
-// v1.1.1: Commit/Permit Local, National, Global Conspiracy categorized as
-//         penalties (rows added to the Add Karma dialog in kernel slice 6a).
-// karma-multipliers.js v1.1.0 - 2026-04-17
-// v1.1.0: Full-share mode removed. groupMode is now only "split" (RAW) or
-//         "pool". Legacy "full" values in saved settings are silently
-//         migrated to "split" via getGroupAwardMode. GMs who want the
-//         full-share behavior should set karmaMultiplier to expected
-//         party size (e.g. 4 for a 4-hero table).
-// v1.0.0: Central helper for category-based karma multipliers and group-award mode.
-//         All karma award sites should route through computeKarmaAward() so that
-//         tuning happens in one place.
 
 const CATEGORY_BY_EVENT = {
   "Violent Crime - Stop": "combat", "Violent Crime - Arrest": "combat",

@@ -19,10 +19,6 @@
 //         executeBreakingFeat unchanged — still wielderStr comparator
 //         for the generic "character bashes through wall" case.
 // v1.4.0: Extract executeBreakingFeat() for auto/semi mode; dialog uses shared logic
-// v1.3.0: Fix inverted break result (success=breaks), auto-success/fail for 3+ rank gap
-// v1.2.1: Add debug logging
-// v1.2.0: Auto-populate target material from attack context
-// v1.1.0: Chat card styled to match attack action format
 
 import { showFaseripButtonDialog } from "./dialog-shim.js";
 
